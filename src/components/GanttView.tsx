@@ -20,6 +20,7 @@ import { TaskDetail } from './TaskDetail'
 
 interface Props {
   state: AppState
+  proyectoId: string
   frenteSel: FrenteSel
   hoy: string
 }
@@ -35,12 +36,12 @@ interface FilaGantt {
   esPrimeraGlobal: boolean
 }
 
-export function GanttView({ state, frenteSel, hoy }: Props) {
+export function GanttView({ state, proyectoId, frenteSel, hoy }: Props) {
   // -- Filas ordenadas con spans para celdas combinadas --
   const filas = useMemo<FilaGantt[]>(() => {
     const out: FilaGantt[] = []
     const frentes = state.frentes
-      .filter((f) => frenteSel === 'todos' || f.id === frenteSel)
+      .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
       .sort((a, b) => a.orden - b.orden)
 
     let primera = true
@@ -79,7 +80,7 @@ export function GanttView({ state, frenteSel, hoy }: Props) {
       }
     }
     return out
-  }, [state, frenteSel])
+  }, [state, proyectoId, frenteSel])
 
   // -- Rango de dias habiles a mostrar --
   const dias = useMemo<ISODate[]>(() => {

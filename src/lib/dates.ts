@@ -11,6 +11,15 @@ const NOMBRE_MES = [
   'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
 ]
 
+/** Fecha de hoy (local) en formato ISO corto. */
+export function hoyISO(): ISODate {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /** Parse 'YYYY-MM-DD' a Date en UTC (medianoche). */
 export function parse(iso: ISODate): Date {
   const [y, m, d] = iso.split('-').map(Number)

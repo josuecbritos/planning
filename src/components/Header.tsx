@@ -9,13 +9,14 @@ import { etiquetaLarga } from '../lib/dates'
 
 interface Props {
   proyecto: Proyecto
+  modo: 'memoria' | 'supabase'
   vista: Vista
   onVista: (v: Vista) => void
   contadores: Contadores
   hoy: string
 }
 
-export function Header({ proyecto, vista, onVista, contadores, hoy }: Props) {
+export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Props) {
   const c = contadores
   return (
     <header className="topbar">
@@ -25,7 +26,10 @@ export function Header({ proyecto, vista, onVista, contadores, hoy }: Props) {
           <small>{c.total} tareas</small>
         </h1>
         <div className="topbar__row" style={{ gap: 12 }}>
-          <span className="hoy-chip">Hoy (simulado): <b>{etiquetaLarga(hoy)}</b></span>
+          <span className={`modo-chip modo-chip--${modo}`} title={modo === 'supabase' ? 'Conectado a Supabase' : 'Datos locales (sin backend)'}>
+            {modo === 'supabase' ? 'Supabase' : 'Local'}
+          </span>
+          <span className="hoy-chip">Hoy{modo === 'supabase' ? '' : ' (simulado)'}: <b>{etiquetaLarga(hoy)}</b></span>
           <div className="toggle">
             <button className={vista === 'tabla' ? 'activo' : ''} onClick={() => onVista('tabla')}>
               Tabla

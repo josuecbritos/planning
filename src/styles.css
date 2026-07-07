@@ -309,3 +309,126 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 /* pequeña ayuda visual de que hay tooltip */
 .trigger { cursor: help; }
+
+/* ---------- Estados de carga / vacio / error ---------- */
+
+.cargando, .fatal, .vacio, .nav-vacio, .vacio-inline {
+  padding: 24px; color: var(--gris-texto);
+}
+.fatal { color: var(--rojo); }
+.vacio { text-align: center; margin-top: 60px; }
+.vacio-inline { font-size: 13px; font-style: italic; }
+.nav-vacio { color: #8aa0b2; font-size: 13px; }
+
+.banner-error {
+  background: var(--rojo-suave); color: var(--rojo); border-bottom: 1px solid var(--rojo-tenue);
+  padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;
+}
+.banner-error button { background: none; border: none; color: var(--rojo); font-size: 14px; }
+
+/* ---------- Botones ---------- */
+
+.btn {
+  border: 1px solid var(--gris-borde); background: #fff; color: var(--texto);
+  border-radius: 7px; padding: 6px 12px; font-size: 13px; font-weight: 600;
+}
+.btn:hover { background: #f4f6f8; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn--primary { background: var(--verde); border-color: var(--verde); color: #fff; }
+.btn--primary:hover { background: var(--verde-oscuro); }
+.btn--sm { padding: 4px 10px; font-size: 12px; }
+.btn--ghost { border-style: dashed; color: var(--gris-texto); background: none; }
+.btn--ghost:hover { color: var(--verde-oscuro); border-color: var(--verde); }
+
+.icon-btn {
+  border: none; background: none; color: var(--gris-texto); font-size: 13px;
+  padding: 2px 5px; border-radius: 5px; line-height: 1;
+}
+.icon-btn:hover { background: rgba(0,0,0,.08); color: var(--texto); }
+
+.link-btn { background: none; border: none; color: #8aa0b2; font-size: 12px; padding: 2px 4px; text-decoration: underline; }
+.link-btn:hover { color: #cfd8dc; }
+.link-btn--danger { color: #ef9a9a; }
+.link-btn--danger:hover { color: #ff8a80; }
+
+/* ---------- Sidebar: proyectos y frentes con CRUD ---------- */
+
+.sidebar__section { display: flex; align-items: center; justify-content: space-between; }
+.sidebar__section .icon-btn { color: #8aa0b2; font-size: 16px; }
+.sidebar__section .icon-btn:hover { color: #fff; background: #2c3b48; }
+
+.nav-proyectos { padding: 4px 8px 16px; }
+.nav-proyecto { border-radius: 8px; margin-bottom: 2px; }
+.nav-proyecto__title {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: none; border: none; color: #cfd8dc; padding: 8px 10px; border-radius: 6px; text-align: left;
+}
+.nav-proyecto__title:hover { background: #2c3b48; }
+.nav-proyecto--activo > .nav-proyecto__title { color: #fff; font-weight: 600; }
+.nav-proyecto__nombre { flex: 1; }
+.nav-proyecto__dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.nav-proyecto__acciones { display: flex; gap: 10px; padding: 2px 12px 8px 30px; }
+
+.nav-frentes { padding-bottom: 6px; }
+.nav-frente-row { display: flex; align-items: center; }
+.nav-frente-row--activo { background: #35506a; border-radius: 6px; }
+.nav-frente--flex { flex: 1; }
+.nav-frente__tools { display: none; padding-right: 6px; }
+.nav-frente-row:hover .nav-frente__tools { display: inline-flex; gap: 2px; }
+.nav-frente__tools .icon-btn { color: #8aa0b2; }
+.nav-frente__tools .icon-btn:hover { color: #fff; }
+.nav-frente--add { color: #8aa0b2; font-style: italic; }
+.nav-frente--add:hover { color: #fff; }
+
+/* ---------- Header: chip de modo ---------- */
+
+.modo-chip {
+  font-size: 11px; font-weight: 700; border-radius: 6px; padding: 3px 9px; letter-spacing: .02em;
+}
+.modo-chip--supabase { background: var(--verde-suave); color: var(--verde-check); }
+.modo-chip--memoria { background: #eceff1; color: var(--gris-texto); }
+
+/* ---------- Tabla: cabeceras con acciones ---------- */
+
+.frente-cabecera { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; }
+.frente-cabecera .frente-titulo { margin: 0; }
+
+.subfrente__titulo { justify-content: space-between; }
+.subfrente__tools { display: inline-flex; gap: 2px; }
+
+.col-acc { width: 66px; white-space: nowrap; text-align: center; }
+.fila-add td { background: #fafbfc; padding: 6px 10px; }
+
+/* ---------- Modales ---------- */
+
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(15,24,32,.45); z-index: 2000;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-card {
+  background: #fff; border-radius: 12px; width: 100%; max-width: 460px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3); overflow: hidden;
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--gris-linea);
+}
+.modal-head h3 { margin: 0; font-size: 16px; }
+.modal-x { border: none; background: none; font-size: 16px; color: var(--gris-texto); }
+.modal-card form { padding: 18px 20px; }
+
+.campo { display: block; margin-bottom: 14px; }
+.campo > span { display: block; font-size: 12px; font-weight: 600; color: var(--gris-texto); margin-bottom: 5px; }
+.campo input, .campo textarea, .campo select {
+  width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--gris-borde);
+  border-radius: 7px; color: var(--texto); background: #fff;
+}
+.campo input:focus, .campo textarea:focus, .campo select:focus { outline: none; border-color: var(--verde); }
+.campo textarea { resize: vertical; }
+.campo .ayuda { display: block; margin-top: 5px; font-size: 11.5px; color: var(--gris-texto); font-weight: 400; }
+
+.swatches { display: flex; gap: 8px; }
+.swatch { width: 26px; height: 26px; border-radius: 6px; border: 2px solid transparent; }
+.swatch--sel { border-color: var(--texto); box-shadow: 0 0 0 2px #fff inset; }
+
+.modal-acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
