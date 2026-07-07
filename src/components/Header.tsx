@@ -1,22 +1,23 @@
-import type { Proyecto } from '../types'
+import type { Proyecto, Usuario } from '../types'
 import type { Vista } from '../App'
 import type { Contadores } from '../lib/derive'
 import { etiquetaLarga } from '../lib/dates'
 
-// Encabezado del proyecto (7.2): resumen permanente con contadores por estado
-// derivado + toggle de vista. Los contadores se recalculan segun el frente
-// filtrado.
+// Encabezado del proyecto (7.2): contadores por estado derivado + toggle de
+// vista + sesion actual.
 
 interface Props {
   proyecto: Proyecto
   modo: 'memoria' | 'supabase'
+  usuario: Usuario
   vista: Vista
   onVista: (v: Vista) => void
   contadores: Contadores
   hoy: string
+  onLogout: () => void
 }
 
-export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Props) {
+export function Header({ proyecto, modo, usuario, vista, onVista, contadores, hoy, onLogout }: Props) {
   const c = contadores
   return (
     <header className="topbar">
@@ -38,6 +39,14 @@ export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Prop
               Gantt
             </button>
           </div>
+          <span className="sesion" title={usuario.email}>
+            <span className="resp-badge">{usuario.iniciales}</span>
+            <span className="sesion__info">
+              <b>{usuario.nombre}</b>
+              <small>{usuario.rol === 'admin' ? 'Admin' : 'Cliente'}</small>
+            </span>
+            <button className="link-btn sesion__salir" onClick={onLogout}>Salir</button>
+          </span>
         </div>
       </div>
 

@@ -1,10 +1,12 @@
 import type {
+  Acceso,
   AppState,
   Frente,
   Proyecto,
   Replanificacion,
   SubFrente,
   Tarea,
+  Usuario,
 } from '../types'
 
 // Helpers puros para reflejar en el AppState local el resultado de una mutacion
@@ -29,6 +31,24 @@ export function upsertSubFrente(s: AppState, sf: SubFrente): AppState {
 }
 export function upsertTarea(s: AppState, t: Tarea): AppState {
   return { ...s, tareas: upsert(s.tareas, t) }
+}
+
+export function upsertUsuario(s: AppState, u: Usuario): AppState {
+  return { ...s, usuarios: upsert(s.usuarios, u) }
+}
+
+export function addAcceso(s: AppState, a: Acceso): AppState {
+  const existe = s.accesos.some(
+    (x) => x.usuarioId === a.usuarioId && x.proyectoId === a.proyectoId,
+  )
+  return existe ? s : { ...s, accesos: [...s.accesos, a] }
+}
+
+export function removeAcceso(s: AppState, usuarioId: string, proyectoId: string): AppState {
+  return {
+    ...s,
+    accesos: s.accesos.filter((a) => !(a.usuarioId === usuarioId && a.proyectoId === proyectoId)),
+  }
 }
 
 /** Reemplaza el historial de una tarea por la lista dada. */
@@ -82,5 +102,6 @@ export function removeProyecto(s: AppState, proyectoId: string): AppState {
     subFrentes: s.subFrentes.filter((sf) => !frenteIds.has(sf.frenteId)),
     tareas: s.tareas.filter((t) => !subIds.has(t.subFrenteId)),
     historial: s.historial.filter((h) => !tareaIds.has(h.tareaId)),
+    accesos: s.accesos.filter((a) => a.proyectoId !== proyectoId),
   }
 }

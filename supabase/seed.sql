@@ -1,17 +1,14 @@
 -- =====================================================================
 -- Seed inicial (opcional) — se ejecuta con `supabase db reset`.
--- Crea los responsables del plan y un proyecto de arranque con su
--- estructura de frentes/sub frentes y unas tareas de muestra.
--- El resto de las tareas se crean desde la UI (CRUD, Fase 1).
+-- Regla 5.1: exactamente 2 Admins. Los responsables de tareas solo
+-- pueden ser esos 2 admins (5.5). Se incluye un usuario Cliente de demo
+-- con acceso al proyecto (5.7).
 -- =====================================================================
 
--- Responsables del Plan PGP Arauco (DV/JB/FS/IC).
--- En la app real la Fase 2 limita a 2 admins; aqui van como responsables.
 insert into usuario (id, nombre, iniciales, email, rol) values
-  ('11111111-1111-1111-1111-111111111111', 'Daniela Vera',  'DV', 'dv@consultora.cl', 'admin'),
-  ('22222222-2222-2222-2222-222222222222', 'Josue Britos',  'JB', 'jb@consultora.cl', 'admin'),
-  ('33333333-3333-3333-3333-333333333333', 'Felipe Soto',   'FS', 'fs@consultora.cl', 'admin'),
-  ('44444444-4444-4444-4444-444444444444', 'Ignacia Cruz',  'IC', 'ic@consultora.cl', 'admin')
+  ('11111111-1111-1111-1111-111111111111', 'Daniela Vera', 'DV', 'dv@consultora.cl', 'admin'),
+  ('22222222-2222-2222-2222-222222222222', 'Josue Britos', 'JB', 'jb@consultora.cl', 'admin'),
+  ('55555555-5555-5555-5555-555555555555', 'Cliente Arauco', 'CA', 'contacto@arauco.cl', 'cliente')
 on conflict (id) do nothing;
 
 -- Proyecto de arranque.
@@ -20,6 +17,11 @@ insert into proyecto (id, nombre, descripcion, color, estado, creado_por) values
    'Implementacion del Plan de Gestion de Procesos — cliente Arauco.',
    '#2e7d32', 'activo', '22222222-2222-2222-2222-222222222222')
 on conflict (id) do nothing;
+
+-- El cliente de demo tiene acceso al proyecto (tabla 5.7).
+insert into acceso_cliente_proyecto (usuario_id, proyecto_id) values
+  ('55555555-5555-5555-5555-555555555555', 'aaaaaaaa-0000-0000-0000-000000000001')
+on conflict do nothing;
 
 -- Frentes.
 insert into frente (id, proyecto_id, nombre, orden) values
@@ -36,17 +38,16 @@ insert into sub_frente (id, frente_id, nombre, orden) values
   ('cccccccc-0000-0000-0000-000000000005', 'bbbbbbbb-0000-0000-0000-000000000002', 'Configuracion y parametrizacion', 2)
 on conflict (id) do nothing;
 
--- Tareas de muestra (para ver la app viva; el resto se crea desde la UI).
+-- Tareas de muestra (responsables: solo los 2 admins).
 insert into tarea (sub_frente_id, titulo, responsable_id, fecha_original, fecha_objetivo, hecha, fecha_real, orden) values
   ('cccccccc-0000-0000-0000-000000000001', 'Entrevista area ventas',            '11111111-1111-1111-1111-111111111111', '2024-10-02', '2024-10-02', true,  '2024-10-02', 0),
   ('cccccccc-0000-0000-0000-000000000001', 'Mapeo de flujos comerciales',       '11111111-1111-1111-1111-111111111111', '2024-10-08', '2024-10-08', true,  '2024-10-10', 1),
-  ('cccccccc-0000-0000-0000-000000000001', 'Documento de requerimientos',       '44444444-4444-4444-4444-444444444444', '2024-10-28', '2024-10-28', false, null,          2),
-  ('cccccccc-0000-0000-0000-000000000002', 'Revision de reportes contables',    '33333333-3333-3333-3333-333333333333', '2024-10-03', '2024-10-03', true,  '2024-10-03', 0),
+  ('cccccccc-0000-0000-0000-000000000001', 'Documento de requerimientos',       '22222222-2222-2222-2222-222222222222', '2024-10-28', '2024-10-28', false, null,          2),
+  ('cccccccc-0000-0000-0000-000000000002', 'Revision de reportes contables',    '11111111-1111-1111-1111-111111111111', '2024-10-03', '2024-10-03', true,  '2024-10-03', 0),
   ('cccccccc-0000-0000-0000-000000000002', 'Analisis de cuentas por cobrar',    '22222222-2222-2222-2222-222222222222', '2024-10-21', '2024-10-21', false, null,          1),
   ('cccccccc-0000-0000-0000-000000000004', 'Modelo conceptual de datos',        '22222222-2222-2222-2222-222222222222', '2024-10-22', '2024-10-22', true,  '2024-10-22', 0);
 
--- Ejemplo de replanificacion (via RPC para registrar el actor): mueve una tarea
--- y deja el rastro en el historial de forma automatica (trigger 5.6).
+-- Ejemplo de replanificacion (via RPC): deja rastro en el historial.
 select replanificar_tarea(
   (select id from tarea where titulo = 'Analisis de cuentas por cobrar' limit 1),
   '2024-10-29',

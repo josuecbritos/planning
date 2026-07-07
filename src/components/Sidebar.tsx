@@ -1,18 +1,23 @@
 import { useState } from 'react'
-import type { AppState } from '../types'
-import type { Actions, FrenteSel } from '../App'
+import type { AppState, Proyecto } from '../types'
+import type { Actions, FrenteSel, Pantalla } from '../App'
 import { TextPromptModal } from './TextPromptModal'
 import { ProyectoModal } from './ProyectoModal'
 
-// Barra lateral: lista de proyectos (con CRUD) y, para el proyecto activo, sus
-// frentes navegables (con CRUD). El frente seleccionado tambien filtra el Gantt.
+// Barra lateral. Los clientes ven solo sus proyectos asignados y sin ninguna
+// accion de edicion; los admins tienen CRUD y la seccion Administracion.
 
 interface Props {
   state: AppState
+  /** Proyectos visibles para el usuario actual (ya filtrados por rol). */
+  proyectos: Proyecto[]
   proyectoActivoId: string | null
   frenteSel: FrenteSel
+  pantalla: Pantalla
+  esAdmin: boolean
   onSelectProyecto: (id: string) => void
   onSelectFrente: (f: FrenteSel) => void
+  onSelectPantalla: (p: Pantalla) => void
   actions: Actions
 }
 
@@ -23,10 +28,20 @@ type ModalState =
   | { tipo: 'frente-editar'; id: string; nombre: string }
   | null
 
-export function Sidebar({ state, proyectoActivoId, frenteSel, onSelectProyecto, onSelectFrente, actions }: Props) {
+export function Sidebar({
+  state,
+  proyectos,
+  proyectoActivoId,
+  frenteSel,
+  pantalla,
+  esAdmin,
+  onSelectProyecto,
+  onSelectFrente,
+  onSelectPantalla,
+  actions,
+}: Props) {
   const [modal, setModal] = useState<ModalState>(null)
 
-  const proyectos = state.proyectos
   const frentes = state.frentes
     .filter((f) => f.proyectoId === proyectoActivoId)
     .sort((a, b) => a.orden - b.orden)
@@ -53,12 +68,14 @@ export function Sidebar({ state, proyectoActivoId, frenteSel, onSelectProyecto, 
 
       <div className="sidebar__section">
         <span>Proyectos</span>
-        <button className="icon-btn" title="Nuevo proyecto" onClick={() => setModal({ tipo: 'proyecto-nuevo' })}>+</button>
+        {esAdmin && (
+          <button className="icon-btn" title="Nuevo proyecto" onClick={() => setModal({ tipo: 'proyecto-nuevo' })}>+</button>
+        )}
       </div>
 
       <div className="nav-proyectos">
         {proyectos.map((p) => {
-          const activo = p.id === proyectoActivoId
+          const activo = p.id === proyectoActivoId && pantalla === 'proyectos'
           return (
             <div key={p.id} className={`nav-proyecto${activo ? ' nav-proyecto--activo' : ''}`}>
               <button className="nav-proyecto__title" onClick={() => onSelectProyecto(p.id)}>
@@ -69,17 +86,19 @@ export function Sidebar({ state, proyectoActivoId, frenteSel, onSelectProyecto, 
 
               {activo && (
                 <div className="nav-frentes">
-                  <div className="nav-proyecto__acciones">
-                    <button className="link-btn" onClick={() => setModal({ tipo: 'proyecto-editar', id: p.id })}>Editar proyecto</button>
-                    <button
-                      className="link-btn link-btn--danger"
-                      onClick={() => {
-                        if (confirm(`¿Eliminar el proyecto "${p.nombre}" y todo su contenido?`)) actions.deleteProyecto(p.id)
-                      }}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
+                  {esAdmin && (
+                    <div className="nav-proyecto__acciones">
+                      <button className="link-btn" onClick={() => setModal({ tipo: 'proyecto-editar', id: p.id })}>Editar proyecto</button>
+                      <button
+                        className="link-btn link-btn--danger"
+                        onClick={() => {
+                          if (confirm(`¿Eliminar el proyecto "${p.nombre}" y todo su contenido?`)) actions.deleteProyecto(p.id)
+                        }}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  )}
 
                   <button
                     className={`nav-frente${frenteSel === 'todos' ? ' nav-frente--activo' : ''}`}
@@ -95,22 +114,26 @@ export function Sidebar({ state, proyectoActivoId, frenteSel, onSelectProyecto, 
                         <span>{f.nombre}</span>
                         <span className="nav-frente__count">{tareasEnFrente(f.id)}</span>
                       </button>
-                      <span className="nav-frente__tools">
-                        <button className="icon-btn" title="Renombrar" onClick={() => setModal({ tipo: 'frente-editar', id: f.id, nombre: f.nombre })}>✎</button>
-                        <button
-                          className="icon-btn"
-                          title="Eliminar frente"
-                          onClick={() => {
-                            if (confirm(`¿Eliminar el frente "${f.nombre}" y sus sub frentes y tareas?`)) actions.deleteFrente(f.id)
-                          }}
-                        >🗑</button>
-                      </span>
+                      {esAdmin && (
+                        <span className="nav-frente__tools">
+                          <button className="icon-btn" title="Renombrar" onClick={() => setModal({ tipo: 'frente-editar', id: f.id, nombre: f.nombre })}>✎</button>
+                          <button
+                            className="icon-btn"
+                            title="Eliminar frente"
+                            onClick={() => {
+                              if (confirm(`¿Eliminar el frente "${f.nombre}" y sus sub frentes y tareas?`)) actions.deleteFrente(f.id)
+                            }}
+                          >🗑</button>
+                        </span>
+                      )}
                     </div>
                   ))}
 
-                  <button className="nav-frente nav-frente--add" onClick={() => setModal({ tipo: 'frente-nuevo' })}>
-                    + Frente
-                  </button>
+                  {esAdmin && (
+                    <button className="nav-frente nav-frente--add" onClick={() => setModal({ tipo: 'frente-nuevo' })}>
+                      + Frente
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -118,6 +141,22 @@ export function Sidebar({ state, proyectoActivoId, frenteSel, onSelectProyecto, 
         })}
         {proyectos.length === 0 && <div className="nav-vacio">Sin proyectos.</div>}
       </div>
+
+      {esAdmin && (
+        <>
+          <div className="sidebar__section"><span>Administracion</span></div>
+          <div className="nav-proyectos">
+            <button
+              className={`nav-frente${pantalla === 'usuarios' ? ' nav-frente--activo' : ''}`}
+              style={{ paddingLeft: 12 }}
+              onClick={() => onSelectPantalla('usuarios')}
+            >
+              <span>Usuarios</span>
+              <span className="nav-frente__count">{state.usuarios.length}</span>
+            </button>
+          </div>
+        </>
+      )}
 
       {modal?.tipo === 'proyecto-nuevo' && (
         <ProyectoModal

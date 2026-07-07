@@ -15,6 +15,8 @@ interface Props {
   proyectoId: string
   frenteSel: FrenteSel
   hoy: string
+  /** false para el rol Cliente: misma vista, sin ninguna accion de edicion. */
+  puedeEditar: boolean
   actions: Actions
 }
 
@@ -25,7 +27,7 @@ type ModalState =
   | { tipo: 'tarea-editar'; tarea: Tarea }
   | null
 
-export function TableView({ state, proyectoId, frenteSel, hoy, actions }: Props) {
+export function TableView({ state, proyectoId, frenteSel, hoy, puedeEditar, actions }: Props) {
   const [modal, setModal] = useState<ModalState>(null)
 
   const frentes = state.frentes
@@ -35,7 +37,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, actions }: Props)
   return (
     <div className="tabla-wrap">
       {frentes.map((f) => (
-        <FrentePagina key={f.id} frente={f} state={state} hoy={hoy} actions={actions} setModal={setModal} />
+        <FrentePagina key={f.id} frente={f} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} />
       ))}
       {frentes.length === 0 && (
         <p className="vacio-inline">Este proyecto aun no tiene frentes. Crea uno desde la barra lateral.</p>
@@ -61,7 +63,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, actions }: Props)
       )}
       {modal?.tipo === 'tarea-nueva' && (
         <TareaModal
-          usuarios={state.usuarios}
+          usuarios={state.usuarios.filter((u) => u.rol === 'admin' && u.activo)}
           fechaSugerida={hoy}
           onSubmit={(d) =>
             actions.createTarea({
@@ -79,7 +81,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, actions }: Props)
       {modal?.tipo === 'tarea-editar' && (
         <TareaModal
           tarea={modal.tarea}
-          usuarios={state.usuarios}
+          usuarios={state.usuarios.filter((u) => u.rol === 'admin' && u.activo)}
           onSubmit={(d) =>
             actions.updateTarea(modal.tarea.id, {
               titulo: d.titulo,
@@ -99,12 +101,14 @@ function FrentePagina({
   frente,
   state,
   hoy,
+  puedeEditar,
   actions,
   setModal,
 }: {
   frente: Frente
   state: AppState
   hoy: string
+  puedeEditar: boolean
   actions: Actions
   setModal: (m: ModalState) => void
 }) {
@@ -116,12 +120,14 @@ function FrentePagina({
     <section>
       <div className="frente-cabecera">
         <h2 className="frente-titulo">{frente.nombre}</h2>
-        <button className="btn btn--sm" onClick={() => setModal({ tipo: 'sub-nuevo', frenteId: frente.id })}>
-          + Sub Frente
-        </button>
+        {puedeEditar && (
+          <button className="btn btn--sm" onClick={() => setModal({ tipo: 'sub-nuevo', frenteId: frente.id })}>
+            + Sub Frente
+          </button>
+        )}
       </div>
       {subs.map((sf) => (
-        <SubFrenteTabla key={sf.id} sub={sf} state={state} hoy={hoy} actions={actions} setModal={setModal} />
+        <SubFrenteTabla key={sf.id} sub={sf} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} />
       ))}
       {subs.length === 0 && <p className="vacio-inline">Sin sub frentes en este frente.</p>}
     </section>
@@ -132,12 +138,14 @@ function SubFrenteTabla({
   sub,
   state,
   hoy,
+  puedeEditar,
   actions,
   setModal,
 }: {
   sub: SubFrente
   state: AppState
   hoy: string
+  puedeEditar: boolean
   actions: Actions
   setModal: (m: ModalState) => void
 }) {
@@ -149,14 +157,16 @@ function SubFrenteTabla({
     <div className="subfrente">
       <div className="subfrente__titulo">
         <span>{sub.nombre} <span className="subfrente__count">· {tareas.length} tareas</span></span>
-        <span className="subfrente__tools">
-          <button className="icon-btn" title="Renombrar" onClick={() => setModal({ tipo: 'sub-editar', id: sub.id, nombre: sub.nombre })}>✎</button>
-          <button
-            className="icon-btn"
-            title="Eliminar sub frente"
-            onClick={() => { if (confirm(`¿Eliminar el sub frente "${sub.nombre}" y sus tareas?`)) actions.deleteSubFrente(sub.id) }}
-          >🗑</button>
-        </span>
+        {puedeEditar && (
+          <span className="subfrente__tools">
+            <button className="icon-btn" title="Renombrar" onClick={() => setModal({ tipo: 'sub-editar', id: sub.id, nombre: sub.nombre })}>✎</button>
+            <button
+              className="icon-btn"
+              title="Eliminar sub frente"
+              onClick={() => { if (confirm(`¿Eliminar el sub frente "${sub.nombre}" y sus tareas?`)) actions.deleteSubFrente(sub.id) }}
+            >🗑</button>
+          </span>
+        )}
       </div>
       <table className="tareas">
         <thead>
@@ -167,20 +177,22 @@ function SubFrenteTabla({
             <th className="col-fecha">F. original</th>
             <th className="col-fecha">F. objetivo</th>
             <th className="col-fecha">F. real</th>
-            <th className="col-acc"></th>
+            {puedeEditar && <th className="col-acc"></th>}
           </tr>
         </thead>
         <tbody>
           {tareas.map((t) => (
-            <TareaFila key={t.id} tarea={t} state={state} hoy={hoy} actions={actions} setModal={setModal} />
+            <TareaFila key={t.id} tarea={t} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} />
           ))}
-          <tr className="fila-add">
-            <td colSpan={7}>
-              <button className="btn btn--ghost" onClick={() => setModal({ tipo: 'tarea-nueva', subFrenteId: sub.id })}>
-                + Tarea
-              </button>
-            </td>
-          </tr>
+          {puedeEditar && (
+            <tr className="fila-add">
+              <td colSpan={7}>
+                <button className="btn btn--ghost" onClick={() => setModal({ tipo: 'tarea-nueva', subFrenteId: sub.id })}>
+                  + Tarea
+                </button>
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -191,12 +203,14 @@ function TareaFila({
   tarea,
   state,
   hoy,
+  puedeEditar,
   actions,
   setModal,
 }: {
   tarea: Tarea
   state: AppState
   hoy: string
+  puedeEditar: boolean
   actions: Actions
   setModal: (m: ModalState) => void
 }) {
@@ -212,6 +226,7 @@ function TareaFila({
           className="chk"
           type="checkbox"
           checked={tarea.hecha}
+          disabled={!puedeEditar}
           onChange={() => actions.toggleHecha(tarea.id, !tarea.hecha)}
           aria-label={`Marcar hecha: ${tarea.titulo}`}
         />
@@ -233,13 +248,17 @@ function TareaFila({
       <td className="col-fecha">{etiquetaCorta(tarea.fechaOriginal)}</td>
 
       <td className={`col-fecha${est === 'vencida' ? ' fecha-vencida' : ''}`}>
-        <input
-          className="fecha-input"
-          type="date"
-          value={tarea.fechaObjetivo}
-          onChange={(e) => e.target.value && actions.cambiarFechaObjetivo(tarea.id, e.target.value)}
-          aria-label={`Fecha objetivo: ${tarea.titulo}`}
-        />
+        {puedeEditar ? (
+          <input
+            className="fecha-input"
+            type="date"
+            value={tarea.fechaObjetivo}
+            onChange={(e) => e.target.value && actions.cambiarFechaObjetivo(tarea.id, e.target.value)}
+            aria-label={`Fecha objetivo: ${tarea.titulo}`}
+          />
+        ) : (
+          etiquetaCorta(tarea.fechaObjetivo)
+        )}
         {est === 'vencida' && <span className="replanificar-tag">Replanificar →</span>}
       </td>
 
@@ -254,14 +273,16 @@ function TareaFila({
         )}
       </td>
 
-      <td className="col-acc">
-        <button className="icon-btn" title="Editar tarea" onClick={() => setModal({ tipo: 'tarea-editar', tarea })}>✎</button>
-        <button
-          className="icon-btn"
-          title="Eliminar tarea"
-          onClick={() => { if (confirm(`¿Eliminar la tarea "${tarea.titulo}"?`)) actions.deleteTarea(tarea.id) }}
-        >🗑</button>
-      </td>
+      {puedeEditar && (
+        <td className="col-acc">
+          <button className="icon-btn" title="Editar tarea" onClick={() => setModal({ tipo: 'tarea-editar', tarea })}>✎</button>
+          <button
+            className="icon-btn"
+            title="Eliminar tarea"
+            onClick={() => { if (confirm(`¿Eliminar la tarea "${tarea.titulo}"?`)) actions.deleteTarea(tarea.id) }}
+          >🗑</button>
+        </td>
+      )}
     </tr>
   )
 }

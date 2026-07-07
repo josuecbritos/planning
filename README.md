@@ -3,8 +3,8 @@
 Herramienta de planificación de proyectos con gestión interna y visibilidad
 controlada al cliente. Implementa las vistas **Tabla** (tipo Monday) y **Gantt**
 (grilla tipo Excel) con la lógica de estados derivados y colores de la sección 6
-del Documento Funcional, y el **CRUD** de proyectos / frentes / sub frentes / tareas
-sobre **Supabase** (Fase 1 de la sección 9).
+del Documento Funcional, el **CRUD** completo sobre **Supabase** (Fase 1) y
+**login con roles Admin/Cliente + acceso por proyecto** (Fase 2, Módulo 1).
 
 ## Dos modos de ejecución
 
@@ -18,6 +18,10 @@ La app elige el backend automáticamente según las variables de entorno:
 El chip en el encabezado indica el modo activo. En modo Local, "hoy" es una fecha
 simulada (30-oct-2024) para que el dataset de demo muestre tareas hechas, vencidas
 y futuras; en Supabase, "hoy" es la fecha real del sistema.
+
+**Login por modo:** en Supabase el login es real (email + contraseña, Supabase Auth).
+En modo Local es un selector "entrar como…" con los usuarios del seed (2 admins y
+1 cliente), pensado para demostrar los roles sin backend.
 
 ## Ejecutar
 
@@ -69,15 +73,33 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   que ningún camino de edición lo eluda (recomendación del documento). El actor se pasa
   vía el RPC `replanificar_tarea`. En modo Local, la misma regla se aplica en código.
 
+**Usuarios y roles (Fase 2 — Módulo 1 / 7.1)**
+- **Login**: Supabase Auth (email + contraseña). El Admin crea al usuario con su email;
+  cuando esa persona inicia sesión por primera vez, un trigger vincula su cuenta.
+- **Módulo de Usuarios** (solo Admins): listar, crear, editar, desactivar/reactivar,
+  y asignar/desasignar proyectos a usuarios Cliente, proyecto a proyecto (tabla 5.7).
+- **Regla de 2 Admins** (5.1): el sistema admite exactamente 2 admins activos. La regla
+  vive como trigger en la base de datos y la UI deshabilita la opción al llegar al límite.
+- **Cliente**: ve **solo los proyectos asignados**, con las mismas vistas Tabla y Gantt
+  (sin diferencia visual, como pide 4.3) pero **solo lectura**: sin botones de edición,
+  sin checkbox, sin replanificar, sin módulo de usuarios.
+- **RLS real**: las políticas de Postgres garantizan a nivel de base de datos que el
+  cliente solo lee sus proyectos asignados y que solo los admins escriben — la interfaz
+  es una capa de conveniencia, no la barrera de seguridad.
+
 ## Modelo de datos y esquema
 
-`supabase/migrations/20260707000001_init.sql` crea las entidades de la sección 5:
-`usuario`, `proyecto`, `frente`, `sub_frente`, `tarea`, `replanificacion`,
-`acceso_cliente_proyecto`, más el trigger de historial y el RPC de replanificación.
+- `supabase/migrations/20260707000001_init.sql` — entidades de la sección 5:
+  `usuario`, `proyecto`, `frente`, `sub_frente`, `tarea`, `replanificacion`,
+  `acceso_cliente_proyecto`, más el trigger de historial y el RPC de replanificación.
+  (RLS permisiva provisional de Fase 1.)
+- `supabase/migrations/20260707000002_fase2_auth.sql` — Fase 2: vínculo con
+  `auth.users`, helpers de sesión (`es_admin()`, `usuario_actual_id()`,
+  `proyectos_visibles()`), trigger del límite de 2 admins, y **RLS real por rol**
+  que reemplaza la permisiva.
 
-> **Seguridad (Fase 1):** la RLS queda **permisiva** a propósito (uso interno, sin login).
-> La **Fase 2** la reemplaza por políticas por usuario/rol y la regla "el cliente solo ve
-> sus proyectos asignados" (tabla 5.7).
+Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
+mismo email que registraste en el Módulo de Usuarios). Al primer login se vinculan.
 
 ## Estructura
 
@@ -87,6 +109,10 @@ src/
   lib/
     dates.ts             Días hábiles y formato
     derive.ts            Estados derivados, colores y marcas (sección 6)
+  auth/
+    auth.ts              Interfaz del servicio de autenticación
+    memoryAuth.ts        Login simulado ("entrar como…") para modo Local
+    supabaseAuth.ts      Login real con Supabase Auth
   data/
     repo.ts              Interfaz de la capa de datos + tipos de entrada
     memoryRepo.ts        Adapter en memoria + localStorage
@@ -97,9 +123,12 @@ src/
     seed.ts              Datos semilla + HOY simulado
   components/
     Sidebar, Header, TableView, GanttView, Marca, Legend, HoverCard,
-    TaskDetail, Modal, TextPromptModal, ProyectoModal, TareaModal
+    TaskDetail, Modal, TextPromptModal, ProyectoModal, TareaModal,
+    LoginPage, UsersView, UsuarioModal
 supabase/
-  migrations/…_init.sql  Esquema + trigger + RPC + RLS
+  migrations/
+    …_init.sql           Esquema + trigger de historial + RPC
+    …_fase2_auth.sql     Auth, límite 2 admins y RLS por rol
   seed.sql               Datos de arranque (opcional)
 docs/
   documento-funcional-v3.1.md
@@ -107,9 +136,9 @@ docs/
 
 ## Roadmap (sección 9)
 
-- **Fase 1 — Uso interno (esta entrega):** base de datos + CRUD + las dos vistas. Sin login.
-- **Fase 2 — Clientes:** login, roles admin/cliente, asignación de proyectos por cliente,
-  RLS real (Módulo 1).
+- **Fase 1 — Uso interno:** ✅ base de datos + CRUD + las dos vistas. Sin login.
+- **Fase 2 — Clientes:** ✅ login, roles admin/cliente, asignación de proyectos por
+  cliente, RLS real (Módulo 1).
 - **Fase 3 — Pulido:** Mi Panel (Módulo 3), panel lateral de detalle, archivo de canceladas,
   indicadores por proyecto.
 

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { AppState, Tarea } from './types'
+import type { AppState, Tarea, Usuario } from './types'
 import { HOY as HOY_SIM } from './data/seed'
 import { makeRepo } from './data'
+import { makeAuth } from './auth'
 import { supabaseConfigured } from './data/client'
 import { hoyISO } from './lib/dates'
 import { contar } from './lib/derive'
@@ -11,21 +12,23 @@ import type {
   NuevoFrente,
   NuevoProyecto,
   NuevoSubFrente,
+  NuevoUsuario,
   PatchProyecto,
   PatchTarea,
+  PatchUsuario,
 } from './data/repo'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
 import { TableView } from './components/TableView'
 import { GanttView } from './components/GanttView'
+import { LoginPage } from './components/LoginPage'
+import { UsersView } from './components/UsersView'
 
 export type Vista = 'tabla' | 'gantt'
 export type FrenteSel = string | 'todos'
+export type Pantalla = 'proyectos' | 'usuarios'
 
-// Admin que "actua" (cambiado_por al replanificar). En Fase 2 sera el usuario logueado.
-const USUARIO_ACTUAL = 'u-jb'
-
-/** Acciones CRUD expuestas a los componentes. Todas persisten via Repo. */
+/** Acciones expuestas a los componentes. Todas persisten via Repo. */
 export interface Actions {
   createProyecto: (i: NuevoProyecto) => Promise<void>
   updateProyecto: (id: string, p: PatchProyecto) => Promise<void>
@@ -41,53 +44,93 @@ export interface Actions {
   deleteTarea: (id: string) => Promise<void>
   toggleHecha: (tareaId: string, hecha: boolean) => Promise<void>
   cambiarFechaObjetivo: (tareaId: string, nueva: string) => Promise<void>
+  createUsuario: (i: NuevoUsuario) => Promise<void>
+  updateUsuario: (id: string, p: PatchUsuario) => Promise<void>
+  asignarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>
+  quitarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>
 }
 
 export default function App() {
   const repo = useMemo(() => makeRepo(), [])
+  const auth = useMemo(() => makeAuth(repo), [repo])
   const HOY = useMemo(() => (supabaseConfigured ? hoyISO() : HOY_SIM), [])
 
+  // undefined = comprobando sesion; null = sin sesion.
+  const [sesion, setSesion] = useState<Usuario | null | undefined>(undefined)
   const [state, setState] = useState<AppState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [vista, setVista] = useState<Vista>('tabla')
+  const [pantalla, setPantalla] = useState<Pantalla>('proyectos')
   const [frenteSel, setFrenteSel] = useState<FrenteSel>('todos')
   const [proyectoActivoId, setProyectoActivoId] = useState<string | null>(null)
 
-  // Carga inicial
+  const esAdmin: boolean = sesion?.rol === 'admin'
+
+  // Comprobar sesion vigente al arrancar.
   useEffect(() => {
+    auth.getUsuarioActual().then(setSesion).catch(() => setSesion(null))
+  }, [auth])
+
+  // En modo Local, lista de usuarios activos para "entrar como" en el login
+  // (del repo, para incluir usuarios creados despues del seed).
+  const [usuariosDemo, setUsuariosDemo] = useState<Usuario[]>([])
+  useEffect(() => {
+    if (sesion === null && !supabaseConfigured) {
+      repo.loadState().then((s) => setUsuariosDemo(s.usuarios.filter((u) => u.activo)))
+    }
+  }, [sesion, repo])
+
+  // Cargar datos cuando hay sesion.
+  useEffect(() => {
+    if (!sesion) return
     let vivo = true
     repo
       .loadState()
       .then((s) => {
         if (!vivo) return
         setState(s)
-        setProyectoActivoId((prev) => prev ?? s.proyectos[0]?.id ?? null)
       })
       .catch((e) => vivo && setError(String(e.message ?? e)))
     return () => {
       vivo = false
     }
-  }, [repo])
+  }, [repo, sesion])
 
-  // Envuelve una mutacion: ejecuta en el repo, aplica al estado local, captura errores.
-  const run = useCallback(
-    async (fn: () => Promise<(s: AppState) => AppState>) => {
-      try {
-        const patch = await fn()
-        setState((s) => (s ? patch(s) : s))
-      } catch (e) {
-        setError(String((e as Error).message ?? e))
-      }
-    },
-    [],
-  )
+  // Proyectos visibles segun el rol: admin todo; cliente solo asignados.
+  // (En Supabase la RLS ya filtra en el servidor; aqui se refuerza en la UI
+  //  y se resuelve el modo Local.)
+  const proyectosVisibles = useMemo(() => {
+    if (!state || !sesion) return []
+    if (sesion.rol === 'admin') return state.proyectos
+    const ids = new Set(state.accesos.filter((a) => a.usuarioId === sesion.id).map((a) => a.proyectoId))
+    return state.proyectos.filter((p) => ids.has(p.id))
+  }, [state, sesion])
+
+  // Seleccion inicial / correccion de proyecto activo.
+  useEffect(() => {
+    if (!state || !sesion) return
+    setProyectoActivoId((prev) => {
+      if (prev && proyectosVisibles.some((p) => p.id === prev)) return prev
+      return proyectosVisibles[0]?.id ?? null
+    })
+  }, [state, sesion, proyectosVisibles])
+
+  const run = useCallback(async (fn: () => Promise<(s: AppState) => AppState>) => {
+    try {
+      const patch = await fn()
+      setState((s) => (s ? patch(s) : s))
+    } catch (e) {
+      setError(String((e as Error).message ?? e))
+    }
+  }, [])
 
   const actions: Actions = useMemo(
     () => ({
       createProyecto: (i) =>
         run(async () => {
-          const p = await repo.createProyecto(i)
+          const p = await repo.createProyecto({ ...i, creadoPor: sesion?.id })
           setProyectoActivoId(p.id)
+          setPantalla('proyectos')
           return (s) => apply.upsertProyecto(s, p)
         }),
       updateProyecto: (id, p) =>
@@ -154,20 +197,56 @@ export default function App() {
         }),
       cambiarFechaObjetivo: (tareaId, nueva) =>
         run(async () => {
-          const { tarea, historial } = await repo.cambiarFechaObjetivo(tareaId, nueva, USUARIO_ACTUAL)
+          const { tarea, historial } = await repo.cambiarFechaObjetivo(tareaId, nueva, sesion?.id)
           return (s) => apply.setHistorialTarea(apply.upsertTarea(s, tarea), tareaId, historial)
         }),
+      createUsuario: (i) =>
+        run(async () => {
+          const u = await repo.createUsuario(i)
+          return (s) => apply.upsertUsuario(s, u)
+        }),
+      updateUsuario: (id, p) =>
+        run(async () => {
+          const u = await repo.updateUsuario(id, p)
+          return (s) => apply.upsertUsuario(s, u)
+        }),
+      asignarAcceso: (usuarioId, proyectoId) =>
+        run(async () => {
+          const a = await repo.asignarAcceso(usuarioId, proyectoId)
+          return (s) => apply.addAcceso(s, a)
+        }),
+      quitarAcceso: (usuarioId, proyectoId) =>
+        run(async () => {
+          await repo.quitarAcceso(usuarioId, proyectoId)
+          return (s) => apply.removeAcceso(s, usuarioId, proyectoId)
+        }),
     }),
-    [repo, run, HOY],
+    [repo, run, HOY, sesion],
   )
 
-  // Al cambiar de proyecto, se resetea el filtro de frente.
+  const onLogin = useCallback(
+    async (email: string, password?: string) => {
+      const u = await auth.login(email, password)
+      setSesion(u)
+      setPantalla('proyectos')
+      setFrenteSel('todos')
+    },
+    [auth],
+  )
+
+  const onLogout = useCallback(async () => {
+    await auth.logout()
+    setSesion(null)
+    setState(null)
+    setProyectoActivoId(null)
+  }, [auth])
+
   const onSelectProyecto = useCallback((id: string) => {
     setProyectoActivoId(id)
     setFrenteSel('todos')
+    setPantalla('proyectos')
   }, [])
 
-  // Frentes/tareas visibles: del proyecto activo + filtro de frente.
   const tareasVisibles = useMemo<Tarea[]>(() => {
     if (!state || !proyectoActivoId) return []
     const frenteIds = new Set(state.frentes.filter((f) => f.proyectoId === proyectoActivoId).map((f) => f.id))
@@ -184,23 +263,37 @@ export default function App() {
     [state, tareasVisibles, HOY],
   )
 
+  // -- Render --
+
+  if (sesion === undefined) {
+    return <div className="cargando">Cargando…</div>
+  }
+
+  if (sesion === null) {
+    return <LoginPage modo={auth.modo} usuariosDemo={usuariosDemo} onLogin={onLogin} />
+  }
+
   if (error && !state) {
     return <div className="fatal">No se pudo cargar: {error}</div>
   }
   if (!state) {
-    return <div className="cargando">Cargando…</div>
+    return <div className="cargando">Cargando datos…</div>
   }
 
-  const proyecto = state.proyectos.find((p) => p.id === proyectoActivoId) ?? null
+  const proyecto = proyectosVisibles.find((p) => p.id === proyectoActivoId) ?? null
 
   return (
     <div className="app">
       <Sidebar
         state={state}
+        proyectos={proyectosVisibles}
         proyectoActivoId={proyectoActivoId}
         frenteSel={frenteSel}
+        pantalla={pantalla}
+        esAdmin={esAdmin}
         onSelectProyecto={onSelectProyecto}
         onSelectFrente={setFrenteSel}
+        onSelectPantalla={setPantalla}
         actions={actions}
       />
       <div className="main">
@@ -210,15 +303,20 @@ export default function App() {
             <button onClick={() => setError(null)} aria-label="Cerrar">✕</button>
           </div>
         )}
-        {proyecto && contadores ? (
+
+        {pantalla === 'usuarios' && esAdmin ? (
+          <UsersView state={state} usuarioActual={sesion} actions={actions} />
+        ) : proyecto && contadores ? (
           <>
             <Header
               proyecto={proyecto}
               modo={repo.modo}
+              usuario={sesion}
               vista={vista}
               onVista={setVista}
               contadores={contadores}
               hoy={HOY}
+              onLogout={onLogout}
             />
             <div className="content">
               {vista === 'tabla' ? (
@@ -227,6 +325,7 @@ export default function App() {
                   proyectoId={proyecto.id}
                   frenteSel={frenteSel}
                   hoy={HOY}
+                  puedeEditar={esAdmin}
                   actions={actions}
                 />
               ) : (
@@ -236,8 +335,14 @@ export default function App() {
           </>
         ) : (
           <div className="vacio">
-            <p>No hay ningun proyecto seleccionado.</p>
-            <p>Crea uno desde la barra lateral para empezar.</p>
+            {esAdmin ? (
+              <>
+                <p>No hay ningun proyecto seleccionado.</p>
+                <p>Crea uno desde la barra lateral para empezar.</p>
+              </>
+            ) : (
+              <p>Aun no tienes proyectos asignados. Contacta a tu consultor.</p>
+            )}
           </div>
         )}
       </div>

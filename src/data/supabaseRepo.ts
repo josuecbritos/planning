@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
+  Acceso,
   AppState,
   Frente,
   Proyecto,
@@ -14,8 +15,10 @@ import type {
   NuevoFrente,
   NuevoProyecto,
   NuevoSubFrente,
+  NuevoUsuario,
   PatchProyecto,
   PatchTarea,
+  PatchUsuario,
   Repo,
 } from './repo'
 
@@ -34,7 +37,11 @@ function unwrap(res: { data: unknown; error: { message: string } | null }): any 
 }
 
 const toUsuario = (r: Row): Usuario => ({
-  id: r.id, nombre: r.nombre, iniciales: r.iniciales ?? '', email: r.email, rol: r.rol, activo: r.activo,
+  id: r.id, nombre: r.nombre, iniciales: r.iniciales ?? '', email: r.email, rol: r.rol,
+  activo: r.activo, authId: r.auth_id ?? undefined,
+})
+const toAcceso = (r: Row): Acceso => ({
+  usuarioId: r.usuario_id, proyectoId: r.proyecto_id, fechaAsignacion: r.fecha_asignacion,
 })
 const toProyecto = (r: Row): Proyecto => ({
   id: r.id, nombre: r.nombre, descripcion: r.descripcion ?? undefined, color: r.color ?? undefined, estado: r.estado,
@@ -77,13 +84,14 @@ export class SupabaseRepo implements Repo {
   }
 
   async loadState(): Promise<AppState> {
-    const [u, p, f, sf, t, h] = await Promise.all([
+    const [u, p, f, sf, t, h, a] = await Promise.all([
       this.db.from('usuario').select('*').order('nombre'),
       this.db.from('proyecto').select('*').order('fecha_creacion'),
       this.db.from('frente').select('*').order('orden'),
       this.db.from('sub_frente').select('*').order('orden'),
       this.db.from('tarea').select('*').order('orden'),
       this.db.from('replanificacion').select('*').order('numero_cambio'),
+      this.db.from('acceso_cliente_proyecto').select('*'),
     ])
     return {
       usuarios: unwrap(u).map(toUsuario),
@@ -92,6 +100,7 @@ export class SupabaseRepo implements Repo {
       subFrentes: unwrap(sf).map(toSubFrente),
       tareas: unwrap(t).map(toTarea),
       historial: unwrap(h).map(toReplan),
+      accesos: unwrap(a).map(toAcceso),
     }
   }
 
@@ -219,6 +228,55 @@ export class SupabaseRepo implements Repo {
       await this.db.from('replanificacion').select('*').eq('tarea_id', id).order('numero_cambio'),
     )
     return { tarea: toTarea(tareaRow), historial: hist.map(toReplan) }
+  }
+
+  // -- Modulo de Usuarios (7.1) --
+  // El limite de 2 admins lo garantiza el trigger `limitar_admins` en la BD.
+
+  async createUsuario(input: NuevoUsuario): Promise<Usuario> {
+    const iniciales = (
+      input.iniciales ?? input.nombre.split(/\s+/).map((p) => p[0]).join('').slice(0, 2)
+    ).toUpperCase()
+    const row = unwrap(
+      await this.db
+        .from('usuario')
+        .insert({ nombre: input.nombre, iniciales, email: input.email.trim().toLowerCase(), rol: input.rol })
+        .select()
+        .single(),
+    )
+    return toUsuario(row)
+  }
+
+  async updateUsuario(id: string, patch: PatchUsuario): Promise<Usuario> {
+    const upd: Row = {}
+    if ('nombre' in patch) upd.nombre = patch.nombre
+    if ('iniciales' in patch) upd.iniciales = patch.iniciales
+    if ('activo' in patch) upd.activo = patch.activo
+    if ('rol' in patch) upd.rol = patch.rol
+    const row = unwrap(await this.db.from('usuario').update(upd).eq('id', id).select().single())
+    return toUsuario(row)
+  }
+
+  async asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso> {
+    const row = unwrap(
+      await this.db
+        .from('acceso_cliente_proyecto')
+        .upsert({ usuario_id: usuarioId, proyecto_id: proyectoId })
+        .select()
+        .single(),
+    )
+    return toAcceso(row)
+  }
+
+  async quitarAcceso(usuarioId: string, proyectoId: string): Promise<void> {
+    unwrap(
+      await this.db
+        .from('acceso_cliente_proyecto')
+        .delete()
+        .eq('usuario_id', usuarioId)
+        .eq('proyecto_id', proyectoId)
+        .select(),
+    )
   }
 
   private async nextOrden(tabla: string, fk: string, fkValue: string): Promise<number> {

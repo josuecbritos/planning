@@ -1,12 +1,14 @@
-import type { AppState, Frente, Proyecto, Replanificacion, SubFrente, Tarea } from '../types'
+import type { Acceso, AppState, Frente, Proyecto, Replanificacion, SubFrente, Tarea, Usuario } from '../types'
 import { initialState } from './seed'
 import type {
   NuevaTarea,
   NuevoFrente,
   NuevoProyecto,
   NuevoSubFrente,
+  NuevoUsuario,
   PatchProyecto,
   PatchTarea,
+  PatchUsuario,
   Repo,
 } from './repo'
 
@@ -27,7 +29,25 @@ function clone<T>(x: T): T {
 function load(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as AppState
+    if (raw) {
+      const s = JSON.parse(raw) as AppState
+      // Migracion suave desde estados guardados por la Fase 1 (sin accesos,
+      // 4 admins y sin usuario cliente): se rebaja el excedente de admins a
+      // cliente y se agrega el cliente de demo con su acceso.
+      if (!Array.isArray(s.accesos)) {
+        s.usuarios
+          .filter((u) => u.rol === 'admin' && u.activo)
+          .slice(2)
+          .forEach((u) => { u.rol = 'cliente' })
+        for (const demo of initialState.usuarios) {
+          if (!s.usuarios.some((u) => u.email === demo.email)) s.usuarios.push(clone(demo))
+        }
+        s.accesos = initialState.accesos
+          .filter((a) => s.proyectos.some((p) => p.id === a.proyectoId))
+          .map((a) => clone(a))
+      }
+      return s
+    }
   } catch {
     /* ignora storage no disponible o corrupto */
   }
@@ -87,6 +107,7 @@ export class MemoryRepo implements Repo {
     this.state.subFrentes = this.state.subFrentes.filter((sf) => !frenteIds.includes(sf.frenteId))
     this.state.tareas = this.state.tareas.filter((t) => !subIds.includes(t.subFrenteId))
     this.state.historial = this.state.historial.filter((h) => !tareaIds.includes(h.tareaId))
+    this.state.accesos = this.state.accesos.filter((a) => a.proyectoId !== id)
     this.persist()
   }
 
@@ -169,6 +190,64 @@ export class MemoryRepo implements Repo {
   async deleteTarea(id: string): Promise<void> {
     this.state.tareas = this.state.tareas.filter((t) => t.id !== id)
     this.state.historial = this.state.historial.filter((h) => h.tareaId !== id)
+    this.persist()
+  }
+
+  // -- Modulo de Usuarios (7.1) --
+
+  /** Regla 5.1: exactamente 2 Admins activos (misma regla que el trigger SQL). */
+  private validarLimiteAdmins(candidato: Usuario) {
+    if (candidato.rol !== 'admin' || !candidato.activo) return
+    const otros = this.state.usuarios.filter(
+      (u) => u.rol === 'admin' && u.activo && u.id !== candidato.id,
+    ).length
+    if (otros >= 2) throw new Error('El sistema admite exactamente 2 usuarios Admin activos')
+  }
+
+  async createUsuario(input: NuevoUsuario): Promise<Usuario> {
+    const email = input.email.trim().toLowerCase()
+    if (this.state.usuarios.some((u) => u.email.toLowerCase() === email)) {
+      throw new Error('Ya existe un usuario con ese email')
+    }
+    const u: Usuario = {
+      id: uid(),
+      nombre: input.nombre,
+      iniciales: (input.iniciales ?? input.nombre.split(/\s+/).map((p) => p[0]).join('').slice(0, 2)).toUpperCase(),
+      email,
+      rol: input.rol,
+      activo: true,
+    }
+    this.validarLimiteAdmins(u)
+    this.state.usuarios.push(u)
+    this.persist()
+    return clone(u)
+  }
+
+  async updateUsuario(id: string, patch: PatchUsuario): Promise<Usuario> {
+    const u = this.state.usuarios.find((x) => x.id === id)
+    if (!u) throw new Error('Usuario no encontrado')
+    const candidato = { ...u, ...patch }
+    this.validarLimiteAdmins(candidato)
+    Object.assign(u, patch)
+    this.persist()
+    return clone(u)
+  }
+
+  async asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso> {
+    const existente = this.state.accesos.find(
+      (a) => a.usuarioId === usuarioId && a.proyectoId === proyectoId,
+    )
+    if (existente) return clone(existente)
+    const a: Acceso = { usuarioId, proyectoId, fechaAsignacion: new Date().toISOString() }
+    this.state.accesos.push(a)
+    this.persist()
+    return clone(a)
+  }
+
+  async quitarAcceso(usuarioId: string, proyectoId: string): Promise<void> {
+    this.state.accesos = this.state.accesos.filter(
+      (a) => !(a.usuarioId === usuarioId && a.proyectoId === proyectoId),
+    )
     this.persist()
   }
 

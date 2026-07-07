@@ -1,11 +1,14 @@
 import type {
+  Acceso,
   AppState,
   Frente,
   ISODate,
   Proyecto,
   Replanificacion,
+  Rol,
   SubFrente,
   Tarea,
+  Usuario,
 } from '../types'
 
 // Contrato de la capa de datos. Dos implementaciones: MemoryRepo (en memoria +
@@ -43,6 +46,14 @@ export type PatchTarea = Partial<
   Pick<Tarea, 'titulo' | 'descripcion' | 'responsableId' | 'hecha' | 'fechaReal' | 'comentarios'>
 >
 
+export interface NuevoUsuario {
+  nombre: string
+  iniciales?: string
+  email: string
+  rol: Rol
+}
+export type PatchUsuario = Partial<Pick<Usuario, 'nombre' | 'iniciales' | 'activo' | 'rol'>>
+
 export interface Repo {
   /** Nombre corto del backend activo, para mostrar en la UI. */
   readonly modo: 'memoria' | 'supabase'
@@ -75,4 +86,12 @@ export interface Repo {
     nueva: ISODate,
     actorId?: string,
   ): Promise<{ tarea: Tarea; historial: Replanificacion[] }>
+
+  // -- Modulo de Usuarios (7.1) --
+
+  createUsuario(input: NuevoUsuario): Promise<Usuario>
+  updateUsuario(id: string, patch: PatchUsuario): Promise<Usuario>
+  /** Asigna un proyecto a un usuario Cliente (tabla 5.7). */
+  asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso>
+  quitarAcceso(usuarioId: string, proyectoId: string): Promise<void>
 }
