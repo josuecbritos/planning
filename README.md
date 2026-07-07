@@ -162,7 +162,7 @@ docs/
   canceladas, indicadores por proyecto.
 
 Con esto, el alcance de la Versión 1 del Documento Funcional v3.1 está completo.
-Siguiente hito natural: **despliegue** (Vercel/Netlify + proyecto Supabase productivo).
+Siguiente hito: **despliegue** — la guía paso a paso está en [DEPLOY.md](DEPLOY.md).
 
 ## Stack
 
