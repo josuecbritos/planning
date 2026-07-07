@@ -23,10 +23,13 @@ import { TableView } from './components/TableView'
 import { GanttView } from './components/GanttView'
 import { LoginPage } from './components/LoginPage'
 import { UsersView } from './components/UsersView'
+import { TaskPanel } from './components/TaskPanel'
+import { MiPanelView } from './components/MiPanelView'
+import { ResumenView } from './components/ResumenView'
 
 export type Vista = 'tabla' | 'gantt'
 export type FrenteSel = string | 'todos'
-export type Pantalla = 'proyectos' | 'usuarios'
+export type Pantalla = 'proyectos' | 'usuarios' | 'mipanel' | 'resumen'
 
 /** Acciones expuestas a los componentes. Todas persisten via Repo. */
 export interface Actions {
@@ -63,6 +66,8 @@ export default function App() {
   const [pantalla, setPantalla] = useState<Pantalla>('proyectos')
   const [frenteSel, setFrenteSel] = useState<FrenteSel>('todos')
   const [proyectoActivoId, setProyectoActivoId] = useState<string | null>(null)
+  // Panel lateral de detalle (7.2): id de la tarea abierta, o null.
+  const [tareaDetalleId, setTareaDetalleId] = useState<string | null>(null)
 
   const esAdmin: boolean = sesion?.rol === 'admin'
 
@@ -187,6 +192,7 @@ export default function App() {
       deleteTarea: (id) =>
         run(async () => {
           await repo.deleteTarea(id)
+          setTareaDetalleId((cur) => (cur === id ? null : cur))
           return (s) => apply.removeTarea(s, id)
         }),
       toggleHecha: (tareaId, hecha) =>
@@ -247,6 +253,13 @@ export default function App() {
     setPantalla('proyectos')
   }, [])
 
+  const onSelectPantalla = useCallback((p: Pantalla) => {
+    setPantalla(p)
+    setTareaDetalleId(null)
+  }, [])
+
+  const abrirDetalle = useCallback((tareaId: string) => setTareaDetalleId(tareaId), [])
+
   const tareasVisibles = useMemo<Tarea[]>(() => {
     if (!state || !proyectoActivoId) return []
     const frenteIds = new Set(state.frentes.filter((f) => f.proyectoId === proyectoActivoId).map((f) => f.id))
@@ -281,6 +294,7 @@ export default function App() {
   }
 
   const proyecto = proyectosVisibles.find((p) => p.id === proyectoActivoId) ?? null
+  const tareaDetalle = tareaDetalleId ? state.tareas.find((t) => t.id === tareaDetalleId) ?? null : null
 
   return (
     <div className="app">
@@ -291,9 +305,11 @@ export default function App() {
         frenteSel={frenteSel}
         pantalla={pantalla}
         esAdmin={esAdmin}
+        usuario={sesion}
         onSelectProyecto={onSelectProyecto}
         onSelectFrente={setFrenteSel}
-        onSelectPantalla={setPantalla}
+        onSelectPantalla={onSelectPantalla}
+        onLogout={onLogout}
         actions={actions}
       />
       <div className="main">
@@ -306,17 +322,30 @@ export default function App() {
 
         {pantalla === 'usuarios' && esAdmin ? (
           <UsersView state={state} usuarioActual={sesion} actions={actions} />
+        ) : pantalla === 'mipanel' && esAdmin ? (
+          <MiPanelView
+            state={state}
+            usuario={sesion}
+            proyectos={proyectosVisibles}
+            hoy={HOY}
+            onAbrirTarea={abrirDetalle}
+          />
+        ) : pantalla === 'resumen' ? (
+          <ResumenView
+            state={state}
+            proyectos={proyectosVisibles}
+            hoy={HOY}
+            onAbrirProyecto={onSelectProyecto}
+          />
         ) : proyecto && contadores ? (
           <>
             <Header
               proyecto={proyecto}
               modo={repo.modo}
-              usuario={sesion}
               vista={vista}
               onVista={setVista}
               contadores={contadores}
               hoy={HOY}
-              onLogout={onLogout}
             />
             <div className="content">
               {vista === 'tabla' ? (
@@ -327,9 +356,16 @@ export default function App() {
                   hoy={HOY}
                   puedeEditar={esAdmin}
                   actions={actions}
+                  onAbrirTarea={abrirDetalle}
                 />
               ) : (
-                <GanttView state={state} proyectoId={proyecto.id} frenteSel={frenteSel} hoy={HOY} />
+                <GanttView
+                  state={state}
+                  proyectoId={proyecto.id}
+                  frenteSel={frenteSel}
+                  hoy={HOY}
+                  onAbrirTarea={abrirDetalle}
+                />
               )}
             </div>
           </>
@@ -346,6 +382,17 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {tareaDetalle && (
+        <TaskPanel
+          state={state}
+          tarea={tareaDetalle}
+          hoy={HOY}
+          puedeEditar={esAdmin}
+          actions={actions}
+          onClose={() => setTareaDetalleId(null)}
+        />
+      )}
     </div>
   )
 }

@@ -64,6 +64,7 @@ const toTarea = (r: Row): Tarea => ({
   fechaReal: r.fecha_real ?? undefined,
   comentarios: r.comentarios ?? undefined,
   orden: r.orden,
+  archivada: r.archivada ?? false,
 })
 const toReplan = (r: Row): Replanificacion => ({
   id: r.id,
@@ -202,6 +203,7 @@ export class SupabaseRepo implements Repo {
       if (patch.hecha === false) upd.fecha_real = null
     }
     if ('fechaReal' in patch) upd.fecha_real = patch.fechaReal ?? null
+    if ('archivada' in patch) upd.archivada = patch.archivada ?? false
     const row = unwrap(await this.db.from('tarea').update(upd).eq('id', id).select().single())
     return toTarea(row)
   }

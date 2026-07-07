@@ -18,6 +18,8 @@ interface Props {
   /** false para el rol Cliente: misma vista, sin ninguna accion de edicion. */
   puedeEditar: boolean
   actions: Actions
+  /** Abre el panel lateral de detalle (7.2). */
+  onAbrirTarea: (tareaId: string) => void
 }
 
 type ModalState =
@@ -27,7 +29,7 @@ type ModalState =
   | { tipo: 'tarea-editar'; tarea: Tarea }
   | null
 
-export function TableView({ state, proyectoId, frenteSel, hoy, puedeEditar, actions }: Props) {
+export function TableView({ state, proyectoId, frenteSel, hoy, puedeEditar, actions, onAbrirTarea }: Props) {
   const [modal, setModal] = useState<ModalState>(null)
 
   const frentes = state.frentes
@@ -37,7 +39,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, puedeEditar, acti
   return (
     <div className="tabla-wrap">
       {frentes.map((f) => (
-        <FrentePagina key={f.id} frente={f} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} />
+        <FrentePagina key={f.id} frente={f} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} onAbrirTarea={onAbrirTarea} />
       ))}
       {frentes.length === 0 && (
         <p className="vacio-inline">Este proyecto aun no tiene frentes. Crea uno desde la barra lateral.</p>
@@ -104,6 +106,7 @@ function FrentePagina({
   puedeEditar,
   actions,
   setModal,
+  onAbrirTarea,
 }: {
   frente: Frente
   state: AppState
@@ -111,6 +114,7 @@ function FrentePagina({
   puedeEditar: boolean
   actions: Actions
   setModal: (m: ModalState) => void
+  onAbrirTarea: (id: string) => void
 }) {
   const subs = state.subFrentes
     .filter((sf) => sf.frenteId === frente.id)
@@ -127,7 +131,7 @@ function FrentePagina({
         )}
       </div>
       {subs.map((sf) => (
-        <SubFrenteTabla key={sf.id} sub={sf} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} />
+        <SubFrenteTabla key={sf.id} sub={sf} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} onAbrirTarea={onAbrirTarea} />
       ))}
       {subs.length === 0 && <p className="vacio-inline">Sin sub frentes en este frente.</p>}
     </section>
@@ -141,6 +145,7 @@ function SubFrenteTabla({
   puedeEditar,
   actions,
   setModal,
+  onAbrirTarea,
 }: {
   sub: SubFrente
   state: AppState
@@ -148,10 +153,14 @@ function SubFrenteTabla({
   puedeEditar: boolean
   actions: Actions
   setModal: (m: ModalState) => void
+  onAbrirTarea: (id: string) => void
 }) {
-  const tareas = state.tareas
+  const todas = state.tareas
     .filter((t) => t.subFrenteId === sub.id)
     .sort((a, b) => a.orden - b.orden)
+  // Las archivadas (canceladas, 6.3) salen del plan; quedan consultables abajo.
+  const tareas = todas.filter((t) => !t.archivada)
+  const archivadas = todas.filter((t) => t.archivada)
 
   return (
     <div className="subfrente">
@@ -182,7 +191,7 @@ function SubFrenteTabla({
         </thead>
         <tbody>
           {tareas.map((t) => (
-            <TareaFila key={t.id} tarea={t} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} />
+            <TareaFila key={t.id} tarea={t} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} onAbrirTarea={onAbrirTarea} />
           ))}
           {puedeEditar && (
             <tr className="fila-add">
@@ -195,6 +204,29 @@ function SubFrenteTabla({
           )}
         </tbody>
       </table>
+
+      {archivadas.length > 0 && (
+        <details className="archivadas">
+          <summary>
+            {archivadas.length} tarea{archivadas.length === 1 ? '' : 's'} archivada{archivadas.length === 1 ? '' : 's'}
+          </summary>
+          <ul>
+            {archivadas.map((t) => (
+              <li key={t.id}>
+                <button className="link-tarea" onClick={() => onAbrirTarea(t.id)}>{t.titulo}</button>
+                {puedeEditar && (
+                  <button
+                    className="link-btn"
+                    onClick={() => actions.updateTarea(t.id, { archivada: false })}
+                  >
+                    Restaurar
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   )
 }
@@ -206,6 +238,7 @@ function TareaFila({
   puedeEditar,
   actions,
   setModal,
+  onAbrirTarea,
 }: {
   tarea: Tarea
   state: AppState
@@ -213,6 +246,7 @@ function TareaFila({
   puedeEditar: boolean
   actions: Actions
   setModal: (m: ModalState) => void
+  onAbrirTarea: (id: string) => void
 }) {
   const color = colorTarea(state, tarea, hoy)
   const est = estadoDerivado(tarea, hoy)
@@ -234,7 +268,13 @@ function TareaFila({
 
       <td className={`tarea-cell tarea-cell--${color}`}>
         <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
-          <span className="tarea-cell__row">
+          <span
+            className="tarea-cell__row tarea-cell__link"
+            role="button"
+            tabIndex={0}
+            onClick={() => onAbrirTarea(tarea.id)}
+            onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
+          >
             {est === 'hecha' && <span className="tarea-cell__mark mk-verde">✓</span>}
             {tarea.titulo}
           </span>
@@ -278,8 +318,13 @@ function TareaFila({
           <button className="icon-btn" title="Editar tarea" onClick={() => setModal({ tipo: 'tarea-editar', tarea })}>✎</button>
           <button
             className="icon-btn"
-            title="Eliminar tarea"
-            onClick={() => { if (confirm(`¿Eliminar la tarea "${tarea.titulo}"?`)) actions.deleteTarea(tarea.id) }}
+            title="Archivar (cancelar): sale del plan y conserva su historial"
+            onClick={() => { if (confirm(`¿Archivar la tarea "${tarea.titulo}"? Sale del plan y conserva su historial.`)) actions.updateTarea(tarea.id, { archivada: true }) }}
+          >⤵</button>
+          <button
+            className="icon-btn"
+            title="Eliminar tarea (definitivo)"
+            onClick={() => { if (confirm(`¿Eliminar definitivamente la tarea "${tarea.titulo}"? Se pierde su historial; si solo quieres cancelarla, usa Archivar.`)) actions.deleteTarea(tarea.id) }}
           >🗑</button>
         </td>
       )}

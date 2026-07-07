@@ -43,7 +43,7 @@ export interface NuevaTarea {
   comentarios?: string
 }
 export type PatchTarea = Partial<
-  Pick<Tarea, 'titulo' | 'descripcion' | 'responsableId' | 'hecha' | 'fechaReal' | 'comentarios'>
+  Pick<Tarea, 'titulo' | 'descripcion' | 'responsableId' | 'hecha' | 'fechaReal' | 'comentarios' | 'archivada'>
 >
 
 export interface NuevoUsuario {

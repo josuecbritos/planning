@@ -3,8 +3,10 @@
 Herramienta de planificación de proyectos con gestión interna y visibilidad
 controlada al cliente. Implementa las vistas **Tabla** (tipo Monday) y **Gantt**
 (grilla tipo Excel) con la lógica de estados derivados y colores de la sección 6
-del Documento Funcional, el **CRUD** completo sobre **Supabase** (Fase 1) y
-**login con roles Admin/Cliente + acceso por proyecto** (Fase 2, Módulo 1).
+del Documento Funcional, el **CRUD** completo sobre **Supabase** (Fase 1),
+**login con roles Admin/Cliente + acceso por proyecto** (Fase 2, Módulo 1) y el
+**pulido de la Fase 3**: Mi Panel, panel lateral de detalle, archivo de
+canceladas e indicadores por proyecto.
 
 ## Dos modos de ejecución
 
@@ -87,6 +89,20 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   cliente solo lee sus proyectos asignados y que solo los admins escriben — la interfaz
   es una capa de conveniencia, no la barrera de seguridad.
 
+**Fase 3 — Pulido**
+- **Mi Panel (Módulo 3)**: todas mis tareas de todos los proyectos, ordenadas con las
+  vencidas primero, filtro por estado (todas / pendientes / vencidas / replanificadas
+  abiertas / hechas) y por proyecto.
+- **Panel lateral de detalle** (backlog de 7.2): click sobre una tarea o una marca del
+  Gantt abre un panel con el detalle completo, la línea de tiempo del historial y las
+  acciones operativas (marcar hecha, replanificar, archivar) para admins.
+- **Archivo de canceladas (6.3)**: archivar una tarea la saca del plan (vistas y
+  contadores) conservando su historial; queda consultable por sub frente y puede
+  restaurarse. Distinto de eliminar (definitivo).
+- **Resumen / indicadores por proyecto**: tarjetas con % de avance, barra de progreso y
+  contadores (hechas, pendientes, por replanificar, replanificadas abiertas) de todos
+  los proyectos visibles. Disponible también para clientes (con sus proyectos).
+
 ## Modelo de datos y esquema
 
 - `supabase/migrations/20260707000001_init.sql` — entidades de la sección 5:
@@ -97,6 +113,8 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   `auth.users`, helpers de sesión (`es_admin()`, `usuario_actual_id()`,
   `proyectos_visibles()`), trigger del límite de 2 admins, y **RLS real por rol**
   que reemplaza la permisiva.
+- `supabase/migrations/20260707000003_fase3_archivo.sql` — Fase 3: campo
+  `archivada` en `tarea` (archivo de canceladas).
 
 Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
 mismo email que registraste en el Módulo de Usuarios). Al primer login se vinculan.
@@ -124,11 +142,12 @@ src/
   components/
     Sidebar, Header, TableView, GanttView, Marca, Legend, HoverCard,
     TaskDetail, Modal, TextPromptModal, ProyectoModal, TareaModal,
-    LoginPage, UsersView, UsuarioModal
+    LoginPage, UsersView, UsuarioModal, TaskPanel, MiPanelView, ResumenView
 supabase/
   migrations/
     …_init.sql           Esquema + trigger de historial + RPC
     …_fase2_auth.sql     Auth, límite 2 admins y RLS por rol
+    …_fase3_archivo.sql  Campo archivada (archivo de canceladas)
   seed.sql               Datos de arranque (opcional)
 docs/
   documento-funcional-v3.1.md
@@ -139,8 +158,11 @@ docs/
 - **Fase 1 — Uso interno:** ✅ base de datos + CRUD + las dos vistas. Sin login.
 - **Fase 2 — Clientes:** ✅ login, roles admin/cliente, asignación de proyectos por
   cliente, RLS real (Módulo 1).
-- **Fase 3 — Pulido:** Mi Panel (Módulo 3), panel lateral de detalle, archivo de canceladas,
-  indicadores por proyecto.
+- **Fase 3 — Pulido:** ✅ Mi Panel (Módulo 3), panel lateral de detalle, archivo de
+  canceladas, indicadores por proyecto.
+
+Con esto, el alcance de la Versión 1 del Documento Funcional v3.1 está completo.
+Siguiente hito natural: **despliegue** (Vercel/Netlify + proyecto Supabase productivo).
 
 ## Stack
 

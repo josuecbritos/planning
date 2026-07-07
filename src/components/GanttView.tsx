@@ -23,6 +23,8 @@ interface Props {
   proyectoId: string
   frenteSel: FrenteSel
   hoy: string
+  /** Abre el panel lateral de detalle (7.2). */
+  onAbrirTarea: (tareaId: string) => void
 }
 
 interface FilaGantt {
@@ -36,7 +38,7 @@ interface FilaGantt {
   esPrimeraGlobal: boolean
 }
 
-export function GanttView({ state, proyectoId, frenteSel, hoy }: Props) {
+export function GanttView({ state, proyectoId, frenteSel, hoy, onAbrirTarea }: Props) {
   // -- Filas ordenadas con spans para celdas combinadas --
   const filas = useMemo<FilaGantt[]>(() => {
     const out: FilaGantt[] = []
@@ -49,15 +51,15 @@ export function GanttView({ state, proyectoId, frenteSel, hoy }: Props) {
       const subs = state.subFrentes
         .filter((sf) => sf.frenteId === f.id)
         .sort((a, b) => a.orden - b.orden)
-      const tareasFrente = state.tareas.filter((t) =>
-        subs.some((sf) => sf.id === t.subFrenteId),
+      const tareasFrente = state.tareas.filter(
+        (t) => !t.archivada && subs.some((sf) => sf.id === t.subFrenteId),
       )
       if (tareasFrente.length === 0) continue
 
       let inicioFrente = true
       for (const sf of subs) {
         const tareas = state.tareas
-          .filter((t) => t.subFrenteId === sf.id)
+          .filter((t) => t.subFrenteId === sf.id && !t.archivada)
           .sort((a, b) => a.orden - b.orden)
         if (tareas.length === 0) continue
 
@@ -159,6 +161,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy }: Props) {
                   dias={dias}
                   state={state}
                   hoy={hoy}
+                  onAbrirTarea={onAbrirTarea}
                 />
               ))}
             </tbody>
@@ -174,11 +177,13 @@ function FilaTarea({
   dias,
   state,
   hoy,
+  onAbrirTarea,
 }: {
   fila: FilaGantt
   dias: ISODate[]
   state: AppState
   hoy: string
+  onAbrirTarea: (id: string) => void
 }) {
   const { tarea } = fila
   const color = colorTarea(state, tarea, hoy)
@@ -207,7 +212,15 @@ function FilaTarea({
       )}
       <td className={`fija fija--tarea tarea-cell--${color}`}>
         <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
-          {tarea.titulo}
+          <span
+            className="tarea-cell__link"
+            role="button"
+            tabIndex={0}
+            onClick={() => onAbrirTarea(tarea.id)}
+            onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
+          >
+            {tarea.titulo}
+          </span>
         </HoverCard>
       </td>
       <td className="fija fija--resp">
@@ -224,7 +237,14 @@ function FilaTarea({
           >
             {tipo && (
               <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
-                <Marca tipo={tipo} />
+                <span
+                  className="tarea-cell__link"
+                  role="button"
+                  tabIndex={-1}
+                  onClick={() => onAbrirTarea(tarea.id)}
+                >
+                  <Marca tipo={tipo} />
+                </span>
               </HoverCard>
             )}
           </td>

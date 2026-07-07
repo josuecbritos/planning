@@ -1,23 +1,21 @@
-import type { Proyecto, Usuario } from '../types'
+import type { Proyecto } from '../types'
 import type { Vista } from '../App'
 import type { Contadores } from '../lib/derive'
 import { etiquetaLarga } from '../lib/dates'
 
 // Encabezado del proyecto (7.2): contadores por estado derivado + toggle de
-// vista + sesion actual.
+// vista. La sesion vive en el pie del sidebar.
 
 interface Props {
   proyecto: Proyecto
   modo: 'memoria' | 'supabase'
-  usuario: Usuario
   vista: Vista
   onVista: (v: Vista) => void
   contadores: Contadores
   hoy: string
-  onLogout: () => void
 }
 
-export function Header({ proyecto, modo, usuario, vista, onVista, contadores, hoy, onLogout }: Props) {
+export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Props) {
   const c = contadores
   return (
     <header className="topbar">
@@ -39,14 +37,6 @@ export function Header({ proyecto, modo, usuario, vista, onVista, contadores, ho
               Gantt
             </button>
           </div>
-          <span className="sesion" title={usuario.email}>
-            <span className="resp-badge">{usuario.iniciales}</span>
-            <span className="sesion__info">
-              <b>{usuario.nombre}</b>
-              <small>{usuario.rol === 'admin' ? 'Admin' : 'Cliente'}</small>
-            </span>
-            <button className="link-btn sesion__salir" onClick={onLogout}>Salir</button>
-          </span>
         </div>
       </div>
 

@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import type { AppState, Proyecto } from '../types'
+import type { AppState, Proyecto, Usuario } from '../types'
 import type { Actions, FrenteSel, Pantalla } from '../App'
 import { TextPromptModal } from './TextPromptModal'
 import { ProyectoModal } from './ProyectoModal'
 
 // Barra lateral. Los clientes ven solo sus proyectos asignados y sin ninguna
-// accion de edicion; los admins tienen CRUD y la seccion Administracion.
+// accion de edicion; los admins tienen CRUD, Mi Panel y Administracion.
+// La sesion (usuario + salir) vive en el pie, visible en toda pantalla.
 
 interface Props {
   state: AppState
@@ -15,9 +16,11 @@ interface Props {
   frenteSel: FrenteSel
   pantalla: Pantalla
   esAdmin: boolean
+  usuario: Usuario
   onSelectProyecto: (id: string) => void
   onSelectFrente: (f: FrenteSel) => void
   onSelectPantalla: (p: Pantalla) => void
+  onLogout: () => void
   actions: Actions
 }
 
@@ -35,9 +38,11 @@ export function Sidebar({
   frenteSel,
   pantalla,
   esAdmin,
+  usuario,
   onSelectProyecto,
   onSelectFrente,
   onSelectPantalla,
+  onLogout,
   actions,
 }: Props) {
   const [modal, setModal] = useState<ModalState>(null)
@@ -48,12 +53,12 @@ export function Sidebar({
 
   function tareasEnFrente(frenteId: string): number {
     const subIds = new Set(state.subFrentes.filter((sf) => sf.frenteId === frenteId).map((sf) => sf.id))
-    return state.tareas.filter((t) => subIds.has(t.subFrenteId)).length
+    return state.tareas.filter((t) => subIds.has(t.subFrenteId) && !t.archivada).length
   }
   function tareasEnProyecto(proyectoId: string): number {
     const frenteIds = new Set(state.frentes.filter((f) => f.proyectoId === proyectoId).map((f) => f.id))
     const subIds = new Set(state.subFrentes.filter((sf) => frenteIds.has(sf.frenteId)).map((sf) => sf.id))
-    return state.tareas.filter((t) => subIds.has(t.subFrenteId)).length
+    return state.tareas.filter((t) => subIds.has(t.subFrenteId) && !t.archivada).length
   }
 
   const proyectoEnEdicion =
@@ -64,6 +69,23 @@ export function Sidebar({
       <div className="sidebar__brand">
         Planificador
         <small>Documento Funcional v3.1</small>
+      </div>
+
+      <div className="nav-proyectos nav-pantallas">
+        <button
+          className={`nav-frente nav-pantalla${pantalla === 'resumen' ? ' nav-frente--activo' : ''}`}
+          onClick={() => onSelectPantalla('resumen')}
+        >
+          <span>Resumen</span>
+        </button>
+        {esAdmin && (
+          <button
+            className={`nav-frente nav-pantalla${pantalla === 'mipanel' ? ' nav-frente--activo' : ''}`}
+            onClick={() => onSelectPantalla('mipanel')}
+          >
+            <span>Mi Panel</span>
+          </button>
+        )}
       </div>
 
       <div className="sidebar__section">
@@ -157,6 +179,17 @@ export function Sidebar({
           </div>
         </>
       )}
+
+      <div className="sidebar__footer">
+        <span className="sesion" title={usuario.email}>
+          <span className="resp-badge">{usuario.iniciales}</span>
+          <span className="sesion__info">
+            <b>{usuario.nombre}</b>
+            <small>{usuario.rol === 'admin' ? 'Admin' : 'Cliente'}</small>
+          </span>
+        </span>
+        <button className="link-btn sesion__salir" onClick={onLogout}>Salir</button>
+      </div>
 
       {modal?.tipo === 'proyecto-nuevo' && (
         <ProyectoModal

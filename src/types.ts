@@ -82,6 +82,11 @@ export interface Tarea {
   fechaReal?: ISODate
   comentarios?: string
   orden: number
+  /**
+   * Archivo de canceladas (6.3): la tarea sale del plan (vistas y
+   * contadores) pero conserva su historial. Puede restaurarse.
+   */
+  archivada?: boolean
 }
 
 /** Estado global de la aplicacion. */

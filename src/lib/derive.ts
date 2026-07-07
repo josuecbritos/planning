@@ -94,14 +94,16 @@ export interface Contadores {
 }
 
 export function contar(state: AppState, tareas: Tarea[], hoy: string): Contadores {
+  // Las archivadas (canceladas, 6.3) salen del plan: no cuentan.
+  const activas = tareas.filter((t) => !t.archivada)
   const c: Contadores = {
     hechas: 0,
     pendientes: 0,
     porReplanificar: 0,
     replanificadasAbiertas: 0,
-    total: tareas.length,
+    total: activas.length,
   }
-  for (const t of tareas) {
+  for (const t of activas) {
     const color = colorTarea(state, t, hoy)
     if (color === 'verde') c.hechas++
     else if (color === 'rojo') c.porReplanificar++
