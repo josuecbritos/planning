@@ -1,38 +1,100 @@
+import { useState } from 'react'
 import type { AppState, Frente, SubFrente, Tarea } from '../types'
-import type { FrenteSel } from '../App'
+import type { Actions, FrenteSel } from '../App'
 import { colorTarea, estadoDerivado, hechaTarde } from '../lib/derive'
 import { cmp, etiquetaCorta } from '../lib/dates'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
+import { TextPromptModal } from './TextPromptModal'
+import { TareaModal } from './TareaModal'
 
-// Vista Tabla tipo Monday (4.2 / 7.2). Cada Frente es una pagina; dentro, cada
-// Sub Frente es una tabla independiente.
+// Vista Tabla tipo Monday (4.2 / 7.2) con CRUD de sub frentes y tareas.
 
 interface Props {
   state: AppState
+  proyectoId: string
   frenteSel: FrenteSel
   hoy: string
-  onToggleHecha: (tareaId: string) => void
-  onCambiarFecha: (tareaId: string, nueva: string) => void
+  /** false para el rol Cliente: misma vista, sin ninguna accion de edicion. */
+  puedeEditar: boolean
+  actions: Actions
+  /** Abre el panel lateral de detalle (7.2). */
+  onAbrirTarea: (tareaId: string) => void
 }
 
-export function TableView({ state, frenteSel, hoy, onToggleHecha, onCambiarFecha }: Props) {
+type ModalState =
+  | { tipo: 'sub-nuevo'; frenteId: string }
+  | { tipo: 'sub-editar'; id: string; nombre: string }
+  | { tipo: 'tarea-nueva'; subFrenteId: string }
+  | { tipo: 'tarea-editar'; tarea: Tarea }
+  | null
+
+export function TableView({ state, proyectoId, frenteSel, hoy, puedeEditar, actions, onAbrirTarea }: Props) {
+  const [modal, setModal] = useState<ModalState>(null)
+
   const frentes = state.frentes
-    .filter((f) => frenteSel === 'todos' || f.id === frenteSel)
+    .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
     .sort((a, b) => a.orden - b.orden)
 
   return (
     <div className="tabla-wrap">
       {frentes.map((f) => (
-        <FrentePagina
-          key={f.id}
-          frente={f}
-          state={state}
-          hoy={hoy}
-          onToggleHecha={onToggleHecha}
-          onCambiarFecha={onCambiarFecha}
-        />
+        <FrentePagina key={f.id} frente={f} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} onAbrirTarea={onAbrirTarea} />
       ))}
+      {frentes.length === 0 && (
+        <p className="vacio-inline">Este proyecto aun no tiene frentes. Crea uno desde la barra lateral.</p>
+      )}
+
+      {modal?.tipo === 'sub-nuevo' && (
+        <TextPromptModal
+          titulo="Nuevo sub frente"
+          label="Nombre del sub frente"
+          textoBoton="Crear"
+          onSubmit={(nombre) => actions.createSubFrente({ frenteId: modal.frenteId, nombre })}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.tipo === 'sub-editar' && (
+        <TextPromptModal
+          titulo="Renombrar sub frente"
+          label="Nombre del sub frente"
+          valorInicial={modal.nombre}
+          onSubmit={(nombre) => actions.updateSubFrente(modal.id, { nombre })}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.tipo === 'tarea-nueva' && (
+        <TareaModal
+          usuarios={state.usuarios.filter((u) => u.rol === 'admin' && u.activo)}
+          fechaSugerida={hoy}
+          onSubmit={(d) =>
+            actions.createTarea({
+              subFrenteId: modal.subFrenteId,
+              titulo: d.titulo,
+              responsableId: d.responsableId,
+              fechaObjetivo: d.fechaObjetivo,
+              descripcion: d.descripcion,
+              comentarios: d.comentarios,
+            })
+          }
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.tipo === 'tarea-editar' && (
+        <TareaModal
+          tarea={modal.tarea}
+          usuarios={state.usuarios.filter((u) => u.rol === 'admin' && u.activo)}
+          onSubmit={(d) =>
+            actions.updateTarea(modal.tarea.id, {
+              titulo: d.titulo,
+              responsableId: d.responsableId,
+              descripcion: d.descripcion,
+              comentarios: d.comentarios,
+            })
+          }
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   )
 }
@@ -41,14 +103,18 @@ function FrentePagina({
   frente,
   state,
   hoy,
-  onToggleHecha,
-  onCambiarFecha,
+  puedeEditar,
+  actions,
+  setModal,
+  onAbrirTarea,
 }: {
   frente: Frente
   state: AppState
   hoy: string
-  onToggleHecha: (id: string) => void
-  onCambiarFecha: (id: string, nueva: string) => void
+  puedeEditar: boolean
+  actions: Actions
+  setModal: (m: ModalState) => void
+  onAbrirTarea: (id: string) => void
 }) {
   const subs = state.subFrentes
     .filter((sf) => sf.frenteId === frente.id)
@@ -56,17 +122,18 @@ function FrentePagina({
 
   return (
     <section>
-      <h2 className="frente-titulo">{frente.nombre}</h2>
+      <div className="frente-cabecera">
+        <h2 className="frente-titulo">{frente.nombre}</h2>
+        {puedeEditar && (
+          <button className="btn btn--sm" onClick={() => setModal({ tipo: 'sub-nuevo', frenteId: frente.id })}>
+            + Sub Frente
+          </button>
+        )}
+      </div>
       {subs.map((sf) => (
-        <SubFrenteTabla
-          key={sf.id}
-          sub={sf}
-          state={state}
-          hoy={hoy}
-          onToggleHecha={onToggleHecha}
-          onCambiarFecha={onCambiarFecha}
-        />
+        <SubFrenteTabla key={sf.id} sub={sf} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} onAbrirTarea={onAbrirTarea} />
       ))}
+      {subs.length === 0 && <p className="vacio-inline">Sin sub frentes en este frente.</p>}
     </section>
   )
 }
@@ -75,23 +142,40 @@ function SubFrenteTabla({
   sub,
   state,
   hoy,
-  onToggleHecha,
-  onCambiarFecha,
+  puedeEditar,
+  actions,
+  setModal,
+  onAbrirTarea,
 }: {
   sub: SubFrente
   state: AppState
   hoy: string
-  onToggleHecha: (id: string) => void
-  onCambiarFecha: (id: string, nueva: string) => void
+  puedeEditar: boolean
+  actions: Actions
+  setModal: (m: ModalState) => void
+  onAbrirTarea: (id: string) => void
 }) {
-  const tareas = state.tareas
+  const todas = state.tareas
     .filter((t) => t.subFrenteId === sub.id)
     .sort((a, b) => a.orden - b.orden)
+  // Las archivadas (canceladas, 6.3) salen del plan; quedan consultables abajo.
+  const tareas = todas.filter((t) => !t.archivada)
+  const archivadas = todas.filter((t) => t.archivada)
 
   return (
     <div className="subfrente">
       <div className="subfrente__titulo">
-        {sub.nombre} <span className="subfrente__count">· {tareas.length} tareas</span>
+        <span>{sub.nombre} <span className="subfrente__count">· {tareas.length} tareas</span></span>
+        {puedeEditar && (
+          <span className="subfrente__tools">
+            <button className="icon-btn" title="Renombrar" onClick={() => setModal({ tipo: 'sub-editar', id: sub.id, nombre: sub.nombre })}>✎</button>
+            <button
+              className="icon-btn"
+              title="Eliminar sub frente"
+              onClick={() => { if (confirm(`¿Eliminar el sub frente "${sub.nombre}" y sus tareas?`)) actions.deleteSubFrente(sub.id) }}
+            >🗑</button>
+          </span>
+        )}
       </div>
       <table className="tareas">
         <thead>
@@ -102,21 +186,47 @@ function SubFrenteTabla({
             <th className="col-fecha">F. original</th>
             <th className="col-fecha">F. objetivo</th>
             <th className="col-fecha">F. real</th>
+            {puedeEditar && <th className="col-acc"></th>}
           </tr>
         </thead>
         <tbody>
           {tareas.map((t) => (
-            <TareaFila
-              key={t.id}
-              tarea={t}
-              state={state}
-              hoy={hoy}
-              onToggleHecha={onToggleHecha}
-              onCambiarFecha={onCambiarFecha}
-            />
+            <TareaFila key={t.id} tarea={t} state={state} hoy={hoy} puedeEditar={puedeEditar} actions={actions} setModal={setModal} onAbrirTarea={onAbrirTarea} />
           ))}
+          {puedeEditar && (
+            <tr className="fila-add">
+              <td colSpan={7}>
+                <button className="btn btn--ghost" onClick={() => setModal({ tipo: 'tarea-nueva', subFrenteId: sub.id })}>
+                  + Tarea
+                </button>
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
+
+      {archivadas.length > 0 && (
+        <details className="archivadas">
+          <summary>
+            {archivadas.length} tarea{archivadas.length === 1 ? '' : 's'} archivada{archivadas.length === 1 ? '' : 's'}
+          </summary>
+          <ul>
+            {archivadas.map((t) => (
+              <li key={t.id}>
+                <button className="link-tarea" onClick={() => onAbrirTarea(t.id)}>{t.titulo}</button>
+                {puedeEditar && (
+                  <button
+                    className="link-btn"
+                    onClick={() => actions.updateTarea(t.id, { archivada: false })}
+                  >
+                    Restaurar
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   )
 }
@@ -125,14 +235,18 @@ function TareaFila({
   tarea,
   state,
   hoy,
-  onToggleHecha,
-  onCambiarFecha,
+  puedeEditar,
+  actions,
+  setModal,
+  onAbrirTarea,
 }: {
   tarea: Tarea
   state: AppState
   hoy: string
-  onToggleHecha: (id: string) => void
-  onCambiarFecha: (id: string, nueva: string) => void
+  puedeEditar: boolean
+  actions: Actions
+  setModal: (m: ModalState) => void
+  onAbrirTarea: (id: string) => void
 }) {
   const color = colorTarea(state, tarea, hoy)
   const est = estadoDerivado(tarea, hoy)
@@ -146,14 +260,21 @@ function TareaFila({
           className="chk"
           type="checkbox"
           checked={tarea.hecha}
-          onChange={() => onToggleHecha(tarea.id)}
+          disabled={!puedeEditar}
+          onChange={() => actions.toggleHecha(tarea.id, !tarea.hecha)}
           aria-label={`Marcar hecha: ${tarea.titulo}`}
         />
       </td>
 
       <td className={`tarea-cell tarea-cell--${color}`}>
         <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
-          <span className="tarea-cell__row">
+          <span
+            className="tarea-cell__row tarea-cell__link"
+            role="button"
+            tabIndex={0}
+            onClick={() => onAbrirTarea(tarea.id)}
+            onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
+          >
             {est === 'hecha' && <span className="tarea-cell__mark mk-verde">✓</span>}
             {tarea.titulo}
           </span>
@@ -161,23 +282,23 @@ function TareaFila({
       </td>
 
       <td className="col-resp">
-        {resp && (
-          <span className="resp-badge" title={resp.nombre}>
-            {resp.iniciales}
-          </span>
-        )}
+        {resp && <span className="resp-badge" title={resp.nombre}>{resp.iniciales}</span>}
       </td>
 
       <td className="col-fecha">{etiquetaCorta(tarea.fechaOriginal)}</td>
 
       <td className={`col-fecha${est === 'vencida' ? ' fecha-vencida' : ''}`}>
-        <input
-          className="fecha-input"
-          type="date"
-          value={tarea.fechaObjetivo}
-          onChange={(e) => e.target.value && onCambiarFecha(tarea.id, e.target.value)}
-          aria-label={`Fecha objetivo: ${tarea.titulo}`}
-        />
+        {puedeEditar ? (
+          <input
+            className="fecha-input"
+            type="date"
+            value={tarea.fechaObjetivo}
+            onChange={(e) => e.target.value && actions.cambiarFechaObjetivo(tarea.id, e.target.value)}
+            aria-label={`Fecha objetivo: ${tarea.titulo}`}
+          />
+        ) : (
+          etiquetaCorta(tarea.fechaObjetivo)
+        )}
         {est === 'vencida' && <span className="replanificar-tag">Replanificar →</span>}
       </td>
 
@@ -191,6 +312,22 @@ function TareaFila({
           '—'
         )}
       </td>
+
+      {puedeEditar && (
+        <td className="col-acc">
+          <button className="icon-btn" title="Editar tarea" onClick={() => setModal({ tipo: 'tarea-editar', tarea })}>✎</button>
+          <button
+            className="icon-btn"
+            title="Archivar (cancelar): sale del plan y conserva su historial"
+            onClick={() => { if (confirm(`¿Archivar la tarea "${tarea.titulo}"? Sale del plan y conserva su historial.`)) actions.updateTarea(tarea.id, { archivada: true }) }}
+          >⤵</button>
+          <button
+            className="icon-btn"
+            title="Eliminar tarea (definitivo)"
+            onClick={() => { if (confirm(`¿Eliminar definitivamente la tarea "${tarea.titulo}"? Se pierde su historial; si solo quieres cancelarla, usa Archivar.`)) actions.deleteTarea(tarea.id) }}
+          >🗑</button>
+        </td>
+      )}
     </tr>
   )
 }

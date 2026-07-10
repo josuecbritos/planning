@@ -10,11 +10,20 @@ export type ISODate = string
 export interface Usuario {
   id: string
   nombre: string
-  /** Iniciales usadas como responsable en el plan (DV/JB/FS/IC). */
+  /** Iniciales para el badge de responsable (DV/JB/...). */
   iniciales: string
   email: string
   rol: Rol
   activo: boolean
+  /** Vinculo con Supabase Auth (null hasta que la persona inicia sesion). */
+  authId?: string
+}
+
+/** Acceso de Cliente a Proyecto (5.7). Los Admin no la necesitan (ven todo). */
+export interface Acceso {
+  usuarioId: string
+  proyectoId: string
+  fechaAsignacion: string
 }
 
 export interface Proyecto {
@@ -73,9 +82,14 @@ export interface Tarea {
   fechaReal?: ISODate
   comentarios?: string
   orden: number
+  /**
+   * Archivo de canceladas (6.3): la tarea sale del plan (vistas y
+   * contadores) pero conserva su historial. Puede restaurarse.
+   */
+  archivada?: boolean
 }
 
-/** Estado global del dummy (equivale al "documento" en memoria). */
+/** Estado global de la aplicacion. */
 export interface AppState {
   usuarios: Usuario[]
   proyectos: Proyecto[]
@@ -83,6 +97,7 @@ export interface AppState {
   subFrentes: SubFrente[]
   tareas: Tarea[]
   historial: Replanificacion[]
+  accesos: Acceso[]
 }
 
 // ---- Estados derivados (seccion 6.2) ----

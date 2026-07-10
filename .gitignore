@@ -12,6 +12,11 @@ dist-ssr
 # Build info
 *.tsbuildinfo
 
+# Env
+.env
+.env.*
+!.env.example
+
 # Editor
 .vscode/*
 !.vscode/extensions.json
