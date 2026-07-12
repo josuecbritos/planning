@@ -65,10 +65,17 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 - **Colores de gestión (6.5):** verde = lista · rojo = replanificar · ámbar = vigílala ·
   sin color = en curso.
 
-**CRUD (Fase 1)**
+**CRUD (Fase 1) — con interacción inline (Bloque 2)**
 - Proyectos: crear / editar (nombre, descripción, color, estado) / eliminar. Multi-proyecto.
-- Frentes y Sub Frentes: crear / renombrar / eliminar.
-- Tareas: crear / editar / eliminar; marcar hecha; replanificar (cambiar fecha objetivo).
+- Frentes: crear / renombrar / eliminar (sidebar). Sub Frentes: **crear y renombrar
+  inline** en la tabla (sin ventanas) / eliminar.
+- Tareas: **creación inline** ("+ Tarea" abre una fila vacía con el cursor en el
+  título; Enter guarda y encadena la siguiente), **edición inline** de título y
+  responsable (click directo en la celda), marcar hecha, replanificar (un click en
+  la fecha abre el calendario; elegir guarda), archivar y eliminar.
+- **Comentarios acumulables** por tarea (N5): hilo con autor y fecha, append-only —
+  cada comentario suma, nunca reemplaza. Chip 💬 en la fila; el hilo vive en el
+  panel de detalle. Comentan los admins; el cliente lo lee.
 
 **Historial de replanificaciones (5.6)**
 - En Supabase, un **trigger nativo** registra cada cambio de `fecha_objetivo`, de modo
@@ -119,6 +126,9 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   `INSERT … RETURNING` de proyecto violaba RLS porque la política de SELECT
   dependía de una función que consulta la propia tabla con el snapshot previo
   al insert; se reescriben las políticas con expresión directa.
+- `supabase/migrations/20260707000005_comentarios.sql` — tabla `comentario`
+  (hilo acumulable por tarea, append-only; comentan admins, leen todos los
+  que ven la tarea). Migra el texto legado de `tarea.comentarios`.
 
 Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
 mismo email que registraste en el Módulo de Usuarios). Al primer login se vinculan.

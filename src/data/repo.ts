@@ -1,6 +1,7 @@
 import type {
   Acceso,
   AppState,
+  Comentario,
   Frente,
   ISODate,
   Proyecto,
@@ -94,4 +95,7 @@ export interface Repo {
   /** Asigna un proyecto a un usuario Cliente (tabla 5.7). */
   asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso>
   quitarAcceso(usuarioId: string, proyectoId: string): Promise<void>
+
+  /** Agrega un comentario al hilo de la tarea (N5, append-only). */
+  addComentario(tareaId: string, texto: string, autorId?: string): Promise<Comentario>
 }

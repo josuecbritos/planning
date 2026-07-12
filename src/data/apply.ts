@@ -1,6 +1,7 @@
 import type {
   Acceso,
   AppState,
+  Comentario,
   Frente,
   Proyecto,
   Replanificacion,
@@ -51,6 +52,10 @@ export function removeAcceso(s: AppState, usuarioId: string, proyectoId: string)
   }
 }
 
+export function addComentario(s: AppState, c: Comentario): AppState {
+  return { ...s, comentarios: [...s.comentarios, c] }
+}
+
 /** Reemplaza el historial de una tarea por la lista dada. */
 export function setHistorialTarea(s: AppState, tareaId: string, hist: Replanificacion[]): AppState {
   return {
@@ -66,6 +71,7 @@ export function removeTarea(s: AppState, tareaId: string): AppState {
     ...s,
     tareas: s.tareas.filter((t) => t.id !== tareaId),
     historial: s.historial.filter((h) => h.tareaId !== tareaId),
+    comentarios: s.comentarios.filter((c) => c.tareaId !== tareaId),
   }
 }
 
@@ -76,6 +82,7 @@ export function removeSubFrente(s: AppState, subFrenteId: string): AppState {
     subFrentes: s.subFrentes.filter((sf) => sf.id !== subFrenteId),
     tareas: s.tareas.filter((t) => t.subFrenteId !== subFrenteId),
     historial: s.historial.filter((h) => !tareaIds.has(h.tareaId)),
+    comentarios: s.comentarios.filter((c) => !tareaIds.has(c.tareaId)),
   }
 }
 
@@ -88,6 +95,7 @@ export function removeFrente(s: AppState, frenteId: string): AppState {
     subFrentes: s.subFrentes.filter((sf) => sf.frenteId !== frenteId),
     tareas: s.tareas.filter((t) => !subIds.has(t.subFrenteId)),
     historial: s.historial.filter((h) => !tareaIds.has(h.tareaId)),
+    comentarios: s.comentarios.filter((c) => !tareaIds.has(c.tareaId)),
   }
 }
 
@@ -102,6 +110,7 @@ export function removeProyecto(s: AppState, proyectoId: string): AppState {
     subFrentes: s.subFrentes.filter((sf) => !frenteIds.has(sf.frenteId)),
     tareas: s.tareas.filter((t) => !subIds.has(t.subFrenteId)),
     historial: s.historial.filter((h) => !tareaIds.has(h.tareaId)),
+    comentarios: s.comentarios.filter((c) => !tareaIds.has(c.tareaId)),
     accesos: s.accesos.filter((a) => a.proyectoId !== proyectoId),
   }
 }

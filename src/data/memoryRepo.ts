@@ -1,4 +1,4 @@
-import type { Acceso, AppState, Frente, Proyecto, Replanificacion, SubFrente, Tarea, Usuario } from '../types'
+import type { Acceso, AppState, Comentario, Frente, Proyecto, Replanificacion, SubFrente, Tarea, Usuario } from '../types'
 import { initialState } from './seed'
 import type {
   NuevaTarea,
@@ -45,6 +45,22 @@ function load(): AppState {
         s.accesos = initialState.accesos
           .filter((a) => s.proyectos.some((p) => p.id === a.proyectoId))
           .map((a) => clone(a))
+      }
+      // Migracion N5: estados previos no tienen hilo de comentarios; se
+      // construye desde el campo legado tarea.comentarios (y se limpia).
+      if (!Array.isArray(s.comentarios)) {
+        s.comentarios = []
+        for (const t of s.tareas) {
+          if (t.comentarios && t.comentarios.trim()) {
+            s.comentarios.push({
+              id: `c-mig-${t.id}`,
+              tareaId: t.id,
+              texto: t.comentarios.trim(),
+              timestamp: new Date().toISOString(),
+            })
+            t.comentarios = undefined
+          }
+        }
       }
       return s
     }
@@ -107,6 +123,7 @@ export class MemoryRepo implements Repo {
     this.state.subFrentes = this.state.subFrentes.filter((sf) => !frenteIds.includes(sf.frenteId))
     this.state.tareas = this.state.tareas.filter((t) => !subIds.includes(t.subFrenteId))
     this.state.historial = this.state.historial.filter((h) => !tareaIds.includes(h.tareaId))
+    this.state.comentarios = this.state.comentarios.filter((c) => !tareaIds.includes(c.tareaId))
     this.state.accesos = this.state.accesos.filter((a) => a.proyectoId !== id)
     this.persist()
   }
@@ -133,6 +150,7 @@ export class MemoryRepo implements Repo {
     this.state.subFrentes = this.state.subFrentes.filter((sf) => sf.frenteId !== id)
     this.state.tareas = this.state.tareas.filter((t) => !subIds.includes(t.subFrenteId))
     this.state.historial = this.state.historial.filter((h) => !tareaIds.includes(h.tareaId))
+    this.state.comentarios = this.state.comentarios.filter((c) => !tareaIds.includes(c.tareaId))
     this.persist()
   }
 
@@ -156,6 +174,7 @@ export class MemoryRepo implements Repo {
     this.state.subFrentes = this.state.subFrentes.filter((sf) => sf.id !== id)
     this.state.tareas = this.state.tareas.filter((t) => t.subFrenteId !== id)
     this.state.historial = this.state.historial.filter((h) => !tareaIds.includes(h.tareaId))
+    this.state.comentarios = this.state.comentarios.filter((c) => !tareaIds.includes(c.tareaId))
     this.persist()
   }
 
@@ -190,6 +209,7 @@ export class MemoryRepo implements Repo {
   async deleteTarea(id: string): Promise<void> {
     this.state.tareas = this.state.tareas.filter((t) => t.id !== id)
     this.state.historial = this.state.historial.filter((h) => h.tareaId !== id)
+    this.state.comentarios = this.state.comentarios.filter((c) => c.tareaId !== id)
     this.persist()
   }
 
@@ -249,6 +269,20 @@ export class MemoryRepo implements Repo {
       (a) => !(a.usuarioId === usuarioId && a.proyectoId === proyectoId),
     )
     this.persist()
+  }
+
+  async addComentario(tareaId: string, texto: string, autorId?: string): Promise<Comentario> {
+    if (!this.state.tareas.some((t) => t.id === tareaId)) throw new Error('Tarea no encontrada')
+    const c: Comentario = {
+      id: uid(),
+      tareaId,
+      autorId,
+      texto: texto.trim(),
+      timestamp: new Date().toISOString(),
+    }
+    this.state.comentarios.push(c)
+    this.persist()
+    return clone(c)
   }
 
   async cambiarFechaObjetivo(

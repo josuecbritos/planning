@@ -218,6 +218,58 @@ table.tareas th {
 }
 .fecha-btn:hover { background: var(--gris-linea); }
 
+/* ---------- Bloque 2: interaccion inline ---------- */
+
+/* Texto editable en el lugar (titulos de tarea y sub frente) */
+.inline-text { cursor: text; border-radius: 4px; padding: 1px 3px; margin: -1px -3px; }
+.inline-text:hover { background: rgba(0,0,0,.05); }
+.inline-input {
+  font: inherit; color: inherit; width: 100%;
+  border: 1px solid var(--verde); border-radius: 5px; padding: 3px 6px; background: #fff;
+}
+.inline-input:focus { outline: none; }
+.inline-input--subfrente { font-weight: 700; max-width: 420px; }
+
+/* Selector de responsable directo en la celda */
+.resp-select {
+  font: inherit; font-size: 12.5px; font-weight: 700; color: var(--texto);
+  border: 1px solid transparent; border-radius: 6px; background: none;
+  padding: 4px 2px; width: 100%; cursor: pointer; text-align: center;
+}
+.resp-select:hover { border-color: var(--gris-borde); background: #fff; }
+.resp-select:focus { outline: none; border-color: var(--verde); background: #fff; }
+
+/* Fila de creacion inline */
+.fila-nueva td { background: #f6fbf7; }
+.fila-nueva .mudo { color: var(--gris-texto); }
+
+/* Boton fantasma para crear sub frente */
+.subfrente-add { margin: -10px 0 26px; }
+.subfrente--nuevo .subfrente__titulo { border-radius: 8px; border-bottom: 1px solid var(--gris-borde); }
+
+/* Chip contador de comentarios junto al titulo */
+.comentarios-chip {
+  background: none; border: none; font-size: 11px; color: var(--gris-texto);
+  padding: 1px 4px; border-radius: 4px; cursor: pointer; flex: none;
+}
+.comentarios-chip:hover { background: rgba(0,0,0,.08); color: var(--texto); }
+
+/* Hilo de comentarios en el panel */
+.comentario-vacio { font-size: 12.5px; color: var(--gris-texto); font-style: italic; margin: 0 0 10px; }
+.comentarios-hilo { list-style: none; margin: 0 0 12px; padding: 0; }
+.comentario { padding: 8px 0; border-bottom: 1px solid var(--gris-linea); }
+.comentario__meta { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.comentario__meta .resp-badge { width: 22px; height: 22px; font-size: 10px; }
+.comentario__fecha { color: var(--gris-texto); margin-left: auto; font-size: 11px; }
+.comentario__texto { margin: 6px 0 0; font-size: 13px; white-space: pre-wrap; }
+.comentario-nuevo { display: flex; flex-direction: column; gap: 8px; }
+.comentario-nuevo textarea {
+  font: inherit; font-size: 13px; border: 1px solid var(--gris-borde);
+  border-radius: 7px; padding: 8px 10px; resize: vertical;
+}
+.comentario-nuevo textarea:focus { outline: none; border-color: var(--verde); }
+.comentario-nuevo .btn { align-self: flex-end; }
+
 /* ---------- Leyenda ---------- */
 
 .leyenda {

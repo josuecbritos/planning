@@ -89,6 +89,19 @@ export interface Tarea {
   archivada?: boolean
 }
 
+/**
+ * Comentario de tarea (N5): hilo acumulable en el tiempo, append-only.
+ * No se sobrescribe ni se borra; cada comentario suma al historial.
+ */
+export interface Comentario {
+  id: string
+  tareaId: string
+  /** Vacio para comentarios migrados del campo legado. */
+  autorId?: string
+  texto: string
+  timestamp: string
+}
+
 /** Estado global de la aplicacion. */
 export interface AppState {
   usuarios: Usuario[]
@@ -98,6 +111,7 @@ export interface AppState {
   tareas: Tarea[]
   historial: Replanificacion[]
   accesos: Acceso[]
+  comentarios: Comentario[]
 }
 
 // ---- Estados derivados (seccion 6.2) ----

@@ -104,6 +104,15 @@ export function formatoFecha(iso: ISODate): string {
   return `${String(d.getUTCDate()).padStart(2, '0')}-${NOMBRE_MES[d.getUTCMonth()]}-${d.getUTCFullYear()}`
 }
 
+/** "07-oct-2024 14:30" — para timestamps (comentarios), en hora local. */
+export function formatoFechaHora(ts: string): string {
+  const d = new Date(ts)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${dd}-${NOMBRE_MES[d.getMonth()]}-${d.getFullYear()} ${hh}:${mm}`
+}
+
 /** "7 oct" — compacto, solo para el encabezado de semana del Gantt. */
 export function etiquetaCorta(iso: ISODate): string {
   const d = parse(iso)

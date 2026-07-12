@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ISODate } from '../types'
 import { formatoFecha } from '../lib/dates'
 
-// Fecha editable inline: muestra el formato unico dd-mmm-aaaa y al hacer
-// click se convierte en date picker. El cambio se CONFIRMA al cerrar el
-// editor (blur o Enter), no en cada tecleo: el input nativo dispara un
-// change por cada segmento editado, lo que generaba replanificaciones
-// intermedias con fechas fantasma en el historial.
+// Fecha editable inline (N4): un solo click abre el calendario de inmediato
+// (showPicker) y elegir una fecha guarda y cierra al instante.
+//
+// Regla anti "fecha fantasma": el input nativo dispara un change por cada
+// segmento tipeado. Distinguimos el origen del cambio: si NO hubo tecleo,
+// vino del calendario y se confirma al momento; si el usuario tipeo, se
+// confirma recien al cerrar (blur/Enter; Escape cancela), nunca por segmento.
 
 interface Props {
   valor: ISODate
@@ -17,10 +19,24 @@ interface Props {
 export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
   const [editando, setEditando] = useState(false)
   const [borrador, setBorrador] = useState<ISODate>(valor)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const huboTecleo = useRef(false)
 
-  function confirmar() {
+  useEffect(() => {
+    if (!editando) return
+    const el = inputRef.current
+    if (!el) return
+    el.focus()
+    try {
+      el.showPicker?.()
+    } catch {
+      /* sin gesto de usuario o sin soporte: queda el input enfocado */
+    }
+  }, [editando])
+
+  function confirmar(nueva: ISODate) {
     setEditando(false)
-    if (borrador && borrador !== valor) onCambiar(borrador)
+    if (nueva && nueva !== valor) onCambiar(nueva)
   }
 
   if (!editando) {
@@ -32,6 +48,7 @@ export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
         aria-label={ariaLabel}
         onClick={() => {
           setBorrador(valor)
+          huboTecleo.current = false
           setEditando(true)
         }}
       >
@@ -42,18 +59,26 @@ export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
 
   return (
     <input
+      ref={inputRef}
       className="fecha-input fecha-input--editando"
       type="date"
-      autoFocus
       value={borrador}
       aria-label={ariaLabel}
-      onChange={(e) => setBorrador(e.target.value)}
-      onBlur={confirmar}
+      onChange={(e) => {
+        const v = e.target.value
+        setBorrador(v)
+        // Cambio sin tecleo previo = seleccion en el calendario: guarda ya.
+        if (!huboTecleo.current && v) confirmar(v)
+      }}
+      onBlur={() => confirmar(borrador)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') confirmar()
-        if (e.key === 'Escape') {
+        if (e.key === 'Enter') {
+          confirmar(borrador)
+        } else if (e.key === 'Escape') {
           setBorrador(valor)
           setEditando(false)
+        } else {
+          huboTecleo.current = true
         }
       }}
     />

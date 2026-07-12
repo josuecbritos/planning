@@ -51,6 +51,7 @@ export interface Actions {
   updateUsuario: (id: string, p: PatchUsuario) => Promise<void>
   asignarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>
   quitarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>
+  addComentario: (tareaId: string, texto: string) => Promise<void>
 }
 
 export default function App() {
@@ -225,6 +226,11 @@ export default function App() {
         run(async () => {
           await repo.quitarAcceso(usuarioId, proyectoId)
           return (s) => apply.removeAcceso(s, usuarioId, proyectoId)
+        }),
+      addComentario: (tareaId, texto) =>
+        run(async () => {
+          const c = await repo.addComentario(tareaId, texto, sesion?.id)
+          return (s) => apply.addComentario(s, c)
         }),
     }),
     [repo, run, HOY, sesion],
