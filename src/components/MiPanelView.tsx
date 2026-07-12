@@ -119,7 +119,7 @@ export function MiPanelView({ state, usuario, proyectos, hoy, onAbrirTarea }: Pr
             <th>Tarea</th>
             <th>Proyecto</th>
             <th>Ubicacion</th>
-            <th className="col-fecha">F. objetivo</th>
+            <th className="col-fecha">Fecha Objetivo</th>
             <th className="col-fecha">Estado</th>
           </tr>
         </thead>
@@ -173,8 +173,8 @@ function FilaMiPanel({
   const cat = categoriaDe(state, tarea, hoy)
 
   return (
-    <tr>
-      <td className={`tarea-cell tarea-cell--${color}`}>
+    <tr className={color !== 'ninguno' ? `fila--${color}` : undefined}>
+      <td className="tarea-cell">
         {cat === 'atrasada_replan' && <span className="punto-ambar" title="Atrasada replanificada" />}
         <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
           <span

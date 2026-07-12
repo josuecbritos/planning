@@ -18,8 +18,9 @@
   --ambar-suave: #fff6e0;
   --ambar-texto: #8a6100;
 
-  --hoy: #d32f2f;
-  --hoy-col: rgba(211, 47, 47, 0.07);
+  /* "Hoy" en azul: no debe confundirse con el rojo de atraso. */
+  --hoy: #1565c0;
+  --hoy-col: rgba(21, 101, 192, 0.08);
 
   --texto: #1f2933;
   --fondo: #f4f6f8;
@@ -131,7 +132,7 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 12px; color: var(--gris-texto);
   border: 1px dashed var(--gris-borde); border-radius: 6px; padding: 4px 10px;
 }
-.hoy-chip b { color: var(--rojo); }
+.hoy-chip b { color: var(--hoy); }
 
 /* Contadores */
 .counters { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -167,15 +168,32 @@ button { font-family: inherit; cursor: pointer; }
 }
 .subfrente__count { font-weight: 400; color: var(--gris-texto); font-size: 12px; }
 
-table.tareas { width: 100%; border-collapse: collapse; background: #fff; }
+/* border-collapse: separate para que los encabezados sticky conserven sus
+   bordes al congelarse; los bordes se reparten right/bottom + left/top de
+   la tabla para no duplicarse. Filas compactas (padding reducido). */
+table.tareas {
+  width: 100%; border-collapse: separate; border-spacing: 0; background: #fff;
+  border-left: 1px solid var(--gris-borde); border-top: 1px solid var(--gris-borde);
+}
 table.tareas th, table.tareas td {
-  border: 1px solid var(--gris-borde); padding: 7px 10px; text-align: left; font-size: 13px;
+  border-right: 1px solid var(--gris-borde); border-bottom: 1px solid var(--gris-borde);
+  padding: 4px 8px; text-align: left; font-size: 13px;
   vertical-align: middle;
 }
 table.tareas th {
   background: #fafbfc; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em;
   color: var(--gris-texto); font-weight: 700;
+  /* Encabezados congelados al hacer scroll vertical */
+  position: sticky; top: 0; z-index: 10;
 }
+
+/* Contenido centrado en Hecha, responsable y fechas */
+table.tareas .col-resp, table.tareas .col-fecha { text-align: center; }
+
+/* Fila completa coloreada segun el estado de la tarea */
+tr.fila--verde > td { background: var(--verde-suave); }
+tr.fila--rojo > td { background: var(--rojo-suave); }
+tr.fila--ambar > td { background: var(--ambar-suave); }
 .col-check { width: 44px; text-align: center; }
 .col-resp { width: 96px; }
 .col-fecha { width: 118px; white-space: nowrap; }
@@ -197,15 +215,7 @@ table.tareas th {
 .mk-verde { color: var(--verde-check); }
 .mk-rojo { color: var(--rojo); }
 
-/* Badge de estado "Atrasada": contenido en la celda, fondo solido, sin
-   aspecto de boton (es una señal, no una accion). */
-.tag-atrasada {
-  display: block; width: max-content; max-width: 100%;
-  font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
-  color: #fff; background: var(--rojo);
-  border-radius: 4px; padding: 1px 7px; margin-top: 3px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
+/* El atraso se señala solo con la fecha en rojo y negrita (.fecha-vencida). */
 .fecha-tarde { color: var(--rojo); font-weight: 600; }
 .fecha-vencida { color: var(--rojo); font-weight: 700; }
 
@@ -334,18 +344,28 @@ table.tareas th {
 .mark--incumplida { width: 18px; height: 18px; border-radius: 3px; background: var(--rojo); }
 .mark--anterior { width: 9px; height: 9px; border-radius: 2px; background: var(--rojo-tenue); }
 .mark--ambar { width: 14px; height: 14px; border-radius: 3px; background: var(--ambar); }
+/* Atrasada replanificada en la leyenda: cuadro rojo + punto ambar */
+.mark--con-punto { position: relative; overflow: visible; }
+.mark--con-punto::after {
+  content: ''; position: absolute; top: -3px; right: -3px; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--ambar); box-shadow: 0 0 0 1px #fff;
+}
 
 /* ---------- Vista Gantt (grilla) ---------- */
 
 .gantt-wrap { padding: 16px 20px 40px; }
 
-/* Barra sobre la grilla: leyenda + selector de horizonte temporal */
+/* Barra sobre la grilla: leyenda y selector de horizonte en filas propias,
+   para que cambiar de modo (p. ej. Rango) nunca deforme la leyenda. */
 .gantt-toolbar {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; flex-wrap: wrap; margin: 0 20px;
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: 10px; margin: 16px 20px 0;
 }
-.gantt-toolbar .leyenda { margin: 16px 0 0; flex: 1; }
-.horizonte { display: flex; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.gantt-toolbar .leyenda { margin: 0; }
+.horizonte {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 10px; flex-wrap: wrap; min-height: 34px;
+}
 .horizonte .toggle button { padding: 6px 12px; font-size: 12.5px; }
 .horizonte__rango { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--gris-texto); }
 .horizonte__fecha { border: 1px solid var(--gris-borde); background: #fff; width: auto; font-size: 12.5px; }
@@ -377,7 +397,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .gantt th.col-hoy, .gantt td.col-hoy { background: var(--hoy-col); }
 .gantt th.col-hoy { color: var(--hoy); }
 .gantt th.dia.hoy-head { background: var(--hoy); color: #fff; }
-.gantt th.dia.hoy-head small { color: #ffd9d9; }
+.gantt th.dia.hoy-head small { color: #cfe3f7; }
 
 .gantt td.celda { height: 30px; text-align: center; padding: 0; }
 .gantt td.lunes, .gantt th.lunes { border-left: 2px solid var(--semana-borde); }
@@ -472,6 +492,16 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 }
 .icon-btn:hover { background: rgba(0,0,0,.08); color: var(--texto); }
 
+/* Tooltip explicativo inmediato sobre los iconos de accion */
+.icon-btn[data-tip] { position: relative; }
+.icon-btn[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  background: #1f2b36; color: #fff; font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 5px; white-space: nowrap;
+  z-index: 100; pointer-events: none;
+}
+
 .link-btn { background: none; border: none; color: #8aa0b2; font-size: 12px; padding: 2px 4px; text-decoration: underline; }
 .link-btn:hover { color: #cfd8dc; }
 .link-btn--danger { color: #ef9a9a; }
@@ -508,11 +538,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 /* ---------- Header: chip de modo ---------- */
 
-.modo-chip {
-  font-size: 11px; font-weight: 700; border-radius: 6px; padding: 3px 9px; letter-spacing: .02em;
-}
-.modo-chip--supabase { background: var(--verde-suave); color: var(--verde-check); }
-.modo-chip--memoria { background: #eceff1; color: var(--gris-texto); }
+/* (el chip de modo se retiro del encabezado) */
 
 /* ---------- Tabla: cabeceras con acciones ---------- */
 

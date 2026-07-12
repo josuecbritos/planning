@@ -66,10 +66,7 @@ export function Sidebar({
 
   return (
     <nav className="sidebar">
-      <div className="sidebar__brand">
-        Planificador
-        <small>Documento Funcional v3.1</small>
-      </div>
+      <div className="sidebar__brand">Andotek Planning</div>
 
       <div className="nav-proyectos nav-pantallas">
         <button
