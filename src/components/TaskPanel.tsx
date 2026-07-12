@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { AppState, Tarea } from '../types'
 import type { Actions } from '../App'
-import { formatoFecha } from '../lib/dates'
+import { formatoFecha, formatoFechaHora } from '../lib/dates'
 import { colorTarea, estadoDerivado, hechaTarde, historialDe } from '../lib/derive'
 import { FechaEditable } from './FechaEditable'
 
@@ -107,12 +107,7 @@ export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: 
         </ol>
       </div>
 
-      {tarea.comentarios && (
-        <div className="panel-detalle__comentarios">
-          <h4>Comentarios</h4>
-          <p>{tarea.comentarios}</p>
-        </div>
-      )}
+      <Comentarios state={state} tarea={tarea} puedeEditar={puedeEditar} actions={actions} />
 
       {puedeEditar && (
         <div className="panel-detalle__acciones">
@@ -156,5 +151,81 @@ export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: 
         </div>
       )}
     </aside>
+  )
+}
+
+/**
+ * N5: hilo de comentarios acumulables. Cada comentario suma al historial
+ * (con autor y fecha); no se sobrescriben ni se borran. Comentan los admins;
+ * el cliente lee el hilo completo.
+ */
+function Comentarios({
+  state,
+  tarea,
+  puedeEditar,
+  actions,
+}: {
+  state: AppState
+  tarea: Tarea
+  puedeEditar: boolean
+  actions: Actions
+}) {
+  const [texto, setTexto] = useState('')
+  const hilo = state.comentarios
+    .filter((c) => c.tareaId === tarea.id)
+    .sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1))
+
+  function publicar() {
+    const limpio = texto.trim()
+    if (!limpio) return
+    actions.addComentario(tarea.id, limpio)
+    setTexto('')
+  }
+
+  return (
+    <div className="panel-detalle__comentarios">
+      <h4>Comentarios {hilo.length > 0 && `(${hilo.length})`}</h4>
+
+      {hilo.length === 0 && <p className="comentario-vacio">Sin comentarios aun.</p>}
+
+      <ul className="comentarios-hilo">
+        {hilo.map((c) => {
+          const autor = state.usuarios.find((u) => u.id === c.autorId)
+          return (
+            <li key={c.id} className="comentario">
+              <div className="comentario__meta">
+                {autor ? (
+                  <>
+                    <span className="resp-badge">{autor.iniciales}</span>
+                    <b>{autor.nombre}</b>
+                  </>
+                ) : (
+                  <b>—</b>
+                )}
+                <span className="comentario__fecha">{formatoFechaHora(c.timestamp)}</span>
+              </div>
+              <p className="comentario__texto">{c.texto}</p>
+            </li>
+          )
+        })}
+      </ul>
+
+      {puedeEditar && (
+        <div className="comentario-nuevo">
+          <textarea
+            rows={2}
+            placeholder="Agregar un comentario… (se suma al hilo, no reemplaza)"
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) publicar()
+            }}
+          />
+          <button className="btn btn--primary btn--sm" disabled={!texto.trim()} onClick={publicar}>
+            Comentar
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

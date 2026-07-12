@@ -164,4 +164,21 @@ export const initialState: AppState = {
   accesos: [
     { usuarioId: 'u-cliente', proyectoId: proyecto.id, fechaAsignacion: '2024-10-01T00:00:00Z' },
   ],
+  // Un hilo de ejemplo para exhibir los comentarios acumulables (N5).
+  comentarios: [
+    {
+      id: 'c-1',
+      tareaId: 't-9', // Analisis de cuentas por cobrar
+      autorId: 'u-jb',
+      texto: 'Falta la informacion de tesoreria; pedida al contacto del cliente.',
+      timestamp: '2024-10-22T14:30:00Z',
+    },
+    {
+      id: 'c-2',
+      tareaId: 't-9',
+      autorId: 'u-dv',
+      texto: 'Llego parte de la informacion; se replanifica al 29 para cerrar con datos completos.',
+      timestamp: '2024-10-25T09:15:00Z',
+    },
+  ],
 }

@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Acceso,
   AppState,
+  Comentario,
   Frente,
   Proyecto,
   Replanificacion,
@@ -42,6 +43,9 @@ const toUsuario = (r: Row): Usuario => ({
 })
 const toAcceso = (r: Row): Acceso => ({
   usuarioId: r.usuario_id, proyectoId: r.proyecto_id, fechaAsignacion: r.fecha_asignacion,
+})
+const toComentario = (r: Row): Comentario => ({
+  id: r.id, tareaId: r.tarea_id, autorId: r.autor_id ?? undefined, texto: r.texto, timestamp: r.timestamp,
 })
 const toProyecto = (r: Row): Proyecto => ({
   id: r.id, nombre: r.nombre, descripcion: r.descripcion ?? undefined, color: r.color ?? undefined, estado: r.estado,
@@ -85,7 +89,7 @@ export class SupabaseRepo implements Repo {
   }
 
   async loadState(): Promise<AppState> {
-    const [u, p, f, sf, t, h, a] = await Promise.all([
+    const [u, p, f, sf, t, h, a, c] = await Promise.all([
       this.db.from('usuario').select('*').order('nombre'),
       this.db.from('proyecto').select('*').order('fecha_creacion'),
       this.db.from('frente').select('*').order('orden'),
@@ -93,6 +97,7 @@ export class SupabaseRepo implements Repo {
       this.db.from('tarea').select('*').order('orden'),
       this.db.from('replanificacion').select('*').order('numero_cambio'),
       this.db.from('acceso_cliente_proyecto').select('*'),
+      this.db.from('comentario').select('*').order('timestamp'),
     ])
     return {
       usuarios: unwrap(u).map(toUsuario),
@@ -102,6 +107,7 @@ export class SupabaseRepo implements Repo {
       tareas: unwrap(t).map(toTarea),
       historial: unwrap(h).map(toReplan),
       accesos: unwrap(a).map(toAcceso),
+      comentarios: unwrap(c).map(toComentario),
     }
   }
 
@@ -279,6 +285,17 @@ export class SupabaseRepo implements Repo {
         .eq('proyecto_id', proyectoId)
         .select(),
     )
+  }
+
+  async addComentario(tareaId: string, texto: string, autorId?: string): Promise<Comentario> {
+    const row = unwrap(
+      await this.db
+        .from('comentario')
+        .insert({ tarea_id: tareaId, autor_id: autorId ?? null, texto: texto.trim() })
+        .select()
+        .single(),
+    )
+    return toComentario(row)
   }
 
   private async nextOrden(tabla: string, fk: string, fkValue: string): Promise<number> {

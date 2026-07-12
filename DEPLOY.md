@@ -30,6 +30,8 @@ orden** el contenido de:
 3. `supabase/migrations/20260707000003_fase3_archivo.sql` — archivo de canceladas
 4. `supabase/migrations/20260707000004_fix_rls_insert_proyecto.sql` — fix: creación
    de proyectos violaba RLS (políticas de SELECT reescritas con expresión directa)
+5. `supabase/migrations/20260707000005_comentarios.sql` — comentarios acumulables
+   por tarea (hilo append-only; migra el texto legado de `tarea.comentarios`)
 
 *(Alternativa con CLI: `supabase link --project-ref TU_REF && supabase db push`.)*
 
