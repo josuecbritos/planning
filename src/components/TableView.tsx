@@ -7,6 +7,7 @@ import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
 import { InlineText } from './InlineText'
 import { FechaEditable } from './FechaEditable'
+import { Avatar, RespPicker } from './RespPicker'
 
 // Vista Tabla tipo Monday (4.2 / 7.2) con interaccion inline (Bloque 2):
 // crear y editar pasa en la fila, sin formularios ni ventanas emergentes.
@@ -330,17 +331,12 @@ function NuevaTareaFila({
         />
       </td>
       <td className="col-resp">
-        <select
-          className="resp-select"
-          value={responsableId}
-          onChange={(e) => setResponsableId(e.target.value)}
-          aria-label="Responsable de la nueva tarea"
-        >
-          <option value="">—</option>
-          {admins.map((u) => (
-            <option key={u.id} value={u.id} title={u.nombre}>{u.iniciales}</option>
-          ))}
-        </select>
+        <RespPicker
+          usuarios={admins}
+          value={responsableId || undefined}
+          onChange={(id) => setResponsableId(id ?? '')}
+          ariaLabel="Responsable de la nueva tarea"
+        />
       </td>
       <td className="col-fecha mudo">{fechaObjetivo ? formatoFecha(fechaObjetivo) : '—'}</td>
       <td className="col-fecha">
@@ -438,20 +434,14 @@ function TareaFila({
       <td className="col-resp">
         {puedeEditar ? (
           // N3: el selector se despliega directo en la celda, sin formulario.
-          <select
-            className="resp-select"
-            value={tarea.responsableId ?? ''}
-            title={resp?.nombre ?? 'Sin asignar'}
-            onChange={(e) => actions.updateTarea(tarea.id, { responsableId: e.target.value || undefined })}
-            aria-label={`Responsable: ${tarea.titulo}`}
-          >
-            <option value="">—</option>
-            {admins.map((u) => (
-              <option key={u.id} value={u.id} title={u.nombre}>{u.iniciales}</option>
-            ))}
-          </select>
+          <RespPicker
+            usuarios={admins}
+            value={tarea.responsableId}
+            onChange={(id) => actions.updateTarea(tarea.id, { responsableId: id })}
+            ariaLabel={`Responsable: ${tarea.titulo}`}
+          />
         ) : (
-          resp && <span className="resp-badge" title={resp.nombre}>{resp.iniciales}</span>
+          resp && <Avatar usuario={resp} />
         )}
       </td>
 

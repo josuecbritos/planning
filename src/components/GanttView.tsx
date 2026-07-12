@@ -12,6 +12,7 @@ import {
 } from '../lib/dates'
 import { colorTarea, marcasDe } from '../lib/derive'
 import { Marca } from './Marca'
+import { Avatar } from './RespPicker'
 import { Legend } from './Legend'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
@@ -224,7 +225,7 @@ function FilaTarea({
         </HoverCard>
       </td>
       <td className="fija fija--resp">
-        {resp && <span className="resp-badge" title={resp.nombre}>{resp.iniciales}</span>}
+        {resp && <Avatar usuario={resp} />}
       </td>
 
       {dias.map((d) => {
