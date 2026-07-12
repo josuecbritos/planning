@@ -25,9 +25,6 @@ export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Prop
           <small>{c.total} tareas</small>
         </h1>
         <div className="topbar__row" style={{ gap: 12 }}>
-          <span className={`modo-chip modo-chip--${modo}`} title={modo === 'supabase' ? 'Conectado a Supabase' : 'Datos locales (sin backend)'}>
-            {modo === 'supabase' ? 'Supabase' : 'Local'}
-          </span>
           <span className="hoy-chip">Hoy{modo === 'supabase' ? '' : ' (simulado)'}: <b>{formatoFecha(hoy)}</b></span>
           <div className="toggle">
             <button className={vista === 'tabla' ? 'activo' : ''} onClick={() => onVista('tabla')}>

@@ -35,8 +35,8 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
     <div className="login">
       <div className="login__card">
         <div className="login__brand">
-          Planificador
-          <small>Herramienta de Planificacion de Proyectos · v3.1</small>
+          Andotek Planning
+          <small>Herramienta de Planificacion de Proyectos</small>
         </div>
 
         {modo === 'supabase' ? (

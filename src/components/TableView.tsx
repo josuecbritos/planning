@@ -29,6 +29,14 @@ export function TableView({ state, proyectoId, frenteSel, hoy, puedeEditar, acti
     .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
     .sort((a, b) => a.orden - b.orden)
 
+  // Candidatos a responsable: admins + clientes con acceso a ESTE proyecto.
+  const candidatos = state.usuarios.filter(
+    (u) =>
+      u.activo &&
+      (u.rol === 'admin' ||
+        state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
+  )
+
   return (
     <div className="tabla-wrap">
       {frentes.map((f) => (
@@ -37,6 +45,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, puedeEditar, acti
           frente={f}
           state={state}
           hoy={hoy}
+          candidatos={candidatos}
           puedeEditar={puedeEditar}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
@@ -53,6 +62,7 @@ function FrentePagina({
   frente,
   state,
   hoy,
+  candidatos,
   puedeEditar,
   actions,
   onAbrirTarea,
@@ -60,6 +70,7 @@ function FrentePagina({
   frente: Frente
   state: AppState
   hoy: string
+  candidatos: Usuario[]
   puedeEditar: boolean
   actions: Actions
   onAbrirTarea: (id: string) => void
@@ -79,6 +90,7 @@ function FrentePagina({
           sub={sf}
           state={state}
           hoy={hoy}
+          candidatos={candidatos}
           puedeEditar={puedeEditar}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
@@ -142,6 +154,7 @@ function SubFrenteTabla({
   sub,
   state,
   hoy,
+  candidatos,
   puedeEditar,
   actions,
   onAbrirTarea,
@@ -149,6 +162,7 @@ function SubFrenteTabla({
   sub: SubFrente
   state: AppState
   hoy: string
+  candidatos: Usuario[]
   puedeEditar: boolean
   actions: Actions
   onAbrirTarea: (id: string) => void
@@ -159,8 +173,6 @@ function SubFrenteTabla({
   // Las archivadas (canceladas, 6.3) salen del plan; quedan consultables abajo.
   const tareas = todas.filter((t) => !t.archivada)
   const archivadas = todas.filter((t) => t.archivada)
-
-  const admins = state.usuarios.filter((u) => u.rol === 'admin' && u.activo)
 
   return (
     <div className="subfrente">
@@ -194,9 +206,9 @@ function SubFrenteTabla({
             <th className="col-check">Hecha</th>
             <th>Tarea</th>
             <th className="col-resp">Resp.</th>
-            <th className="col-fecha">F. original</th>
-            <th className="col-fecha">F. objetivo</th>
-            <th className="col-fecha">F. real</th>
+            <th className="col-fecha">Fecha Original</th>
+            <th className="col-fecha">Fecha Objetivo</th>
+            <th className="col-fecha">Fecha Cierre</th>
             {puedeEditar && <th className="col-acc"></th>}
           </tr>
         </thead>
@@ -207,13 +219,13 @@ function SubFrenteTabla({
               tarea={t}
               state={state}
               hoy={hoy}
-              admins={admins}
+              candidatos={candidatos}
               puedeEditar={puedeEditar}
               actions={actions}
               onAbrirTarea={onAbrirTarea}
             />
           ))}
-          {puedeEditar && <NuevaTareaFila subFrenteId={sub.id} admins={admins} actions={actions} />}
+          {puedeEditar && <NuevaTareaFila subFrenteId={sub.id} candidatos={candidatos} actions={actions} />}
         </tbody>
       </table>
 
@@ -250,11 +262,11 @@ function SubFrenteTabla({
  */
 function NuevaTareaFila({
   subFrenteId,
-  admins,
+  candidatos,
   actions,
 }: {
   subFrenteId: string
-  admins: Usuario[]
+  candidatos: Usuario[]
   actions: Actions
 }) {
   const [activa, setActiva] = useState(false)
@@ -332,7 +344,7 @@ function NuevaTareaFila({
       </td>
       <td className="col-resp">
         <RespPicker
-          usuarios={admins}
+          usuarios={candidatos}
           value={responsableId || undefined}
           onChange={(id) => setResponsableId(id ?? '')}
           ariaLabel="Responsable de la nueva tarea"
@@ -361,7 +373,7 @@ function TareaFila({
   tarea,
   state,
   hoy,
-  admins,
+  candidatos,
   puedeEditar,
   actions,
   onAbrirTarea,
@@ -369,7 +381,7 @@ function TareaFila({
   tarea: Tarea
   state: AppState
   hoy: string
-  admins: Usuario[]
+  candidatos: Usuario[]
   puedeEditar: boolean
   actions: Actions
   onAbrirTarea: (id: string) => void
@@ -383,7 +395,7 @@ function TareaFila({
   const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
 
   return (
-    <tr>
+    <tr className={color !== 'ninguno' ? `fila--${color}` : undefined}>
       <td className="col-check">
         <input
           className="chk"
@@ -395,7 +407,7 @@ function TareaFila({
         />
       </td>
 
-      <td className={`tarea-cell tarea-cell--${color}`}>
+      <td className="tarea-cell">
         {/* Punto ambar en la esquina: atrasada Y replanificada (el rojo manda). */}
         {conPunto && <span className="punto-ambar" title="Atrasada replanificada" />}
         <span className="tarea-cell__row">
@@ -437,7 +449,7 @@ function TareaFila({
         {puedeEditar ? (
           // N3: el selector se despliega directo en la celda, sin formulario.
           <RespPicker
-            usuarios={admins}
+            usuarios={candidatos}
             value={tarea.responsableId}
             onChange={(id) => actions.updateTarea(tarea.id, { responsableId: id })}
             ariaLabel={`Responsable: ${tarea.titulo}`}
@@ -459,7 +471,6 @@ function TareaFila({
         ) : (
           tarea.fechaObjetivo ? formatoFecha(tarea.fechaObjetivo) : '—'
         )}
-        {esAtrasada(cat) && <span className="tag-atrasada">Atrasada</span>}
       </td>
 
       {/* "Hecha" es terminal: no se distingue si fue a tiempo o tarde. */}
@@ -469,15 +480,17 @@ function TareaFila({
 
       {puedeEditar && (
         <td className="col-acc">
-          <button className="icon-btn" title="Detalle e historial" onClick={() => onAbrirTarea(tarea.id)}>ⓘ</button>
+          <button className="icon-btn" data-tip="Información" aria-label="Información" onClick={() => onAbrirTarea(tarea.id)}>ⓘ</button>
           <button
             className="icon-btn"
-            title="Archivar (cancelar): sale del plan y conserva su historial"
+            data-tip="Archivar"
+            aria-label="Archivar"
             onClick={() => { if (confirm(`¿Archivar la tarea "${tarea.titulo}"? Sale del plan y conserva su historial.`)) actions.updateTarea(tarea.id, { archivada: true }) }}
           >⤵</button>
           <button
             className="icon-btn"
-            title="Eliminar tarea (definitivo)"
+            data-tip="Eliminar"
+            aria-label="Eliminar"
             onClick={() => { if (confirm(`¿Eliminar definitivamente la tarea "${tarea.titulo}"? Se pierde su historial; si solo quieres cancelarla, usa Archivar.`)) actions.deleteTarea(tarea.id) }}
           >🗑</button>
         </td>

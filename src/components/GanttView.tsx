@@ -47,11 +47,14 @@ interface FilaGantt {
   esPrimeraGlobal: boolean
 }
 
-/** Ventana fija del modo "Alrededor de hoy": 3 semanas atras + 1 adelante. */
+/**
+ * Ventana fija del modo "Alrededor de hoy": 2 semanas hacia atras + la
+ * semana actual + 2 semanas hacia adelante.
+ */
 function ventanaHoy(hoy: ISODate): { desde: ISODate; hasta: ISODate } {
   return {
-    desde: inicioSemana(addDays(hoy, -21)),
-    hasta: addDays(inicioSemana(addDays(hoy, 7)), 4),
+    desde: inicioSemana(addDays(hoy, -14)),
+    hasta: addDays(inicioSemana(addDays(hoy, 14)), 4),
   }
 }
 
@@ -61,7 +64,13 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, puedeEditar, acti
   const [modo, setModo] = useState<ModoHorizonte>('hoy')
   const [rango, setRango] = useState<{ desde: ISODate; hasta: ISODate }>(() => ventanaHoy(hoy))
 
-  const admins = state.usuarios.filter((u) => u.rol === 'admin' && u.activo)
+  // Candidatos a responsable: admins + clientes con acceso a ESTE proyecto.
+  const candidatos = state.usuarios.filter(
+    (u) =>
+      u.activo &&
+      (u.rol === 'admin' ||
+        state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
+  )
 
   // -- Filas ordenadas con spans para celdas combinadas --
   const filas = useMemo<FilaGantt[]>(() => {
@@ -134,7 +143,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, puedeEditar, acti
       desde = inicioSemana(min)
       hasta = addDays(inicioSemana(max), 4)
     } else {
-      // Default: alrededor de hoy (3 semanas atras + 1 adelante, fijo).
+      // Default: alrededor de hoy (2 atras + actual + 2 adelante, fijo).
       const v = ventanaHoy(hoy)
       desde = v.desde
       hasta = v.hasta
@@ -165,7 +174,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, puedeEditar, acti
         <Legend />
         <div className="horizonte">
           <div className="toggle">
-            <button className={modo === 'hoy' ? 'activo' : ''} onClick={() => setModo('hoy')} title="3 semanas atras + 1 adelante, fijo">
+            <button className={modo === 'hoy' ? 'activo' : ''} onClick={() => setModo('hoy')} title="2 semanas atras + semana actual + 2 adelante, fijo">
               Alrededor de hoy
             </button>
             <button className={modo === 'rango' ? 'activo' : ''} onClick={() => setModo('rango')}>
@@ -235,7 +244,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, puedeEditar, acti
                   dias={dias}
                   state={state}
                   hoy={hoy}
-                  admins={admins}
+                  candidatos={candidatos}
                   puedeEditar={puedeEditar}
                   actions={actions}
                   onAbrirTarea={onAbrirTarea}
@@ -254,7 +263,7 @@ function FilaTarea({
   dias,
   state,
   hoy,
-  admins,
+  candidatos,
   puedeEditar,
   actions,
   onAbrirTarea,
@@ -263,7 +272,7 @@ function FilaTarea({
   dias: ISODate[]
   state: AppState
   hoy: string
-  admins: Usuario[]
+  candidatos: Usuario[]
   puedeEditar: boolean
   actions: Actions
   onAbrirTarea: (id: string) => void
@@ -322,7 +331,7 @@ function FilaTarea({
       <td className="fija fija--resp">
         {puedeEditar ? (
           <RespPicker
-            usuarios={admins}
+            usuarios={candidatos}
             value={tarea.responsableId}
             onChange={(id) => actions.updateTarea(tarea.id, { responsableId: id })}
             ariaLabel={`Responsable: ${tarea.titulo}`}
