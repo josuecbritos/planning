@@ -2,11 +2,12 @@ import { useState } from 'react'
 import type { AppState, Frente, SubFrente, Tarea } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import { colorTarea, estadoDerivado, hechaTarde } from '../lib/derive'
-import { cmp, etiquetaCorta } from '../lib/dates'
+import { cmp, formatoFecha } from '../lib/dates'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
 import { TextPromptModal } from './TextPromptModal'
 import { TareaModal } from './TareaModal'
+import { FechaEditable } from './FechaEditable'
 
 // Vista Tabla tipo Monday (4.2 / 7.2) con CRUD de sub frentes y tareas.
 
@@ -285,27 +286,25 @@ function TareaFila({
         {resp && <span className="resp-badge" title={resp.nombre}>{resp.iniciales}</span>}
       </td>
 
-      <td className="col-fecha">{etiquetaCorta(tarea.fechaOriginal)}</td>
+      <td className="col-fecha">{formatoFecha(tarea.fechaOriginal)}</td>
 
       <td className={`col-fecha${est === 'vencida' ? ' fecha-vencida' : ''}`}>
         {puedeEditar ? (
-          <input
-            className="fecha-input"
-            type="date"
-            value={tarea.fechaObjetivo}
-            onChange={(e) => e.target.value && actions.cambiarFechaObjetivo(tarea.id, e.target.value)}
-            aria-label={`Fecha objetivo: ${tarea.titulo}`}
+          <FechaEditable
+            valor={tarea.fechaObjetivo}
+            onCambiar={(nueva) => actions.cambiarFechaObjetivo(tarea.id, nueva)}
+            ariaLabel={`Fecha objetivo: ${tarea.titulo}`}
           />
         ) : (
-          etiquetaCorta(tarea.fechaObjetivo)
+          formatoFecha(tarea.fechaObjetivo)
         )}
-        {est === 'vencida' && <span className="replanificar-tag">Replanificar →</span>}
+        {est === 'vencida' && <span className="tag-atrasada">Atrasada</span>}
       </td>
 
       <td className="col-fecha">
         {tarea.fechaReal ? (
           <span className={tarde && cmp(tarea.fechaReal, tarea.fechaObjetivo) > 0 ? 'fecha-tarde' : ''}>
-            {etiquetaCorta(tarea.fechaReal)}
+            {formatoFecha(tarea.fechaReal)}
             {tarde && ' (tarde)'}
           </span>
         ) : (

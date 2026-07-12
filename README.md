@@ -115,6 +115,10 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   que reemplaza la permisiva.
 - `supabase/migrations/20260707000003_fase3_archivo.sql` — Fase 3: campo
   `archivada` en `tarea` (archivo de canceladas).
+- `supabase/migrations/20260707000004_fix_rls_insert_proyecto.sql` — fix: el
+  `INSERT … RETURNING` de proyecto violaba RLS porque la política de SELECT
+  dependía de una función que consulta la propia tabla con el snapshot previo
+  al insert; se reescriben las políticas con expresión directa.
 
 Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
 mismo email que registraste en el Módulo de Usuarios). Al primer login se vinculan.

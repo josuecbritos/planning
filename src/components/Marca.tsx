@@ -9,7 +9,7 @@ export function Marca({ tipo }: { tipo: TipoMarca }) {
     case 'hecha':
       return <span className="mark mark--hecha" aria-label="Hecha">✓</span>
     case 'incumplida':
-      return <span className="mark mark--incumplida" aria-label="No se cumplio" />
+      return <span className="mark mark--incumplida" aria-label="Atrasado" />
     case 'anterior':
       return <span className="mark mark--anterior" aria-label="Fecha anterior" />
   }

@@ -1,5 +1,5 @@
 import type { AppState, Tarea } from '../types'
-import { etiquetaLarga } from '../lib/dates'
+import { formatoFecha } from '../lib/dates'
 import {
   colorTarea,
   estadoDerivado,
@@ -18,7 +18,7 @@ function estadoLlano(state: AppState, t: Tarea, hoy: string): { texto: string; c
       clase: 'hc-estado--verde',
     }
   }
-  if (est === 'vencida') return { texto: 'No se cumplio — replanificar', clase: 'hc-estado--rojo' }
+  if (est === 'vencida') return { texto: 'Atrasada', clase: 'hc-estado--rojo' }
   if (color === 'ambar') return { texto: 'Replanificada, sigue abierta', clase: 'hc-estado--ambar' }
   return { texto: 'En curso', clase: 'hc-estado--ninguno' }
 }
@@ -45,16 +45,16 @@ export function TaskDetail({ state, tarea, hoy }: { state: AppState; tarea: Tare
       )}
       <div className="hovercard__row">
         <span>Fecha comprometida original</span>
-        <span>{etiquetaLarga(tarea.fechaOriginal)}</span>
+        <span>{formatoFecha(tarea.fechaOriginal)}</span>
       </div>
       <div className="hovercard__row">
         <span>Fecha vigente</span>
-        <span>{etiquetaLarga(tarea.fechaObjetivo)}</span>
+        <span>{formatoFecha(tarea.fechaObjetivo)}</span>
       </div>
       {tarea.hecha && tarea.fechaReal && (
         <div className="hovercard__row">
           <span>Fecha real de termino</span>
-          <span>{etiquetaLarga(tarea.fechaReal)}</span>
+          <span>{formatoFecha(tarea.fechaReal)}</span>
         </div>
       )}
 
@@ -70,7 +70,7 @@ export function TaskDetail({ state, tarea, hoy }: { state: AppState; tarea: Tare
             return (
               <span key={i} style={{ display: 'contents' }}>
                 <span className={`fecha ${esVigente ? 'fecha--vigente' : 'fecha--tachada'}`}>
-                  {etiquetaLarga(f)}
+                  {formatoFecha(f)}
                 </span>
                 {!esVigente && <span className="flecha">→</span>}
               </span>
