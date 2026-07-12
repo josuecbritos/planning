@@ -49,6 +49,18 @@ export function esFinDeSemana(iso: ISODate): boolean {
   return dow === 0 || dow === 6
 }
 
+/**
+ * Ancla una fecha al dia habil mas cercano: sabado -> viernes, domingo ->
+ * lunes. Las tareas no admiten fechas de fin de semana (la Gantt solo
+ * representa dias habiles).
+ */
+export function ajustarDiaHabil(iso: ISODate): ISODate {
+  const dow = parse(iso).getUTCDay()
+  if (dow === 6) return addDays(iso, -1)
+  if (dow === 0) return addDays(iso, 1)
+  return iso
+}
+
 /** Suma n dias habiles (omite fines de semana). n puede ser negativo. */
 export function addDiasHabiles(iso: ISODate, n: number): ISODate {
   let cur = iso

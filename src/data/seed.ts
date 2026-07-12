@@ -60,7 +60,8 @@ const subFrentes: SubFrente[] = [
 interface Seed {
   titulo: string
   resp: keyof typeof respId
-  original: ISODate
+  /** Sin `original`, la tarea nace sin fecha (aun no planificada). */
+  original?: ISODate
   replan?: ISODate[]
   real?: ISODate
 }
@@ -101,6 +102,7 @@ const seeds: Record<string, Seed[]> = {
     { titulo: 'Configuracion de perfiles y accesos', resp: 'DV', original: '2024-11-11' },
     { titulo: 'Plan de pruebas de configuracion', resp: 'IC', original: '2024-11-18' },
     { titulo: 'Ambiente de QA disponible', resp: 'FS', original: '2024-11-22' },
+    { titulo: 'Checklist de go-live', resp: 'DV' }, // nace sin fecha (1.2)
   ],
 }
 
@@ -130,8 +132,9 @@ function build(): { tareas: Tarea[]; historial: Replanificacion[] } {
       })
 
       // Historial: cadena original -> replan[0] -> replan[1] -> ...
-      if (s.replan && s.replan.length) {
-        let anterior = s.original
+      // (solo tiene sentido si la tarea nacio con fecha)
+      if (s.original && s.replan && s.replan.length) {
+        let anterior: ISODate = s.original
         s.replan.forEach((nueva, i) => {
           historial.push({
             id: `h-${++hIdx}`,

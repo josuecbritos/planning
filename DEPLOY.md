@@ -32,6 +32,9 @@ orden** el contenido de:
    de proyectos violaba RLS (políticas de SELECT reescritas con expresión directa)
 5. `supabase/migrations/20260707000005_comentarios.sql` — comentarios acumulables
    por tarea (hilo append-only; migra el texto legado de `tarea.comentarios`)
+6. `supabase/migrations/20260707000006_estados_y_fechas.sql` — la tarea nace sin
+   fecha (la primera fecha fija el compromiso inicial, sin historial) y ninguna
+   fecha puede caer en fin de semana (se ancla al día hábil más cercano)
 
 *(Alternativa con CLI: `supabase link --project-ref TU_REF && supabase db push`.)*
 

@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react'
 import type { AppState, Proyecto, Tarea, Usuario } from '../types'
 import { cmp, formatoFecha } from '../lib/dates'
-import { colorTarea, estadoDerivado } from '../lib/derive'
+import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, type Categoria } from '../lib/derive'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
 
 // Mi Panel (Modulo 3): todas mis tareas de todos los proyectos, con filtro
 // por estado o proyecto e indicador visual de vencidas.
 
-type FiltroEstado = 'todas' | 'pendientes' | 'vencidas' | 'hechas' | 'replanificadas'
+// Filtros = las 5 categorias excluyentes + todas.
+type FiltroEstado = 'todas' | Categoria
 
 interface Props {
   state: AppState
@@ -26,10 +27,11 @@ interface FilaPanel {
 
 const FILTROS: { key: FiltroEstado; label: string }[] = [
   { key: 'todas', label: 'Todas' },
-  { key: 'pendientes', label: 'Pendientes' },
-  { key: 'vencidas', label: 'Atrasadas' },
-  { key: 'replanificadas', label: 'Replanificadas abiertas' },
-  { key: 'hechas', label: 'Hechas' },
+  { key: 'pendiente', label: 'Pendientes' },
+  { key: 'pendiente_replan', label: 'Pend. replanificadas' },
+  { key: 'atrasada', label: 'Atrasadas' },
+  { key: 'atrasada_replan', label: 'Atr. replanificadas' },
+  { key: 'hecha', label: 'Hechas' },
 ]
 
 export function MiPanelView({ state, usuario, proyectos, hoy, onAbrirTarea }: Props) {
@@ -47,12 +49,16 @@ export function MiPanelView({ state, usuario, proyectos, hoy, onAbrirTarea }: Pr
       if (!proyecto) continue
       out.push({ tarea: t, proyecto, ruta: `${frente!.nombre} › ${sub!.nombre}` })
     }
-    // Vencidas primero, luego por fecha objetivo ascendente; hechas al final.
+    // Atrasadas primero, luego por fecha objetivo ascendente; hechas al final;
+    // las sin fecha al final de su grupo.
+    const peso = (c: Categoria) =>
+      c === 'atrasada_replan' ? 0 : c === 'atrasada' ? 1 : c === 'pendiente_replan' ? 2 : c === 'pendiente' ? 3 : 4
     return out.sort((a, b) => {
-      const ea = estadoDerivado(a.tarea, hoy)
-      const eb = estadoDerivado(b.tarea, hoy)
-      const peso = (e: string) => (e === 'vencida' ? 0 : e === 'pendiente' ? 1 : 2)
-      if (peso(ea) !== peso(eb)) return peso(ea) - peso(eb)
+      const pa = peso(categoriaDe(state, a.tarea, hoy))
+      const pb = peso(categoriaDe(state, b.tarea, hoy))
+      if (pa !== pb) return pa - pb
+      if (!a.tarea.fechaObjetivo) return 1
+      if (!b.tarea.fechaObjetivo) return -1
       return cmp(a.tarea.fechaObjetivo, b.tarea.fechaObjetivo)
     })
   }, [state, usuario.id, proyectos, hoy])
@@ -60,19 +66,14 @@ export function MiPanelView({ state, usuario, proyectos, hoy, onAbrirTarea }: Pr
   const filtradas = useMemo(() => {
     return misFilas.filter(({ tarea, proyecto }) => {
       if (filtroProyecto !== 'todos' && proyecto.id !== filtroProyecto) return false
-      const est = estadoDerivado(tarea, hoy)
-      const color = colorTarea(state, tarea, hoy)
-      switch (filtroEstado) {
-        case 'pendientes': return est === 'pendiente'
-        case 'vencidas': return est === 'vencida'
-        case 'hechas': return est === 'hecha'
-        case 'replanificadas': return color === 'ambar'
-        default: return true
-      }
+      if (filtroEstado === 'todas') return true
+      return categoriaDe(state, tarea, hoy) === filtroEstado
     })
   }, [misFilas, filtroEstado, filtroProyecto, state, hoy])
 
-  const vencidas = misFilas.filter(({ tarea }) => estadoDerivado(tarea, hoy) === 'vencida').length
+  const atrasadas = misFilas.filter(({ tarea }) =>
+    esAtrasada(categoriaDe(state, tarea, hoy)),
+  ).length
 
   return (
     <div className="usuarios-wrap">
@@ -81,8 +82,8 @@ export function MiPanelView({ state, usuario, proyectos, hoy, onAbrirTarea }: Pr
           <h2>Mi Panel</h2>
           <p className="usuarios-sub">
             {misFilas.length} tareas a mi cargo en {proyectos.length} proyecto{proyectos.length === 1 ? '' : 's'}
-            {vencidas > 0 && (
-              <span className="mipanel-alerta"> · {vencidas} atrasada{vencidas === 1 ? '' : 's'} — asignar nueva fecha</span>
+            {atrasadas > 0 && (
+              <span className="mipanel-alerta"> · {atrasadas} atrasada{atrasadas === 1 ? '' : 's'} — asignar nueva fecha</span>
             )}
           </p>
         </div>
@@ -145,11 +146,12 @@ export function MiPanelView({ state, usuario, proyectos, hoy, onAbrirTarea }: Pr
   )
 }
 
-const ESTADO_CHIP: Record<string, { texto: string; clase: string }> = {
-  verde: { texto: 'Hecha', clase: 'hc-estado--verde' },
-  rojo: { texto: 'Atrasada', clase: 'hc-estado--rojo' },
-  ambar: { texto: 'Replanificada, abierta', clase: 'hc-estado--ambar' },
-  ninguno: { texto: 'En curso', clase: 'hc-estado--ninguno-claro' },
+const CHIP_CLASE: Record<Categoria, string> = {
+  hecha: 'hc-estado--verde',
+  pendiente: 'hc-estado--ninguno-claro',
+  pendiente_replan: 'hc-estado--ambar',
+  atrasada: 'hc-estado--rojo',
+  atrasada_replan: 'hc-estado--rojo hc-estado--punto',
 }
 
 function FilaMiPanel({
@@ -168,12 +170,12 @@ function FilaMiPanel({
   onAbrirTarea: (id: string) => void
 }) {
   const color = colorTarea(state, tarea, hoy)
-  const est = estadoDerivado(tarea, hoy)
-  const chip = ESTADO_CHIP[color]
+  const cat = categoriaDe(state, tarea, hoy)
 
   return (
     <tr>
       <td className={`tarea-cell tarea-cell--${color}`}>
+        {cat === 'atrasada_replan' && <span className="punto-ambar" title="Atrasada replanificada" />}
         <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
           <span
             className="tarea-cell__row tarea-cell__link"
@@ -182,7 +184,7 @@ function FilaMiPanel({
             onClick={() => onAbrirTarea(tarea.id)}
             onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
           >
-            {est === 'hecha' && <span className="tarea-cell__mark mk-verde">✓</span>}
+            {cat === 'hecha' && <span className="tarea-cell__mark mk-verde">✓</span>}
             {tarea.titulo}
           </span>
         </HoverCard>
@@ -194,11 +196,11 @@ function FilaMiPanel({
         </span>
       </td>
       <td className="mipanel-ruta">{ruta}</td>
-      <td className={`col-fecha${est === 'vencida' ? ' fecha-vencida' : ''}`}>
-        {formatoFecha(tarea.fechaObjetivo)}
+      <td className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}>
+        {tarea.fechaObjetivo ? formatoFecha(tarea.fechaObjetivo) : '—'}
       </td>
       <td>
-        <span className={`hovercard__estado ${chip.clase}`}>{chip.texto}</span>
+        <span className={`hovercard__estado ${CHIP_CLASE[cat]}`}>{CATEGORIA_LABEL[cat]}</span>
       </td>
     </tr>
   )

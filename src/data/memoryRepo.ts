@@ -1,4 +1,5 @@
 import type { Acceso, AppState, Comentario, Frente, Proyecto, Replanificacion, SubFrente, Tarea, Usuario } from '../types'
+import { ajustarDiaHabil } from '../lib/dates'
 import { initialState } from './seed'
 import type {
   NuevaTarea,
@@ -181,14 +182,16 @@ export class MemoryRepo implements Repo {
   // -- Tarea --
   async createTarea(input: NuevaTarea): Promise<Tarea> {
     const hermanos = this.state.tareas.filter((t) => t.subFrenteId === input.subFrenteId)
+    // Sin fin de semana; la primera fecha (si viene) fija la original.
+    const fecha = input.fechaObjetivo ? ajustarDiaHabil(input.fechaObjetivo) : undefined
     const t: Tarea = {
       id: uid(),
       subFrenteId: input.subFrenteId,
       titulo: input.titulo,
       descripcion: input.descripcion,
       responsableId: input.responsableId,
-      fechaObjetivo: input.fechaObjetivo,
-      fechaOriginal: input.fechaOriginal ?? input.fechaObjetivo,
+      fechaObjetivo: fecha,
+      fechaOriginal: fecha,
       hecha: false,
       comentarios: input.comentarios,
       orden: this.siguienteOrden(hermanos),
@@ -203,6 +206,7 @@ export class MemoryRepo implements Repo {
     Object.assign(t, patch)
     // Coherencia: si se desmarca hecha, se limpia fecha_real.
     if (patch.hecha === false) t.fechaReal = undefined
+    if (t.fechaReal) t.fechaReal = ajustarDiaHabil(t.fechaReal)
     this.persist()
     return clone(t)
   }
@@ -292,18 +296,25 @@ export class MemoryRepo implements Repo {
   ): Promise<{ tarea: Tarea; historial: Replanificacion[] }> {
     const t = this.state.tareas.find((x) => x.id === id)
     if (!t) throw new Error('Tarea no encontrada')
-    if (nueva !== t.fechaObjetivo) {
-      const numeroCambio = this.state.historial.filter((h) => h.tareaId === id).length + 1
-      this.state.historial.push({
-        id: uid(),
-        tareaId: id,
-        fechaAnterior: t.fechaObjetivo,
-        fechaNueva: nueva,
-        numeroCambio,
-        cambiadoPor: actorId ?? '',
-        timestamp: `${t.fechaObjetivo}T00:00:00Z`,
-      })
-      t.fechaObjetivo = nueva
+    const fecha = ajustarDiaHabil(nueva) // sin fin de semana
+    if (fecha !== t.fechaObjetivo) {
+      if (!t.fechaObjetivo) {
+        // Primera planificacion: fija el compromiso inicial, sin historial.
+        t.fechaObjetivo = fecha
+        t.fechaOriginal = t.fechaOriginal ?? fecha
+      } else {
+        const numeroCambio = this.state.historial.filter((h) => h.tareaId === id).length + 1
+        this.state.historial.push({
+          id: uid(),
+          tareaId: id,
+          fechaAnterior: t.fechaObjetivo,
+          fechaNueva: fecha,
+          numeroCambio,
+          cambiadoPor: actorId ?? '',
+          timestamp: `${t.fechaObjetivo}T00:00:00Z`,
+        })
+        t.fechaObjetivo = fecha
+      }
       this.persist()
     }
     return {

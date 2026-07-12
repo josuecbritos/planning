@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
-import { colorTarea, estadoDerivado, hechaTarde } from '../lib/derive'
-import { cmp, formatoFecha } from '../lib/dates'
+import { categoriaDe, colorTarea, esAtrasada, puntoAmbar } from '../lib/derive'
+import { formatoFecha } from '../lib/dates'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
 import { InlineText } from './InlineText'
@@ -213,7 +213,7 @@ function SubFrenteTabla({
               onAbrirTarea={onAbrirTarea}
             />
           ))}
-          {puedeEditar && <NuevaTareaFila subFrenteId={sub.id} admins={admins} hoy={hoy} actions={actions} />}
+          {puedeEditar && <NuevaTareaFila subFrenteId={sub.id} admins={admins} actions={actions} />}
         </tbody>
       </table>
 
@@ -251,29 +251,29 @@ function SubFrenteTabla({
 function NuevaTareaFila({
   subFrenteId,
   admins,
-  hoy,
   actions,
 }: {
   subFrenteId: string
   admins: Usuario[]
-  hoy: string
   actions: Actions
 }) {
   const [activa, setActiva] = useState(false)
   const [titulo, setTitulo] = useState('')
   const [responsableId, setResponsableId] = useState('')
-  const [fechaObjetivo, setFechaObjetivo] = useState(hoy)
+  // La tarea nace SIN FECHA (1.2): el campo parte en blanco; la primera fecha
+  // que se le asigne fijara su compromiso inicial.
+  const [fechaObjetivo, setFechaObjetivo] = useState('')
   const filaRef = useRef<HTMLTableRowElement>(null)
   const tituloRef = useRef<HTMLInputElement>(null)
 
   function guardar(): boolean {
     const limpio = titulo.trim()
-    if (!limpio || !fechaObjetivo) return false
+    if (!limpio) return false
     actions.createTarea({
       subFrenteId,
       titulo: limpio,
       responsableId: responsableId || undefined,
-      fechaObjetivo,
+      fechaObjetivo: fechaObjetivo || undefined,
     })
     // Encadena: limpia el titulo y conserva responsable/fecha como defaults.
     setTitulo('')
@@ -374,10 +374,10 @@ function TareaFila({
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
+  const cat = categoriaDe(state, tarea, hoy)
   const color = colorTarea(state, tarea, hoy)
-  const est = estadoDerivado(tarea, hoy)
+  const conPunto = puntoAmbar(state, tarea, hoy)
   const resp = state.usuarios.find((u) => u.id === tarea.responsableId)
-  const tarde = hechaTarde(tarea)
   const nComentarios = state.comentarios.filter((c) => c.tareaId === tarea.id).length
 
   const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
@@ -396,8 +396,10 @@ function TareaFila({
       </td>
 
       <td className={`tarea-cell tarea-cell--${color}`}>
+        {/* Punto ambar en la esquina: atrasada Y replanificada (el rojo manda). */}
+        {conPunto && <span className="punto-ambar" title="Atrasada replanificada" />}
         <span className="tarea-cell__row">
-          {est === 'hecha' && <span className="tarea-cell__mark mk-verde">✓</span>}
+          {cat === 'hecha' && <span className="tarea-cell__mark mk-verde">✓</span>}
           {puedeEditar ? (
             // N3: click en el titulo lo edita en el lugar (el detalle vive en ⓘ).
             <InlineText
@@ -445,9 +447,9 @@ function TareaFila({
         )}
       </td>
 
-      <td className="col-fecha">{formatoFecha(tarea.fechaOriginal)}</td>
+      <td className="col-fecha">{tarea.fechaOriginal ? formatoFecha(tarea.fechaOriginal) : '—'}</td>
 
-      <td className={`col-fecha${est === 'vencida' ? ' fecha-vencida' : ''}`}>
+      <td className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}>
         {puedeEditar ? (
           <FechaEditable
             valor={tarea.fechaObjetivo}
@@ -455,20 +457,14 @@ function TareaFila({
             ariaLabel={`Fecha objetivo: ${tarea.titulo}`}
           />
         ) : (
-          formatoFecha(tarea.fechaObjetivo)
+          tarea.fechaObjetivo ? formatoFecha(tarea.fechaObjetivo) : '—'
         )}
-        {est === 'vencida' && <span className="tag-atrasada">Atrasada</span>}
+        {esAtrasada(cat) && <span className="tag-atrasada">Atrasada</span>}
       </td>
 
+      {/* "Hecha" es terminal: no se distingue si fue a tiempo o tarde. */}
       <td className="col-fecha">
-        {tarea.fechaReal ? (
-          <span className={tarde && cmp(tarea.fechaReal, tarea.fechaObjetivo) > 0 ? 'fecha-tarde' : ''}>
-            {formatoFecha(tarea.fechaReal)}
-            {tarde && ' (tarde)'}
-          </span>
-        ) : (
-          '—'
-        )}
+        {tarea.fechaReal ? formatoFecha(tarea.fechaReal) : '—'}
       </td>
 
       {puedeEditar && (

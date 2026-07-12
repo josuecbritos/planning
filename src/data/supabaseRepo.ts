@@ -62,8 +62,8 @@ const toTarea = (r: Row): Tarea => ({
   titulo: r.titulo,
   descripcion: r.descripcion ?? undefined,
   responsableId: r.responsable_id ?? undefined,
-  fechaObjetivo: r.fecha_objetivo,
-  fechaOriginal: r.fecha_original,
+  fechaObjetivo: r.fecha_objetivo ?? undefined,
+  fechaOriginal: r.fecha_original ?? undefined,
   hecha: r.hecha,
   fechaReal: r.fecha_real ?? undefined,
   comentarios: r.comentarios ?? undefined,
@@ -187,8 +187,10 @@ export class SupabaseRepo implements Repo {
           titulo: input.titulo,
           descripcion: input.descripcion ?? null,
           responsable_id: input.responsableId ?? null,
-          fecha_objetivo: input.fechaObjetivo,
-          fecha_original: input.fechaOriginal ?? input.fechaObjetivo,
+          // El trigger normalizar_fechas_tarea ancla a dia habil y fija
+          // fecha_original con la primera fecha.
+          fecha_objetivo: input.fechaObjetivo ?? null,
+          fecha_original: null,
           hecha: false,
           comentarios: input.comentarios ?? null,
           orden,

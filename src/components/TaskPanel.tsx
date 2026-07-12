@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AppState, Tarea } from '../types'
 import type { Actions } from '../App'
 import { formatoFecha, formatoFechaHora } from '../lib/dates'
-import { colorTarea, estadoDerivado, hechaTarde, historialDe } from '../lib/derive'
+import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, historialDe } from '../lib/derive'
 import { FechaEditable } from './FechaEditable'
 
 // Panel lateral de detalle (7.2, era backlog en v3.1): click sobre una tarea
@@ -18,13 +18,6 @@ interface Props {
   onClose: () => void
 }
 
-const ESTADO_TEXTO: Record<string, string> = {
-  verde: 'Hecha',
-  rojo: 'Atrasada',
-  ambar: 'Replanificada, sigue abierta',
-  ninguno: 'En curso',
-}
-
 export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -33,20 +26,21 @@ export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: 
   }, [onClose])
 
   const color = colorTarea(state, tarea, hoy)
-  const est = estadoDerivado(tarea, hoy)
+  const cat = categoriaDe(state, tarea, hoy)
   const hist = historialDe(state, tarea.id)
   const resp = state.usuarios.find((u) => u.id === tarea.responsableId)
   const sub = state.subFrentes.find((sf) => sf.id === tarea.subFrenteId)
   const frente = state.frentes.find((f) => f.id === sub?.frenteId)
-  const tarde = hechaTarde(tarea)
 
-  const cadena: string[] = [tarea.fechaOriginal, ...hist.map((h) => h.fechaNueva)]
+  const cadena: string[] = tarea.fechaOriginal
+    ? [tarea.fechaOriginal, ...hist.map((h) => h.fechaNueva)]
+    : []
 
   return (
     <aside className="panel-detalle">
       <div className="panel-detalle__head">
         <span className={`hovercard__estado hc-estado--${color}`}>
-          {tarea.archivada ? 'Archivada' : ESTADO_TEXTO[color]}
+          {tarea.archivada ? 'Archivada' : CATEGORIA_LABEL[cat]}
         </span>
         <button className="modal-x" onClick={onClose} aria-label="Cerrar">✕</button>
       </div>
@@ -66,15 +60,16 @@ export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: 
           </>
         )}
         <dt>Fecha comprometida original</dt>
-        <dd>{formatoFecha(tarea.fechaOriginal)}</dd>
+        <dd>{tarea.fechaOriginal ? formatoFecha(tarea.fechaOriginal) : 'Sin fecha aun'}</dd>
         <dt>Fecha vigente</dt>
-        <dd className={est === 'vencida' ? 'fecha-vencida' : ''}>{formatoFecha(tarea.fechaObjetivo)}</dd>
+        <dd className={esAtrasada(cat) ? 'fecha-vencida' : ''}>
+          {tarea.fechaObjetivo ? formatoFecha(tarea.fechaObjetivo) : 'Sin fecha aun'}
+        </dd>
+        {/* "Hecha" es terminal: no se distingue si fue a tiempo o tarde. */}
         {tarea.hecha && tarea.fechaReal && (
           <>
             <dt>Fecha real de termino</dt>
-            <dd className={tarde ? 'fecha-tarde' : ''}>
-              {formatoFecha(tarea.fechaReal)}{tarde ? ' (tarde)' : ''}
-            </dd>
+            <dd>{formatoFecha(tarea.fechaReal)}</dd>
           </>
         )}
       </dl>
@@ -123,7 +118,7 @@ export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: 
                 Hecha
               </label>
               <label className="panel-accion">
-                Replanificar a
+                {tarea.fechaObjetivo ? 'Replanificar a' : 'Planificar para'}
                 <FechaEditable
                   valor={tarea.fechaObjetivo}
                   onCambiar={(nueva) => actions.cambiarFechaObjetivo(tarea.id, nueva)}

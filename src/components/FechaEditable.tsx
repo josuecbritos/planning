@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ISODate } from '../types'
-import { formatoFecha } from '../lib/dates'
+import { ajustarDiaHabil, formatoFecha } from '../lib/dates'
 
 // Fecha editable inline (N4): un solo click abre el calendario de inmediato
 // (showPicker) y elegir una fecha guarda y cierra al instante.
@@ -11,14 +11,15 @@ import { formatoFecha } from '../lib/dates'
 // confirma recien al cerrar (blur/Enter; Escape cancela), nunca por segmento.
 
 interface Props {
-  valor: ISODate
+  /** Sin valor = tarea aun no planificada ("nace sin fecha"). */
+  valor?: ISODate
   onCambiar: (nueva: ISODate) => void
   ariaLabel?: string
 }
 
 export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
   const [editando, setEditando] = useState(false)
-  const [borrador, setBorrador] = useState<ISODate>(valor)
+  const [borrador, setBorrador] = useState<ISODate>(valor ?? '')
   const inputRef = useRef<HTMLInputElement>(null)
   const huboTecleo = useRef(false)
 
@@ -36,23 +37,26 @@ export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
 
   function confirmar(nueva: ISODate) {
     setEditando(false)
-    if (nueva && nueva !== valor) onCambiar(nueva)
+    if (!nueva) return
+    // Sin fechas de fin de semana: se ancla al dia habil mas cercano.
+    const habil = ajustarDiaHabil(nueva)
+    if (habil !== valor) onCambiar(habil)
   }
 
   if (!editando) {
     return (
       <button
         type="button"
-        className="fecha-btn"
-        title="Cambiar fecha (queda registrado en el historial)"
+        className={`fecha-btn${valor ? '' : ' fecha-btn--vacia'}`}
+        title={valor ? 'Cambiar fecha (queda registrado en el historial)' : 'Asignar la primera fecha (compromiso inicial)'}
         aria-label={ariaLabel}
         onClick={() => {
-          setBorrador(valor)
+          setBorrador(valor ?? '')
           huboTecleo.current = false
           setEditando(true)
         }}
       >
-        {formatoFecha(valor)}
+        {valor ? formatoFecha(valor) : 'Planificar'}
       </button>
     )
   }
@@ -75,7 +79,7 @@ export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
         if (e.key === 'Enter') {
           confirmar(borrador)
         } else if (e.key === 'Escape') {
-          setBorrador(valor)
+          setBorrador(valor ?? '')
           setEditando(false)
         } else {
           huboTecleo.current = true

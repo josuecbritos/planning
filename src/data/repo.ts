@@ -38,9 +38,8 @@ export interface NuevaTarea {
   titulo: string
   descripcion?: string
   responsableId?: string
-  fechaObjetivo: ISODate
-  /** Si se omite, toma el valor de fechaObjetivo (compromiso inicial). */
-  fechaOriginal?: ISODate
+  /** Opcional: la tarea nace sin fecha. La primera fecha fija la original. */
+  fechaObjetivo?: ISODate
   comentarios?: string
 }
 export type PatchTarea = Partial<

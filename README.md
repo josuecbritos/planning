@@ -60,10 +60,20 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 - **Gantt en grilla:** columnas fijas congeladas, celdas combinadas reales, una columna
   por día hábil, encabezado semana/día, columna de HOY, marcas de la sección 6.4 y
   tooltips con historial (6.6).
-- **Estados derivados (6.2):** el único estado manual es `hecha`; `vencida`,
-  `pendiente` y el atributo `replanificada` se derivan.
-- **Colores de gestión (6.5):** verde = lista · rojo = replanificar · ámbar = vigílala ·
-  sin color = en curso.
+- **Modelo de 5 categorías excluyentes** (definiciones cerradas): el único estado
+  manual es `hecha`; toda tarea cae en exactamente una de — Hecha (verde ✓) ·
+  Pendiente (sin color) · Pendiente replanificada (ámbar) · Atrasada (rojo) ·
+  Atrasada replanificada (rojo + **punto ámbar** en la esquina). El rojo manda
+  sobre el ámbar; "hecha" es terminal (sin distinción de a tiempo o tarde, y no
+  cuenta como replanificada). Los 5 contadores del encabezado suman el total.
+- **La tarea nace sin fecha:** la primera fecha asignada fija el compromiso
+  inicial (sin historial); solo los cambios posteriores cuentan como
+  replanificación. No se permiten fechas de fin de semana (se anclan al día
+  hábil más cercano).
+- **Horizonte del Gantt:** selector de 3 modos — *Alrededor de hoy* (default fijo:
+  3 semanas atrás + 1 adelante, no persistido), *Rango personalizado* (desde/hasta)
+  y *Todo el proyecto*. La edición inline (título, responsable) funciona también
+  en la grilla.
 
 **CRUD (Fase 1) — con interacción inline (Bloque 2)**
 - Proyectos: crear / editar (nombre, descripción, color, estado) / eliminar. Multi-proyecto.
@@ -129,6 +139,9 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 - `supabase/migrations/20260707000005_comentarios.sql` — tabla `comentario`
   (hilo acumulable por tarea, append-only; comentan admins, leen todos los
   que ven la tarea). Migra el texto legado de `tarea.comentarios`.
+- `supabase/migrations/20260707000006_estados_y_fechas.sql` — fechas opcionales
+  (la tarea nace sin fecha; la primera fija `fecha_original` sin historial) y
+  anclaje de toda fecha al día hábil más cercano, ambos como triggers.
 
 Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
 mismo email que registraste en el Módulo de Usuarios). Al primer login se vinculan.
