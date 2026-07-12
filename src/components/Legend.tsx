@@ -8,7 +8,7 @@ export function Legend() {
     <div className="leyenda">
       <div className="leyenda__item"><Marca tipo="pendiente" /> Pendiente</div>
       <div className="leyenda__item"><Marca tipo="hecha" /> Hecha</div>
-      <div className="leyenda__item"><Marca tipo="incumplida" /> No se cumplio — replanificar</div>
+      <div className="leyenda__item"><Marca tipo="incumplida" /> Atrasado</div>
       <div className="leyenda__item"><Marca tipo="anterior" /> Fecha anterior</div>
       <div className="leyenda__item"><span className="mark mark--ambar" /> Tarea replanificada, sigue abierta</div>
     </div>

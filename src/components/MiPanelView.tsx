@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { AppState, Proyecto, Tarea, Usuario } from '../types'
-import { cmp, etiquetaCorta } from '../lib/dates'
+import { cmp, formatoFecha } from '../lib/dates'
 import { colorTarea, estadoDerivado } from '../lib/derive'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
@@ -27,7 +27,7 @@ interface FilaPanel {
 const FILTROS: { key: FiltroEstado; label: string }[] = [
   { key: 'todas', label: 'Todas' },
   { key: 'pendientes', label: 'Pendientes' },
-  { key: 'vencidas', label: 'Vencidas' },
+  { key: 'vencidas', label: 'Atrasadas' },
   { key: 'replanificadas', label: 'Replanificadas abiertas' },
   { key: 'hechas', label: 'Hechas' },
 ]
@@ -82,7 +82,7 @@ export function MiPanelView({ state, usuario, proyectos, hoy, onAbrirTarea }: Pr
           <p className="usuarios-sub">
             {misFilas.length} tareas a mi cargo en {proyectos.length} proyecto{proyectos.length === 1 ? '' : 's'}
             {vencidas > 0 && (
-              <span className="mipanel-alerta"> · {vencidas} vencida{vencidas === 1 ? '' : 's'} — replanificar</span>
+              <span className="mipanel-alerta"> · {vencidas} atrasada{vencidas === 1 ? '' : 's'} — asignar nueva fecha</span>
             )}
           </p>
         </div>
@@ -147,7 +147,7 @@ export function MiPanelView({ state, usuario, proyectos, hoy, onAbrirTarea }: Pr
 
 const ESTADO_CHIP: Record<string, { texto: string; clase: string }> = {
   verde: { texto: 'Hecha', clase: 'hc-estado--verde' },
-  rojo: { texto: 'Vencida — replanificar', clase: 'hc-estado--rojo' },
+  rojo: { texto: 'Atrasada', clase: 'hc-estado--rojo' },
   ambar: { texto: 'Replanificada, abierta', clase: 'hc-estado--ambar' },
   ninguno: { texto: 'En curso', clase: 'hc-estado--ninguno-claro' },
 }
@@ -195,7 +195,7 @@ function FilaMiPanel({
       </td>
       <td className="mipanel-ruta">{ruta}</td>
       <td className={`col-fecha${est === 'vencida' ? ' fecha-vencida' : ''}`}>
-        {etiquetaCorta(tarea.fechaObjetivo)}
+        {formatoFecha(tarea.fechaObjetivo)}
       </td>
       <td>
         <span className={`hovercard__estado ${chip.clase}`}>{chip.texto}</span>

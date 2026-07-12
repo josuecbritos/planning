@@ -95,7 +95,16 @@ export function etiquetaDia(iso: ISODate): { inicial: string; numero: number } {
   return { inicial: INICIALES_DIA[d.getUTCDay()], numero: d.getUTCDate() }
 }
 
-/** "7 oct" */
+/**
+ * Formato unico de fecha de toda la interfaz: "dd-mmm-aaaa" (ej. "07-oct-2024").
+ * Aplica a columnas de tabla, tooltips y panel de detalle.
+ */
+export function formatoFecha(iso: ISODate): string {
+  const d = parse(iso)
+  return `${String(d.getUTCDate()).padStart(2, '0')}-${NOMBRE_MES[d.getUTCMonth()]}-${d.getUTCFullYear()}`
+}
+
+/** "7 oct" — compacto, solo para el encabezado de semana del Gantt. */
 export function etiquetaCorta(iso: ISODate): string {
   const d = parse(iso)
   return `${d.getUTCDate()} ${NOMBRE_MES[d.getUTCMonth()]}`
@@ -105,12 +114,6 @@ export function etiquetaCorta(iso: ISODate): string {
 export function etiquetaSemana(lunes: ISODate): string {
   const viernes = addDays(lunes, 4)
   return `${etiquetaCorta(lunes)} – ${etiquetaCorta(viernes)}`
-}
-
-/** "lu 7 oct 2024" — formato legible para tooltips. */
-export function etiquetaLarga(iso: ISODate): string {
-  const d = parse(iso)
-  return `${INICIALES_DIA[d.getUTCDay()]} ${d.getUTCDate()} ${NOMBRE_MES[d.getUTCMonth()]} ${d.getUTCFullYear()}`
 }
 
 /** Diferencia en dias habiles entre dos fechas (b - a). */

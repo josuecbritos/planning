@@ -24,7 +24,7 @@ export function ResumenView({ state, proyectos, hoy, onAbrirProyecto }: Props) {
         <div>
           <h2>Resumen de proyectos</h2>
           <p className="usuarios-sub">
-            Rojo = tareas vencidas que exigen replanificar · Ambar = replanificadas que siguen abiertas.
+            Rojo = tareas atrasadas (exigen nueva fecha) · Ambar = replanificadas que siguen abiertas.
           </p>
         </div>
       </div>
@@ -80,7 +80,7 @@ function TarjetaProyecto({
         <span className="stat stat--verde"><b>{c.hechas}</b> hechas</span>
         <span className="stat"><b>{c.pendientes}</b> pendientes</span>
         <span className={`stat${c.porReplanificar > 0 ? ' stat--rojo' : ''}`}>
-          <b>{c.porReplanificar}</b> por replanificar
+          <b>{c.porReplanificar}</b> atrasadas
         </span>
         <span className={`stat${c.replanificadasAbiertas > 0 ? ' stat--ambar' : ''}`}>
           <b>{c.replanificadasAbiertas}</b> replanificadas abiertas

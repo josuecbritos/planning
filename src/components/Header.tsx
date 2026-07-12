@@ -1,7 +1,7 @@
 import type { Proyecto } from '../types'
 import type { Vista } from '../App'
 import type { Contadores } from '../lib/derive'
-import { etiquetaLarga } from '../lib/dates'
+import { formatoFecha } from '../lib/dates'
 
 // Encabezado del proyecto (7.2): contadores por estado derivado + toggle de
 // vista. La sesion vive en el pie del sidebar.
@@ -28,7 +28,7 @@ export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Prop
           <span className={`modo-chip modo-chip--${modo}`} title={modo === 'supabase' ? 'Conectado a Supabase' : 'Datos locales (sin backend)'}>
             {modo === 'supabase' ? 'Supabase' : 'Local'}
           </span>
-          <span className="hoy-chip">Hoy{modo === 'supabase' ? '' : ' (simulado)'}: <b>{etiquetaLarga(hoy)}</b></span>
+          <span className="hoy-chip">Hoy{modo === 'supabase' ? '' : ' (simulado)'}: <b>{formatoFecha(hoy)}</b></span>
           <div className="toggle">
             <button className={vista === 'tabla' ? 'activo' : ''} onClick={() => onVista('tabla')}>
               Tabla
@@ -52,7 +52,7 @@ export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Prop
         <div className="counter counter--rojo">
           <span className="counter__swatch" style={{ background: 'var(--rojo)' }} />
           <span className="counter__num">{c.porReplanificar}</span>
-          <span className="counter__lbl">Por replanificar</span>
+          <span className="counter__lbl">Atrasadas</span>
         </div>
         <div className="counter counter--ambar">
           <span className="counter__swatch" style={{ background: 'var(--ambar)' }} />

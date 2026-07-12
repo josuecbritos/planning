@@ -28,6 +28,8 @@ orden** el contenido de:
 1. `supabase/migrations/20260707000001_init.sql` — tablas, trigger de historial, RPC
 2. `supabase/migrations/20260707000002_fase2_auth.sql` — auth, límite 2 admins, RLS
 3. `supabase/migrations/20260707000003_fase3_archivo.sql` — archivo de canceladas
+4. `supabase/migrations/20260707000004_fix_rls_insert_proyecto.sql` — fix: creación
+   de proyectos violaba RLS (políticas de SELECT reescritas con expresión directa)
 
 *(Alternativa con CLI: `supabase link --project-ref TU_REF && supabase db push`.)*
 

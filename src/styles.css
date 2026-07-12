@@ -183,10 +183,14 @@ table.tareas th {
 .mk-verde { color: var(--verde-check); }
 .mk-rojo { color: var(--rojo); }
 
-.replanificar-tag {
-  display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 700;
-  color: var(--rojo); background: #fff; border: 1px solid var(--rojo-tenue);
-  border-radius: 5px; padding: 1px 6px;
+/* Badge de estado "Atrasada": contenido en la celda, fondo solido, sin
+   aspecto de boton (es una señal, no una accion). */
+.tag-atrasada {
+  display: block; width: max-content; max-width: 100%;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
+  color: #fff; background: var(--rojo);
+  border-radius: 4px; padding: 1px 7px; margin-top: 3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .fecha-tarde { color: var(--rojo); font-weight: 600; }
 .fecha-vencida { color: var(--rojo); font-weight: 700; }
@@ -205,6 +209,14 @@ table.tareas th {
 }
 .fecha-input:hover { border-color: var(--gris-borde); }
 .fecha-input:focus { border-color: var(--verde); outline: none; background: #fff; }
+.fecha-input--editando { border-color: var(--verde); background: #fff; max-width: 160px; }
+
+/* Fecha editable inline: texto con el formato unico; al click se abre el picker */
+.fecha-btn {
+  background: none; border: none; font: inherit; color: inherit;
+  padding: 2px 5px; border-radius: 5px; cursor: pointer;
+}
+.fecha-btn:hover { background: var(--gris-linea); }
 
 /* ---------- Leyenda ---------- */
 
@@ -264,8 +276,9 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 /* Etiquetas fijas de frente/subfrente (celdas combinadas) */
 .gantt td.fija--frente {
-  writing-mode: vertical-rl; transform: rotate(180deg); text-align: center;
-  background: var(--verde); color: #fff; font-weight: 700; font-size: 12px; letter-spacing: .02em;
+  background: var(--verde); color: #fff; font-weight: 700; font-size: 12px;
+  letter-spacing: .02em; vertical-align: top; padding: 8px 10px;
+  overflow-wrap: break-word;
 }
 .gantt td.fija--sf { background: var(--gris-sf); font-weight: 600; font-size: 12px; vertical-align: top; padding: 8px 8px; }
 .gantt td.fija--tarea { font-weight: 600; padding: 4px 10px; font-size: 12.5px; }

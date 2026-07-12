@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import type { AppState, Tarea } from '../types'
 import type { Actions } from '../App'
-import { etiquetaLarga } from '../lib/dates'
+import { formatoFecha } from '../lib/dates'
 import { colorTarea, estadoDerivado, hechaTarde, historialDe } from '../lib/derive'
+import { FechaEditable } from './FechaEditable'
 
 // Panel lateral de detalle (7.2, era backlog en v3.1): click sobre una tarea
 // o una marca abre este panel con el detalle completo, el historial y las
@@ -19,7 +20,7 @@ interface Props {
 
 const ESTADO_TEXTO: Record<string, string> = {
   verde: 'Hecha',
-  rojo: 'No se cumplio — replanificar',
+  rojo: 'Atrasada',
   ambar: 'Replanificada, sigue abierta',
   ninguno: 'En curso',
 }
@@ -65,14 +66,14 @@ export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: 
           </>
         )}
         <dt>Fecha comprometida original</dt>
-        <dd>{etiquetaLarga(tarea.fechaOriginal)}</dd>
+        <dd>{formatoFecha(tarea.fechaOriginal)}</dd>
         <dt>Fecha vigente</dt>
-        <dd className={est === 'vencida' ? 'fecha-vencida' : ''}>{etiquetaLarga(tarea.fechaObjetivo)}</dd>
+        <dd className={est === 'vencida' ? 'fecha-vencida' : ''}>{formatoFecha(tarea.fechaObjetivo)}</dd>
         {tarea.hecha && tarea.fechaReal && (
           <>
             <dt>Fecha real de termino</dt>
             <dd className={tarde ? 'fecha-tarde' : ''}>
-              {etiquetaLarga(tarea.fechaReal)}{tarde ? ' (tarde)' : ''}
+              {formatoFecha(tarea.fechaReal)}{tarde ? ' (tarde)' : ''}
             </dd>
           </>
         )}
@@ -93,7 +94,7 @@ export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: 
               : null
             return (
               <li key={i} className={esVigente ? 'vigente' : 'pasada'}>
-                <span className="fecha-cadena">{etiquetaLarga(f)}</span>
+                <span className="fecha-cadena">{formatoFecha(f)}</span>
                 <small>
                   {i === 0
                     ? 'Compromiso inicial'
@@ -128,11 +129,10 @@ export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: 
               </label>
               <label className="panel-accion">
                 Replanificar a
-                <input
-                  className="fecha-input panel-accion__fecha"
-                  type="date"
-                  value={tarea.fechaObjetivo}
-                  onChange={(e) => e.target.value && actions.cambiarFechaObjetivo(tarea.id, e.target.value)}
+                <FechaEditable
+                  valor={tarea.fechaObjetivo}
+                  onCambiar={(nueva) => actions.cambiarFechaObjetivo(tarea.id, nueva)}
+                  ariaLabel="Nueva fecha objetivo"
                 />
               </label>
               <button
