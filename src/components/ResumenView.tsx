@@ -24,7 +24,7 @@ export function ResumenView({ state, proyectos, hoy, onAbrirProyecto }: Props) {
         <div>
           <h2>Resumen de proyectos</h2>
           <p className="usuarios-sub">
-            Rojo = tareas atrasadas (exigen nueva fecha) · Ambar = replanificadas que siguen abiertas.
+            Rojo = atrasadas (exigen nueva fecha) · Ambar = replanificadas en plazo · Punto = atrasada y replanificada.
           </p>
         </div>
       </div>
@@ -75,15 +75,19 @@ function TarjetaProyecto({
         <span className="resumen-card__pct">{avance}%</span>
       </div>
 
+      {/* Las 5 categorias excluyentes (suman el total), de menos a mas critica. */}
       <div className="resumen-card__stats">
         <span className="stat"><b>{c.total}</b> tareas</span>
         <span className="stat stat--verde"><b>{c.hechas}</b> hechas</span>
         <span className="stat"><b>{c.pendientes}</b> pendientes</span>
-        <span className={`stat${c.porReplanificar > 0 ? ' stat--rojo' : ''}`}>
-          <b>{c.porReplanificar}</b> atrasadas
+        <span className={`stat${c.pendientesReplan > 0 ? ' stat--ambar' : ''}`}>
+          <b>{c.pendientesReplan}</b> pend. replanificadas
         </span>
-        <span className={`stat${c.replanificadasAbiertas > 0 ? ' stat--ambar' : ''}`}>
-          <b>{c.replanificadasAbiertas}</b> replanificadas abiertas
+        <span className={`stat${c.atrasadas > 0 ? ' stat--rojo' : ''}`}>
+          <b>{c.atrasadas}</b> atrasadas
+        </span>
+        <span className={`stat${c.atrasadasReplan > 0 ? ' stat--rojo' : ''}`}>
+          <b>{c.atrasadasReplan}</b> atr. replanificadas
         </span>
       </div>
     </button>

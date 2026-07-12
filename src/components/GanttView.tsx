@@ -1,29 +1,37 @@
-import { useMemo } from 'react'
-import type { AppState, ISODate, Tarea, TipoMarca } from '../types'
-import type { FrenteSel } from '../App'
+import { useMemo, useState } from 'react'
+import type { AppState, ISODate, Tarea, TipoMarca, Usuario } from '../types'
+import type { Actions, FrenteSel } from '../App'
 import {
+  addDays,
   cmp,
   diasHabiles,
   etiquetaDia,
   etiquetaSemana,
   esLunes,
   inicioSemana,
-  addDays,
 } from '../lib/dates'
-import { colorTarea, marcasDe } from '../lib/derive'
+import { colorTarea, marcasDe, puntoAmbar } from '../lib/derive'
 import { Marca } from './Marca'
-import { Avatar } from './RespPicker'
+import { Avatar, RespPicker } from './RespPicker'
 import { Legend } from './Legend'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
+import { InlineText } from './InlineText'
 
-// Vista Gantt — grilla tipo Excel (4.3). Marcas segun 6.4.
+// Vista Gantt — grilla tipo Excel (4.3). Horizonte temporal con tres modos
+// (definiciones cerradas §2) y edicion inline reutilizando el mismo patron
+// de la vista tabla (titulo y responsable; el resto via panel de detalle).
+
+/** Modos del horizonte. Siempre arranca en 'hoy'; no se persiste. */
+type ModoHorizonte = 'hoy' | 'rango' | 'todo'
 
 interface Props {
   state: AppState
   proyectoId: string
   frenteSel: FrenteSel
   hoy: string
+  puedeEditar: boolean
+  actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
 }
@@ -39,7 +47,22 @@ interface FilaGantt {
   esPrimeraGlobal: boolean
 }
 
-export function GanttView({ state, proyectoId, frenteSel, hoy, onAbrirTarea }: Props) {
+/** Ventana fija del modo "Alrededor de hoy": 3 semanas atras + 1 adelante. */
+function ventanaHoy(hoy: ISODate): { desde: ISODate; hasta: ISODate } {
+  return {
+    desde: inicioSemana(addDays(hoy, -21)),
+    hasta: addDays(inicioSemana(addDays(hoy, 7)), 4),
+  }
+}
+
+export function GanttView({ state, proyectoId, frenteSel, hoy, puedeEditar, actions, onAbrirTarea }: Props) {
+  // Horizonte: por defecto "Alrededor de hoy"; se puede cambiar durante la
+  // sesion pero NO se persiste (al recargar vuelve al default).
+  const [modo, setModo] = useState<ModoHorizonte>('hoy')
+  const [rango, setRango] = useState<{ desde: ISODate; hasta: ISODate }>(() => ventanaHoy(hoy))
+
+  const admins = state.usuarios.filter((u) => u.rol === 'admin' && u.activo)
+
   // -- Filas ordenadas con spans para celdas combinadas --
   const filas = useMemo<FilaGantt[]>(() => {
     const out: FilaGantt[] = []
@@ -85,24 +108,40 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, onAbrirTarea }: P
     return out
   }, [state, proyectoId, frenteSel])
 
-  // -- Rango de dias habiles a mostrar --
+  // -- Rango de dias habiles segun el modo de horizonte --
   const dias = useMemo<ISODate[]>(() => {
     if (filas.length === 0) return []
-    const fechas: ISODate[] = [hoy]
-    for (const { tarea } of filas) {
-      fechas.push(tarea.fechaOriginal, tarea.fechaObjetivo)
-      if (tarea.fechaReal) fechas.push(tarea.fechaReal)
-      for (const h of state.historial.filter((x) => x.tareaId === tarea.id)) {
-        fechas.push(h.fechaAnterior, h.fechaNueva)
+
+    let desde: ISODate
+    let hasta: ISODate
+
+    if (modo === 'rango' && rango.desde && rango.hasta && cmp(rango.desde, rango.hasta) <= 0) {
+      desde = rango.desde
+      hasta = rango.hasta
+    } else if (modo === 'todo') {
+      // Desde la primera hasta la ultima fecha del proyecto.
+      const fechas: ISODate[] = [hoy]
+      for (const { tarea } of filas) {
+        if (tarea.fechaOriginal) fechas.push(tarea.fechaOriginal)
+        if (tarea.fechaObjetivo) fechas.push(tarea.fechaObjetivo)
+        if (tarea.fechaReal) fechas.push(tarea.fechaReal)
+        for (const h of state.historial.filter((x) => x.tareaId === tarea.id)) {
+          fechas.push(h.fechaAnterior, h.fechaNueva)
+        }
       }
+      const min = fechas.reduce((a, b) => (cmp(a, b) <= 0 ? a : b))
+      const max = fechas.reduce((a, b) => (cmp(a, b) >= 0 ? a : b))
+      desde = inicioSemana(min)
+      hasta = addDays(inicioSemana(max), 4)
+    } else {
+      // Default: alrededor de hoy (3 semanas atras + 1 adelante, fijo).
+      const v = ventanaHoy(hoy)
+      desde = v.desde
+      hasta = v.hasta
     }
-    const min = fechas.reduce((a, b) => (cmp(a, b) <= 0 ? a : b))
-    const max = fechas.reduce((a, b) => (cmp(a, b) >= 0 ? a : b))
-    // Extiende al lunes de la primera semana y al viernes de la ultima.
-    const desde = inicioSemana(min)
-    const hasta = addDays(inicioSemana(max), 4)
+
     return diasHabiles(desde, hasta)
-  }, [filas, state.historial, hoy])
+  }, [filas, state.historial, hoy, modo, rango])
 
   // -- Agrupacion por semana para el encabezado de dos niveles --
   const semanas = useMemo(() => {
@@ -122,7 +161,41 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, onAbrirTarea }: P
 
   return (
     <div>
-      <Legend />
+      <div className="gantt-toolbar">
+        <Legend />
+        <div className="horizonte">
+          <div className="toggle">
+            <button className={modo === 'hoy' ? 'activo' : ''} onClick={() => setModo('hoy')} title="3 semanas atras + 1 adelante, fijo">
+              Alrededor de hoy
+            </button>
+            <button className={modo === 'rango' ? 'activo' : ''} onClick={() => setModo('rango')}>
+              Rango
+            </button>
+            <button className={modo === 'todo' ? 'activo' : ''} onClick={() => setModo('todo')}>
+              Todo el proyecto
+            </button>
+          </div>
+          {modo === 'rango' && (
+            <span className="horizonte__rango">
+              <input
+                type="date"
+                className="fecha-input horizonte__fecha"
+                value={rango.desde}
+                aria-label="Desde"
+                onChange={(e) => setRango((r) => ({ ...r, desde: e.target.value }))}
+              />
+              –
+              <input
+                type="date"
+                className="fecha-input horizonte__fecha"
+                value={rango.hasta}
+                aria-label="Hasta"
+                onChange={(e) => setRango((r) => ({ ...r, hasta: e.target.value }))}
+              />
+            </span>
+          )}
+        </div>
+      </div>
       <div className="gantt-wrap">
         <div className="gantt-scroll">
           <table className="gantt">
@@ -162,6 +235,9 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, onAbrirTarea }: P
                   dias={dias}
                   state={state}
                   hoy={hoy}
+                  admins={admins}
+                  puedeEditar={puedeEditar}
+                  actions={actions}
                   onAbrirTarea={onAbrirTarea}
                 />
               ))}
@@ -178,16 +254,23 @@ function FilaTarea({
   dias,
   state,
   hoy,
+  admins,
+  puedeEditar,
+  actions,
   onAbrirTarea,
 }: {
   fila: FilaGantt
   dias: ISODate[]
   state: AppState
   hoy: string
+  admins: Usuario[]
+  puedeEditar: boolean
+  actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
   const { tarea } = fila
   const color = colorTarea(state, tarea, hoy)
+  const conPunto = puntoAmbar(state, tarea, hoy)
   const resp = state.usuarios.find((u) => u.id === tarea.responsableId)
 
   // Mapa fecha -> marca. La marca principal (ultima en la lista) prevalece.
@@ -198,6 +281,7 @@ function FilaTarea({
   }, [state, tarea, hoy])
 
   const sep = fila.esInicioSub && !fila.esPrimeraGlobal ? ' sep-sf' : ''
+  const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
 
   return (
     <tr className={sep.trim()}>
@@ -212,20 +296,40 @@ function FilaTarea({
         </td>
       )}
       <td className={`fija fija--tarea tarea-cell--${color}`}>
-        <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
-          <span
-            className="tarea-cell__link"
-            role="button"
-            tabIndex={0}
-            onClick={() => onAbrirTarea(tarea.id)}
-            onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
-          >
-            {tarea.titulo}
-          </span>
-        </HoverCard>
+        {conPunto && <span className="punto-ambar" title="Atrasada replanificada" />}
+        {puedeEditar ? (
+          // Mismo patron inline que la tabla: click en el titulo lo edita.
+          <InlineText
+            valor={tarea.titulo}
+            onGuardar={(titulo) => actions.updateTarea(tarea.id, { titulo })}
+            ariaLabel={`Editar titulo: ${tarea.titulo}`}
+            wrapDisplay={(nodo) => <HoverCard card={tooltip}>{nodo}</HoverCard>}
+          />
+        ) : (
+          <HoverCard card={tooltip}>
+            <span
+              className="tarea-cell__link"
+              role="button"
+              tabIndex={0}
+              onClick={() => onAbrirTarea(tarea.id)}
+              onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
+            >
+              {tarea.titulo}
+            </span>
+          </HoverCard>
+        )}
       </td>
       <td className="fija fija--resp">
-        {resp && <Avatar usuario={resp} />}
+        {puedeEditar ? (
+          <RespPicker
+            usuarios={admins}
+            value={tarea.responsableId}
+            onChange={(id) => actions.updateTarea(tarea.id, { responsableId: id })}
+            ariaLabel={`Responsable: ${tarea.titulo}`}
+          />
+        ) : (
+          resp && <Avatar usuario={resp} />
+        )}
       </td>
 
       {dias.map((d) => {
@@ -237,7 +341,7 @@ function FilaTarea({
             className={`celda${esLunes(d) ? ' lunes' : ''}${esHoy ? ' col-hoy' : ''}`}
           >
             {tipo && (
-              <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
+              <HoverCard card={tooltip}>
                 <span
                   className="tarea-cell__link"
                   role="button"

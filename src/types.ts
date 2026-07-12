@@ -72,10 +72,14 @@ export interface Tarea {
   titulo: string
   descripcion?: string
   responsableId?: string
-  /** Fecha vigente. Al cambiarla se genera una Replanificacion. */
-  fechaObjetivo: ISODate
-  /** Compromiso inicial. Nunca se modifica. */
-  fechaOriginal: ISODate
+  /**
+   * Fecha vigente. La tarea NACE SIN FECHA; la primera fecha asignada fija
+   * tambien fechaOriginal (sin historial). Los cambios posteriores generan
+   * una Replanificacion. Nunca cae en fin de semana.
+   */
+  fechaObjetivo?: ISODate
+  /** Compromiso inicial: la PRIMERA fecha asignada. Inmutable desde entonces. */
+  fechaOriginal?: ISODate
   /** Unico estado que se marca a mano. Default false. */
   hecha: boolean
   /** Fecha real de termino; se registra al marcar hecha. Puede diferir de fechaObjetivo. */
@@ -114,11 +118,14 @@ export interface AppState {
   comentarios: Comentario[]
 }
 
-// ---- Estados derivados (seccion 6.2) ----
+// ---- Estados derivados ----
+// El modelo de 5 categorias excluyentes vive en lib/derive.ts (Categoria).
 
-export type EstadoDerivado = 'hecha' | 'vencida' | 'pendiente'
-
-/** Color del campo tarea — la señal principal de gestion (6.5). */
+/**
+ * Color del campo tarea — la señal principal de gestion (6.5).
+ * El rojo manda sobre el ambar; "atrasada replanificada" es rojo con un
+ * punto ambar en la esquina (ver derive.puntoAmbar).
+ */
 export type ColorTarea = 'verde' | 'rojo' | 'ambar' | 'ninguno'
 
 /** Tipos de marca en la grilla Gantt (6.4). */

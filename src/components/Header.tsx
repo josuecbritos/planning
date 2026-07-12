@@ -40,6 +40,7 @@ export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Prop
         </div>
       </div>
 
+      {/* Cinco categorias excluyentes, de menos a mas critica; suman el total (1.3). */}
       <div className="counters">
         <div className="counter counter--verde">
           <span className="counter__num">{c.hechas}</span>
@@ -49,15 +50,20 @@ export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Prop
           <span className="counter__num">{c.pendientes}</span>
           <span className="counter__lbl">Pendientes</span>
         </div>
-        <div className="counter counter--rojo">
-          <span className="counter__swatch" style={{ background: 'var(--rojo)' }} />
-          <span className="counter__num">{c.porReplanificar}</span>
-          <span className="counter__lbl">Atrasadas</span>
-        </div>
         <div className="counter counter--ambar">
           <span className="counter__swatch" style={{ background: 'var(--ambar)' }} />
-          <span className="counter__num">{c.replanificadasAbiertas}</span>
-          <span className="counter__lbl">Replanificadas abiertas</span>
+          <span className="counter__num">{c.pendientesReplan}</span>
+          <span className="counter__lbl">Pendientes replanificadas</span>
+        </div>
+        <div className="counter counter--rojo">
+          <span className="counter__swatch" style={{ background: 'var(--rojo)' }} />
+          <span className="counter__num">{c.atrasadas}</span>
+          <span className="counter__lbl">Atrasadas</span>
+        </div>
+        <div className="counter counter--rojo">
+          <span className="counter__swatch counter__swatch--punto" />
+          <span className="counter__num">{c.atrasadasReplan}</span>
+          <span className="counter__lbl">Atrasadas replanificadas</span>
         </div>
       </div>
     </header>

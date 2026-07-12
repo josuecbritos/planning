@@ -1,15 +1,23 @@
 import type {
   AppState,
   ColorTarea,
-  EstadoDerivado,
   MarcaGantt,
   Replanificacion,
   Tarea,
 } from '../types'
 import { cmp } from './dates'
 
-// Logica de la seccion 6: el usuario solo marca "hecha"; todo lo demas se
-// deriva. Nada de esto se almacena.
+// Modelo de estados (definiciones cerradas): el usuario solo marca "hecha";
+// todo lo demas se deriva de la fecha y del historial. Toda tarea cae en
+// EXACTAMENTE UNA de cinco categorias excluyentes que suman el 100%.
+
+/** Las cinco categorias, de menos a mas critica. */
+export type Categoria =
+  | 'hecha'
+  | 'pendiente'
+  | 'pendiente_replan'
+  | 'atrasada'
+  | 'atrasada_replan'
 
 /** Historial de una tarea, ordenado por numero de cambio. */
 export function historialDe(state: AppState, tareaId: string): Replanificacion[] {
@@ -22,74 +30,80 @@ export function tieneHistorial(state: AppState, tareaId: string): boolean {
   return state.historial.some((h) => h.tareaId === tareaId)
 }
 
-/** Estado derivado principal (6.2). `hoy` es la fecha simulada del sistema. */
-export function estadoDerivado(t: Tarea, hoy: string): EstadoDerivado {
+/**
+ * Categoria de una tarea (1.1). Reglas:
+ *  - "Hecha" es terminal: sin señales de alerta, sin distincion de tarde,
+ *    y no cuenta como replanificada aunque se haya movido.
+ *  - La replanificacion solo aplica a tareas abiertas.
+ *  - Una tarea sin fecha es "pendiente" (aun no planificada).
+ */
+export function categoriaDe(state: AppState, t: Tarea, hoy: string): Categoria {
   if (t.hecha) return 'hecha'
-  if (cmp(t.fechaObjetivo, hoy) < 0) return 'vencida' // fechaObjetivo < hoy
-  return 'pendiente'
+  const replan = tieneHistorial(state, t.id)
+  const vencida = !!t.fechaObjetivo && cmp(t.fechaObjetivo, hoy) < 0
+  if (vencida) return replan ? 'atrasada_replan' : 'atrasada'
+  return replan ? 'pendiente_replan' : 'pendiente'
 }
 
-/** Atributo replanificada (6.2): coexiste con el estado principal. */
-export function esReplanificada(state: AppState, t: Tarea): boolean {
-  return tieneHistorial(state, t.id)
+/** true si la tarea esta vencida y sin hacer (atrasada o atrasada replanificada). */
+export function esAtrasada(cat: Categoria): boolean {
+  return cat === 'atrasada' || cat === 'atrasada_replan'
 }
 
 /**
- * Color del campo tarea (6.5) — la señal principal de gestion.
- *   verde  = hecha
- *   rojo   = vencida (haz algo: asignar nueva fecha)
- *   ambar  = pendiente con historial (vigilala)
- *   ninguno= pendiente sin historial (en curso)
+ * Color de fondo del campo tarea (6.5 actualizado). El rojo manda sobre el
+ * ambar: una atrasada replanificada es roja; su condicion de replanificada
+ * se señala con el punto ambar en la esquina (ver puntoAmbar).
  */
 export function colorTarea(state: AppState, t: Tarea, hoy: string): ColorTarea {
-  const est = estadoDerivado(t, hoy)
-  if (est === 'hecha') return 'verde'
-  if (est === 'vencida') return 'rojo'
-  // pendiente
-  return esReplanificada(state, t) ? 'ambar' : 'ninguno'
+  switch (categoriaDe(state, t, hoy)) {
+    case 'hecha': return 'verde'
+    case 'atrasada':
+    case 'atrasada_replan': return 'rojo'
+    case 'pendiente_replan': return 'ambar'
+    default: return 'ninguno'
+  }
 }
 
-/** true si la tarea se cerro despues de su fecha objetivo vigente. */
-export function hechaTarde(t: Tarea): boolean {
-  return t.hecha && !!t.fechaReal && cmp(t.fechaReal, t.fechaObjetivo) > 0
+/** Punto ambar en la esquina: atrasada Y replanificada (1.2). */
+export function puntoAmbar(state: AppState, t: Tarea, hoy: string): boolean {
+  return categoriaDe(state, t, hoy) === 'atrasada_replan'
 }
 
 /**
- * Marcas de la grilla Gantt para una tarea (6.4).
- * Puede devolver varias: la marca "principal" + un rastro de fechas anteriores.
+ * Marcas de la grilla Gantt para una tarea (6.4 actualizado):
+ *  - Hecha: solo la marca verde en la fecha real ("hecha es terminal";
+ *    no arrastra rastro ni señal de tarde).
+ *  - Abierta: rastro rojo tenue por cada fecha anterior + marca principal
+ *    en la fecha objetivo (✕ en plazo, ■ roja si vencida).
+ *  - Sin fecha: sin marcas.
  */
 export function marcasDe(state: AppState, t: Tarea, hoy: string): MarcaGantt[] {
-  const marcas: MarcaGantt[] = []
-  const hist = historialDe(state, t.id)
-
-  // Rastro: una marca tenue por cada fecha anterior donde estuvo la tarea.
-  for (const h of hist) {
-    marcas.push({ fecha: h.fechaAnterior, tipo: 'anterior' })
+  if (t.hecha) {
+    const fecha = t.fechaReal ?? t.fechaObjetivo
+    return fecha ? [{ fecha, tipo: 'hecha' }] : []
   }
 
-  if (t.hecha && t.fechaReal) {
-    // Si se hizo tarde, la fecha_objetivo incumplida tambien se marca tenue.
-    if (hechaTarde(t)) {
-      marcas.push({ fecha: t.fechaObjetivo, tipo: 'anterior' })
-    }
-    // Marca principal en la columna de fecha_real (no de fecha_objetivo).
-    marcas.push({ fecha: t.fechaReal, tipo: 'hecha' })
-  } else {
-    // No hecha: la marca cae en fecha_objetivo.
+  const marcas: MarcaGantt[] = []
+  for (const h of historialDe(state, t.id)) {
+    marcas.push({ fecha: h.fechaAnterior, tipo: 'anterior' })
+  }
+  if (t.fechaObjetivo) {
     const vencida = cmp(t.fechaObjetivo, hoy) < 0
     marcas.push({ fecha: t.fechaObjetivo, tipo: vencida ? 'incumplida' : 'pendiente' })
   }
-
   return marcas
 }
 
-// ---- Contadores del encabezado (7.2) ----
+// ---- Contadores del encabezado (1.3) ----
+// Cinco categorias excluyentes, de menos a mas critica; suman el total.
 
 export interface Contadores {
   hechas: number
   pendientes: number
-  porReplanificar: number // rojas (vencidas)
-  replanificadasAbiertas: number // ambar
+  pendientesReplan: number
+  atrasadas: number
+  atrasadasReplan: number
   total: number
 }
 
@@ -99,17 +113,28 @@ export function contar(state: AppState, tareas: Tarea[], hoy: string): Contadore
   const c: Contadores = {
     hechas: 0,
     pendientes: 0,
-    porReplanificar: 0,
-    replanificadasAbiertas: 0,
+    pendientesReplan: 0,
+    atrasadas: 0,
+    atrasadasReplan: 0,
     total: activas.length,
   }
   for (const t of activas) {
-    const color = colorTarea(state, t, hoy)
-    if (color === 'verde') c.hechas++
-    else if (color === 'rojo') c.porReplanificar++
-    else if (color === 'ambar') c.replanificadasAbiertas++
-    // pendientes = no hechas y no vencidas (sin color o ambar cuentan como abiertas)
-    if (!t.hecha && cmp(t.fechaObjetivo, hoy) >= 0) c.pendientes++
+    switch (categoriaDe(state, t, hoy)) {
+      case 'hecha': c.hechas++; break
+      case 'pendiente': c.pendientes++; break
+      case 'pendiente_replan': c.pendientesReplan++; break
+      case 'atrasada': c.atrasadas++; break
+      case 'atrasada_replan': c.atrasadasReplan++; break
+    }
   }
   return c
+}
+
+/** Etiquetas en lenguaje llano por categoria (para chips y filtros). */
+export const CATEGORIA_LABEL: Record<Categoria, string> = {
+  hecha: 'Hecha',
+  pendiente: 'Pendiente',
+  pendiente_replan: 'Pendiente replanificada',
+  atrasada: 'Atrasada',
+  atrasada_replan: 'Atrasada replanificada',
 }

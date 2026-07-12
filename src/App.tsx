@@ -370,6 +370,8 @@ export default function App() {
                   proyectoId={proyecto.id}
                   frenteSel={frenteSel}
                   hoy={HOY}
+                  puedeEditar={esAdmin}
+                  actions={actions}
                   onAbrirTarea={abrirDetalle}
                 />
               )}

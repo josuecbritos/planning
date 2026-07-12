@@ -142,6 +142,13 @@ button { font-family: inherit; cursor: pointer; }
 .counter__num { font-size: 17px; font-weight: 700; line-height: 1; }
 .counter__lbl { font-size: 11.5px; color: var(--gris-texto); }
 .counter__swatch { width: 10px; height: 10px; border-radius: 3px; }
+.counter__swatch--punto {
+  background: var(--rojo); position: relative; overflow: visible;
+}
+.counter__swatch--punto::after {
+  content: ''; position: absolute; top: -3px; right: -3px; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--ambar); box-shadow: 0 0 0 1px #fff;
+}
 .counter--verde .counter__num { color: var(--verde-check); }
 .counter--rojo .counter__num { color: var(--rojo); }
 .counter--ambar .counter__num { color: var(--ambar-texto); }
@@ -174,7 +181,14 @@ table.tareas th {
 .col-fecha { width: 118px; white-space: nowrap; }
 
 /* Celda del titulo con color de gestion (6.5) */
-.tarea-cell { font-weight: 600; }
+.tarea-cell { font-weight: 600; position: relative; }
+
+/* Punto ambar en la esquina: atrasada Y replanificada (el rojo manda). */
+.punto-ambar {
+  position: absolute; top: 3px; right: 3px; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--ambar); box-shadow: 0 0 0 1.5px #fff;
+  pointer-events: none;
+}
 .tarea-cell--verde { background: var(--verde-suave); }
 .tarea-cell--rojo { background: var(--rojo-suave); }
 .tarea-cell--ambar { background: var(--ambar-suave); }
@@ -217,6 +231,8 @@ table.tareas th {
   padding: 2px 5px; border-radius: 5px; cursor: pointer;
 }
 .fecha-btn:hover { background: var(--gris-linea); }
+.fecha-btn--vacia { color: var(--gris-texto); font-style: italic; border: 1px dashed var(--gris-borde); }
+.fecha-btn--vacia:hover { color: var(--verde-oscuro); border-color: var(--verde); background: none; }
 
 /* ---------- Bloque 2: interaccion inline ---------- */
 
@@ -322,6 +338,17 @@ table.tareas th {
 /* ---------- Vista Gantt (grilla) ---------- */
 
 .gantt-wrap { padding: 16px 20px 40px; }
+
+/* Barra sobre la grilla: leyenda + selector de horizonte temporal */
+.gantt-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin: 0 20px;
+}
+.gantt-toolbar .leyenda { margin: 16px 0 0; flex: 1; }
+.horizonte { display: flex; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.horizonte .toggle button { padding: 6px 12px; font-size: 12.5px; }
+.horizonte__rango { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--gris-texto); }
+.horizonte__fecha { border: 1px solid var(--gris-borde); background: #fff; width: auto; font-size: 12.5px; }
 .gantt-scroll {
   overflow: auto; border: 1px solid var(--gris-borde); border-radius: 8px; background: #fff;
   max-height: calc(100vh - 250px);
@@ -390,6 +417,11 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .hc-estado--rojo { background: var(--rojo-suave); color: var(--rojo); }
 .hc-estado--ambar { background: var(--ambar-suave); color: var(--ambar-texto); }
 .hc-estado--ninguno { background: #37474f; color: #cfd8dc; }
+.hc-estado--punto { position: relative; padding-right: 16px; }
+.hc-estado--punto::after {
+  content: ''; position: absolute; top: 3px; right: 4px; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--ambar);
+}
 .hovercard__row { display: flex; justify-content: space-between; gap: 18px; }
 .hovercard__row span:first-child { color: #90a4ae; }
 .hovercard__hist { margin-top: 8px; border-top: 1px solid #37474f; padding-top: 8px; }
