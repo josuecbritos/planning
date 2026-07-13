@@ -187,8 +187,10 @@ table.tareas th {
   position: sticky; top: 0; z-index: 10;
 }
 
-/* Contenido centrado en Hecha, responsable y fechas */
-table.tareas .col-resp, table.tareas .col-fecha { text-align: center; }
+/* Contenido centrado en Hecha, responsable y fechas.
+   (Con el prefijo table.tareas: la regla generica th/td de arriba
+   pone text-align left con mayor especificidad y ganaba en Hecha.) */
+table.tareas .col-check, table.tareas .col-resp, table.tareas .col-fecha { text-align: center; }
 
 /* Fila completa coloreada segun el estado de la tarea */
 tr.fila--verde > td { background: var(--verde-suave); }
@@ -402,6 +404,11 @@ tr.fila--morado > td { background: var(--morado-suave); }
 .marca-wrap--click { cursor: pointer; }
 .marca-wrap[draggable='true'] { cursor: grab; }
 
+/* Arrastre con snap por dia: la marca original queda tenue y un fantasma
+   encajado en la celda muestra el dia donde caeria la tarea al soltar. */
+.marca-wrap--en-vuelo { opacity: .3; }
+.marca-fantasma { display: inline-flex; opacity: .55; pointer-events: none; }
+
 /* "+" al hover para crear hermanos (§6.4.25) */
 .con-mas { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
 .con-mas__acciones { display: inline-flex; gap: 2px; }
@@ -422,33 +429,31 @@ td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { 
 .gantt td.fija--frente .mas-btn { background: rgba(255,255,255,.25); color: #fff; }
 .gantt td.fija--frente .mas-btn:hover { background: rgba(255,255,255,.45); }
 
-/* Popover para crear elementos desde la grilla */
-.crear-pop {
-  position: fixed; z-index: 2600; background: #fff; border-radius: 10px;
-  box-shadow: 0 10px 36px rgba(15,24,32,.28); border: 1px solid var(--gris-linea);
-  padding: 8px;
-}
-.crear-pop input {
-  font: inherit; font-size: 13px; width: 260px;
-  border: 1px solid var(--verde); border-radius: 6px; padding: 6px 9px;
-}
-.crear-pop input:focus { outline: none; }
+/* Creacion inline desde la grilla (§6.4.25): el "+" inserta el input en
+   su propia celda, igual que en la vista tabla. */
+.gantt td.fija--input { padding: 4px 8px; }
+.gantt .crear-inline { font-size: 12.5px; font-weight: 400; color: var(--texto); }
 
 /* Contenedores vacios en la grilla */
 .gantt td.gantt-vacio { padding: 6px 10px; }
 .gantt td.gantt-vacio .mudo { color: var(--gris-texto); font-style: italic; font-size: 12px; }
 
-/* §6.5: filas de carga por persona */
+/* §6.5: filas de carga por persona. La zona izquierda reutiliza las cuatro
+   columnas congeladas (.fija--*) — una celda con colSpan no queda sticky —
+   neutralizando el color de frente/sub frente; asi los nombres permanecen
+   visibles al hacer scroll horizontal, igual que el resto de la grilla. */
 .gantt tr.carga-sep td { border-top: 2px solid var(--gris-borde); background: #fafbfc; }
-.carga-sep__label {
+.gantt tr.carga-sep td.fija { background: #fafbfc; color: var(--gris-texto); }
+.gantt tr.carga-fila td.fija { background: #fff; color: var(--texto); font-weight: 400; }
+.gantt td.carga-vacia { border-right-color: transparent; }
+.gantt tr.carga-sep td.carga-sep__label {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--gris-texto); padding: 5px 10px; position: sticky; left: 0; background: #fafbfc; z-index: 2;
+  padding: 5px 10px; text-align: left; border-right-color: transparent;
 }
-.carga-fila__nombre {
+.gantt tr.carga-fila td.carga-fila__nombre {
   font-size: 12.5px; font-weight: 600; text-align: right; padding: 4px 10px;
-  position: sticky; left: 0; background: #fff; z-index: 2; width: 510px; min-width: 510px;
 }
-.carga-fila .fija--resp { text-align: center; }
+.gantt tr.carga-fila td.fija--resp { text-align: center; }
 .carga-celda { font-size: 12px; color: var(--texto); text-align: center; }
 .gantt-scroll {
   overflow: auto; border: 1px solid var(--gris-borde); border-radius: 8px; background: #fff;
@@ -457,12 +462,15 @@ td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { 
 table.gantt { border-collapse: separate; border-spacing: 0; }
 table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); border-bottom: 1px solid var(--gris-linea); }
 
-/* Columnas fijas (congeladas) */
-.gantt .fija { position: sticky; background: #fff; z-index: 2; }
-.gantt .fija--frente { left: 0; width: 120px; min-width: 120px; }
-.gantt .fija--sf { left: 120px; width: 150px; min-width: 150px; }
-.gantt .fija--tarea { left: 270px; width: 240px; min-width: 240px; }
-.gantt .fija--resp { left: 510px; width: 60px; min-width: 60px; box-shadow: 2px 0 4px rgba(0,0,0,.08); }
+/* Columnas fijas (congeladas). Los `left` asumen los anchos exactos
+   declarados (120/150/240/60): overflow-wrap anywhere evita que una palabra
+   larga ensanche la columna y desplace el anclaje (break-word no reduce el
+   ancho minimo intrinseco dentro de una tabla). */
+.gantt .fija { position: sticky; background: #fff; z-index: 2; overflow-wrap: anywhere; }
+.gantt .fija--frente { left: 0; width: 120px; min-width: 120px; max-width: 120px; }
+.gantt .fija--sf { left: 120px; width: 150px; min-width: 150px; max-width: 150px; }
+.gantt .fija--tarea { left: 270px; width: 240px; min-width: 240px; max-width: 240px; }
+.gantt .fija--resp { left: 510px; width: 60px; min-width: 60px; max-width: 60px; box-shadow: 2px 0 4px rgba(0,0,0,.08); }
 
 .gantt thead th {
   position: sticky; top: 0; z-index: 3; background: #fafbfc; text-align: center;
@@ -487,7 +495,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .gantt td.fija--frente {
   background: var(--verde); color: #fff; font-weight: 700; font-size: 12px;
   letter-spacing: .02em; vertical-align: middle; text-align: center;
-  padding: 8px 10px; overflow-wrap: break-word;
+  padding: 8px 10px;
 }
 .gantt td.fija--sf {
   background: var(--gris-sf); font-weight: 600; font-size: 12px;
@@ -722,17 +730,35 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   border-radius: 6px; padding: 6px 12px; margin: 0 0 12px;
 }
 
-/* Modal de permisos por cliente (§7) */
-.permisos { padding: 0; }
+/* Modal de permisos por cliente (§7): lista legible + selector segmentado
+   de alcance [ No | Solo asignadas | Todas ] por permiso sobre tareas. */
+.permisos { padding: 0; min-width: 460px; }
 .permisos__intro { font-size: 12.5px; color: var(--gris-texto); margin: 0 0 12px; }
+.permisos__alcance { font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--gris-texto); }
+.permisos-lista { border: 1px solid var(--gris-linea); border-radius: 8px; background: #fff; }
+.permiso-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 8px 12px;
+}
+.permiso-item + .permiso-item { border-top: 1px solid var(--gris-linea); }
+.permiso-item__label { font-size: 13px; font-weight: 600; }
+.permiso-item__label small { display: block; font-size: 11.5px; font-weight: 400; color: var(--gris-texto); }
+.seg {
+  display: inline-flex; border: 1px solid var(--gris-borde); border-radius: 8px;
+  overflow: hidden; background: #fff; flex: none;
+}
+.seg__btn {
+  border: none; background: transparent; font: inherit; font-size: 12px;
+  padding: 5px 11px; cursor: pointer; color: var(--gris-texto);
+  border-left: 1px solid var(--gris-linea); white-space: nowrap;
+}
+.seg__btn:first-child { border-left: none; }
+.seg__btn--on { background: var(--verde); color: #fff; font-weight: 700; }
+.seg__btn--no.seg__btn--on { background: #5c6b77; }
 .permisos__grupo {
   font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
   color: var(--gris-texto); margin: 14px 0 6px; border-top: 1px solid var(--gris-linea); padding-top: 10px;
 }
-.permiso-fila { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 13px; }
-.permiso-fila label { display: flex; align-items: center; gap: 10px; }
-.permiso-fila input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--verde); }
-.permiso-fila--tarea { justify-content: space-between; }
 .permisos__nota { font-size: 11.5px; color: var(--gris-texto); margin: 12px 0 0; }
 .asignaciones { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .asignacion {
