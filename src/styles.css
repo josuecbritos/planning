@@ -200,6 +200,20 @@ tr.fila--morado > td { background: var(--morado-suave); }
 .col-check { width: 44px; text-align: center; }
 .col-resp { width: 96px; }
 .col-fecha { width: 118px; white-space: nowrap; }
+.col-estado { width: 176px; white-space: nowrap; }
+table.tareas .col-estado { text-align: center; }
+
+/* Punto 1: columna Estado — la categoria en texto, como refuerzo del color
+   de fila (chip blanco con texto del color de gestion). */
+.estado-chip {
+  display: inline-block; font-size: 11px; font-weight: 700; border-radius: 5px;
+  padding: 2px 8px; background: #fff; border: 1px solid var(--gris-linea);
+  color: var(--gris-texto);
+}
+.estado-chip--verde { color: var(--verde-check); border-color: #bfdcc4; }
+.estado-chip--rojo { color: var(--rojo); border-color: #f0c4c0; }
+.estado-chip--ambar { color: var(--ambar-texto); border-color: #ecd9a0; }
+.estado-chip--morado { color: var(--morado-texto); border-color: #d5bfe0; }
 
 /* Celda del titulo con color de gestion (6.5) */
 .tarea-cell { font-weight: 600; position: relative; }
@@ -399,15 +413,25 @@ tr.fila--morado > td { background: var(--morado-suave); }
 .gantt td.celda--planificable { cursor: copy; }
 .gantt td.celda--planificable:hover { background: var(--verde-suave); }
 
-/* Marcas interactivas (§6.4.22/23) */
+/* Marcas interactivas (estandar por clics, punto 2) */
 .marca-wrap { display: inline-flex; }
 .marca-wrap--click { cursor: pointer; }
-.marca-wrap[draggable='true'] { cursor: grab; }
 
-/* Arrastre con snap por dia: la marca original queda tenue y un fantasma
-   encajado en la celda muestra el dia donde caeria la tarea al soltar. */
-.marca-wrap--en-vuelo { opacity: .3; }
-.marca-fantasma { display: inline-flex; opacity: .55; pointer-events: none; }
+/* Recordatorio de gestos sobre la grilla */
+.gantt-ayuda { margin: 0; font-size: 12px; color: var(--gris-texto); }
+.gantt-ayuda b { color: var(--texto); font-weight: 600; }
+
+/* Mini-aviso (2.2): "No puedes eliminar tareas que ya pasaron" */
+.mini-aviso {
+  position: fixed; z-index: 2700; max-width: 260px;
+  background: #1f2b36; color: #fff; font-size: 12px; font-weight: 600;
+  padding: 7px 12px; border-radius: 8px; box-shadow: 0 8px 28px rgba(15,24,32,.3);
+  pointer-events: none; animation: mini-aviso-in .14s ease-out;
+}
+@keyframes mini-aviso-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
 
 /* "+" al hover para crear hermanos (§6.4.25) */
 .con-mas { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
@@ -442,18 +466,35 @@ td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { 
    columnas congeladas (.fija--*) — una celda con colSpan no queda sticky —
    neutralizando el color de frente/sub frente; asi los nombres permanecen
    visibles al hacer scroll horizontal, igual que el resto de la grilla. */
-.gantt tr.carga-sep td { border-top: 2px solid var(--gris-borde); background: #fafbfc; }
-.gantt tr.carga-sep td.fija { background: #fafbfc; color: var(--gris-texto); }
 .gantt tr.carga-fila td.fija { background: #fff; color: var(--texto); font-weight: 400; }
 .gantt td.carga-vacia { border-right-color: transparent; }
-.gantt tr.carga-sep td.carga-sep__label {
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  padding: 5px 10px; text-align: left; border-right-color: transparent;
-}
 .gantt tr.carga-fila td.carga-fila__nombre {
   font-size: 12.5px; font-weight: 600; text-align: right; padding: 4px 10px;
 }
 .gantt tr.carga-fila td.fija--resp { text-align: center; }
+
+/* Fila-titulo de la seccion (punto 3): banda continua y baja, con la
+   etiqueta en una sola linea. El texto desborda de la primera celda
+   congelada sobre sus vecinas vacias (z-index mayor, dentro de la zona
+   congelada) para no depender del ancho de la columna Frente. */
+.gantt tr.carga-sep td {
+  border-top: 2px solid var(--gris-borde); border-bottom: 1px solid var(--gris-borde);
+  background: #eef1f4; height: 24px;
+}
+.gantt tr.carga-sep td.fija { background: #eef1f4; }
+.gantt tr.carga-sep td.carga-sep__label {
+  font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--gris-texto); text-align: left; vertical-align: middle;
+  padding: 4px 12px; white-space: nowrap; overflow: visible;
+  border-right-color: transparent; z-index: 3;
+}
+
+/* Fila "Sin asignar" (punto 4): tareas sin responsable por dia */
+.gantt tr.carga-fila--sin td.carga-fila__nombre { color: var(--gris-texto); font-style: italic; }
+.avatar--sin {
+  background: #fff; border: 1.5px dashed var(--gris-borde);
+  color: var(--gris-texto); font-weight: 700;
+}
 .carga-celda { font-size: 12px; color: var(--texto); text-align: center; }
 .gantt-scroll {
   overflow: auto; border: 1px solid var(--gris-borde); border-radius: 8px; background: #fff;
@@ -534,6 +575,8 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 .hovercard__row { display: flex; justify-content: space-between; gap: 18px; }
 .hovercard__row span:first-child { color: #90a4ae; }
+/* Registro de auditoria del marcado (punto 1) */
+.hovercard__marcada { margin-top: 4px; font-size: 12px; color: #9ccc9c; }
 .hovercard__hist { margin-top: 8px; border-top: 1px solid #37474f; padding-top: 8px; }
 .hovercard__hist-title { color: #90a4ae; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
 .hovercard__chain { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
@@ -651,6 +694,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   background: #fff; border-radius: 12px; width: 100%; max-width: 460px;
   box-shadow: 0 20px 60px rgba(0,0,0,.3); overflow: hidden;
 }
+.modal-card--ancha { max-width: 620px; }
 .modal-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 20px; border-bottom: 1px solid var(--gris-linea);
@@ -730,36 +774,38 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   border-radius: 6px; padding: 6px 12px; margin: 0 0 12px;
 }
 
-/* Modal de permisos por cliente (§7): lista legible + selector segmentado
-   de alcance [ No | Solo asignadas | Todas ] por permiso sobre tareas. */
-.permisos { padding: 0; min-width: 460px; }
-.permisos__intro { font-size: 12.5px; color: var(--gris-texto); margin: 0 0 12px; }
-.permisos__alcance { font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--gris-texto); }
-.permisos-lista { border: 1px solid var(--gris-linea); border-radius: 8px; background: #fff; }
+/* Modal de permisos por cliente (§7, formato punto 5): lista legible con
+   aire + selector segmentado de alcance [ No | Solo asignadas | Todas ]. */
+.permisos { padding: 18px 24px 22px; }
+.permisos__intro { font-size: 13px; color: var(--gris-texto); margin: 0 0 16px; }
+.permisos__alcance { font-size: 11.5px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--gris-texto); }
+.permisos-lista { border: 1px solid var(--gris-linea); border-radius: 10px; background: #fff; }
 .permiso-item {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  padding: 8px 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 11px 16px;
 }
 .permiso-item + .permiso-item { border-top: 1px solid var(--gris-linea); }
-.permiso-item__label { font-size: 13px; font-weight: 600; }
-.permiso-item__label small { display: block; font-size: 11.5px; font-weight: 400; color: var(--gris-texto); }
+.permiso-item__label { font-size: 13.5px; font-weight: 600; }
+.permiso-item__label small { display: block; font-size: 12px; font-weight: 400; color: var(--gris-texto); margin-top: 2px; }
 .seg {
   display: inline-flex; border: 1px solid var(--gris-borde); border-radius: 8px;
   overflow: hidden; background: #fff; flex: none;
 }
 .seg__btn {
-  border: none; background: transparent; font: inherit; font-size: 12px;
-  padding: 5px 11px; cursor: pointer; color: var(--gris-texto);
+  border: none; background: transparent; font: inherit; font-size: 12.5px;
+  padding: 6px 13px; cursor: pointer; color: var(--gris-texto);
   border-left: 1px solid var(--gris-linea); white-space: nowrap;
 }
 .seg__btn:first-child { border-left: none; }
 .seg__btn--on { background: var(--verde); color: #fff; font-weight: 700; }
 .seg__btn--no.seg__btn--on { background: #5c6b77; }
 .permisos__grupo {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
-  color: var(--gris-texto); margin: 14px 0 6px; border-top: 1px solid var(--gris-linea); padding-top: 10px;
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--gris-texto); margin: 20px 0 8px;
 }
-.permisos__nota { font-size: 11.5px; color: var(--gris-texto); margin: 12px 0 0; }
+.permisos__grupo:first-of-type { margin-top: 0; }
+.permisos__nota { font-size: 12px; color: var(--gris-texto); margin: 14px 0 0; line-height: 1.5; }
+.permisos .modal-acciones { margin-top: 18px; border-top: 1px solid var(--gris-linea); padding-top: 16px; }
 .asignaciones { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .asignacion {
   display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
@@ -819,6 +865,10 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .panel-detalle__cadena li.vigente { border-left-color: transparent; padding-bottom: 0; }
 .panel-detalle__cadena .fecha-cadena { display: block; font-size: 13.5px; font-weight: 600; }
 .panel-detalle__cadena small { color: var(--gris-texto); font-size: 11.5px; }
+/* Registro de auditoria: dia real en que la tarea se marco lista (punto 1) */
+.panel-detalle__cadena li.marcada-lista { border-left-color: transparent; padding-bottom: 0; }
+.panel-detalle__cadena li.marcada-lista::before { background: var(--verde-check); }
+.panel-detalle__cadena li.marcada-lista .fecha-cadena { color: var(--verde-check); }
 .panel-detalle__comentarios p { font-size: 13px; margin: 0; white-space: pre-wrap; }
 
 .panel-detalle__acciones {

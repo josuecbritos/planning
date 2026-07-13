@@ -66,13 +66,6 @@ export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
         <dd className={esAtrasada(cat) ? 'fecha-vencida' : ''}>
           {tarea.fechaObjetivo ? formatoFecha(tarea.fechaObjetivo) : 'Sin fecha aun'}
         </dd>
-        {/* "Hecha" es terminal: no se distingue si fue a tiempo o tarde. */}
-        {tarea.hecha && tarea.fechaReal && (
-          <>
-            <dt>Fecha real de termino</dt>
-            <dd>{formatoFecha(tarea.fechaReal)}</dd>
-          </>
-        )}
       </dl>
 
       <div className="panel-detalle__hist">
@@ -100,6 +93,14 @@ export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
               </li>
             )
           })}
+          {/* Punto 1: el dia real del marcado vive SOLO en el historial;
+              la marca queda en la ultima fecha planificada. */}
+          {tarea.hecha && tarea.fechaReal && (
+            <li className="marcada-lista">
+              <span className="fecha-cadena">{formatoFecha(tarea.fechaReal)}</span>
+              <small>Se marco lista este dia</small>
+            </li>
+          )}
         </ol>
       </div>
 

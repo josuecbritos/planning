@@ -48,7 +48,8 @@ export interface Actions {
   updateTarea: (id: string, p: PatchTarea) => Promise<void>
   deleteTarea: (id: string) => Promise<void>
   toggleHecha: (tareaId: string, hecha: boolean) => Promise<void>
-  cambiarFechaObjetivo: (tareaId: string, nueva: string) => Promise<void>
+  /** `nueva = null` desplanifica (borra la marca; queda "sin fecha"). */
+  cambiarFechaObjetivo: (tareaId: string, nueva: string | null) => Promise<void>
   createUsuario: (i: NuevoUsuario) => Promise<void>
   updateUsuario: (id: string, p: PatchUsuario) => Promise<void>
   asignarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>

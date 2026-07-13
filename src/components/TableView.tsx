@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import type { Can } from '../lib/permisos'
-import { categoriaDe, colorTarea, esAtrasada, nReplanificaciones } from '../lib/derive'
+import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, nReplanificaciones } from '../lib/derive'
 import { formatoFecha } from '../lib/dates'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
@@ -210,7 +210,7 @@ function SubFrenteTabla({
             <th className="col-resp">Resp.</th>
             <th className="col-fecha">Fecha Original</th>
             <th className="col-fecha">Fecha Objetivo</th>
-            <th className="col-fecha">Fecha Cierre</th>
+            <th className="col-estado">Estado</th>
             {can.algunoDeTareas && <th className="col-acc"></th>}
           </tr>
         </thead>
@@ -362,7 +362,7 @@ function NuevaTareaFila({
           aria-label="Fecha objetivo de la nueva tarea"
         />
       </td>
-      <td className="col-fecha mudo">—</td>
+      <td className="col-estado mudo">—</td>
       <td className="col-acc">
         <button className="icon-btn" title="Guardar (Enter)" onMouseDown={(e) => e.preventDefault()} onClick={guardar}>✓</button>
         <button className="icon-btn" title="Cerrar (Esc)" onMouseDown={(e) => e.preventDefault()} onClick={() => { setTitulo(''); setActiva(false) }}>✕</button>
@@ -476,9 +476,11 @@ function TareaFila({
         )}
       </td>
 
-      {/* "Hecha" es terminal: no se distingue si fue a tiempo o tarde. */}
-      <td className="col-fecha">
-        {tarea.fechaReal ? formatoFecha(tarea.fechaReal) : '—'}
+      {/* Punto 1: la categoria en texto refuerza el color de fila. La fecha
+          de cierre ya no es columna: la marca vive en la fecha planificada y
+          el dia real del marcado queda solo en el historial. */}
+      <td className="col-estado">
+        <span className={`estado-chip estado-chip--${color}`}>{CATEGORIA_LABEL[cat]}</span>
       </td>
 
       {can.algunoDeTareas && (

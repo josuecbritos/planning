@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { AppState, Frente, ISODate, SubFrente, Tarea, TipoMarca, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import {
@@ -21,15 +22,18 @@ import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
 import { InlineText } from './InlineText'
 
-// Vista Gantt — grilla tipo Excel (4.3), editable (§6.4):
-//  - click en celda vacia planifica una tarea sin fecha
-//  - arrastrar la marca replanifica, encajando dia a dia (snap por celda):
-//    la marca original queda tenue y un fantasma muestra el dia de destino
-//  - click sobre la marca alterna hecha / no hecha
+// Vista Gantt — grilla tipo Excel (4.3). Estandar de planificacion por
+// CLICS (pedido punto 2; reemplaza el arrastre):
+//  - clic izquierdo en celda vacia         → planifica (pone la marca)
+//  - clic izquierdo en marca FUTURA        → borra la marca (queda sin fecha)
+//  - clic izquierdo en marca de hoy/vencida→ bloqueado + mini-aviso
+//  - clic izquierdo en celda futura de una tarea de hoy/vencida → replanifica
+//    (nueva marca a futuro; cuenta como replanificacion, regla 1.2)
+//  - clic derecho sobre una marca          → alterna lista / no lista
+//    (el menu contextual del navegador queda suprimido sobre la grilla)
 //  - "+" al pasar el mouse crea un hermano justo debajo, INLINE en la grilla
 //  - contenedores vacios muestran "+ agregar" que se convierte en input
-// Al pie, filas de carga por persona (§6.5), con las columnas de la
-// izquierda congeladas igual que el resto de la grilla.
+// Al pie, filas de carga por persona (§6.5) + fila "Sin asignar".
 
 /** Modos del horizonte. Siempre arranca en 'hoy'; no se persiste. */
 type ModoHorizonte = 'hoy' | 'rango' | 'todo'
@@ -99,23 +103,15 @@ interface CrearEn {
   contenedorId: string
 }
 
-/** Arrastre de una marca: tarea en vuelo + dia bajo el cursor (snap). */
-interface DragMarca {
-  tareaId: string
-  overDia: ISODate | null
+/** Mini-aviso flotante (2.2): "No puedes eliminar tareas que ya pasaron". */
+interface Aviso {
+  x: number
+  y: number
+  texto: string
 }
 
-// El navegador dibuja por defecto una copia de la marca que sigue al mouse
-// pixel a pixel ("movimiento libre"). Se reemplaza por una imagen vacia y
-// el destino se muestra con un fantasma encajado en la celda del dia.
-let imgVacia: HTMLImageElement | null = null
-function imagenVacia(): HTMLImageElement {
-  if (!imgVacia) {
-    imgVacia = new Image(1, 1)
-    imgVacia.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-  }
-  return imgVacia
-}
+/** Clave interna de la fila de carga "Sin asignar" (tareas sin responsable). */
+const SIN_ASIGNAR = '__sin_asignar__'
 
 /**
  * Ventana fija del modo "Alrededor de hoy": 2 semanas hacia atras + la
@@ -138,7 +134,14 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
   // §6.3.19: solo dias habiles (default) o semana completa de 7 dias.
   const [soloHabiles, setSoloHabiles] = useState(true)
   const [crearEn, setCrearEn] = useState<CrearEn | null>(null)
-  const [drag, setDrag] = useState<DragMarca | null>(null)
+  const [aviso, setAviso] = useState<Aviso | null>(null)
+  const avisoTimer = useRef<number | undefined>(undefined)
+
+  function mostrarAviso(e: React.MouseEvent, texto: string) {
+    setAviso({ x: Math.min(e.clientX, window.innerWidth - 280), y: e.clientY + 14, texto })
+    window.clearTimeout(avisoTimer.current)
+    avisoTimer.current = window.setTimeout(() => setAviso(null), 2400)
+  }
 
   // Candidatos a responsable: admins + clientes con acceso a ESTE proyecto.
   const candidatos = state.usuarios.filter(
@@ -311,28 +314,30 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
   // tareas cuya fecha VIGENTE cae ese dia (la misma fecha donde la Gantt
   // dibuja la marca principal); incluye hechas y no hechas; cada tarea
   // cuenta UNA sola vez (las fechas anteriores de replanificaciones no
-  // suman); una fila por persona con tareas en el rango visible.
+  // suman). Fila extra "Sin asignar" para tareas sin responsable (punto 4).
   const carga = useMemo(() => {
     const diasSet = new Set(dias)
-    const porPersona = new Map<string, Map<ISODate, number>>()
+    const porClave = new Map<string, Map<ISODate, number>>()
     for (const { tarea } of filasTarea) {
       const fecha = fechaVigente(tarea)
-      if (!tarea.responsableId || !fecha) continue
-      if (!diasSet.has(fecha)) continue
-      let m = porPersona.get(tarea.responsableId)
+      if (!fecha || !diasSet.has(fecha)) continue
+      const clave = tarea.responsableId ?? SIN_ASIGNAR
+      let m = porClave.get(clave)
       if (!m) {
         m = new Map()
-        porPersona.set(tarea.responsableId, m)
+        porClave.set(clave, m)
       }
       m.set(fecha, (m.get(fecha) ?? 0) + 1)
     }
-    return [...porPersona.entries()]
+    const personas = [...porClave.entries()]
+      .filter(([clave]) => clave !== SIN_ASIGNAR)
       .map(([usuarioId, porDia]) => ({
         usuario: state.usuarios.find((u) => u.id === usuarioId),
         porDia,
       }))
       .filter((x): x is { usuario: Usuario; porDia: Map<ISODate, number> } => Boolean(x.usuario))
       .sort((a, b) => a.usuario.nombre.localeCompare(b.usuario.nombre))
+    return { personas, sinAsignar: porClave.get(SIN_ASIGNAR) ?? null }
   }, [filasTarea, dias, state.usuarios])
 
   // -- Creacion inline (§6.4.25/26) --
@@ -369,47 +374,23 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
     }
   }
 
-  // -- Arrastre con snap por dia (§6.4.22) --
-  // El estado vive aca (no en la fila): cualquier celda de la grilla acepta
-  // el drop de la tarea en vuelo, aunque el cursor se desvie de su fila.
-
-  function empezarDrag(e: React.DragEvent, tarea: Tarea) {
-    e.dataTransfer.setData('text/plain', tarea.id)
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setDragImage(imagenVacia(), 0, 0)
-    setDrag({ tareaId: tarea.id, overDia: tarea.fechaObjetivo ?? null })
-  }
-
-  function arrastrarSobre(e: React.DragEvent, d: ISODate) {
-    if (!drag) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDrag((prev) => (prev && prev.overDia !== d ? { ...prev, overDia: d } : prev))
-  }
-
-  function soltarEn(e: React.DragEvent, d: ISODate) {
-    e.preventDefault()
-    const id = drag?.tareaId ?? e.dataTransfer.getData('text/plain')
-    setDrag(null)
-    if (!id) return
-    const t = state.tareas.find((x) => x.id === id)
-    if (t && can.editarFechas(t) && d !== t.fechaObjetivo) actions.cambiarFechaObjetivo(id, d)
-  }
-
-  function terminarDrag() {
-    setDrag(null)
-  }
-
   if (filas.length === 0) {
     return <div className="gantt-wrap">Este proyecto aun no tiene frentes.</div>
   }
 
   const finOffsetSemana = soloHabiles ? 4 : 6
+  const hayCarga = carga.personas.length > 0 || carga.sinAsignar !== null
 
   return (
     <div>
       <div className="gantt-toolbar">
         <Legend />
+        {can.algunoDeTareas && (
+          <p className="gantt-ayuda">
+            Clic en un dia: planifica (o replanifica una atrasada) · Clic en la marca: quita la
+            fecha si aun es futura · <b>Clic derecho en la marca: alterna lista</b>
+          </p>
+        )}
         <div className="horizonte">
           {ocultasFinde > 0 && (
             <span className="aviso-finde">
@@ -460,7 +441,9 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
       </div>
       <div className="gantt-wrap">
         <div className="gantt-scroll">
-          <table className="gantt">
+          {/* 2.1: sin menu contextual del navegador sobre la grilla (el clic
+              derecho es el gesto de marcar lista). */}
+          <table className="gantt" onContextMenu={(e) => e.preventDefault()}>
             <thead>
               <tr className="semana">
                 <th className="fija fija--frente" rowSpan={2}>Frente</th>
@@ -513,16 +496,12 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
                   crearEn={crearEn}
                   onCrear={crearElemento}
                   onCerrarCrear={() => setCrearEn(null)}
-                  drag={drag}
-                  empezarDrag={empezarDrag}
-                  arrastrarSobre={arrastrarSobre}
-                  soltarEn={soltarEn}
-                  terminarDrag={terminarDrag}
+                  mostrarAviso={mostrarAviso}
                 />
               ))}
 
-              {/* §6.5 — Carga por persona (solo personas con tareas en rango) */}
-              {carga.length > 0 && (
+              {/* §6.5 — Carga por persona + "Sin asignar" (puntos 3 y 4) */}
+              {hayCarga && (
                 <tr className="carga-sep">
                   <td className="fija fija--frente carga-sep__label">Carga por persona</td>
                   <td className="fija fija--sf carga-vacia" />
@@ -533,30 +512,69 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
                   ))}
                 </tr>
               )}
-              {carga.map(({ usuario, porDia }) => (
-                <tr key={`carga-${usuario.id}`} className="carga-fila">
-                  <td className="fija fija--frente carga-vacia" />
-                  <td className="fija fija--sf carga-vacia" />
-                  <td className="fija fija--tarea carga-fila__nombre">{usuario.nombre}</td>
-                  <td className="fija fija--resp"><Avatar usuario={usuario} /></td>
-                  {dias.map((d) => {
-                    const n = porDia.get(d)
-                    return (
-                      <td
-                        key={d}
-                        className={`celda carga-celda${esLunes(d) ? ' lunes' : ''}${d === hoy ? ' col-hoy' : ''}${esFinDeSemana(d) ? ' finde' : ''}`}
-                      >
-                        {n ?? ''}
-                      </td>
-                    )
-                  })}
-                </tr>
+              {carga.personas.map(({ usuario, porDia }) => (
+                <FilaCarga key={`carga-${usuario.id}`} nombre={usuario.nombre} avatar={<Avatar usuario={usuario} />} porDia={porDia} dias={dias} hoy={hoy} />
               ))}
+              {carga.sinAsignar && (
+                <FilaCarga
+                  nombre="Sin asignar"
+                  avatar={<span className="avatar avatar--sin" title="Tareas sin responsable">?</span>}
+                  porDia={carga.sinAsignar}
+                  dias={dias}
+                  hoy={hoy}
+                  atenuada
+                />
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {aviso &&
+        createPortal(
+          <div className="mini-aviso" role="alert" style={{ left: aviso.x, top: aviso.y }}>
+            {aviso.texto}
+          </div>,
+          document.body,
+        )}
     </div>
+  )
+}
+
+/** Fila de carga: nombre congelado + conteo por dia (persona o "Sin asignar"). */
+function FilaCarga({
+  nombre,
+  avatar,
+  porDia,
+  dias,
+  hoy,
+  atenuada,
+}: {
+  nombre: string
+  avatar: React.ReactNode
+  porDia: Map<ISODate, number>
+  dias: ISODate[]
+  hoy: string
+  atenuada?: boolean
+}) {
+  return (
+    <tr className={`carga-fila${atenuada ? ' carga-fila--sin' : ''}`}>
+      <td className="fija fija--frente carga-vacia" />
+      <td className="fija fija--sf carga-vacia" />
+      <td className="fija fija--tarea carga-fila__nombre">{nombre}</td>
+      <td className="fija fija--resp">{avatar}</td>
+      {dias.map((d) => {
+        const n = porDia.get(d)
+        return (
+          <td
+            key={d}
+            className={`celda carga-celda${esLunes(d) ? ' lunes' : ''}${d === hoy ? ' col-hoy' : ''}${esFinDeSemana(d) ? ' finde' : ''}`}
+          >
+            {n ?? ''}
+          </td>
+        )
+      })}
+    </tr>
   )
 }
 
@@ -607,11 +625,7 @@ function FilaGanttRow({
   crearEn,
   onCrear,
   onCerrarCrear,
-  drag,
-  empezarDrag,
-  arrastrarSobre,
-  soltarEn,
-  terminarDrag,
+  mostrarAviso,
 }: {
   fila: FilaGantt
   dias: ISODate[]
@@ -625,11 +639,7 @@ function FilaGanttRow({
   crearEn: CrearEn | null
   onCrear: (nombre: string) => void
   onCerrarCrear: () => void
-  drag: DragMarca | null
-  empezarDrag: (e: React.DragEvent, tarea: Tarea) => void
-  arrastrarSobre: (e: React.DragEvent, d: ISODate) => void
-  soltarEn: (e: React.DragEvent, d: ISODate) => void
-  terminarDrag: () => void
+  mostrarAviso: (e: React.MouseEvent, texto: string) => void
 }) {
   // -- Celdas fijas de frente / sub frente (con "+" para crear hermanos) --
 
@@ -673,14 +683,11 @@ function FilaGanttRow({
     </td>
   )
 
-  // Celdas de dias vacias que igual aceptan el drop de una marca en vuelo.
   const celdasVacias = () =>
     dias.map((d) => (
       <td
         key={d}
         className={`celda${esLunes(d) ? ' lunes' : ''}${d === hoy ? ' col-hoy' : ''}${esFinDeSemana(d) ? ' finde' : ''}`}
-        onDragOver={drag ? (e) => arrastrarSobre(e, d) : undefined}
-        onDrop={drag ? (e) => soltarEn(e, d) : undefined}
       />
     ))
 
@@ -794,12 +801,50 @@ function FilaGanttRow({
   const sep = fila.esInicioSub && !fila.esPrimeraGlobal ? ' sep-sf' : ''
   const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
 
-  const puedePlanificarCelda = can.editarFechas(tarea) && !tarea.fechaObjetivo && !tarea.hecha
-  const puedeArrastrar = can.editarFechas(tarea) && !tarea.hecha && !!tarea.fechaObjetivo
-  // Esta fila lleva la marca en vuelo: su marca original queda tenue y el
-  // dia bajo el cursor muestra el fantasma encajado (snap por celda).
-  const esFilaEnVuelo = drag?.tareaId === tarea.id
-  const tipoEnVuelo = esFilaEnVuelo && tarea.fechaObjetivo ? marcas.get(tarea.fechaObjetivo) : undefined
+  // -- Estandar de planificacion por clics (punto 2) --
+  const puedeEditar = can.editarFechas(tarea) && !tarea.hecha
+  const sinFecha = !tarea.fechaObjetivo
+  const vencidaOHoy = !!tarea.fechaObjetivo && tarea.fechaObjetivo <= hoy
+
+  // 2.1/2.3: la celda es clickeable para planificar (tarea sin fecha, en
+  // cualquier dia) o replanificar (tarea de hoy/vencida, en un dia futuro).
+  const celdaPlanificable = (d: ISODate) =>
+    puedeEditar && !marcas.has(d) && (sinFecha || (vencidaOHoy && d > hoy))
+
+  function clickCelda(e: React.MouseEvent, d: ISODate) {
+    if (celdaPlanificable(d)) {
+      actions.cambiarFechaObjetivo(tarea.id, d)
+    } else if (puedeEditar && vencidaOHoy && d === tarea.fechaObjetivo) {
+      // 2.2: la celda de la marca vencida tampoco se puede "vaciar".
+      mostrarAviso(e, 'No puedes eliminar tareas que ya pasaron')
+    }
+  }
+
+  function clickMarca(e: React.MouseEvent, tipo: TipoMarca) {
+    e.stopPropagation()
+    const esPrincipal = tipo === 'pendiente' || tipo === 'incumplida' || tipo === 'incumplida_replan'
+    if (!esPrincipal || !puedeEditar) {
+      // Marcas de hecha, rastros o sin permiso: abre el detalle.
+      onAbrirTarea(tarea.id)
+      return
+    }
+    if (vencidaOHoy) {
+      // 2.2: de hoy o vencida no se borra; se marca lista o se replanifica.
+      mostrarAviso(e, 'No puedes eliminar tareas que ya pasaron')
+    } else {
+      // 2.1: clic sobre marca futura la borra; queda "sin planificar".
+      actions.cambiarFechaObjetivo(tarea.id, null)
+    }
+  }
+
+  function clickDerechoMarca(e: React.MouseEvent, tipo: TipoMarca) {
+    e.preventDefault()
+    e.stopPropagation()
+    const alternable = tipo === 'pendiente' || tipo === 'incumplida' || tipo === 'incumplida_replan' || tipo === 'hecha'
+    if (alternable && can.marcarHechas(tarea)) {
+      actions.toggleHecha(tarea.id, !tarea.hecha)
+    }
+  }
 
   return (
     <tr className={sep.trim()}>
@@ -868,49 +913,24 @@ function FilaGanttRow({
       {dias.map((d) => {
         const tipo = marcas.get(d)
         const esHoy = d === hoy
-        const esPrincipal =
-          tipo === 'pendiente' || tipo === 'incumplida' || tipo === 'incumplida_replan' || tipo === 'hecha'
-        // Fantasma de destino: solo en la fila de la tarea en vuelo.
-        const esFantasma = esFilaEnVuelo && drag?.overDia === d && d !== tarea.fechaObjetivo
         return (
           <td
             key={d}
-            className={`celda${esLunes(d) ? ' lunes' : ''}${esHoy ? ' col-hoy' : ''}${esFinDeSemana(d) ? ' finde' : ''}${puedePlanificarCelda ? ' celda--planificable' : ''}`}
-            // §6.4.21: click en la celda del dia planifica una tarea sin fecha.
-            onClick={puedePlanificarCelda ? () => actions.cambiarFechaObjetivo(tarea.id, d) : undefined}
-            // §6.4.22: cualquier celda acepta la marca en vuelo (aunque el
-            // cursor se desvie de la fila) y replanifica al dia de la columna.
-            onDragOver={drag ? (e) => arrastrarSobre(e, d) : undefined}
-            onDrop={drag ? (e) => soltarEn(e, d) : undefined}
+            className={`celda${esLunes(d) ? ' lunes' : ''}${esHoy ? ' col-hoy' : ''}${esFinDeSemana(d) ? ' finde' : ''}${celdaPlanificable(d) ? ' celda--planificable' : ''}`}
+            onClick={puedeEditar ? (e) => clickCelda(e, d) : undefined}
           >
-            {esFantasma ? (
-              <span className="marca-fantasma">
-                <Marca tipo={tipoEnVuelo ?? 'pendiente'} />
-              </span>
-            ) : (
-              tipo && (
-                <HoverCard card={tooltip}>
-                  <span
-                    className={`marca-wrap${esPrincipal && can.marcarHechas(tarea) ? ' marca-wrap--click' : ''}${esFilaEnVuelo && esPrincipal ? ' marca-wrap--en-vuelo' : ''}`}
-                    role="button"
-                    tabIndex={-1}
-                    draggable={esPrincipal && puedeArrastrar}
-                    onDragStart={(e) => empezarDrag(e, tarea)}
-                    onDragEnd={terminarDrag}
-                    // §6.4.23: click sobre la marca alterna hecha / no hecha.
-                    onClick={
-                      esPrincipal && can.marcarHechas(tarea)
-                        ? (e) => {
-                            e.stopPropagation()
-                            actions.toggleHecha(tarea.id, !tarea.hecha)
-                          }
-                        : () => onAbrirTarea(tarea.id)
-                    }
-                  >
-                    <Marca tipo={tipo} />
-                  </span>
-                </HoverCard>
-              )
+            {tipo && (
+              <HoverCard card={tooltip}>
+                <span
+                  className={`marca-wrap${puedeEditar || can.marcarHechas(tarea) ? ' marca-wrap--click' : ''}`}
+                  role="button"
+                  tabIndex={-1}
+                  onClick={(e) => clickMarca(e, tipo)}
+                  onContextMenu={(e) => clickDerechoMarca(e, tipo)}
+                >
+                  <Marca tipo={tipo} />
+                </span>
+              </HoverCard>
             )}
           </td>
         )

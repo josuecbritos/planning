@@ -43,6 +43,10 @@ orden** el contenido de:
    cliente (jsonb + RLS por permiso + trigger de validación campo a campo)
 9. `supabase/migrations/20260707000009_invitaciones.sql` — tabla de invitaciones
    (token de 7 días, un solo uso)
+10. `supabase/migrations/20260707000010_estandar_planificacion.sql` — estándar de
+    planificación por clics: se permite desplanificar (borrar la fecha de) una
+    tarea futura, pero una tarea que vence hoy o ya venció no puede quedar sin
+    fecha (solo marcarse lista o replanificarse)
 
 *(Alternativa con CLI: `supabase link --project-ref TU_REF && supabase db push`.)*
 
