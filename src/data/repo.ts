@@ -27,10 +27,13 @@ export type PatchProyecto = Partial<Pick<Proyecto, 'nombre' | 'descripcion' | 'c
 export interface NuevoFrente {
   proyectoId: string
   nombre: string
+  /** Posicion explicita (insertar "justo debajo" de un hermano). */
+  orden?: number
 }
 export interface NuevoSubFrente {
   frenteId: string
   nombre: string
+  orden?: number
 }
 
 export interface NuevaTarea {
@@ -41,9 +44,11 @@ export interface NuevaTarea {
   /** Opcional: la tarea nace sin fecha. La primera fecha fija la original. */
   fechaObjetivo?: ISODate
   comentarios?: string
+  /** Posicion explicita (insertar "justo debajo" de un hermano). */
+  orden?: number
 }
 export type PatchTarea = Partial<
-  Pick<Tarea, 'titulo' | 'descripcion' | 'responsableId' | 'hecha' | 'fechaReal' | 'comentarios' | 'archivada'>
+  Pick<Tarea, 'titulo' | 'descripcion' | 'responsableId' | 'hecha' | 'fechaReal' | 'comentarios' | 'archivada' | 'orden'>
 >
 
 export interface NuevoUsuario {
@@ -52,7 +57,7 @@ export interface NuevoUsuario {
   email: string
   rol: Rol
 }
-export type PatchUsuario = Partial<Pick<Usuario, 'nombre' | 'iniciales' | 'activo' | 'rol'>>
+export type PatchUsuario = Partial<Pick<Usuario, 'nombre' | 'iniciales' | 'activo' | 'rol' | 'permisos'>>
 
 export interface Repo {
   /** Nombre corto del backend activo, para mostrar en la UI. */
@@ -78,13 +83,17 @@ export interface Repo {
   deleteTarea(id: string): Promise<void>
 
   /**
-   * Cambia la fecha objetivo. Genera el registro de historial (5.6) y devuelve
-   * la tarea y el historial completo actualizado de esa tarea.
+   * Cambia la fecha objetivo aplicando la regla 1.2/1.3: si la fecha que se
+   * mueve es futura, es planificacion (la original acompaña, sin historial);
+   * si vence hoy o ya vencio, es replanificacion (historial, original
+   * congelada). `hoy` es la fecha de referencia (simulada en modo Local; en
+   * Supabase la regla vive en triggers con current_date).
    */
   cambiarFechaObjetivo(
     id: string,
     nueva: ISODate,
     actorId?: string,
+    hoy?: ISODate,
   ): Promise<{ tarea: Tarea; historial: Replanificacion[] }>
 
   // -- Modulo de Usuarios (7.1) --

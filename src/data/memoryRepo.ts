@@ -1,5 +1,5 @@
 import type { Acceso, AppState, Comentario, Frente, Proyecto, Replanificacion, SubFrente, Tarea, Usuario } from '../types'
-import { ajustarDiaHabil } from '../lib/dates'
+import { hoyISO } from '../lib/dates'
 import { initialState } from './seed'
 import type {
   NuevaTarea,
@@ -132,7 +132,7 @@ export class MemoryRepo implements Repo {
   // -- Frente --
   async createFrente(input: NuevoFrente): Promise<Frente> {
     const hermanos = this.state.frentes.filter((f) => f.proyectoId === input.proyectoId)
-    const f: Frente = { id: uid(), proyectoId: input.proyectoId, nombre: input.nombre, orden: this.siguienteOrden(hermanos) }
+    const f: Frente = { id: uid(), proyectoId: input.proyectoId, nombre: input.nombre, orden: input.orden ?? this.siguienteOrden(hermanos) }
     this.state.frentes.push(f)
     this.persist()
     return clone(f)
@@ -158,7 +158,7 @@ export class MemoryRepo implements Repo {
   // -- Sub Frente --
   async createSubFrente(input: NuevoSubFrente): Promise<SubFrente> {
     const hermanos = this.state.subFrentes.filter((sf) => sf.frenteId === input.frenteId)
-    const sf: SubFrente = { id: uid(), frenteId: input.frenteId, nombre: input.nombre, orden: this.siguienteOrden(hermanos) }
+    const sf: SubFrente = { id: uid(), frenteId: input.frenteId, nombre: input.nombre, orden: input.orden ?? this.siguienteOrden(hermanos) }
     this.state.subFrentes.push(sf)
     this.persist()
     return clone(sf)
@@ -182,8 +182,8 @@ export class MemoryRepo implements Repo {
   // -- Tarea --
   async createTarea(input: NuevaTarea): Promise<Tarea> {
     const hermanos = this.state.tareas.filter((t) => t.subFrenteId === input.subFrenteId)
-    // Sin fin de semana; la primera fecha (si viene) fija la original.
-    const fecha = input.fechaObjetivo ? ajustarDiaHabil(input.fechaObjetivo) : undefined
+    // La primera fecha (si viene) fija la original. Cualquier dia es valido.
+    const fecha = input.fechaObjetivo
     const t: Tarea = {
       id: uid(),
       subFrenteId: input.subFrenteId,
@@ -194,7 +194,7 @@ export class MemoryRepo implements Repo {
       fechaOriginal: fecha,
       hecha: false,
       comentarios: input.comentarios,
-      orden: this.siguienteOrden(hermanos),
+      orden: input.orden ?? this.siguienteOrden(hermanos),
     }
     this.state.tareas.push(t)
     this.persist()
@@ -206,7 +206,6 @@ export class MemoryRepo implements Repo {
     Object.assign(t, patch)
     // Coherencia: si se desmarca hecha, se limpia fecha_real.
     if (patch.hecha === false) t.fechaReal = undefined
-    if (t.fechaReal) t.fechaReal = ajustarDiaHabil(t.fechaReal)
     this.persist()
     return clone(t)
   }
@@ -293,27 +292,35 @@ export class MemoryRepo implements Repo {
     id: string,
     nueva: string,
     actorId?: string,
+    hoy?: string,
   ): Promise<{ tarea: Tarea; historial: Replanificacion[] }> {
     const t = this.state.tareas.find((x) => x.id === id)
     if (!t) throw new Error('Tarea no encontrada')
-    const fecha = ajustarDiaHabil(nueva) // sin fin de semana
-    if (fecha !== t.fechaObjetivo) {
-      if (!t.fechaObjetivo) {
-        // Primera planificacion: fija el compromiso inicial, sin historial.
-        t.fechaObjetivo = fecha
-        t.fechaOriginal = t.fechaOriginal ?? fecha
+    const ref = hoy ?? hoyISO()
+    if (nueva && nueva !== t.fechaObjetivo) {
+      const tieneHist = this.state.historial.some((h) => h.tareaId === id)
+      // 1.2: solo es replanificacion si la fecha que se mueve vence hoy o ya
+      // vencio. Mover una fecha futura (o poner la primera) es planificacion.
+      const esPlanificacion = !t.fechaObjetivo || t.fechaObjetivo > ref
+      if (esPlanificacion) {
+        t.fechaObjetivo = nueva
+        // 1.3: la original acompaña mientras no haya replanificaciones reales.
+        if (!tieneHist) t.fechaOriginal = nueva
       } else {
+        // esPlanificacion=false implica que la tarea tiene fecha vigente.
+        const anterior = t.fechaObjetivo as string
         const numeroCambio = this.state.historial.filter((h) => h.tareaId === id).length + 1
         this.state.historial.push({
           id: uid(),
           tareaId: id,
-          fechaAnterior: t.fechaObjetivo,
-          fechaNueva: fecha,
+          fechaAnterior: anterior,
+          fechaNueva: nueva,
           numeroCambio,
           cambiadoPor: actorId ?? '',
-          timestamp: `${t.fechaObjetivo}T00:00:00Z`,
+          timestamp: `${anterior}T00:00:00Z`,
         })
-        t.fechaObjetivo = fecha
+        t.fechaObjetivo = nueva
+        // fecha_original queda congelada desde la primera replanificacion.
       }
       this.persist()
     }

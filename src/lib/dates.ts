@@ -87,6 +87,17 @@ export function diasHabiles(desde: ISODate, hasta: ISODate): ISODate[] {
   return out
 }
 
+/** Todos los dias entre desde y hasta (semana completa de 7 dias). */
+export function diasCalendario(desde: ISODate, hasta: ISODate): ISODate[] {
+  const out: ISODate[] = []
+  let cur = desde
+  while (cmp(cur, hasta) <= 0) {
+    out.push(cur)
+    cur = addDays(cur, 1)
+  }
+  return out
+}
+
 /** Lunes de la semana a la que pertenece la fecha. */
 export function inicioSemana(iso: ISODate): ISODate {
   const dow = parse(iso).getUTCDay() // 0=do..6=sa
@@ -131,10 +142,10 @@ export function etiquetaCorta(iso: ISODate): string {
   return `${d.getUTCDate()} ${NOMBRE_MES[d.getUTCMonth()]}`
 }
 
-/** "7 oct – 11 oct" (lunes a viernes de esa semana). */
-export function etiquetaSemana(lunes: ISODate): string {
-  const viernes = addDays(lunes, 4)
-  return `${etiquetaCorta(lunes)} – ${etiquetaCorta(viernes)}`
+/** "7 oct – 11 oct" (lunes a viernes; con finSemana=6, lunes a domingo). */
+export function etiquetaSemana(lunes: ISODate, finOffset = 4): string {
+  const fin = addDays(lunes, finOffset)
+  return `${etiquetaCorta(lunes)} – ${etiquetaCorta(fin)}`
 }
 
 /** Diferencia en dias habiles entre dos fechas (b - a). */

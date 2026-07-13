@@ -60,20 +60,34 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 - **Gantt en grilla:** columnas fijas congeladas, celdas combinadas reales, una columna
   por día hábil, encabezado semana/día, columna de HOY, marcas de la sección 6.4 y
   tooltips con historial (6.6).
-- **Modelo de 5 categorías excluyentes** (definiciones cerradas): el único estado
-  manual es `hecha`; toda tarea cae en exactamente una de — Hecha (verde ✓) ·
+- **Modelo de 5 categorías excluyentes** (v2): el único estado manual es `hecha`;
+  el color pinta la **fila completa** con gravedad creciente — Hecha (verde ✓) ·
   Pendiente (sin color) · Pendiente replanificada (ámbar) · Atrasada (rojo) ·
-  Atrasada replanificada (rojo + **punto ámbar** en la esquina). El rojo manda
-  sobre el ámbar; "hecha" es terminal (sin distinción de a tiempo o tarde, y no
-  cuenta como replanificada). Los 5 contadores del encabezado suman el total.
-- **La tarea nace sin fecha:** la primera fecha asignada fija el compromiso
-  inicial (sin historial); solo los cambios posteriores cuentan como
-  replanificación. No se permiten fechas de fin de semana (se anclan al día
-  hábil más cercano).
-- **Horizonte del Gantt:** selector de 3 modos — *Alrededor de hoy* (default fijo:
-  3 semanas atrás + 1 adelante, no persistido), *Rango personalizado* (desde/hasta)
-  y *Todo el proyecto*. La edición inline (título, responsable) funciona también
-  en la grilla.
+  **Atrasada replanificada (morado, lo más crítico)**. "Hecha" es terminal. Los 5
+  contadores del encabezado suman el total. Junto al nombre, **↻ ×N** muestra las
+  replanificaciones (solo tabla).
+- **Regla de replanificación (v2):** mover una fecha **futura** es planificación
+  (sin historial, y la fecha original acompaña); solo cuenta como replanificación
+  mover una fecha que **vence hoy o ya venció** — ahí la fecha original se congela
+  ("la última fecha comprometida antes de empezar a atrasarse").
+- **Fechas en cualquier día**, incluidos sábado y domingo. La Gantt alterna entre
+  **solo días hábiles** (default) y **semana completa (7 días)**, con aviso de
+  tareas de fin de semana ocultas.
+- **Horizonte del Gantt:** *Alrededor de hoy* (default fijo: 2 semanas atrás +
+  actual + 2 adelante, no persistido), *Rango personalizado* y *Todo el proyecto*.
+- **Gantt editable:** click en una celda planifica una tarea sin fecha; arrastrar
+  la marca replanifica; click sobre la marca alterna hecha/no hecha; "+" al pasar
+  el mouse crea un hermano justo debajo (frente/sub frente/tarea); los
+  contenedores vacíos muestran "+ agregar". Al pie, **filas de carga por persona**
+  (tareas por día según fecha vigente).
+- **Permisos por cliente (§7):** cada usuario cliente tiene su configuración
+  (crear frentes/sub frentes/tareas; editar fechas, marcar hechas, editar,
+  archivar/eliminar, asignar responsable — cada uno con alcance "todas" o "solo
+  asignadas"). Se configuran desde el Módulo de Usuarios (🔑) y se refuerzan en
+  la base de datos (RLS + trigger campo a campo).
+- **Alta por invitación (§8):** el admin crea el usuario y le envía un correo con
+  enlace (caduca en 7 días, reenviable); el invitado define su contraseña. Ver
+  DEPLOY.md para configurar el proveedor de correo y las Edge Functions.
 
 **CRUD (Fase 1) — con interacción inline (Bloque 2)**
 - Proyectos: crear / editar (nombre, descripción, color, estado) / eliminar. Multi-proyecto.

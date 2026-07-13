@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { AppState, Usuario } from '../types'
 import type { Actions } from '../App'
 import { UsuarioModal } from './UsuarioModal'
+import { PermisosModal } from './PermisosModal'
+import { supabaseConfigured, getClient } from '../data/client'
 
 // Modulo de Usuarios (7.1). Solo accesible para Admins:
 // listar, crear, editar, desactivar usuarios y asignar proyectos a Clientes.
@@ -12,10 +14,34 @@ interface Props {
   actions: Actions
 }
 
-type ModalState = { tipo: 'nuevo' } | { tipo: 'editar'; usuario: Usuario } | null
+type ModalState =
+  | { tipo: 'nuevo' }
+  | { tipo: 'editar'; usuario: Usuario }
+  | { tipo: 'permisos'; usuario: Usuario }
+  | null
 
 export function UsersView({ state, usuarioActual, actions }: Props) {
   const [modal, setModal] = useState<ModalState>(null)
+  const [invitandoId, setInvitandoId] = useState<string | null>(null)
+  const [avisoInvitacion, setAvisoInvitacion] = useState<string | null>(null)
+
+  // §8: envia (o reenvia) la invitacion por correo via Edge Function.
+  async function invitar(u: Usuario) {
+    if (!supabaseConfigured) return
+    setInvitandoId(u.id)
+    setAvisoInvitacion(null)
+    try {
+      const { error } = await getClient().functions.invoke('invitar-usuario', {
+        body: { usuarioId: u.id },
+      })
+      if (error) throw new Error(error.message)
+      setAvisoInvitacion(`Invitacion enviada a ${u.email} (caduca en 7 dias).`)
+    } catch (e) {
+      setAvisoInvitacion(`No se pudo enviar la invitacion: ${(e as Error).message}`)
+    } finally {
+      setInvitandoId(null)
+    }
+  }
 
   const adminsActivos = state.usuarios.filter((u) => u.rol === 'admin' && u.activo).length
   const adminsCompletos = adminsActivos >= 2
@@ -39,6 +65,8 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
         </button>
       </div>
 
+      {avisoInvitacion && <p className="usuarios-aviso">{avisoInvitacion}</p>}
+
       <table className="tareas usuarios-tabla">
         <thead>
           <tr>
@@ -59,6 +87,9 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
               state={state}
               actions={actions}
               onEditar={() => setModal({ tipo: 'editar', usuario: u })}
+              onPermisos={() => setModal({ tipo: 'permisos', usuario: u })}
+              onInvitar={() => invitar(u)}
+              invitando={invitandoId === u.id}
             />
           ))}
         </tbody>
@@ -68,6 +99,13 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
         <UsuarioModal
           adminsCompletos={adminsCompletos}
           onSubmit={(d) => actions.createUsuario(d)}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.tipo === 'permisos' && (
+        <PermisosModal
+          usuario={modal.usuario}
+          onGuardar={(permisos) => actions.updateUsuario(modal.usuario.id, { permisos })}
           onClose={() => setModal(null)}
         />
       )}
@@ -89,12 +127,18 @@ function UsuarioFila({
   state,
   actions,
   onEditar,
+  onPermisos,
+  onInvitar,
+  invitando,
 }: {
   usuario: Usuario
   esYo: boolean
   state: AppState
   actions: Actions
   onEditar: () => void
+  onPermisos: () => void
+  onInvitar: () => void
+  invitando: boolean
 }) {
   const accesos = state.accesos.filter((a) => a.usuarioId === usuario.id)
   const proyectosAsignados = accesos
@@ -160,6 +204,19 @@ function UsuarioFila({
       </td>
       <td className="col-acc">
         <button className="icon-btn" title="Editar" onClick={onEditar}>✎</button>
+        {usuario.rol === 'cliente' && (
+          <button className="icon-btn" title="Permisos" onClick={onPermisos}>🔑</button>
+        )}
+        {supabaseConfigured && !usuario.authId && usuario.activo && (
+          <button
+            className="icon-btn"
+            title={invitando ? 'Enviando…' : 'Enviar / reenviar invitacion por correo'}
+            disabled={invitando}
+            onClick={onInvitar}
+          >
+            ✉
+          </button>
+        )}
         {!esYo && (
           <button
             className="icon-btn"

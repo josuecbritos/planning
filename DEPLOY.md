@@ -35,6 +35,14 @@ orden** el contenido de:
 6. `supabase/migrations/20260707000006_estados_y_fechas.sql` — la tarea nace sin
    fecha (la primera fecha fija el compromiso inicial, sin historial) y ninguna
    fecha puede caer en fin de semana (se ancla al día hábil más cercano)
+7. `supabase/migrations/20260707000007_estados_v2.sql` — modelo de estados v2:
+   la replanificación solo cuenta si la fecha movida vence hoy o ya venció; la
+   fecha original acompaña durante la planificación y se congela en la primera
+   replanificación; se permiten fechas de fin de semana (reemplaza el punto 6)
+8. `supabase/migrations/20260707000008_permisos_cliente.sql` — permisos por
+   cliente (jsonb + RLS por permiso + trigger de validación campo a campo)
+9. `supabase/migrations/20260707000009_invitaciones.sql` — tabla de invitaciones
+   (token de 7 días, un solo uso)
 
 *(Alternativa con CLI: `supabase link --project-ref TU_REF && supabase db push`.)*
 
@@ -119,6 +127,30 @@ se necesita nada extra (la app es una sola página, sin rutas de servidor).
 - [ ] Cambiar una fecha objetivo y verificar que el historial aparece en el
       tooltip / panel de detalle (el trigger funciona).
 - [ ] Confirmar que el registro público está desactivado (paso 4).
+
+## Invitaciones por correo (§8 de la gran pedida)
+
+El alta de usuarios funciona por invitación: el admin crea el usuario y le envía
+un correo con un enlace que caduca en 7 días; el invitado define su contraseña.
+Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
+
+1. **Cuenta en [Resend](https://resend.com)** (capa gratuita: 100 correos/día):
+   crea una API key y verifica tu dominio remitente (o usa `onboarding@resend.dev`
+   para pruebas).
+2. **Desplegar las funciones** (con la CLI de Supabase):
+   ```bash
+   supabase functions deploy invitar-usuario
+   supabase functions deploy aceptar-invitacion --no-verify-jwt
+   ```
+   (`aceptar-invitacion` la invoca el invitado sin sesión; valida el token.)
+3. **Secrets**:
+   ```bash
+   supabase secrets set RESEND_API_KEY=re_xxx \
+     EMAIL_FROM="Andotek Planning <planning@tudominio.cl>" \
+     SITE_URL=https://planning-andotek.vercel.app
+   ```
+4. Desde el Módulo de Usuarios, el botón ✉ envía (o reenvía) la invitación a
+   cualquier usuario activo que aún no tenga cuenta.
 
 ## Mantenimiento
 

@@ -18,6 +18,11 @@
   --ambar-suave: #fff6e0;
   --ambar-texto: #8a6100;
 
+  /* Atrasada replanificada: lo mas critico */
+  --morado: #6a1b9a;
+  --morado-suave: #f0e4f7;
+  --morado-texto: #5e1690;
+
   /* "Hoy" en azul: no debe confundirse con el rojo de atraso. */
   --hoy: #1565c0;
   --hoy-col: rgba(21, 101, 192, 0.08);
@@ -143,16 +148,11 @@ button { font-family: inherit; cursor: pointer; }
 .counter__num { font-size: 17px; font-weight: 700; line-height: 1; }
 .counter__lbl { font-size: 11.5px; color: var(--gris-texto); }
 .counter__swatch { width: 10px; height: 10px; border-radius: 3px; }
-.counter__swatch--punto {
-  background: var(--rojo); position: relative; overflow: visible;
-}
-.counter__swatch--punto::after {
-  content: ''; position: absolute; top: -3px; right: -3px; width: 7px; height: 7px;
-  border-radius: 50%; background: var(--ambar); box-shadow: 0 0 0 1px #fff;
-}
+
 .counter--verde .counter__num { color: var(--verde-check); }
 .counter--rojo .counter__num { color: var(--rojo); }
 .counter--ambar .counter__num { color: var(--ambar-texto); }
+.counter--morado .counter__num { color: var(--morado-texto); }
 
 /* ---------- Vista Tabla ---------- */
 
@@ -194,6 +194,7 @@ table.tareas .col-resp, table.tareas .col-fecha { text-align: center; }
 tr.fila--verde > td { background: var(--verde-suave); }
 tr.fila--rojo > td { background: var(--rojo-suave); }
 tr.fila--ambar > td { background: var(--ambar-suave); }
+tr.fila--morado > td { background: var(--morado-suave); }
 .col-check { width: 44px; text-align: center; }
 .col-resp { width: 96px; }
 .col-fecha { width: 118px; white-space: nowrap; }
@@ -201,12 +202,7 @@ tr.fila--ambar > td { background: var(--ambar-suave); }
 /* Celda del titulo con color de gestion (6.5) */
 .tarea-cell { font-weight: 600; position: relative; }
 
-/* Punto ambar en la esquina: atrasada Y replanificada (el rojo manda). */
-.punto-ambar {
-  position: absolute; top: 3px; right: 3px; width: 9px; height: 9px;
-  border-radius: 50%; background: var(--ambar); box-shadow: 0 0 0 1.5px #fff;
-  pointer-events: none;
-}
+
 .tarea-cell--verde { background: var(--verde-suave); }
 .tarea-cell--rojo { background: var(--rojo-suave); }
 .tarea-cell--ambar { background: var(--ambar-suave); }
@@ -220,6 +216,19 @@ tr.fila--ambar > td { background: var(--ambar-suave); }
 .fecha-vencida { color: var(--rojo); font-weight: 700; }
 
 .chk { width: 18px; height: 18px; accent-color: var(--verde); cursor: pointer; }
+
+/* Control moderno de Hecha: circulo estilo Monday/Todoist */
+.check-hecha {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--gris-borde); background: #fff;
+  color: transparent; font-size: 12px; font-weight: 800; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0; transition: all .12s;
+}
+.check-hecha:hover:not(:disabled) { border-color: var(--verde); color: var(--verde); }
+.check-hecha--on { background: var(--verde); border-color: var(--verde); color: #fff; }
+.check-hecha--on:hover:not(:disabled) { background: var(--verde-oscuro); color: #fff; }
+.check-hecha:disabled { cursor: default; opacity: .6; }
 
 .resp-badge {
   display: inline-flex; align-items: center; justify-content: center;
@@ -302,6 +311,13 @@ tr.fila--ambar > td { background: var(--ambar-suave); }
 .subfrente-add { margin: -10px 0 26px; }
 .subfrente--nuevo .subfrente__titulo { border-radius: 8px; border-bottom: 1px solid var(--gris-borde); }
 
+/* Indicador de replanificaciones junto al titulo (↻ ×N, solo tabla) */
+.replan-count {
+  font-size: 11px; font-weight: 700; color: var(--ambar-texto);
+  background: rgba(0,0,0,.05); border-radius: 4px; padding: 1px 5px;
+  white-space: nowrap; flex: none;
+}
+
 /* Chip contador de comentarios junto al titulo */
 .comentarios-chip {
   background: none; border: none; font-size: 11px; color: var(--gris-texto);
@@ -342,14 +358,10 @@ tr.fila--ambar > td { background: var(--ambar-suave); }
   color: #fff; font-size: 12px; font-weight: 700;
 }
 .mark--incumplida { width: 18px; height: 18px; border-radius: 3px; background: var(--rojo); }
+.mark--incumplida-replan { width: 18px; height: 18px; border-radius: 3px; background: var(--morado); }
 .mark--anterior { width: 9px; height: 9px; border-radius: 2px; background: var(--rojo-tenue); }
 .mark--ambar { width: 14px; height: 14px; border-radius: 3px; background: var(--ambar); }
-/* Atrasada replanificada en la leyenda: cuadro rojo + punto ambar */
-.mark--con-punto { position: relative; overflow: visible; }
-.mark--con-punto::after {
-  content: ''; position: absolute; top: -3px; right: -3px; width: 8px; height: 8px;
-  border-radius: 50%; background: var(--ambar); box-shadow: 0 0 0 1px #fff;
-}
+
 
 /* ---------- Vista Gantt (grilla) ---------- */
 
@@ -369,6 +381,75 @@ tr.fila--ambar > td { background: var(--ambar-suave); }
 .horizonte .toggle button { padding: 6px 12px; font-size: 12.5px; }
 .horizonte__rango { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--gris-texto); }
 .horizonte__fecha { border: 1px solid var(--gris-borde); background: #fff; width: auto; font-size: 12.5px; }
+
+/* §6.3.20: aviso de tareas de fin de semana ocultas */
+.aviso-finde {
+  font-size: 12px; color: var(--ambar-texto); background: var(--ambar-suave);
+  border: 1px solid #f0dfae; border-radius: 6px; padding: 4px 10px;
+}
+.aviso-finde .link-btn { color: var(--ambar-texto); font-weight: 700; }
+
+/* Columnas de fin de semana (modo semana completa) */
+.gantt th.dia.finde { background: #f1f3f5; color: #9aa7b1; }
+.gantt td.celda.finde { background: #f7f8f9; }
+
+/* Celda clickeable para planificar una tarea sin fecha (§6.4.21) */
+.gantt td.celda--planificable { cursor: copy; }
+.gantt td.celda--planificable:hover { background: var(--verde-suave); }
+
+/* Marcas interactivas (§6.4.22/23) */
+.marca-wrap { display: inline-flex; }
+.marca-wrap--click { cursor: pointer; }
+.marca-wrap[draggable='true'] { cursor: grab; }
+
+/* "+" al hover para crear hermanos (§6.4.25) */
+.con-mas { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
+.con-mas__acciones { display: inline-flex; gap: 2px; }
+.mas-btn {
+  border: none; background: rgba(0,0,0,.08); color: inherit;
+  width: 18px; height: 18px; border-radius: 4px; font-size: 12px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .12s; padding: 0; flex: none; position: relative;
+}
+td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { opacity: 1; }
+.mas-btn:hover { background: rgba(0,0,0,.2); }
+.mas-btn[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  background: #1f2b36; color: #fff; font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 5px; white-space: nowrap; z-index: 100; pointer-events: none;
+}
+.gantt td.fija--frente .mas-btn { background: rgba(255,255,255,.25); color: #fff; }
+.gantt td.fija--frente .mas-btn:hover { background: rgba(255,255,255,.45); }
+
+/* Popover para crear elementos desde la grilla */
+.crear-pop {
+  position: fixed; z-index: 2600; background: #fff; border-radius: 10px;
+  box-shadow: 0 10px 36px rgba(15,24,32,.28); border: 1px solid var(--gris-linea);
+  padding: 8px;
+}
+.crear-pop input {
+  font: inherit; font-size: 13px; width: 260px;
+  border: 1px solid var(--verde); border-radius: 6px; padding: 6px 9px;
+}
+.crear-pop input:focus { outline: none; }
+
+/* Contenedores vacios en la grilla */
+.gantt td.gantt-vacio { padding: 6px 10px; }
+.gantt td.gantt-vacio .mudo { color: var(--gris-texto); font-style: italic; font-size: 12px; }
+
+/* §6.5: filas de carga por persona */
+.gantt tr.carga-sep td { border-top: 2px solid var(--gris-borde); background: #fafbfc; }
+.carga-sep__label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--gris-texto); padding: 5px 10px; position: sticky; left: 0; background: #fafbfc; z-index: 2;
+}
+.carga-fila__nombre {
+  font-size: 12.5px; font-weight: 600; text-align: right; padding: 4px 10px;
+  position: sticky; left: 0; background: #fff; z-index: 2; width: 510px; min-width: 510px;
+}
+.carga-fila .fija--resp { text-align: center; }
+.carga-celda { font-size: 12px; color: var(--texto); text-align: center; }
 .gantt-scroll {
   overflow: auto; border: 1px solid var(--gris-borde); border-radius: 8px; background: #fff;
   max-height: calc(100vh - 250px);
@@ -405,14 +486,18 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 /* Etiquetas fijas de frente/subfrente (celdas combinadas) */
 .gantt td.fija--frente {
   background: var(--verde); color: #fff; font-weight: 700; font-size: 12px;
-  letter-spacing: .02em; vertical-align: top; padding: 8px 10px;
-  overflow-wrap: break-word;
+  letter-spacing: .02em; vertical-align: middle; text-align: center;
+  padding: 8px 10px; overflow-wrap: break-word;
 }
-.gantt td.fija--sf { background: var(--gris-sf); font-weight: 600; font-size: 12px; vertical-align: top; padding: 8px 8px; }
+.gantt td.fija--sf {
+  background: var(--gris-sf); font-weight: 600; font-size: 12px;
+  vertical-align: middle; text-align: center; padding: 8px 8px;
+}
 .gantt td.fija--tarea { font-weight: 600; padding: 4px 10px; font-size: 12.5px; }
 .gantt td.fija--tarea.tarea-cell--verde { background: var(--verde-suave); }
 .gantt td.fija--tarea.tarea-cell--rojo { background: var(--rojo-suave); }
 .gantt td.fija--tarea.tarea-cell--ambar { background: var(--ambar-suave); }
+.gantt td.fija--tarea.tarea-cell--morado { background: var(--morado-suave); }
 .gantt td.fija--resp { text-align: center; }
 
 /* Separador entre sub frentes */
@@ -436,12 +521,9 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .hc-estado--verde { background: var(--verde-suave); color: var(--verde-check); }
 .hc-estado--rojo { background: var(--rojo-suave); color: var(--rojo); }
 .hc-estado--ambar { background: var(--ambar-suave); color: var(--ambar-texto); }
+.hc-estado--morado { background: var(--morado-suave); color: var(--morado-texto); }
 .hc-estado--ninguno { background: #37474f; color: #cfd8dc; }
-.hc-estado--punto { position: relative; padding-right: 16px; }
-.hc-estado--punto::after {
-  content: ''; position: absolute; top: 3px; right: 4px; width: 7px; height: 7px;
-  border-radius: 50%; background: var(--ambar);
-}
+
 .hovercard__row { display: flex; justify-content: space-between; gap: 18px; }
 .hovercard__row span:first-child { color: #90a4ae; }
 .hovercard__hist { margin-top: 8px; border-top: 1px solid #37474f; padding-top: 8px; }
@@ -635,6 +717,23 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .chip-rol--admin { background: var(--verde-suave); color: var(--verde-check); }
 .chip-rol--cliente { background: #e3f2fd; color: #1565c0; }
 .usuarios-todos, .usuarios-sin { font-size: 12.5px; color: var(--gris-texto); font-style: italic; }
+.usuarios-aviso {
+  font-size: 12.5px; color: var(--verde-check); background: var(--verde-suave);
+  border-radius: 6px; padding: 6px 12px; margin: 0 0 12px;
+}
+
+/* Modal de permisos por cliente (§7) */
+.permisos { padding: 0; }
+.permisos__intro { font-size: 12.5px; color: var(--gris-texto); margin: 0 0 12px; }
+.permisos__grupo {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--gris-texto); margin: 14px 0 6px; border-top: 1px solid var(--gris-linea); padding-top: 10px;
+}
+.permiso-fila { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 13px; }
+.permiso-fila label { display: flex; align-items: center; gap: 10px; }
+.permiso-fila input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--verde); }
+.permiso-fila--tarea { justify-content: space-between; }
+.permisos__nota { font-size: 11.5px; color: var(--gris-texto); margin: 12px 0 0; }
 .asignaciones { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .asignacion {
   display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;

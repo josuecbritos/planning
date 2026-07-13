@@ -151,7 +151,7 @@ const CHIP_CLASE: Record<Categoria, string> = {
   pendiente: 'hc-estado--ninguno-claro',
   pendiente_replan: 'hc-estado--ambar',
   atrasada: 'hc-estado--rojo',
-  atrasada_replan: 'hc-estado--rojo hc-estado--punto',
+  atrasada_replan: 'hc-estado--morado',
 }
 
 function FilaMiPanel({
@@ -175,7 +175,6 @@ function FilaMiPanel({
   return (
     <tr className={color !== 'ninguno' ? `fila--${color}` : undefined}>
       <td className="tarea-cell">
-        {cat === 'atrasada_replan' && <span className="punto-ambar" title="Atrasada replanificada" />}
         <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
           <span
             className="tarea-cell__row tarea-cell__link"

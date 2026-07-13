@@ -19,7 +19,7 @@ export function TaskDetail({ state, tarea, hoy }: { state: AppState; tarea: Tare
   return (
     <>
       <div className="hovercard__title">{tarea.titulo}</div>
-      <span className={`hovercard__estado hc-estado--${color}${cat === 'atrasada_replan' ? ' hc-estado--punto' : ''}`}>
+      <span className={`hovercard__estado hc-estado--${color}`}>
         {CATEGORIA_LABEL[cat]}
       </span>
 

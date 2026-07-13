@@ -7,6 +7,25 @@ export type EstadoProyecto = 'activo' | 'pausado' | 'cerrado'
 /** Fecha ISO corta, ej. '2024-10-30'. */
 export type ISODate = string
 
+/** Alcance de un permiso que actua sobre tareas (§7.30). */
+export type AlcancePermiso = 'todas' | 'asignadas'
+
+/**
+ * Permisos configurables por usuario cliente (§7.29). Los que actuan sobre
+ * tareas llevan alcance: 'todas' las del proyecto o solo las 'asignadas' al
+ * cliente. Ausente/false = no puede. Los admins ignoran esta estructura.
+ */
+export interface PermisosCliente {
+  crearFrentes?: boolean
+  crearSubFrentes?: boolean
+  crearTareas?: boolean
+  editarFechas?: false | AlcancePermiso
+  marcarHechas?: false | AlcancePermiso
+  editarTareas?: false | AlcancePermiso
+  archivarEliminar?: false | AlcancePermiso
+  asignarResponsable?: false | AlcancePermiso
+}
+
 export interface Usuario {
   id: string
   nombre: string
@@ -17,6 +36,8 @@ export interface Usuario {
   activo: boolean
   /** Vinculo con Supabase Auth (null hasta que la persona inicia sesion). */
   authId?: string
+  /** Configuracion de permisos (solo rol cliente; §7.28). */
+  permisos?: PermisosCliente
 }
 
 /** Acceso de Cliente a Proyecto (5.7). Los Admin no la necesitan (ven todo). */
@@ -122,17 +143,18 @@ export interface AppState {
 // El modelo de 5 categorias excluyentes vive en lib/derive.ts (Categoria).
 
 /**
- * Color del campo tarea — la señal principal de gestion (6.5).
- * El rojo manda sobre el ambar; "atrasada replanificada" es rojo con un
- * punto ambar en la esquina (ver derive.puntoAmbar).
+ * Color de fila — la señal principal de gestion. Gravedad creciente:
+ * verde (hecha) → sin color → ambar → rojo → MORADO (atrasada
+ * replanificada, lo mas critico).
  */
-export type ColorTarea = 'verde' | 'rojo' | 'ambar' | 'ninguno'
+export type ColorTarea = 'verde' | 'ambar' | 'rojo' | 'morado' | 'ninguno'
 
 /** Tipos de marca en la grilla Gantt (6.4). */
 export type TipoMarca =
   | 'pendiente' // ✕
   | 'hecha' // ■ verde con ✓
-  | 'incumplida' // ■ rojo
+  | 'incumplida' // ■ rojo (atrasada)
+  | 'incumplida_replan' // ■ morado (atrasada replanificada)
   | 'anterior' // ▪ rojo tenue
 
 export interface MarcaGantt {

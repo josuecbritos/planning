@@ -6,6 +6,7 @@ import { makeAuth } from './auth'
 import { supabaseConfigured } from './data/client'
 import { hoyISO } from './lib/dates'
 import { contar } from './lib/derive'
+import { makeCan } from './lib/permisos'
 import * as apply from './data/apply'
 import type {
   NuevaTarea,
@@ -26,6 +27,7 @@ import { UsersView } from './components/UsersView'
 import { TaskPanel } from './components/TaskPanel'
 import { MiPanelView } from './components/MiPanelView'
 import { ResumenView } from './components/ResumenView'
+import { AceptarInvitacion } from './components/AceptarInvitacion'
 
 export type Vista = 'tabla' | 'gantt'
 export type FrenteSel = string | 'todos'
@@ -37,10 +39,10 @@ export interface Actions {
   updateProyecto: (id: string, p: PatchProyecto) => Promise<void>
   deleteProyecto: (id: string) => Promise<void>
   createFrente: (i: NuevoFrente) => Promise<void>
-  updateFrente: (id: string, p: { nombre?: string }) => Promise<void>
+  updateFrente: (id: string, p: { nombre?: string; orden?: number }) => Promise<void>
   deleteFrente: (id: string) => Promise<void>
   createSubFrente: (i: NuevoSubFrente) => Promise<void>
-  updateSubFrente: (id: string, p: { nombre?: string }) => Promise<void>
+  updateSubFrente: (id: string, p: { nombre?: string; orden?: number }) => Promise<void>
   deleteSubFrente: (id: string) => Promise<void>
   createTarea: (i: NuevaTarea) => Promise<void>
   updateTarea: (id: string, p: PatchTarea) => Promise<void>
@@ -59,6 +61,12 @@ export default function App() {
   const auth = useMemo(() => makeAuth(repo), [repo])
   const HOY = useMemo(() => (supabaseConfigured ? hoyISO() : HOY_SIM), [])
 
+  // §8: enlace de invitacion (#invitacion=TOKEN) — tiene prioridad sobre todo.
+  const [tokenInvitacion, setTokenInvitacion] = useState<string | null>(() => {
+    const m = window.location.hash.match(/#invitacion=([\w-]+)/)
+    return m ? m[1] : null
+  })
+
   // undefined = comprobando sesion; null = sin sesion.
   const [sesion, setSesion] = useState<Usuario | null | undefined>(undefined)
   const [state, setState] = useState<AppState | null>(null)
@@ -71,6 +79,7 @@ export default function App() {
   const [tareaDetalleId, setTareaDetalleId] = useState<string | null>(null)
 
   const esAdmin: boolean = sesion?.rol === 'admin'
+  const can = useMemo(() => makeCan(sesion ?? null), [sesion])
 
   // Comprobar sesion vigente al arrancar.
   useEffect(() => {
@@ -204,7 +213,7 @@ export default function App() {
         }),
       cambiarFechaObjetivo: (tareaId, nueva) =>
         run(async () => {
-          const { tarea, historial } = await repo.cambiarFechaObjetivo(tareaId, nueva, sesion?.id)
+          const { tarea, historial } = await repo.cambiarFechaObjetivo(tareaId, nueva, sesion?.id, HOY)
           return (s) => apply.setHistorialTarea(apply.upsertTarea(s, tarea), tareaId, historial)
         }),
       createUsuario: (i) =>
@@ -284,6 +293,18 @@ export default function App() {
 
   // -- Render --
 
+  if (tokenInvitacion) {
+    return (
+      <AceptarInvitacion
+        token={tokenInvitacion}
+        onListo={() => {
+          window.location.hash = ''
+          setTokenInvitacion(null)
+        }}
+      />
+    )
+  }
+
   if (sesion === undefined) {
     return <div className="cargando">Cargando…</div>
   }
@@ -311,6 +332,7 @@ export default function App() {
         frenteSel={frenteSel}
         pantalla={pantalla}
         esAdmin={esAdmin}
+        can={can}
         usuario={sesion}
         onSelectProyecto={onSelectProyecto}
         onSelectFrente={setFrenteSel}
@@ -360,7 +382,7 @@ export default function App() {
                   proyectoId={proyecto.id}
                   frenteSel={frenteSel}
                   hoy={HOY}
-                  puedeEditar={esAdmin}
+                  can={can}
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                 />
@@ -370,7 +392,7 @@ export default function App() {
                   proyectoId={proyecto.id}
                   frenteSel={frenteSel}
                   hoy={HOY}
-                  puedeEditar={esAdmin}
+                  can={can}
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                 />
@@ -396,7 +418,7 @@ export default function App() {
           state={state}
           tarea={tareaDetalle}
           hoy={HOY}
-          puedeEditar={esAdmin}
+          can={can}
           actions={actions}
           onClose={() => setTareaDetalleId(null)}
         />

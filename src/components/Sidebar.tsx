@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { AppState, Proyecto, Usuario } from '../types'
 import type { Actions, FrenteSel, Pantalla } from '../App'
+import type { Can } from '../lib/permisos'
 import { TextPromptModal } from './TextPromptModal'
 import { ProyectoModal } from './ProyectoModal'
 
@@ -16,6 +17,7 @@ interface Props {
   frenteSel: FrenteSel
   pantalla: Pantalla
   esAdmin: boolean
+  can: Can
   usuario: Usuario
   onSelectProyecto: (id: string) => void
   onSelectFrente: (f: FrenteSel) => void
@@ -38,6 +40,7 @@ export function Sidebar({
   frenteSel,
   pantalla,
   esAdmin,
+  can,
   usuario,
   onSelectProyecto,
   onSelectFrente,
@@ -148,7 +151,7 @@ export function Sidebar({
                     </div>
                   ))}
 
-                  {esAdmin && (
+                  {can.crearFrentes && (
                     <button className="nav-frente nav-frente--add" onClick={() => setModal({ tipo: 'frente-nuevo' })}>
                       + Frente
                     </button>

@@ -51,23 +51,23 @@ export function esAtrasada(cat: Categoria): boolean {
 }
 
 /**
- * Color de fondo del campo tarea (6.5 actualizado). El rojo manda sobre el
- * ambar: una atrasada replanificada es roja; su condicion de replanificada
- * se señala con el punto ambar en la esquina (ver puntoAmbar).
+ * Color de FILA por categoria (1.1). Gravedad creciente: verde → sin color
+ * → ambar → rojo → morado. La atrasada replanificada es categoria propia
+ * con fila morada completa: lo mas critico resalta por sobre todo.
  */
 export function colorTarea(state: AppState, t: Tarea, hoy: string): ColorTarea {
   switch (categoriaDe(state, t, hoy)) {
     case 'hecha': return 'verde'
-    case 'atrasada':
-    case 'atrasada_replan': return 'rojo'
     case 'pendiente_replan': return 'ambar'
+    case 'atrasada': return 'rojo'
+    case 'atrasada_replan': return 'morado'
     default: return 'ninguno'
   }
 }
 
-/** Punto ambar en la esquina: atrasada Y replanificada (1.2). */
-export function puntoAmbar(state: AppState, t: Tarea, hoy: string): boolean {
-  return categoriaDe(state, t, hoy) === 'atrasada_replan'
+/** Cantidad de replanificaciones (para el indicador ↻ ×N de la tabla). */
+export function nReplanificaciones(state: AppState, tareaId: string): number {
+  return state.historial.filter((h) => h.tareaId === tareaId).length
 }
 
 /**
@@ -85,12 +85,16 @@ export function marcasDe(state: AppState, t: Tarea, hoy: string): MarcaGantt[] {
   }
 
   const marcas: MarcaGantt[] = []
+  const replan = tieneHistorial(state, t.id)
   for (const h of historialDe(state, t.id)) {
     marcas.push({ fecha: h.fechaAnterior, tipo: 'anterior' })
   }
   if (t.fechaObjetivo) {
     const vencida = cmp(t.fechaObjetivo, hoy) < 0
-    marcas.push({ fecha: t.fechaObjetivo, tipo: vencida ? 'incumplida' : 'pendiente' })
+    marcas.push({
+      fecha: t.fechaObjetivo,
+      tipo: vencida ? (replan ? 'incumplida_replan' : 'incumplida') : 'pendiente',
+    })
   }
   return marcas
 }
