@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ISODate } from '../types'
-import { ajustarDiaHabil, formatoFecha } from '../lib/dates'
+import { formatoFecha } from '../lib/dates'
 
 // Fecha editable inline (N4): un solo click abre el calendario de inmediato
 // (showPicker) y elegir una fecha guarda y cierra al instante.
@@ -37,10 +37,8 @@ export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
 
   function confirmar(nueva: ISODate) {
     setEditando(false)
-    if (!nueva) return
-    // Sin fechas de fin de semana: se ancla al dia habil mas cercano.
-    const habil = ajustarDiaHabil(nueva)
-    if (habil !== valor) onCambiar(habil)
+    // Cualquier dia es valido, incluidos sabado y domingo (§6.3.18).
+    if (nueva && nueva !== valor) onCambiar(nueva)
   }
 
   if (!editando) {

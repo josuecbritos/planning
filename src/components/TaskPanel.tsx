@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AppState, Tarea } from '../types'
 import type { Actions } from '../App'
+import type { Can } from '../lib/permisos'
 import { formatoFecha, formatoFechaHora } from '../lib/dates'
 import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, historialDe } from '../lib/derive'
 import { FechaEditable } from './FechaEditable'
@@ -13,12 +14,12 @@ interface Props {
   state: AppState
   tarea: Tarea
   hoy: string
-  puedeEditar: boolean
+  can: Can
   actions: Actions
   onClose: () => void
 }
 
-export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: Props) {
+export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
@@ -102,43 +103,49 @@ export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: 
         </ol>
       </div>
 
-      <Comentarios state={state} tarea={tarea} puedeEditar={puedeEditar} actions={actions} />
+      <Comentarios state={state} tarea={tarea} puedeComentar={can.esAdmin} actions={actions} />
 
-      {puedeEditar && (
+      {can.algunoDeTareas && (
         <div className="panel-detalle__acciones">
           {!tarea.archivada && (
             <>
-              <label className="panel-accion">
-                <input
-                  className="chk"
-                  type="checkbox"
-                  checked={tarea.hecha}
-                  onChange={() => actions.toggleHecha(tarea.id, !tarea.hecha)}
-                />
-                Hecha
-              </label>
-              <label className="panel-accion">
-                {tarea.fechaObjetivo ? 'Replanificar a' : 'Planificar para'}
-                <FechaEditable
-                  valor={tarea.fechaObjetivo}
-                  onCambiar={(nueva) => actions.cambiarFechaObjetivo(tarea.id, nueva)}
-                  ariaLabel="Nueva fecha objetivo"
-                />
-              </label>
-              <button
-                className="btn"
-                title="Cancelar la tarea: sale del plan y conserva su historial"
-                onClick={() => {
-                  if (confirm(`¿Archivar la tarea "${tarea.titulo}"? Sale del plan y conserva su historial.`)) {
-                    actions.updateTarea(tarea.id, { archivada: true })
-                  }
-                }}
-              >
-                Archivar (cancelar)
-              </button>
+              {can.marcarHechas(tarea) && (
+                <label className="panel-accion">
+                  <input
+                    className="chk"
+                    type="checkbox"
+                    checked={tarea.hecha}
+                    onChange={() => actions.toggleHecha(tarea.id, !tarea.hecha)}
+                  />
+                  Hecha
+                </label>
+              )}
+              {can.editarFechas(tarea) && (
+                <label className="panel-accion">
+                  {tarea.fechaObjetivo ? 'Replanificar a' : 'Planificar para'}
+                  <FechaEditable
+                    valor={tarea.fechaObjetivo}
+                    onCambiar={(nueva) => actions.cambiarFechaObjetivo(tarea.id, nueva)}
+                    ariaLabel="Nueva fecha objetivo"
+                  />
+                </label>
+              )}
+              {can.archivarEliminar(tarea) && (
+                <button
+                  className="btn"
+                  title="Cancelar la tarea: sale del plan y conserva su historial"
+                  onClick={() => {
+                    if (confirm(`¿Archivar la tarea "${tarea.titulo}"? Sale del plan y conserva su historial.`)) {
+                      actions.updateTarea(tarea.id, { archivada: true })
+                    }
+                  }}
+                >
+                  Archivar (cancelar)
+                </button>
+              )}
             </>
           )}
-          {tarea.archivada && (
+          {tarea.archivada && can.archivarEliminar(tarea) && (
             <button className="btn btn--primary" onClick={() => actions.updateTarea(tarea.id, { archivada: false })}>
               Restaurar al plan
             </button>
@@ -157,12 +164,12 @@ export function TaskPanel({ state, tarea, hoy, puedeEditar, actions, onClose }: 
 function Comentarios({
   state,
   tarea,
-  puedeEditar,
+  puedeComentar,
   actions,
 }: {
   state: AppState
   tarea: Tarea
-  puedeEditar: boolean
+  puedeComentar: boolean
   actions: Actions
 }) {
   const [texto, setTexto] = useState('')
@@ -205,7 +212,7 @@ function Comentarios({
         })}
       </ul>
 
-      {puedeEditar && (
+      {puedeComentar && (
         <div className="comentario-nuevo">
           <textarea
             rows={2}

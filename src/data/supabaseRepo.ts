@@ -39,7 +39,7 @@ function unwrap(res: { data: unknown; error: { message: string } | null }): any 
 
 const toUsuario = (r: Row): Usuario => ({
   id: r.id, nombre: r.nombre, iniciales: r.iniciales ?? '', email: r.email, rol: r.rol,
-  activo: r.activo, authId: r.auth_id ?? undefined,
+  activo: r.activo, authId: r.auth_id ?? undefined, permisos: r.permisos ?? undefined,
 })
 const toAcceso = (r: Row): Acceso => ({
   usuarioId: r.usuario_id, proyectoId: r.proyecto_id, fechaAsignacion: r.fecha_asignacion,
@@ -138,7 +138,7 @@ export class SupabaseRepo implements Repo {
 
   // -- Frente --
   async createFrente(input: NuevoFrente): Promise<Frente> {
-    const orden = await this.nextOrden('frente', 'proyecto_id', input.proyectoId)
+    const orden = input.orden ?? (await this.nextOrden('frente', 'proyecto_id', input.proyectoId))
     const row = unwrap(
       await this.db
         .from('frente')
@@ -158,7 +158,7 @@ export class SupabaseRepo implements Repo {
 
   // -- Sub Frente --
   async createSubFrente(input: NuevoSubFrente): Promise<SubFrente> {
-    const orden = await this.nextOrden('sub_frente', 'frente_id', input.frenteId)
+    const orden = input.orden ?? (await this.nextOrden('sub_frente', 'frente_id', input.frenteId))
     const row = unwrap(
       await this.db
         .from('sub_frente')
@@ -178,7 +178,7 @@ export class SupabaseRepo implements Repo {
 
   // -- Tarea --
   async createTarea(input: NuevaTarea): Promise<Tarea> {
-    const orden = await this.nextOrden('tarea', 'sub_frente_id', input.subFrenteId)
+    const orden = input.orden ?? (await this.nextOrden('tarea', 'sub_frente_id', input.subFrenteId))
     const row = unwrap(
       await this.db
         .from('tarea')
@@ -212,6 +212,7 @@ export class SupabaseRepo implements Repo {
     }
     if ('fechaReal' in patch) upd.fecha_real = patch.fechaReal ?? null
     if ('archivada' in patch) upd.archivada = patch.archivada ?? false
+    if ('orden' in patch) upd.orden = patch.orden
     const row = unwrap(await this.db.from('tarea').update(upd).eq('id', id).select().single())
     return toTarea(row)
   }
@@ -263,6 +264,7 @@ export class SupabaseRepo implements Repo {
     if ('iniciales' in patch) upd.iniciales = patch.iniciales
     if ('activo' in patch) upd.activo = patch.activo
     if ('rol' in patch) upd.rol = patch.rol
+    if ('permisos' in patch) upd.permisos = patch.permisos ?? {}
     const row = unwrap(await this.db.from('usuario').update(upd).eq('id', id).select().single())
     return toUsuario(row)
   }

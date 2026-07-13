@@ -11,7 +11,7 @@ export function Legend() {
       <div className="leyenda__item"><Marca tipo="pendiente" /> Pendiente</div>
       <div className="leyenda__item"><span className="mark mark--ambar" /> Pendiente replanificada</div>
       <div className="leyenda__item"><Marca tipo="incumplida" /> Atrasada</div>
-      <div className="leyenda__item"><span className="mark mark--incumplida mark--con-punto" /> Atrasada replanificada</div>
+      <div className="leyenda__item"><Marca tipo="incumplida_replan" /> Atrasada replanificada</div>
       <div className="leyenda__item"><Marca tipo="anterior" /> Fecha anterior</div>
     </div>
   )

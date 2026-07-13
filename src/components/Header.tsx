@@ -57,8 +57,8 @@ export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Prop
           <span className="counter__num">{c.atrasadas}</span>
           <span className="counter__lbl">Atrasadas</span>
         </div>
-        <div className="counter counter--rojo">
-          <span className="counter__swatch counter__swatch--punto" />
+        <div className="counter counter--morado">
+          <span className="counter__swatch" style={{ background: 'var(--morado)' }} />
           <span className="counter__num">{c.atrasadasReplan}</span>
           <span className="counter__lbl">Atrasadas replanificadas</span>
         </div>

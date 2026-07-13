@@ -1,13 +1,15 @@
 import { useRef, useState } from 'react'
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
-import { categoriaDe, colorTarea, esAtrasada, puntoAmbar } from '../lib/derive'
+import type { Can } from '../lib/permisos'
+import { categoriaDe, colorTarea, esAtrasada, nReplanificaciones } from '../lib/derive'
 import { formatoFecha } from '../lib/dates'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
 import { InlineText } from './InlineText'
 import { FechaEditable } from './FechaEditable'
 import { Avatar, RespPicker } from './RespPicker'
+import { CheckHecha } from './CheckHecha'
 
 // Vista Tabla tipo Monday (4.2 / 7.2) con interaccion inline (Bloque 2):
 // crear y editar pasa en la fila, sin formularios ni ventanas emergentes.
@@ -17,14 +19,14 @@ interface Props {
   proyectoId: string
   frenteSel: FrenteSel
   hoy: string
-  /** false para el rol Cliente: misma vista, sin ninguna accion de edicion. */
-  puedeEditar: boolean
+  /** Permisos del usuario actual (§7): gobiernan cada control de la vista. */
+  can: Can
   actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
 }
 
-export function TableView({ state, proyectoId, frenteSel, hoy, puedeEditar, actions, onAbrirTarea }: Props) {
+export function TableView({ state, proyectoId, frenteSel, hoy, can, actions, onAbrirTarea }: Props) {
   const frentes = state.frentes
     .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
     .sort((a, b) => a.orden - b.orden)
@@ -46,7 +48,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, puedeEditar, acti
           state={state}
           hoy={hoy}
           candidatos={candidatos}
-          puedeEditar={puedeEditar}
+          can={can}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
         />
@@ -63,7 +65,7 @@ function FrentePagina({
   state,
   hoy,
   candidatos,
-  puedeEditar,
+  can,
   actions,
   onAbrirTarea,
 }: {
@@ -71,7 +73,7 @@ function FrentePagina({
   state: AppState
   hoy: string
   candidatos: Usuario[]
-  puedeEditar: boolean
+  can: Can
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -91,13 +93,13 @@ function FrentePagina({
           state={state}
           hoy={hoy}
           candidatos={candidatos}
-          puedeEditar={puedeEditar}
+          can={can}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
         />
       ))}
       {subs.length === 0 && <p className="vacio-inline">Sin sub frentes en este frente.</p>}
-      {puedeEditar && <NuevoSubFrenteInline frenteId={frente.id} actions={actions} />}
+      {can.crearSubFrentes && <NuevoSubFrenteInline frenteId={frente.id} actions={actions} />}
     </section>
   )
 }
@@ -155,7 +157,7 @@ function SubFrenteTabla({
   state,
   hoy,
   candidatos,
-  puedeEditar,
+  can,
   actions,
   onAbrirTarea,
 }: {
@@ -163,7 +165,7 @@ function SubFrenteTabla({
   state: AppState
   hoy: string
   candidatos: Usuario[]
-  puedeEditar: boolean
+  can: Can
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -178,7 +180,7 @@ function SubFrenteTabla({
     <div className="subfrente">
       <div className="subfrente__titulo">
         <span>
-          {puedeEditar ? (
+          {can.editarEstructura ? (
             <InlineText
               valor={sub.nombre}
               onGuardar={(nombre) => actions.updateSubFrente(sub.id, { nombre })}
@@ -190,7 +192,7 @@ function SubFrenteTabla({
           )}{' '}
           <span className="subfrente__count">· {tareas.length} tareas</span>
         </span>
-        {puedeEditar && (
+        {can.editarEstructura && (
           <span className="subfrente__tools">
             <button
               className="icon-btn"
@@ -209,7 +211,7 @@ function SubFrenteTabla({
             <th className="col-fecha">Fecha Original</th>
             <th className="col-fecha">Fecha Objetivo</th>
             <th className="col-fecha">Fecha Cierre</th>
-            {puedeEditar && <th className="col-acc"></th>}
+            {can.algunoDeTareas && <th className="col-acc"></th>}
           </tr>
         </thead>
         <tbody>
@@ -220,12 +222,12 @@ function SubFrenteTabla({
               state={state}
               hoy={hoy}
               candidatos={candidatos}
-              puedeEditar={puedeEditar}
+              can={can}
               actions={actions}
               onAbrirTarea={onAbrirTarea}
             />
           ))}
-          {puedeEditar && <NuevaTareaFila subFrenteId={sub.id} candidatos={candidatos} actions={actions} />}
+          {can.crearTareas && <NuevaTareaFila subFrenteId={sub.id} candidatos={candidatos} actions={actions} />}
         </tbody>
       </table>
 
@@ -238,7 +240,7 @@ function SubFrenteTabla({
             {archivadas.map((t) => (
               <li key={t.id}>
                 <button className="link-tarea" onClick={() => onAbrirTarea(t.id)}>{t.titulo}</button>
-                {puedeEditar && (
+                {can.archivarEliminar(t) && (
                   <button
                     className="link-btn"
                     onClick={() => actions.updateTarea(t.id, { archivada: false })}
@@ -374,7 +376,7 @@ function TareaFila({
   state,
   hoy,
   candidatos,
-  puedeEditar,
+  can,
   actions,
   onAbrirTarea,
 }: {
@@ -382,37 +384,33 @@ function TareaFila({
   state: AppState
   hoy: string
   candidatos: Usuario[]
-  puedeEditar: boolean
+  can: Can
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
   const cat = categoriaDe(state, tarea, hoy)
   const color = colorTarea(state, tarea, hoy)
-  const conPunto = puntoAmbar(state, tarea, hoy)
   const resp = state.usuarios.find((u) => u.id === tarea.responsableId)
   const nComentarios = state.comentarios.filter((c) => c.tareaId === tarea.id).length
+  const nReplan = nReplanificaciones(state, tarea.id)
 
   const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
 
   return (
     <tr className={color !== 'ninguno' ? `fila--${color}` : undefined}>
       <td className="col-check">
-        <input
-          className="chk"
-          type="checkbox"
-          checked={tarea.hecha}
-          disabled={!puedeEditar}
-          onChange={() => actions.toggleHecha(tarea.id, !tarea.hecha)}
-          aria-label={`Marcar hecha: ${tarea.titulo}`}
+        <CheckHecha
+          hecha={tarea.hecha}
+          disabled={!can.marcarHechas(tarea)}
+          onToggle={() => actions.toggleHecha(tarea.id, !tarea.hecha)}
+          ariaLabel={`Marcar hecha: ${tarea.titulo}`}
         />
       </td>
 
       <td className="tarea-cell">
-        {/* Punto ambar en la esquina: atrasada Y replanificada (el rojo manda). */}
-        {conPunto && <span className="punto-ambar" title="Atrasada replanificada" />}
         <span className="tarea-cell__row">
           {cat === 'hecha' && <span className="tarea-cell__mark mk-verde">✓</span>}
-          {puedeEditar ? (
+          {can.editarTareas(tarea) ? (
             // N3: click en el titulo lo edita en el lugar (el detalle vive en ⓘ).
             <InlineText
               valor={tarea.titulo}
@@ -433,6 +431,11 @@ function TareaFila({
               </span>
             </HoverCard>
           )}
+          {nReplan > 0 && (
+            <span className="replan-count" title={`Se replanifico ${nReplan} ${nReplan === 1 ? 'vez' : 'veces'}`}>
+              ↻ ×{nReplan}
+            </span>
+          )}
           {nComentarios > 0 && (
             <button
               className="comentarios-chip"
@@ -446,7 +449,7 @@ function TareaFila({
       </td>
 
       <td className="col-resp">
-        {puedeEditar ? (
+        {can.asignarResponsable(tarea) ? (
           // N3: el selector se despliega directo en la celda, sin formulario.
           <RespPicker
             usuarios={candidatos}
@@ -462,7 +465,7 @@ function TareaFila({
       <td className="col-fecha">{tarea.fechaOriginal ? formatoFecha(tarea.fechaOriginal) : '—'}</td>
 
       <td className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}>
-        {puedeEditar ? (
+        {can.editarFechas(tarea) ? (
           <FechaEditable
             valor={tarea.fechaObjetivo}
             onCambiar={(nueva) => actions.cambiarFechaObjetivo(tarea.id, nueva)}
@@ -478,21 +481,25 @@ function TareaFila({
         {tarea.fechaReal ? formatoFecha(tarea.fechaReal) : '—'}
       </td>
 
-      {puedeEditar && (
+      {can.algunoDeTareas && (
         <td className="col-acc">
           <button className="icon-btn" data-tip="Información" aria-label="Información" onClick={() => onAbrirTarea(tarea.id)}>ⓘ</button>
-          <button
-            className="icon-btn"
-            data-tip="Archivar"
-            aria-label="Archivar"
-            onClick={() => { if (confirm(`¿Archivar la tarea "${tarea.titulo}"? Sale del plan y conserva su historial.`)) actions.updateTarea(tarea.id, { archivada: true }) }}
-          >⤵</button>
-          <button
-            className="icon-btn"
-            data-tip="Eliminar"
-            aria-label="Eliminar"
-            onClick={() => { if (confirm(`¿Eliminar definitivamente la tarea "${tarea.titulo}"? Se pierde su historial; si solo quieres cancelarla, usa Archivar.`)) actions.deleteTarea(tarea.id) }}
-          >🗑</button>
+          {can.archivarEliminar(tarea) && (
+            <>
+              <button
+                className="icon-btn"
+                data-tip="Archivar"
+                aria-label="Archivar"
+                onClick={() => { if (confirm(`¿Archivar la tarea "${tarea.titulo}"? Sale del plan y conserva su historial.`)) actions.updateTarea(tarea.id, { archivada: true }) }}
+              >⤵</button>
+              <button
+                className="icon-btn"
+                data-tip="Eliminar"
+                aria-label="Eliminar"
+                onClick={() => { if (confirm(`¿Eliminar definitivamente la tarea "${tarea.titulo}"? Se pierde su historial; si solo quieres cancelarla, usa Archivar.`)) actions.deleteTarea(tarea.id) }}
+              >🗑</button>
+            </>
+          )}
         </td>
       )}
     </tr>
