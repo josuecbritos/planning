@@ -86,12 +86,15 @@ export interface Repo {
    * Cambia la fecha objetivo aplicando la regla 1.2/1.3: si la fecha que se
    * mueve es futura, es planificacion (la original acompaña, sin historial);
    * si vence hoy o ya vencio, es replanificacion (historial, original
-   * congelada). `hoy` es la fecha de referencia (simulada en modo Local; en
-   * Supabase la regla vive en triggers con current_date).
+   * congelada). `nueva = null` DESPLANIFICA: borra la fecha y la tarea queda
+   * "sin planificar" — solo permitido si la fecha vigente es futura (una
+   * tarea que vence hoy o ya vencio no se puede borrar, solo marcarse lista
+   * o replanificarse). `hoy` es la fecha de referencia (simulada en modo
+   * Local; en Supabase la regla vive en triggers con current_date).
    */
   cambiarFechaObjetivo(
     id: string,
-    nueva: ISODate,
+    nueva: ISODate | null,
     actorId?: string,
     hoy?: ISODate,
   ): Promise<{ tarea: Tarea; historial: Replanificacion[] }>

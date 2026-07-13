@@ -290,14 +290,27 @@ export class MemoryRepo implements Repo {
 
   async cambiarFechaObjetivo(
     id: string,
-    nueva: string,
+    nueva: string | null,
     actorId?: string,
     hoy?: string,
   ): Promise<{ tarea: Tarea; historial: Replanificacion[] }> {
     const t = this.state.tareas.find((x) => x.id === id)
     if (!t) throw new Error('Tarea no encontrada')
     const ref = hoy ?? hoyISO()
-    if (nueva && nueva !== t.fechaObjetivo) {
+    if (nueva === null) {
+      // Desplanificar (borrar la marca): la tarea vuelve a "sin fecha".
+      // Regla 2.2: si la fecha vence hoy o ya vencio, no se puede borrar.
+      if (t.fechaObjetivo) {
+        if (t.fechaObjetivo <= ref && !t.hecha) {
+          throw new Error('No puedes eliminar tareas que ya pasaron')
+        }
+        t.fechaObjetivo = undefined
+        // Sin replanificaciones aun, la original acompaña (vuelve a nula);
+        // con historial, queda congelada como registro.
+        if (!this.state.historial.some((h) => h.tareaId === id)) t.fechaOriginal = undefined
+        this.persist()
+      }
+    } else if (nueva && nueva !== t.fechaObjetivo) {
       const tieneHist = this.state.historial.some((h) => h.tareaId === id)
       // 1.2: solo es replanificacion si la fecha que se mueve vence hoy o ya
       // vencio. Mover una fecha futura (o poner la primera) es planificacion.

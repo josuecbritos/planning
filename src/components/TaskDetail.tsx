@@ -37,13 +37,6 @@ export function TaskDetail({ state, tarea, hoy }: { state: AppState; tarea: Tare
         <span>Fecha vigente</span>
         <span>{tarea.fechaObjetivo ? formatoFecha(tarea.fechaObjetivo) : 'Sin fecha aun'}</span>
       </div>
-      {tarea.hecha && tarea.fechaReal && (
-        <div className="hovercard__row">
-          <span>Fecha real de termino</span>
-          <span>{formatoFecha(tarea.fechaReal)}</span>
-        </div>
-      )}
-
       <div className="hovercard__hist">
         <div className="hovercard__hist-title">
           {hist.length === 0
@@ -64,6 +57,11 @@ export function TaskDetail({ state, tarea, hoy }: { state: AppState; tarea: Tare
               )
             })}
           </div>
+        )}
+        {/* Punto 1: el dia real del marcado es solo un registro historico;
+            la marca vive en la ultima fecha planificada. */}
+        {tarea.hecha && tarea.fechaReal && (
+          <div className="hovercard__marcada">Se marco lista el {formatoFecha(tarea.fechaReal)}</div>
         )}
       </div>
     </>

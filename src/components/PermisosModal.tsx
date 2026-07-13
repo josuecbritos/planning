@@ -69,7 +69,7 @@ export function PermisosModal({ usuario, onGuardar, onClose }: Props) {
     setPermisos((p) => ({ ...p, [k]: v }))
 
   return (
-    <Modal titulo={`Permisos de ${usuario.nombre}`} onClose={onClose}>
+    <Modal titulo={`Permisos de ${usuario.nombre}`} onClose={onClose} ancho>
       <div className="permisos">
         <p className="permisos__intro">
           Configuracion propia de este cliente. Sin permisos activos, solo lectura.

@@ -56,7 +56,10 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 **Vistas** (sección 4, 6, 7.2)
 - **Tabla tipo Monday:** navegación por Frente en el sidebar; cada Sub Frente es una
   tabla. Columnas: Hecha (checkbox), Tarea (con color de gestión), Responsable,
-  F. original (solo lectura), F. objetivo (editable → replanifica), F. real.
+  F. original (solo lectura), F. objetivo (editable → replanifica) y **Estado**
+  (la categoría en texto, como refuerzo del color de fila). La fecha de cierre no
+  es columna: la marca de una hecha vive en su **última fecha planificada** y el
+  día real del marcado queda solo como registro en el historial.
 - **Gantt en grilla:** columnas fijas congeladas, celdas combinadas reales, una columna
   por día hábil, encabezado semana/día, columna de HOY, marcas de la sección 6.4 y
   tooltips con historial (6.6).
@@ -75,15 +78,19 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   tareas de fin de semana ocultas.
 - **Horizonte del Gantt:** *Alrededor de hoy* (default fijo: 2 semanas atrás +
   actual + 2 adelante, no persistido), *Rango personalizado* y *Todo el proyecto*.
-- **Gantt editable:** click en una celda planifica una tarea sin fecha; arrastrar
-  la marca replanifica **con snap por día** (la marca original queda tenue y un
-  fantasma encaja celda a celda en el día de destino; se puede soltar aunque el
-  cursor se desvíe de la fila); click sobre la marca alterna hecha/no hecha (la ✓
-  queda en la fecha vigente, no se mueve al día en que se marcó); "+" al pasar
-  el mouse crea un hermano justo debajo (frente/sub frente/tarea) **inline en la
-  propia grilla**, igual que los "+ agregar" de contenedores vacíos. Al pie,
-  **filas de carga por persona** (cada tarea cuenta una sola vez, en su fecha
-  vigente, hecha o no; con los nombres congelados al hacer scroll).
+- **Gantt editable — estándar por clics (sin arrastre):** clic izquierdo en una
+  celda vacía planifica la tarea ese día; clic izquierdo sobre una marca **futura**
+  la borra (la tarea queda "sin planificar"); una tarea que vence hoy o ya venció
+  **no se puede borrar** (mini-aviso: "No puedes eliminar tareas que ya pasaron") —
+  se marca lista o se replanifica poniendo la nueva marca en un día futuro (cuenta
+  como replanificación); **clic derecho sobre la marca alterna lista / no lista**
+  (el menú contextual del navegador queda suprimido sobre la grilla). La ✓ de una
+  lista queda en su última fecha planificada. "+" al pasar el mouse crea un hermano
+  justo debajo (frente/sub frente/tarea) **inline en la propia grilla**, igual que
+  los "+ agregar" de contenedores vacíos. Al pie, **filas de carga por persona**
+  (cada tarea cuenta una sola vez, en su fecha vigente, hecha o no; nombres
+  congelados al hacer scroll) más una fila **"Sin asignar"** con las tareas sin
+  responsable por día.
 - **Permisos por cliente (§7):** cada usuario cliente tiene su configuración
   (crear frentes/sub frentes/tareas; editar fechas, marcar hechas, editar,
   archivar/eliminar, asignar responsable — cada uno con alcance "todas" o "solo
