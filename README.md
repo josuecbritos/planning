@@ -76,10 +76,14 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 - **Horizonte del Gantt:** *Alrededor de hoy* (default fijo: 2 semanas atrás +
   actual + 2 adelante, no persistido), *Rango personalizado* y *Todo el proyecto*.
 - **Gantt editable:** click en una celda planifica una tarea sin fecha; arrastrar
-  la marca replanifica; click sobre la marca alterna hecha/no hecha; "+" al pasar
-  el mouse crea un hermano justo debajo (frente/sub frente/tarea); los
-  contenedores vacíos muestran "+ agregar". Al pie, **filas de carga por persona**
-  (tareas por día según fecha vigente).
+  la marca replanifica **con snap por día** (la marca original queda tenue y un
+  fantasma encaja celda a celda en el día de destino; se puede soltar aunque el
+  cursor se desvíe de la fila); click sobre la marca alterna hecha/no hecha (la ✓
+  queda en la fecha vigente, no se mueve al día en que se marcó); "+" al pasar
+  el mouse crea un hermano justo debajo (frente/sub frente/tarea) **inline en la
+  propia grilla**, igual que los "+ agregar" de contenedores vacíos. Al pie,
+  **filas de carga por persona** (cada tarea cuenta una sola vez, en su fecha
+  vigente, hecha o no; con los nombres congelados al hacer scroll).
 - **Permisos por cliente (§7):** cada usuario cliente tiene su configuración
   (crear frentes/sub frentes/tareas; editar fechas, marcar hechas, editar,
   archivar/eliminar, asignar responsable — cada uno con alcance "todas" o "solo

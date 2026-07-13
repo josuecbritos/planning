@@ -2,25 +2,57 @@ import { useState } from 'react'
 import type { AlcancePermiso, PermisosCliente, Usuario } from '../types'
 import { Modal } from './Modal'
 
-// Configuracion de permisos por cliente (§7.29-30): on/off por permiso y,
-// para los que actuan sobre tareas, alcance "todas" o "solo asignadas".
+// Configuracion de permisos por cliente (§7.29-30): cada permiso es una
+// fila de una lista; los que actuan sobre tareas se controlan con un
+// selector segmentado de tres posiciones que hace el ALCANCE explicito:
+// [ No | Solo asignadas | Todas ].
 
 type PermisoTarea = 'editarFechas' | 'marcarHechas' | 'editarTareas' | 'archivarEliminar' | 'asignarResponsable'
 type PermisoCreacion = 'crearFrentes' | 'crearSubFrentes' | 'crearTareas'
 
-const CREACION: { key: PermisoCreacion; label: string }[] = [
+const CREACION: { key: PermisoCreacion; label: string; hint?: string }[] = [
   { key: 'crearFrentes', label: 'Crear frentes' },
   { key: 'crearSubFrentes', label: 'Crear sub frentes' },
   { key: 'crearTareas', label: 'Crear tareas' },
 ]
 
-const SOBRE_TAREAS: { key: PermisoTarea; label: string }[] = [
-  { key: 'editarFechas', label: 'Editar fechas (planificar / replanificar)' },
-  { key: 'marcarHechas', label: 'Marcar tareas como hechas' },
-  { key: 'editarTareas', label: 'Editar tareas (nombre)' },
-  { key: 'archivarEliminar', label: 'Archivar / eliminar tareas' },
-  { key: 'asignarResponsable', label: 'Asignar / cambiar responsable' },
+const SOBRE_TAREAS: { key: PermisoTarea; label: string; hint?: string }[] = [
+  { key: 'editarFechas', label: 'Editar fechas', hint: 'Planificar y replanificar' },
+  { key: 'marcarHechas', label: 'Marcar como hechas' },
+  { key: 'editarTareas', label: 'Editar tareas', hint: 'Cambiar el nombre' },
+  { key: 'archivarEliminar', label: 'Archivar / eliminar' },
+  { key: 'asignarResponsable', label: 'Asignar responsable', hint: 'A cualquier persona con acceso al proyecto' },
 ]
+
+/** Selector segmentado generico (2 o 3 posiciones). */
+function Seg<T extends string | boolean>({
+  opciones,
+  valor,
+  onChange,
+  ariaLabel,
+}: {
+  opciones: { v: T; label: string }[]
+  valor: T
+  onChange: (v: T) => void
+  ariaLabel: string
+}) {
+  return (
+    <div className="seg" role="radiogroup" aria-label={ariaLabel}>
+      {opciones.map((o) => (
+        <button
+          key={String(o.v)}
+          type="button"
+          role="radio"
+          aria-checked={o.v === valor}
+          className={`seg__btn${o.v === valor ? ' seg__btn--on' : ''}${o.v === false ? ' seg__btn--no' : ''}`}
+          onClick={() => onChange(o.v)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 interface Props {
   usuario: Usuario
@@ -43,48 +75,54 @@ export function PermisosModal({ usuario, onGuardar, onClose }: Props) {
           Configuracion propia de este cliente. Sin permisos activos, solo lectura.
         </p>
 
-        <h4 className="permisos__grupo">Creacion</h4>
-        {CREACION.map(({ key, label }) => (
-          <label key={key} className="permiso-fila">
-            <input
-              type="checkbox"
-              checked={!!permisos[key]}
-              onChange={(e) => setCreacion(key, e.target.checked)}
-            />
-            <span>{label}</span>
-          </label>
-        ))}
-
-        <h4 className="permisos__grupo">Sobre tareas (con alcance)</h4>
-        {SOBRE_TAREAS.map(({ key, label }) => {
-          const valor = permisos[key] || false
-          return (
-            <div key={key} className="permiso-fila permiso-fila--tarea">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={valor !== false}
-                  onChange={(e) => setTarea(key, e.target.checked ? 'asignadas' : false)}
-                />
-                <span>{label}</span>
-              </label>
-              {valor !== false && (
-                <select
-                  className="asignar-select"
-                  value={valor}
-                  onChange={(e) => setTarea(key, e.target.value as AlcancePermiso)}
-                >
-                  <option value="asignadas">Solo sus tareas asignadas</option>
-                  <option value="todas">Todas las tareas del proyecto</option>
-                </select>
-              )}
+        <h4 className="permisos__grupo">Crear elementos</h4>
+        <div className="permisos-lista">
+          {CREACION.map(({ key, label, hint }) => (
+            <div key={key} className="permiso-item">
+              <span className="permiso-item__label">
+                {label}
+                {hint && <small>{hint}</small>}
+              </span>
+              <Seg
+                ariaLabel={label}
+                opciones={[
+                  { v: false, label: 'No' },
+                  { v: true, label: 'Si' },
+                ]}
+                valor={!!permisos[key]}
+                onChange={(v) => setCreacion(key, v)}
+              />
             </div>
-          )
-        })}
+          ))}
+        </div>
+
+        <h4 className="permisos__grupo">
+          Sobre tareas <span className="permisos__alcance">· alcance: en que tareas puede actuar</span>
+        </h4>
+        <div className="permisos-lista">
+          {SOBRE_TAREAS.map(({ key, label, hint }) => (
+            <div key={key} className="permiso-item">
+              <span className="permiso-item__label">
+                {label}
+                {hint && <small>{hint}</small>}
+              </span>
+              <Seg
+                ariaLabel={label}
+                opciones={[
+                  { v: false as const, label: 'No' },
+                  { v: 'asignadas' as const, label: 'Solo asignadas' },
+                  { v: 'todas' as const, label: 'Todas' },
+                ]}
+                valor={permisos[key] || false}
+                onChange={(v) => setTarea(key, v)}
+              />
+            </div>
+          ))}
+        </div>
 
         <p className="permisos__nota">
-          "Asignar / cambiar responsable" permite asignar a cualquier persona con
-          acceso al proyecto (admins y otros clientes asignados).
+          <strong>Solo asignadas</strong>: unicamente las tareas cuyo responsable es este
+          cliente. <strong>Todas</strong>: cualquier tarea de sus proyectos.
         </p>
 
         <div className="modal-acciones">

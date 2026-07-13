@@ -1,6 +1,7 @@
 import type {
   AppState,
   ColorTarea,
+  ISODate,
   MarcaGantt,
   Replanificacion,
   Tarea,
@@ -71,16 +72,27 @@ export function nReplanificaciones(state: AppState, tareaId: string): number {
 }
 
 /**
+ * Fecha VIGENTE de una tarea: donde vive hoy en el plan. Es la fecha
+ * objetivo actual; para una hecha sin fecha planificada, la fecha real.
+ * Las marcas principales de la Gantt y las filas de carga usan ESTA fecha,
+ * de modo que lo que se ve y lo que se cuenta siempre coinciden.
+ */
+export function fechaVigente(t: Tarea): ISODate | undefined {
+  return t.fechaObjetivo ?? (t.hecha ? t.fechaReal : undefined)
+}
+
+/**
  * Marcas de la grilla Gantt para una tarea (6.4 actualizado):
- *  - Hecha: solo la marca verde en la fecha real ("hecha es terminal";
- *    no arrastra rastro ni señal de tarde).
+ *  - Hecha: solo la marca verde en la fecha vigente ("hecha es terminal";
+ *    no arrastra rastro ni señal de tarde). Queda en la fecha planificada,
+ *    no en el dia en que se marco: la marca no se mueve al marcar hecha.
  *  - Abierta: rastro rojo tenue por cada fecha anterior + marca principal
  *    en la fecha objetivo (✕ en plazo, ■ roja si vencida).
  *  - Sin fecha: sin marcas.
  */
 export function marcasDe(state: AppState, t: Tarea, hoy: string): MarcaGantt[] {
   if (t.hecha) {
-    const fecha = t.fechaReal ?? t.fechaObjetivo
+    const fecha = fechaVigente(t)
     return fecha ? [{ fecha, tipo: 'hecha' }] : []
   }
 

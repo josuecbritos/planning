@@ -1,5 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useMemo, useState } from 'react'
 import type { AppState, Frente, ISODate, SubFrente, Tarea, TipoMarca, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import {
@@ -13,7 +12,7 @@ import {
   esLunes,
   inicioSemana,
 } from '../lib/dates'
-import { colorTarea, marcasDe } from '../lib/derive'
+import { colorTarea, fechaVigente, marcasDe } from '../lib/derive'
 import type { Can } from '../lib/permisos'
 import { Marca } from './Marca'
 import { Avatar, RespPicker } from './RespPicker'
@@ -24,11 +23,13 @@ import { InlineText } from './InlineText'
 
 // Vista Gantt — grilla tipo Excel (4.3), editable (§6.4):
 //  - click en celda vacia planifica una tarea sin fecha
-//  - arrastrar la marca replanifica (aplican las reglas 1.2/1.3)
+//  - arrastrar la marca replanifica, encajando dia a dia (snap por celda):
+//    la marca original queda tenue y un fantasma muestra el dia de destino
 //  - click sobre la marca alterna hecha / no hecha
-//  - "+" al pasar el mouse crea un hermano justo debajo (frente/sub/tarea)
-//  - contenedores vacios muestran "+ agregar"
-// Al pie, filas de carga por persona (§6.5).
+//  - "+" al pasar el mouse crea un hermano justo debajo, INLINE en la grilla
+//  - contenedores vacios muestran "+ agregar" que se convierte en input
+// Al pie, filas de carga por persona (§6.5), con las columnas de la
+// izquierda congeladas igual que el resto de la grilla.
 
 /** Modos del horizonte. Siempre arranca en 'hoy'; no se persiste. */
 type ModoHorizonte = 'hoy' | 'rango' | 'todo'
@@ -69,16 +70,51 @@ type FilaGantt =
       frente: Frente
       esPrimeraGlobal: boolean
     }
+  // Filas de creacion inline (§6.4.25): el "+" inserta un input EN la grilla.
+  | { tipo: 'input-frente'; esPrimeraGlobal: boolean }
+  | {
+      tipo: 'input-sub'
+      frente: Frente
+      esInicioFrente: boolean
+      spanFrente: number
+      esPrimeraGlobal: boolean
+    }
+  | {
+      tipo: 'input-tarea'
+      frente: Frente
+      sub: SubFrente
+      esInicioFrente: boolean
+      spanFrente: number
+      esInicioSub: boolean
+      spanSub: number
+      esPrimeraGlobal: boolean
+    }
 
-/** Estado del mini-input flotante para crear elementos desde la grilla. */
+/** Donde esta abierto el input inline de creacion. */
 interface CrearEn {
   tipo: 'frente' | 'sub' | 'tarea'
   /** Hermano tras el cual insertar (undefined = al final del contenedor). */
   despuesDe?: { id: string; orden: number }
   /** Contenedor del nuevo elemento (proyecto/frente/sub segun tipo). */
   contenedorId: string
-  x: number
-  y: number
+}
+
+/** Arrastre de una marca: tarea en vuelo + dia bajo el cursor (snap). */
+interface DragMarca {
+  tareaId: string
+  overDia: ISODate | null
+}
+
+// El navegador dibuja por defecto una copia de la marca que sigue al mouse
+// pixel a pixel ("movimiento libre"). Se reemplaza por una imagen vacia y
+// el destino se muestra con un fantasma encajado en la celda del dia.
+let imgVacia: HTMLImageElement | null = null
+function imagenVacia(): HTMLImageElement {
+  if (!imgVacia) {
+    imgVacia = new Image(1, 1)
+    imgVacia.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+  }
+  return imgVacia
 }
 
 /**
@@ -102,6 +138,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
   // §6.3.19: solo dias habiles (default) o semana completa de 7 dias.
   const [soloHabiles, setSoloHabiles] = useState(true)
   const [crearEn, setCrearEn] = useState<CrearEn | null>(null)
+  const [drag, setDrag] = useState<DragMarca | null>(null)
 
   // Candidatos a responsable: admins + clientes con acceso a ESTE proyecto.
   const candidatos = state.usuarios.filter(
@@ -111,7 +148,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
         state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
   )
 
-  // -- Filas (incluye contenedores vacios, §6.4.26) --
+  // -- Filas (incluye contenedores vacios §6.4.26 e inputs inline §6.4.25) --
   const filas = useMemo<FilaGantt[]>(() => {
     const out: FilaGantt[] = []
     const frentes = state.frentes
@@ -124,45 +161,77 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
         .filter((sf) => sf.frenteId === f.id)
         .sort((a, b) => a.orden - b.orden)
 
-      if (subs.length === 0) {
-        out.push({ tipo: 'vacio-frente', frente: f, esPrimeraGlobal: primera })
-        primera = false
-        continue
-      }
-
-      // Filas por sub frente (una por tarea, o una vacia).
       const filasFrente: FilaGantt[] = []
-      for (const sf of subs) {
-        const tareas = state.tareas
-          .filter((t) => t.subFrenteId === sf.id && !t.archivada)
-          .sort((a, b) => a.orden - b.orden)
-        if (tareas.length === 0) {
-          filasFrente.push({
-            tipo: 'vacio-sub',
-            frente: f,
-            sub: sf,
-            esInicioFrente: false,
-            spanFrente: 0,
-            esPrimeraGlobal: false,
-          })
-        } else {
-          tareas.forEach((t, i) =>
-            filasFrente.push({
-              tipo: 'tarea',
-              tarea: t,
+      if (subs.length === 0) {
+        filasFrente.push({ tipo: 'vacio-frente', frente: f, esPrimeraGlobal: false })
+      } else {
+        for (const sf of subs) {
+          const tareas = state.tareas
+            .filter((t) => t.subFrenteId === sf.id && !t.archivada)
+            .sort((a, b) => a.orden - b.orden)
+          const filasSub: FilaGantt[] = []
+          if (tareas.length === 0) {
+            filasSub.push({
+              tipo: 'vacio-sub',
               frente: f,
               sub: sf,
               esInicioFrente: false,
               spanFrente: 0,
-              esInicioSub: i === 0,
-              spanSub: tareas.length,
               esPrimeraGlobal: false,
-            }),
-          )
+            })
+          } else {
+            for (const t of tareas) {
+              filasSub.push({
+                tipo: 'tarea',
+                tarea: t,
+                frente: f,
+                sub: sf,
+                esInicioFrente: false,
+                spanFrente: 0,
+                esInicioSub: false,
+                spanSub: 0,
+                esPrimeraGlobal: false,
+              })
+            }
+            // Input de tarea nueva justo debajo de su hermana.
+            if (crearEn?.tipo === 'tarea' && crearEn.contenedorId === sf.id && crearEn.despuesDe) {
+              const idx = filasSub.findIndex(
+                (x) => x.tipo === 'tarea' && x.tarea.id === crearEn.despuesDe!.id,
+              )
+              filasSub.splice(idx < 0 ? filasSub.length : idx + 1, 0, {
+                tipo: 'input-tarea',
+                frente: f,
+                sub: sf,
+                esInicioFrente: false,
+                spanFrente: 0,
+                esInicioSub: false,
+                spanSub: 0,
+                esPrimeraGlobal: false,
+              })
+            }
+            // La celda combinada del sub frente abarca tambien el input.
+            filasSub.forEach((x, i) => {
+              if (x.tipo === 'tarea' || x.tipo === 'input-tarea') {
+                x.esInicioSub = i === 0
+                x.spanSub = filasSub.length
+              }
+            })
+          }
+          filasFrente.push(...filasSub)
+          // Input de sub frente nuevo justo debajo del sub hermano.
+          if (crearEn?.tipo === 'sub' && crearEn.contenedorId === f.id && crearEn.despuesDe?.id === sf.id) {
+            filasFrente.push({
+              tipo: 'input-sub',
+              frente: f,
+              esInicioFrente: false,
+              spanFrente: 0,
+              esPrimeraGlobal: false,
+            })
+          }
         }
       }
       filasFrente.forEach((fila, i) => {
-        if (fila.tipo !== 'vacio-frente') {
+        if (fila.tipo !== 'vacio-frente' && fila.tipo !== 'input-frente') {
           fila.esInicioFrente = i === 0
           fila.spanFrente = filasFrente.length
         }
@@ -170,9 +239,16 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
       })
       out.push(...filasFrente)
       primera = false
+      // Input de frente nuevo justo debajo del frente hermano.
+      if (crearEn?.tipo === 'frente' && crearEn.despuesDe?.id === f.id) {
+        out.push({ tipo: 'input-frente', esPrimeraGlobal: false })
+      }
+    }
+    if (crearEn?.tipo === 'frente' && !crearEn.despuesDe) {
+      out.push({ tipo: 'input-frente', esPrimeraGlobal: out.length === 0 })
     }
     return out
-  }, [state, proyectoId, frenteSel])
+  }, [state, proyectoId, frenteSel, crearEn])
 
   const filasTarea = useMemo(
     () => filas.filter((f): f is Extract<FilaGantt, { tipo: 'tarea' }> => f.tipo === 'tarea'),
@@ -214,8 +290,8 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
   const ocultasFinde = useMemo(() => {
     if (!soloHabiles) return 0
     return filasTarea.filter(({ tarea }) => {
-      const fechas = [tarea.fechaObjetivo, tarea.hecha ? tarea.fechaReal : undefined]
-      return fechas.some((d) => d && esFinDeSemana(d))
+      const f = fechaVigente(tarea)
+      return f && esFinDeSemana(f)
     }).length
   }, [filasTarea, soloHabiles])
 
@@ -231,20 +307,24 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
     return grupos
   }, [dias])
 
-  // §6.5: carga por persona — tareas cuya fecha VIGENTE cae en el rango
-  // visible, hechas y no hechas; cada tarea cuenta una sola vez.
+  // §6.5: carga por persona. Reglas: cada celda persona x dia cuenta las
+  // tareas cuya fecha VIGENTE cae ese dia (la misma fecha donde la Gantt
+  // dibuja la marca principal); incluye hechas y no hechas; cada tarea
+  // cuenta UNA sola vez (las fechas anteriores de replanificaciones no
+  // suman); una fila por persona con tareas en el rango visible.
   const carga = useMemo(() => {
     const diasSet = new Set(dias)
     const porPersona = new Map<string, Map<ISODate, number>>()
     for (const { tarea } of filasTarea) {
-      if (!tarea.responsableId || !tarea.fechaObjetivo) continue
-      if (!diasSet.has(tarea.fechaObjetivo)) continue
+      const fecha = fechaVigente(tarea)
+      if (!tarea.responsableId || !fecha) continue
+      if (!diasSet.has(fecha)) continue
       let m = porPersona.get(tarea.responsableId)
       if (!m) {
         m = new Map()
         porPersona.set(tarea.responsableId, m)
       }
-      m.set(tarea.fechaObjetivo, (m.get(tarea.fechaObjetivo) ?? 0) + 1)
+      m.set(fecha, (m.get(fecha) ?? 0) + 1)
     }
     return [...porPersona.entries()]
       .map(([usuarioId, porDia]) => ({
@@ -255,11 +335,11 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
       .sort((a, b) => a.usuario.nombre.localeCompare(b.usuario.nombre))
   }, [filasTarea, dias, state.usuarios])
 
-  // -- Creacion de hermanos "justo debajo" (§6.4.25) --
-  function abrirCrear(e: React.MouseEvent, crear: Omit<CrearEn, 'x' | 'y'>) {
+  // -- Creacion inline (§6.4.25/26) --
+
+  function abrirCrear(e: React.MouseEvent, crear: CrearEn) {
     e.stopPropagation()
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setCrearEn({ ...crear, x: Math.min(r.left, window.innerWidth - 300), y: r.bottom + 4 })
+    setCrearEn(crear)
   }
 
   async function crearElemento(nombre: string) {
@@ -287,6 +367,37 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
       }
       await actions.createTarea({ subFrenteId: contenedorId, titulo: nombre, orden: insertar })
     }
+  }
+
+  // -- Arrastre con snap por dia (§6.4.22) --
+  // El estado vive aca (no en la fila): cualquier celda de la grilla acepta
+  // el drop de la tarea en vuelo, aunque el cursor se desvie de su fila.
+
+  function empezarDrag(e: React.DragEvent, tarea: Tarea) {
+    e.dataTransfer.setData('text/plain', tarea.id)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setDragImage(imagenVacia(), 0, 0)
+    setDrag({ tareaId: tarea.id, overDia: tarea.fechaObjetivo ?? null })
+  }
+
+  function arrastrarSobre(e: React.DragEvent, d: ISODate) {
+    if (!drag) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDrag((prev) => (prev && prev.overDia !== d ? { ...prev, overDia: d } : prev))
+  }
+
+  function soltarEn(e: React.DragEvent, d: ISODate) {
+    e.preventDefault()
+    const id = drag?.tareaId ?? e.dataTransfer.getData('text/plain')
+    setDrag(null)
+    if (!id) return
+    const t = state.tareas.find((x) => x.id === id)
+    if (t && can.editarFechas(t) && d !== t.fechaObjetivo) actions.cambiarFechaObjetivo(id, d)
+  }
+
+  function terminarDrag() {
+    setDrag(null)
   }
 
   if (filas.length === 0) {
@@ -379,14 +490,16 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
               </tr>
             </thead>
             <tbody>
-              {filas.map((fila) => (
+              {filas.map((fila, i) => (
                 <FilaGanttRow
                   key={
                     fila.tipo === 'tarea'
                       ? fila.tarea.id
                       : fila.tipo === 'vacio-sub'
                         ? `vs-${fila.sub.id}`
-                        : `vf-${fila.frente.id}`
+                        : fila.tipo === 'vacio-frente'
+                          ? `vf-${fila.frente.id}`
+                          : `in-${fila.tipo}-${i}`
                   }
                   fila={fila}
                   dias={dias}
@@ -397,13 +510,24 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
                   actions={actions}
                   onAbrirTarea={onAbrirTarea}
                   abrirCrear={abrirCrear}
+                  crearEn={crearEn}
+                  onCrear={crearElemento}
+                  onCerrarCrear={() => setCrearEn(null)}
+                  drag={drag}
+                  empezarDrag={empezarDrag}
+                  arrastrarSobre={arrastrarSobre}
+                  soltarEn={soltarEn}
+                  terminarDrag={terminarDrag}
                 />
               ))}
 
               {/* §6.5 — Carga por persona (solo personas con tareas en rango) */}
               {carga.length > 0 && (
                 <tr className="carga-sep">
-                  <td className="fija carga-sep__label" colSpan={4}>Carga por persona</td>
+                  <td className="fija fija--frente carga-sep__label">Carga por persona</td>
+                  <td className="fija fija--sf carga-vacia" />
+                  <td className="fija fija--tarea carga-vacia" />
+                  <td className="fija fija--resp carga-vacia" />
                   {dias.map((d) => (
                     <td key={d} className={`celda${esLunes(d) ? ' lunes' : ''}${d === hoy ? ' col-hoy' : ''}`} />
                   ))}
@@ -411,7 +535,9 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
               )}
               {carga.map(({ usuario, porDia }) => (
                 <tr key={`carga-${usuario.id}`} className="carga-fila">
-                  <td className="fija carga-fila__nombre" colSpan={3}>{usuario.nombre}</td>
+                  <td className="fija fija--frente carga-vacia" />
+                  <td className="fija fija--sf carga-vacia" />
+                  <td className="fija fija--tarea carga-fila__nombre">{usuario.nombre}</td>
                   <td className="fija fija--resp"><Avatar usuario={usuario} /></td>
                   {dias.map((d) => {
                     const n = porDia.get(d)
@@ -430,34 +556,21 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
           </table>
         </div>
       </div>
-
-      {crearEn &&
-        createPortal(
-          <CrearPopover
-            crear={crearEn}
-            onCrear={(nombre) => {
-              crearElemento(nombre)
-            }}
-            onCerrar={() => setCrearEn(null)}
-          />,
-          document.body,
-        )}
     </div>
   )
 }
 
-/** Mini input flotante para crear frente/sub/tarea desde la grilla. */
-function CrearPopover({
-  crear,
+/** Input inline para crear frente/sub/tarea EN la grilla (patron de la tabla). */
+function CrearInput({
+  placeholder,
   onCrear,
   onCerrar,
 }: {
-  crear: CrearEn
+  placeholder: string
   onCrear: (nombre: string) => void
   onCerrar: () => void
 }) {
   const [nombre, setNombre] = useState('')
-  const etiqueta = crear.tipo === 'frente' ? 'Nuevo frente' : crear.tipo === 'sub' ? 'Nuevo sub frente' : 'Nueva tarea'
 
   function confirmar() {
     const limpio = nombre.trim()
@@ -466,19 +579,18 @@ function CrearPopover({
   }
 
   return (
-    <div className="crear-pop" style={{ left: crear.x, top: crear.y }}>
-      <input
-        autoFocus
-        placeholder={`${etiqueta}… (Enter crea)`}
-        value={nombre}
-        onChange={(e) => setNombre(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') confirmar()
-          if (e.key === 'Escape') onCerrar()
-        }}
-        onBlur={confirmar}
-      />
-    </div>
+    <input
+      className="inline-input crear-inline"
+      autoFocus
+      placeholder={placeholder}
+      value={nombre}
+      onChange={(e) => setNombre(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') confirmar()
+        if (e.key === 'Escape') onCerrar()
+      }}
+      onBlur={confirmar}
+    />
   )
 }
 
@@ -492,6 +604,14 @@ function FilaGanttRow({
   actions,
   onAbrirTarea,
   abrirCrear,
+  crearEn,
+  onCrear,
+  onCerrarCrear,
+  drag,
+  empezarDrag,
+  arrastrarSobre,
+  soltarEn,
+  terminarDrag,
 }: {
   fila: FilaGantt
   dias: ISODate[]
@@ -501,10 +621,16 @@ function FilaGanttRow({
   can: Can
   actions: Actions
   onAbrirTarea: (id: string) => void
-  abrirCrear: (e: React.MouseEvent, crear: Omit<CrearEn, 'x' | 'y'>) => void
+  abrirCrear: (e: React.MouseEvent, crear: CrearEn) => void
+  crearEn: CrearEn | null
+  onCrear: (nombre: string) => void
+  onCerrarCrear: () => void
+  drag: DragMarca | null
+  empezarDrag: (e: React.DragEvent, tarea: Tarea) => void
+  arrastrarSobre: (e: React.DragEvent, d: ISODate) => void
+  soltarEn: (e: React.DragEvent, d: ISODate) => void
+  terminarDrag: () => void
 }) {
-  const dragTareaId = useRef<string | null>(null)
-
   // -- Celdas fijas de frente / sub frente (con "+" para crear hermanos) --
 
   const celdaFrente = (frente: Frente, span: number) => (
@@ -547,14 +673,72 @@ function FilaGanttRow({
     </td>
   )
 
-  // -- Contenedores vacios (§6.4.26) --
+  // Celdas de dias vacias que igual aceptan el drop de una marca en vuelo.
+  const celdasVacias = () =>
+    dias.map((d) => (
+      <td
+        key={d}
+        className={`celda${esLunes(d) ? ' lunes' : ''}${d === hoy ? ' col-hoy' : ''}${esFinDeSemana(d) ? ' finde' : ''}`}
+        onDragOver={drag ? (e) => arrastrarSobre(e, d) : undefined}
+        onDrop={drag ? (e) => soltarEn(e, d) : undefined}
+      />
+    ))
+
+  // -- Filas de creacion inline (§6.4.25) --
+
+  if (fila.tipo === 'input-frente') {
+    return (
+      <tr className={fila.esPrimeraGlobal ? '' : 'sep-sf'}>
+        <td className="fija fija--frente fija--input">
+          <CrearInput placeholder="Nuevo frente… (Enter crea)" onCrear={onCrear} onCerrar={onCerrarCrear} />
+        </td>
+        <td className="fija fija--sf" />
+        <td className="fija fija--tarea" />
+        <td className="fija fija--resp" />
+        {celdasVacias()}
+      </tr>
+    )
+  }
+
+  if (fila.tipo === 'input-sub') {
+    return (
+      <tr className="sep-sf">
+        {fila.esInicioFrente && celdaFrente(fila.frente, fila.spanFrente)}
+        <td className="fija fija--sf fija--input">
+          <CrearInput placeholder="Nuevo sub frente… (Enter crea)" onCrear={onCrear} onCerrar={onCerrarCrear} />
+        </td>
+        <td className="fija fija--tarea" />
+        <td className="fija fija--resp" />
+        {celdasVacias()}
+      </tr>
+    )
+  }
+
+  if (fila.tipo === 'input-tarea') {
+    return (
+      <tr>
+        {fila.esInicioFrente && celdaFrente(fila.frente, fila.spanFrente)}
+        {fila.esInicioSub && celdaSub(fila.frente, fila.sub, fila.spanSub)}
+        <td className="fija fija--tarea fija--input">
+          <CrearInput placeholder="Nueva tarea… (Enter crea)" onCrear={onCrear} onCerrar={onCerrarCrear} />
+        </td>
+        <td className="fija fija--resp" />
+        {celdasVacias()}
+      </tr>
+    )
+  }
+
+  // -- Contenedores vacios (§6.4.26): "+ agregar" se convierte en input --
 
   if (fila.tipo === 'vacio-frente') {
+    const creandoAca = crearEn?.tipo === 'sub' && crearEn.contenedorId === fila.frente.id && !crearEn.despuesDe
     return (
       <tr className={fila.esPrimeraGlobal ? '' : 'sep-sf'}>
         {celdaFrente(fila.frente, 1)}
-        <td className="fija fija--sf gantt-vacio" colSpan={1}>
-          {can.crearSubFrentes ? (
+        <td className={`fija fija--sf gantt-vacio${creandoAca ? ' fija--input' : ''}`} colSpan={1}>
+          {creandoAca ? (
+            <CrearInput placeholder="Nuevo sub frente… (Enter crea)" onCrear={onCrear} onCerrar={onCerrarCrear} />
+          ) : can.crearSubFrentes ? (
             <button
               className="btn btn--ghost btn--sm"
               onClick={(e) => abrirCrear(e, { tipo: 'sub', contenedorId: fila.frente.id })}
@@ -567,20 +751,21 @@ function FilaGanttRow({
         </td>
         <td className="fija fija--tarea" />
         <td className="fija fija--resp" />
-        {dias.map((d) => (
-          <td key={d} className={`celda${esLunes(d) ? ' lunes' : ''}${d === hoy ? ' col-hoy' : ''}${esFinDeSemana(d) ? ' finde' : ''}`} />
-        ))}
+        {celdasVacias()}
       </tr>
     )
   }
 
   if (fila.tipo === 'vacio-sub') {
+    const creandoAca = crearEn?.tipo === 'tarea' && crearEn.contenedorId === fila.sub.id && !crearEn.despuesDe
     return (
       <tr className={fila.esPrimeraGlobal ? '' : 'sep-sf'}>
         {fila.esInicioFrente && celdaFrente(fila.frente, fila.spanFrente)}
         {celdaSub(fila.frente, fila.sub, 1)}
-        <td className="fija fija--tarea gantt-vacio">
-          {can.crearTareas ? (
+        <td className={`fija fija--tarea gantt-vacio${creandoAca ? ' fija--input' : ''}`}>
+          {creandoAca ? (
+            <CrearInput placeholder="Nueva tarea… (Enter crea)" onCrear={onCrear} onCerrar={onCerrarCrear} />
+          ) : can.crearTareas ? (
             <button
               className="btn btn--ghost btn--sm"
               onClick={(e) => abrirCrear(e, { tipo: 'tarea', contenedorId: fila.sub.id })}
@@ -592,9 +777,7 @@ function FilaGanttRow({
           )}
         </td>
         <td className="fija fija--resp" />
-        {dias.map((d) => (
-          <td key={d} className={`celda${esLunes(d) ? ' lunes' : ''}${d === hoy ? ' col-hoy' : ''}${esFinDeSemana(d) ? ' finde' : ''}`} />
-        ))}
+        {celdasVacias()}
       </tr>
     )
   }
@@ -613,6 +796,10 @@ function FilaGanttRow({
 
   const puedePlanificarCelda = can.editarFechas(tarea) && !tarea.fechaObjetivo && !tarea.hecha
   const puedeArrastrar = can.editarFechas(tarea) && !tarea.hecha && !!tarea.fechaObjetivo
+  // Esta fila lleva la marca en vuelo: su marca original queda tenue y el
+  // dia bajo el cursor muestra el fantasma encajado (snap por celda).
+  const esFilaEnVuelo = drag?.tareaId === tarea.id
+  const tipoEnVuelo = esFilaEnVuelo && tarea.fechaObjetivo ? marcas.get(tarea.fechaObjetivo) : undefined
 
   return (
     <tr className={sep.trim()}>
@@ -683,49 +870,47 @@ function FilaGanttRow({
         const esHoy = d === hoy
         const esPrincipal =
           tipo === 'pendiente' || tipo === 'incumplida' || tipo === 'incumplida_replan' || tipo === 'hecha'
+        // Fantasma de destino: solo en la fila de la tarea en vuelo.
+        const esFantasma = esFilaEnVuelo && drag?.overDia === d && d !== tarea.fechaObjetivo
         return (
           <td
             key={d}
             className={`celda${esLunes(d) ? ' lunes' : ''}${esHoy ? ' col-hoy' : ''}${esFinDeSemana(d) ? ' finde' : ''}${puedePlanificarCelda ? ' celda--planificable' : ''}`}
             // §6.4.21: click en la celda del dia planifica una tarea sin fecha.
             onClick={puedePlanificarCelda ? () => actions.cambiarFechaObjetivo(tarea.id, d) : undefined}
-            // §6.4.22: soltar una marca arrastrada replanifica a este dia.
-            onDragOver={can.editarFechas(tarea) ? (e) => e.preventDefault() : undefined}
-            onDrop={
-              can.editarFechas(tarea)
-                ? (e) => {
-                    e.preventDefault()
-                    const id = e.dataTransfer.getData('text/plain')
-                    if (id === tarea.id && d !== tarea.fechaObjetivo) actions.cambiarFechaObjetivo(tarea.id, d)
-                  }
-                : undefined
-            }
+            // §6.4.22: cualquier celda acepta la marca en vuelo (aunque el
+            // cursor se desvie de la fila) y replanifica al dia de la columna.
+            onDragOver={drag ? (e) => arrastrarSobre(e, d) : undefined}
+            onDrop={drag ? (e) => soltarEn(e, d) : undefined}
           >
-            {tipo && (
-              <HoverCard card={tooltip}>
-                <span
-                  className={`marca-wrap${esPrincipal && can.marcarHechas(tarea) ? ' marca-wrap--click' : ''}`}
-                  role="button"
-                  tabIndex={-1}
-                  draggable={esPrincipal && puedeArrastrar}
-                  onDragStart={(e) => {
-                    dragTareaId.current = tarea.id
-                    e.dataTransfer.setData('text/plain', tarea.id)
-                    e.dataTransfer.effectAllowed = 'move'
-                  }}
-                  // §6.4.23: click sobre la marca alterna hecha / no hecha.
-                  onClick={
-                    esPrincipal && can.marcarHechas(tarea)
-                      ? (e) => {
-                          e.stopPropagation()
-                          actions.toggleHecha(tarea.id, !tarea.hecha)
-                        }
-                      : () => onAbrirTarea(tarea.id)
-                  }
-                >
-                  <Marca tipo={tipo} />
-                </span>
-              </HoverCard>
+            {esFantasma ? (
+              <span className="marca-fantasma">
+                <Marca tipo={tipoEnVuelo ?? 'pendiente'} />
+              </span>
+            ) : (
+              tipo && (
+                <HoverCard card={tooltip}>
+                  <span
+                    className={`marca-wrap${esPrincipal && can.marcarHechas(tarea) ? ' marca-wrap--click' : ''}${esFilaEnVuelo && esPrincipal ? ' marca-wrap--en-vuelo' : ''}`}
+                    role="button"
+                    tabIndex={-1}
+                    draggable={esPrincipal && puedeArrastrar}
+                    onDragStart={(e) => empezarDrag(e, tarea)}
+                    onDragEnd={terminarDrag}
+                    // §6.4.23: click sobre la marca alterna hecha / no hecha.
+                    onClick={
+                      esPrincipal && can.marcarHechas(tarea)
+                        ? (e) => {
+                            e.stopPropagation()
+                            actions.toggleHecha(tarea.id, !tarea.hecha)
+                          }
+                        : () => onAbrirTarea(tarea.id)
+                    }
+                  >
+                    <Marca tipo={tipo} />
+                  </span>
+                </HoverCard>
+              )
             )}
           </td>
         )
