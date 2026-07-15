@@ -14,6 +14,7 @@ import {
   inicioSemana,
 } from '../lib/dates'
 import { colorTarea, fechaVigente, marcasDe } from '../lib/derive'
+import { filtraTareas, pasaFiltroTareas, rangoDeFecha, type Filtro } from '../lib/filtros'
 import type { Can } from '../lib/permisos'
 import { Marca } from './Marca'
 import { Avatar, RespPicker } from './RespPicker'
@@ -44,6 +45,9 @@ interface Props {
   frenteSel: FrenteSel
   hoy: string
   can: Can
+  /** Filtro activo (punto 3): responsable/estado filtran tareas; la parte
+   *  de fecha NO filtra — se traduce al horizonte visible. */
+  filtro: Filtro
   actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
@@ -124,7 +128,7 @@ function ventanaHoy(hoy: ISODate): { desde: ISODate; hasta: ISODate } {
   }
 }
 
-export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onAbrirTarea }: Props) {
+export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, actions, onAbrirTarea }: Props) {
   // Horizonte: por defecto "Alrededor de hoy"; no se persiste.
   const [modo, setModo] = useState<ModoHorizonte>('hoy')
   const [rango, setRango] = useState<{ desde: ISODate; hasta: ISODate }>(() => {
@@ -151,6 +155,11 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
         state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
   )
 
+  // Punto 3: responsable/estado filtran las tareas mostradas en la grilla
+  // (la fecha del filtro no: define el horizonte). Con filtro de tareas
+  // activo, los contenedores sin coincidencias se omiten.
+  const hayFiltroTareas = filtraTareas(filtro)
+
   // -- Filas (incluye contenedores vacios §6.4.26 e inputs inline §6.4.25) --
   const filas = useMemo<FilaGantt[]>(() => {
     const out: FilaGantt[] = []
@@ -166,14 +175,20 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
 
       const filasFrente: FilaGantt[] = []
       if (subs.length === 0) {
-        filasFrente.push({ tipo: 'vacio-frente', frente: f, esPrimeraGlobal: false })
+        if (!hayFiltroTareas) filasFrente.push({ tipo: 'vacio-frente', frente: f, esPrimeraGlobal: false })
       } else {
         for (const sf of subs) {
           const tareas = state.tareas
-            .filter((t) => t.subFrenteId === sf.id && !t.archivada)
+            .filter(
+              (t) =>
+                t.subFrenteId === sf.id &&
+                !t.archivada &&
+                (!hayFiltroTareas || pasaFiltroTareas(state, t, filtro, hoy)),
+            )
             .sort((a, b) => a.orden - b.orden)
           const filasSub: FilaGantt[] = []
           if (tareas.length === 0) {
+            if (hayFiltroTareas) continue
             filasSub.push({
               tipo: 'vacio-sub',
               frente: f,
@@ -251,7 +266,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
       out.push({ tipo: 'input-frente', esPrimeraGlobal: out.length === 0 })
     }
     return out
-  }, [state, proyectoId, frenteSel, crearEn])
+  }, [state, proyectoId, frenteSel, crearEn, filtro, hoy, hayFiltroTareas])
 
   const filasTarea = useMemo(
     () => filas.filter((f): f is Extract<FilaGantt, { tipo: 'tarea' }> => f.tipo === 'tarea'),
@@ -259,9 +274,20 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
   )
 
   // -- Rango de dias segun el modo de horizonte + toggle habiles/completa --
+  // Punto 3.5: si el filtro trae fecha, ESA define el horizonte (la ventana
+  // temporal visible); las relativas se recalculan contra hoy.
   const dias = useMemo<ISODate[]>(() => {
     let desde: ISODate
     let hasta: ISODate
+
+    const rangoFiltro = filtro.fecha ? rangoDeFecha(filtro.fecha, hoy) : null
+    if (rangoFiltro && (rangoFiltro.desde || rangoFiltro.hasta)) {
+      const v = ventanaHoy(hoy)
+      desde = rangoFiltro.desde ?? v.desde
+      hasta = rangoFiltro.hasta ?? v.hasta
+      if (cmp(desde, hasta) > 0) [desde, hasta] = [hasta, desde]
+      return soloHabiles ? diasHabiles(desde, hasta) : diasCalendario(desde, hasta)
+    }
 
     if (modo === 'rango' && rango.desde && rango.hasta && cmp(rango.desde, rango.hasta) <= 0) {
       desde = rango.desde
@@ -287,7 +313,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
     }
 
     return soloHabiles ? diasHabiles(desde, hasta) : diasCalendario(desde, hasta)
-  }, [filasTarea, state.historial, hoy, modo, rango, soloHabiles])
+  }, [filasTarea, state.historial, hoy, modo, rango, soloHabiles, filtro.fecha])
 
   // §6.3.20: en modo dias habiles, tareas con fecha de finde quedan ocultas.
   const ocultasFinde = useMemo(() => {
@@ -382,7 +408,13 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
   }
 
   if (filas.length === 0) {
-    return <div className="gantt-wrap">Este proyecto aun no tiene frentes.</div>
+    return (
+      <div className="gantt-wrap">
+        {hayFiltroTareas
+          ? 'Ninguna tarea coincide con el filtro activo.'
+          : 'Este proyecto aun no tiene frentes.'}
+      </div>
+    )
   }
 
   const finOffsetSemana = soloHabiles ? 4 : 6
@@ -415,18 +447,24 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
               Semana completa
             </button>
           </div>
-          <div className="toggle">
-            <button className={modo === 'hoy' ? 'activo' : ''} onClick={() => setModo('hoy')} title="2 semanas atras + semana actual + 2 adelante, fijo">
-              Alrededor de hoy
-            </button>
-            <button className={modo === 'rango' ? 'activo' : ''} onClick={() => setModo('rango')}>
-              Rango
-            </button>
-            <button className={modo === 'todo' ? 'activo' : ''} onClick={() => setModo('todo')}>
-              Todo el proyecto
-            </button>
-          </div>
-          {modo === 'rango' && (
+          {filtro.fecha ? (
+            <span className="horizonte-filtro" title="Quita el filtro de fecha para volver a elegir el horizonte">
+              Horizonte definido por el filtro de fecha
+            </span>
+          ) : (
+            <div className="toggle">
+              <button className={modo === 'hoy' ? 'activo' : ''} onClick={() => setModo('hoy')} title="2 semanas atras + semana actual + 2 adelante, fijo">
+                Alrededor de hoy
+              </button>
+              <button className={modo === 'rango' ? 'activo' : ''} onClick={() => setModo('rango')}>
+                Rango
+              </button>
+              <button className={modo === 'todo' ? 'activo' : ''} onClick={() => setModo('todo')}>
+                Todo el proyecto
+              </button>
+            </div>
+          )}
+          {!filtro.fecha && modo === 'rango' && (
             <span className="horizonte__rango">
               <input
                 type="date"

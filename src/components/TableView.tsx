@@ -3,6 +3,7 @@ import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import type { Can } from '../lib/permisos'
 import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, nReplanificaciones } from '../lib/derive'
+import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { formatoFecha } from '../lib/dates'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
@@ -21,12 +22,15 @@ interface Props {
   hoy: string
   /** Permisos del usuario actual (§7): gobiernan cada control de la vista. */
   can: Can
+  /** Filtro activo (punto 3): en la tabla filtran los tres campos. */
+  filtro: Filtro
   actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
 }
 
-export function TableView({ state, proyectoId, frenteSel, hoy, can, actions, onAbrirTarea }: Props) {
+export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, actions, onAbrirTarea }: Props) {
+  const filtrando = !filtroVacio(filtro)
   const frentes = state.frentes
     .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
     .sort((a, b) => a.orden - b.orden)
@@ -49,6 +53,8 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, actions, onA
           hoy={hoy}
           candidatos={candidatos}
           can={can}
+          filtro={filtro}
+          filtrando={filtrando}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
         />
@@ -66,6 +72,8 @@ function FrentePagina({
   hoy,
   candidatos,
   can,
+  filtro,
+  filtrando,
   actions,
   onAbrirTarea,
 }: {
@@ -74,6 +82,8 @@ function FrentePagina({
   hoy: string
   candidatos: Usuario[]
   can: Can
+  filtro: Filtro
+  filtrando: boolean
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -81,12 +91,20 @@ function FrentePagina({
     .filter((sf) => sf.frenteId === frente.id)
     .sort((a, b) => a.orden - b.orden)
 
+  // Con filtro activo, los contenedores sin coincidencias se omiten.
+  const coincidencias = (subId: string) =>
+    state.tareas.filter(
+      (t) => t.subFrenteId === subId && !t.archivada && pasaFiltroCompleto(state, t, filtro, hoy),
+    ).length
+  const subsVisibles = filtrando ? subs.filter((sf) => coincidencias(sf.id) > 0) : subs
+  if (filtrando && subsVisibles.length === 0) return null
+
   return (
     <section>
       <div className="frente-cabecera">
         <h2 className="frente-titulo">{frente.nombre}</h2>
       </div>
-      {subs.map((sf) => (
+      {subsVisibles.map((sf) => (
         <SubFrenteTabla
           key={sf.id}
           sub={sf}
@@ -94,12 +112,14 @@ function FrentePagina({
           hoy={hoy}
           candidatos={candidatos}
           can={can}
+          filtro={filtro}
+          filtrando={filtrando}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
         />
       ))}
       {subs.length === 0 && <p className="vacio-inline">Sin sub frentes en este frente.</p>}
-      {can.crearSubFrentes && <NuevoSubFrenteInline frenteId={frente.id} actions={actions} />}
+      {can.crearSubFrentes && !filtrando && <NuevoSubFrenteInline frenteId={frente.id} actions={actions} />}
     </section>
   )
 }
@@ -158,6 +178,8 @@ function SubFrenteTabla({
   hoy,
   candidatos,
   can,
+  filtro,
+  filtrando,
   actions,
   onAbrirTarea,
 }: {
@@ -166,6 +188,8 @@ function SubFrenteTabla({
   hoy: string
   candidatos: Usuario[]
   can: Can
+  filtro: Filtro
+  filtrando: boolean
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -173,8 +197,10 @@ function SubFrenteTabla({
     .filter((t) => t.subFrenteId === sub.id)
     .sort((a, b) => a.orden - b.orden)
   // Las archivadas (canceladas, 6.3) salen del plan; quedan consultables abajo.
-  const tareas = todas.filter((t) => !t.archivada)
-  const archivadas = todas.filter((t) => t.archivada)
+  const tareas = todas.filter(
+    (t) => !t.archivada && (!filtrando || pasaFiltroCompleto(state, t, filtro, hoy)),
+  )
+  const archivadas = filtrando ? [] : todas.filter((t) => t.archivada)
 
   return (
     <div className="subfrente">
@@ -230,7 +256,9 @@ function SubFrenteTabla({
               onAbrirTarea={onAbrirTarea}
             />
           ))}
-          {can.crearTareas && <NuevaTareaFila subFrenteId={sub.id} candidatos={candidatos} actions={actions} />}
+          {can.crearTareas && !filtrando && (
+            <NuevaTareaFila subFrenteId={sub.id} candidatos={candidatos} actions={actions} />
+          )}
         </tbody>
       </table>
 

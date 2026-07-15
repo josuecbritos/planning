@@ -7,6 +7,7 @@ import { supabaseConfigured } from './data/client'
 import { hoyISO } from './lib/dates'
 import { contar } from './lib/derive'
 import { makeCan } from './lib/permisos'
+import type { Filtro } from './lib/filtros'
 import * as apply from './data/apply'
 import type {
   NuevaTarea,
@@ -25,6 +26,7 @@ import { GanttView } from './components/GanttView'
 import { LoginPage } from './components/LoginPage'
 import { UsersView } from './components/UsersView'
 import { TaskPanel } from './components/TaskPanel'
+import { FiltrosBar } from './components/FiltrosBar'
 import { MiPanelView } from './components/MiPanelView'
 import { ResumenView } from './components/ResumenView'
 import { AceptarInvitacion } from './components/AceptarInvitacion'
@@ -34,6 +36,8 @@ export type FrenteSel = string | 'todos'
 export type Pantalla = 'proyectos' | 'usuarios' | 'mipanel' | 'resumen'
 /** Modos de la barra lateral (punto 6): fija (default) o escondida. */
 export type SidebarModo = 'fija' | 'escondida'
+/** Tema de la interfaz (punto 4): manual, no sigue al sistema operativo. */
+export type Tema = 'claro' | 'oscuro'
 
 /** Acciones expuestas a los componentes. Todas persisten via Repo. */
 export interface Actions {
@@ -79,6 +83,10 @@ export default function App() {
   // Punto 6: modo de la sidebar. Primera preferencia persistente de la app
   // (por usuario, sobrevive a recargas y sesiones posteriores).
   const [sidebarModo, setSidebarModo] = useState<SidebarModo>('fija')
+  // Filtro activo del proyecto (punto 3). Se limpia al cambiar de proyecto.
+  const [filtro, setFiltro] = useState<Filtro>({})
+  // Tema claro/oscuro (punto 4): boton manual, persistente por usuario.
+  const [tema, setTema] = useState<Tema>('claro')
   const [frenteSel, setFrenteSel] = useState<FrenteSel>('todos')
   const [proyectoActivoId, setProyectoActivoId] = useState<string | null>(null)
   // Panel lateral de detalle (7.2): id de la tarea abierta, o null.
@@ -101,6 +109,40 @@ export default function App() {
     } catch {
       /* storage no disponible: queda el default */
     }
+  }, [sesion])
+
+  // El tema se aplica en la raiz del documento: asi tambien alcanza a los
+  // portales (modales, menus, hovercards, mini-avisos).
+  useEffect(() => {
+    document.documentElement.dataset.tema = tema
+  }, [tema])
+
+  // Cargar la preferencia de tema del usuario (sin sesion: claro).
+  useEffect(() => {
+    if (!sesion) {
+      setTema('claro')
+      return
+    }
+    try {
+      const v = localStorage.getItem(`planificador.tema.${sesion.id}`)
+      setTema(v === 'oscuro' ? 'oscuro' : 'claro')
+    } catch {
+      /* storage no disponible: queda el default */
+    }
+  }, [sesion])
+
+  const toggleTema = useCallback(() => {
+    setTema((t) => {
+      const nuevo: Tema = t === 'claro' ? 'oscuro' : 'claro'
+      if (sesion) {
+        try {
+          localStorage.setItem(`planificador.tema.${sesion.id}`, nuevo)
+        } catch {
+          /* sin persistencia: el tema aplica igual en esta sesion */
+        }
+      }
+      return nuevo
+    })
   }, [sesion])
 
   const toggleSidebarModo = useCallback(() => {
@@ -297,6 +339,7 @@ export default function App() {
     setProyectoActivoId(id)
     setFrenteSel('todos')
     setPantalla('proyectos')
+    setFiltro({})
   }, [])
 
   const onSelectPantalla = useCallback((p: Pantalla) => {
@@ -354,6 +397,16 @@ export default function App() {
   const proyecto = proyectosVisibles.find((p) => p.id === proyectoActivoId) ?? null
   const tareaDetalle = tareaDetalleId ? state.tareas.find((t) => t.id === tareaDetalleId) ?? null : null
 
+  // Candidatos a responsable del proyecto activo (para el filtro).
+  const candidatosFiltro = proyecto
+    ? state.usuarios.filter(
+        (u) =>
+          u.activo &&
+          (u.rol === 'admin' ||
+            state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyecto.id)),
+      )
+    : []
+
   return (
     <div className={`app${sidebarModo === 'escondida' ? ' app--sidebar-escondida' : ''}`}>
       {/* Punto 6: en modo escondida queda una franja de iconos siempre
@@ -396,6 +449,8 @@ export default function App() {
           usuario={sesion}
           sidebarModo={sidebarModo}
           onToggleSidebar={toggleSidebarModo}
+          tema={tema}
+          onToggleTema={toggleTema}
           onSelectProyecto={onSelectProyecto}
           onSelectFrente={setFrenteSel}
           onSelectPantalla={onSelectPantalla}
@@ -439,6 +494,13 @@ export default function App() {
               hoy={HOY}
             />
             <div className="content">
+              <FiltrosBar
+                proyectoId={proyecto.id}
+                usuarioId={sesion.id}
+                candidatos={candidatosFiltro}
+                filtro={filtro}
+                onCambiar={setFiltro}
+              />
               {vista === 'tabla' ? (
                 <TableView
                   state={state}
@@ -446,6 +508,7 @@ export default function App() {
                   frenteSel={frenteSel}
                   hoy={HOY}
                   can={can}
+                  filtro={filtro}
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                 />
@@ -456,6 +519,7 @@ export default function App() {
                   frenteSel={frenteSel}
                   hoy={HOY}
                   can={can}
+                  filtro={filtro}
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                 />
