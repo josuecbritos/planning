@@ -298,16 +298,28 @@ export class MemoryRepo implements Repo {
     if (!t) throw new Error('Tarea no encontrada')
     const ref = hoy ?? hoyISO()
     if (nueva === null) {
-      // Desplanificar (borrar la marca): la tarea vuelve a "sin fecha".
-      // Regla 2.2: si la fecha vence hoy o ya vencio, no se puede borrar.
+      // Borrar la marca. Regla 2.2: si la fecha vence hoy o ya vencio, no
+      // se puede borrar (se marca lista o se replanifica).
       if (t.fechaObjetivo) {
         if (t.fechaObjetivo <= ref && !t.hecha) {
           throw new Error('No puedes eliminar tareas que ya pasaron')
         }
-        t.fechaObjetivo = undefined
-        // Sin replanificaciones aun, la original acompaña (vuelve a nula);
-        // con historial, queda congelada como registro.
-        if (!this.state.historial.some((h) => h.tareaId === id)) t.fechaOriginal = undefined
+        const regs = this.state.historial
+          .filter((h) => h.tareaId === id)
+          .sort((a, b) => a.numeroCambio - b.numeroCambio)
+        if (regs.length > 0) {
+          // La marca venia de una replanificacion: borrarla DESHACE ese
+          // movimiento (la fecha vuelve a la anterior y el registro se
+          // elimina), en vez de dejar una "replanificada" sin fecha.
+          const ultimo = regs[regs.length - 1]
+          t.fechaObjetivo = ultimo.fechaAnterior
+          this.state.historial = this.state.historial.filter((h) => h.id !== ultimo.id)
+        } else {
+          // Sin historial: la tarea vuelve a "sin planificar" y la
+          // original la acompaña (vuelve a nula).
+          t.fechaObjetivo = undefined
+          t.fechaOriginal = undefined
+        }
         this.persist()
       }
     } else if (nueva && nueva !== t.fechaObjetivo) {

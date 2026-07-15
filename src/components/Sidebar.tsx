@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { AppState, Proyecto, Usuario } from '../types'
-import type { Actions, FrenteSel, Pantalla } from '../App'
+import type { Actions, FrenteSel, Pantalla, SidebarModo } from '../App'
 import type { Can } from '../lib/permisos'
 import { TextPromptModal } from './TextPromptModal'
 import { ProyectoModal } from './ProyectoModal'
@@ -19,6 +19,9 @@ interface Props {
   esAdmin: boolean
   can: Can
   usuario: Usuario
+  /** Punto 6: modo actual de la barra (fija / escondida) y su alternador. */
+  sidebarModo: SidebarModo
+  onToggleSidebar: () => void
   onSelectProyecto: (id: string) => void
   onSelectFrente: (f: FrenteSel) => void
   onSelectPantalla: (p: Pantalla) => void
@@ -42,6 +45,8 @@ export function Sidebar({
   esAdmin,
   can,
   usuario,
+  sidebarModo,
+  onToggleSidebar,
   onSelectProyecto,
   onSelectFrente,
   onSelectPantalla,
@@ -69,7 +74,21 @@ export function Sidebar({
 
   return (
     <nav className="sidebar">
-      <div className="sidebar__brand">Andotek Planning</div>
+      <div className="sidebar__brand">
+        <span>Andotek Planning</span>
+        <button
+          className="sidebar__plegar"
+          title={
+            sidebarModo === 'fija'
+              ? 'Esconder la barra (queda una franja con iconos; se despliega al pasar el mouse)'
+              : 'Fijar la barra lateral'
+          }
+          aria-label={sidebarModo === 'fija' ? 'Esconder barra lateral' : 'Fijar barra lateral'}
+          onClick={onToggleSidebar}
+        >
+          {sidebarModo === 'fija' ? '«' : '📌'}
+        </button>
+      </div>
 
       <div className="nav-proyectos nav-pantallas">
         <button

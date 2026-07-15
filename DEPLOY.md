@@ -47,6 +47,10 @@ orden** el contenido de:
     planificación por clics: se permite desplanificar (borrar la fecha de) una
     tarea futura, pero una tarea que vence hoy o ya venció no puede quedar sin
     fecha (solo marcarse lista o replanificarse)
+11. `supabase/migrations/20260707000011_desplanificar_deshace.sql` — RPC
+    `desplanificar_tarea`: borrar la marca de una tarea replanificada deshace la
+    última replanificación (vuelve a la fecha anterior y elimina ese registro
+    del historial); sin historial, deja la tarea sin planificar
 
 *(Alternativa con CLI: `supabase link --project-ref TU_REF && supabase db push`.)*
 

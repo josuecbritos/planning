@@ -205,12 +205,15 @@ function SubFrenteTabla({
       <table className="tareas">
         <thead>
           <tr>
+            {/* Orden (punto 5): primero COMO ESTA la tarea (Estado junto al
+                nombre), despues las fechas — la Objetivo es la operativa y
+                la Original queda al final como referencia. */}
             <th className="col-check">Hecha</th>
             <th>Tarea</th>
             <th className="col-resp">Resp.</th>
-            <th className="col-fecha">Fecha Original</th>
-            <th className="col-fecha">Fecha Objetivo</th>
             <th className="col-estado">Estado</th>
+            <th className="col-fecha">Fecha Objetivo</th>
+            <th className="col-fecha">Fecha Original</th>
             {can.algunoDeTareas && <th className="col-acc"></th>}
           </tr>
         </thead>
@@ -352,7 +355,7 @@ function NuevaTareaFila({
           ariaLabel="Responsable de la nueva tarea"
         />
       </td>
-      <td className="col-fecha mudo">{fechaObjetivo ? formatoFecha(fechaObjetivo) : '—'}</td>
+      <td className="col-estado mudo">—</td>
       <td className="col-fecha">
         <input
           className="fecha-input"
@@ -362,7 +365,7 @@ function NuevaTareaFila({
           aria-label="Fecha objetivo de la nueva tarea"
         />
       </td>
-      <td className="col-estado mudo">—</td>
+      <td className="col-fecha mudo">{fechaObjetivo ? formatoFecha(fechaObjetivo) : '—'}</td>
       <td className="col-acc">
         <button className="icon-btn" title="Guardar (Enter)" onMouseDown={(e) => e.preventDefault()} onClick={guardar}>✓</button>
         <button className="icon-btn" title="Cerrar (Esc)" onMouseDown={(e) => e.preventDefault()} onClick={() => { setTitulo(''); setActiva(false) }}>✕</button>
@@ -462,7 +465,11 @@ function TareaFila({
         )}
       </td>
 
-      <td className="col-fecha">{tarea.fechaOriginal ? formatoFecha(tarea.fechaOriginal) : '—'}</td>
+      {/* La categoria en texto refuerza el color de fila; va junto al
+          nombre para el barrido visual (punto 5). */}
+      <td className="col-estado">
+        <span className={`estado-chip estado-chip--${color}`}>{CATEGORIA_LABEL[cat]}</span>
+      </td>
 
       <td className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}>
         {can.editarFechas(tarea) ? (
@@ -476,12 +483,8 @@ function TareaFila({
         )}
       </td>
 
-      {/* Punto 1: la categoria en texto refuerza el color de fila. La fecha
-          de cierre ya no es columna: la marca vive en la fecha planificada y
-          el dia real del marcado queda solo en el historial. */}
-      <td className="col-estado">
-        <span className={`estado-chip estado-chip--${color}`}>{CATEGORIA_LABEL[cat]}</span>
-      </td>
+      {/* Siempre visible, sin enfasis especial cuando difiere (punto 5). */}
+      <td className="col-fecha">{tarea.fechaOriginal ? formatoFecha(tarea.fechaOriginal) : '—'}</td>
 
       {can.algunoDeTareas && (
         <td className="col-acc">
