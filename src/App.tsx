@@ -32,6 +32,8 @@ import { AceptarInvitacion } from './components/AceptarInvitacion'
 export type Vista = 'tabla' | 'gantt'
 export type FrenteSel = string | 'todos'
 export type Pantalla = 'proyectos' | 'usuarios' | 'mipanel' | 'resumen'
+/** Modos de la barra lateral (punto 6): fija (default) o escondida. */
+export type SidebarModo = 'fija' | 'escondida'
 
 /** Acciones expuestas a los componentes. Todas persisten via Repo. */
 export interface Actions {
@@ -74,6 +76,9 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [vista, setVista] = useState<Vista>('tabla')
   const [pantalla, setPantalla] = useState<Pantalla>('proyectos')
+  // Punto 6: modo de la sidebar. Primera preferencia persistente de la app
+  // (por usuario, sobrevive a recargas y sesiones posteriores).
+  const [sidebarModo, setSidebarModo] = useState<SidebarModo>('fija')
   const [frenteSel, setFrenteSel] = useState<FrenteSel>('todos')
   const [proyectoActivoId, setProyectoActivoId] = useState<string | null>(null)
   // Panel lateral de detalle (7.2): id de la tarea abierta, o null.
@@ -86,6 +91,31 @@ export default function App() {
   useEffect(() => {
     auth.getUsuarioActual().then(setSesion).catch(() => setSesion(null))
   }, [auth])
+
+  // Cargar la preferencia de sidebar del usuario al iniciar sesion.
+  useEffect(() => {
+    if (!sesion) return
+    try {
+      const v = localStorage.getItem(`planificador.sidebar.${sesion.id}`)
+      setSidebarModo(v === 'escondida' ? 'escondida' : 'fija')
+    } catch {
+      /* storage no disponible: queda el default */
+    }
+  }, [sesion])
+
+  const toggleSidebarModo = useCallback(() => {
+    setSidebarModo((m) => {
+      const nuevo: SidebarModo = m === 'fija' ? 'escondida' : 'fija'
+      if (sesion) {
+        try {
+          localStorage.setItem(`planificador.sidebar.${sesion.id}`, nuevo)
+        } catch {
+          /* sin persistencia: el modo aplica igual en esta sesion */
+        }
+      }
+      return nuevo
+    })
+  }, [sesion])
 
   // En modo Local, lista de usuarios activos para "entrar como" en el login
   // (del repo, para incluir usuarios creados despues del seed).
@@ -325,22 +355,54 @@ export default function App() {
   const tareaDetalle = tareaDetalleId ? state.tareas.find((t) => t.id === tareaDetalleId) ?? null : null
 
   return (
-    <div className="app">
-      <Sidebar
-        state={state}
-        proyectos={proyectosVisibles}
-        proyectoActivoId={proyectoActivoId}
-        frenteSel={frenteSel}
-        pantalla={pantalla}
-        esAdmin={esAdmin}
-        can={can}
-        usuario={sesion}
-        onSelectProyecto={onSelectProyecto}
-        onSelectFrente={setFrenteSel}
-        onSelectPantalla={onSelectPantalla}
-        onLogout={onLogout}
-        actions={actions}
-      />
+    <div className={`app${sidebarModo === 'escondida' ? ' app--sidebar-escondida' : ''}`}>
+      {/* Punto 6: en modo escondida queda una franja de iconos siempre
+          clicable; al pasar el mouse, la sidebar completa se despliega
+          encima y se repliega al salir. */}
+      <div className="sidebar-zona">
+        {sidebarModo === 'escondida' && (
+          <div className="sidebar-mini" aria-label="Proyectos">
+            <button
+              className="sidebar-mini__btn"
+              title="Fijar barra lateral"
+              aria-label="Fijar barra lateral"
+              onClick={toggleSidebarModo}
+            >
+              »
+            </button>
+            {proyectosVisibles.map((p) => (
+              <button
+                key={p.id}
+                className={`sidebar-mini__proy${
+                  p.id === proyectoActivoId && pantalla === 'proyectos' ? ' sidebar-mini__proy--activo' : ''
+                }`}
+                title={p.nombre}
+                style={{ background: p.color ?? '#607d8b' }}
+                onClick={() => onSelectProyecto(p.id)}
+              >
+                {p.nombre.trim().charAt(0).toUpperCase() || '·'}
+              </button>
+            ))}
+          </div>
+        )}
+        <Sidebar
+          state={state}
+          proyectos={proyectosVisibles}
+          proyectoActivoId={proyectoActivoId}
+          frenteSel={frenteSel}
+          pantalla={pantalla}
+          esAdmin={esAdmin}
+          can={can}
+          usuario={sesion}
+          sidebarModo={sidebarModo}
+          onToggleSidebar={toggleSidebarModo}
+          onSelectProyecto={onSelectProyecto}
+          onSelectFrente={setFrenteSel}
+          onSelectPantalla={onSelectPantalla}
+          onLogout={onLogout}
+          actions={actions}
+        />
+      </div>
       <div className="main">
         {error && (
           <div className="banner-error" role="alert">

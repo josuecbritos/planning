@@ -314,10 +314,12 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
   // tareas cuya fecha VIGENTE cae ese dia (la misma fecha donde la Gantt
   // dibuja la marca principal); incluye hechas y no hechas; cada tarea
   // cuenta UNA sola vez (las fechas anteriores de replanificaciones no
-  // suman). Fila extra "Sin asignar" para tareas sin responsable (punto 4).
+  // suman). Filas extra: "Sin asignar" (tareas sin responsable) y "Total"
+  // (suma de todas las personas + sin asignar).
   const carga = useMemo(() => {
     const diasSet = new Set(dias)
     const porClave = new Map<string, Map<ISODate, number>>()
+    const total = new Map<ISODate, number>()
     for (const { tarea } of filasTarea) {
       const fecha = fechaVigente(tarea)
       if (!fecha || !diasSet.has(fecha)) continue
@@ -328,6 +330,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
         porClave.set(clave, m)
       }
       m.set(fecha, (m.get(fecha) ?? 0) + 1)
+      total.set(fecha, (total.get(fecha) ?? 0) + 1)
     }
     const personas = [...porClave.entries()]
       .filter(([clave]) => clave !== SIN_ASIGNAR)
@@ -337,7 +340,11 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
       }))
       .filter((x): x is { usuario: Usuario; porDia: Map<ISODate, number> } => Boolean(x.usuario))
       .sort((a, b) => a.usuario.nombre.localeCompare(b.usuario.nombre))
-    return { personas, sinAsignar: porClave.get(SIN_ASIGNAR) ?? null }
+    return {
+      personas,
+      sinAsignar: porClave.get(SIN_ASIGNAR) ?? null,
+      total: total.size > 0 ? total : null,
+    }
   }, [filasTarea, dias, state.usuarios])
 
   // -- Creacion inline (§6.4.25/26) --
@@ -387,8 +394,9 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
         <Legend />
         {can.algunoDeTareas && (
           <p className="gantt-ayuda">
-            Clic en un dia: planifica (o replanifica una atrasada) · Clic en la marca: quita la
-            fecha si aun es futura · <b>Clic derecho en la marca: alterna lista</b>
+            Clic en un dia (pasado o futuro): planifica, o replanifica una atrasada · Clic en la
+            marca futura: la quita (si venia de una replanificacion, la deshace) ·{' '}
+            <b>Clic derecho en la marca: alterna lista</b>
           </p>
         )}
         <div className="horizonte">
@@ -525,6 +533,17 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
                   atenuada
                 />
               )}
+              {/* Punto 4: total de tareas por dia (personas + sin asignar) */}
+              {carga.total && (
+                <FilaCarga
+                  nombre="Total"
+                  avatar={<span className="avatar avatar--total" title="Total de tareas por dia">Σ</span>}
+                  porDia={carga.total}
+                  dias={dias}
+                  hoy={hoy}
+                  esTotal
+                />
+              )}
             </tbody>
           </table>
         </div>
@@ -541,7 +560,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, actions, onA
   )
 }
 
-/** Fila de carga: nombre congelado + conteo por dia (persona o "Sin asignar"). */
+/** Fila de carga: nombre congelado + conteo por dia (persona, "Sin asignar" o "Total"). */
 function FilaCarga({
   nombre,
   avatar,
@@ -549,6 +568,7 @@ function FilaCarga({
   dias,
   hoy,
   atenuada,
+  esTotal,
 }: {
   nombre: string
   avatar: React.ReactNode
@@ -556,9 +576,10 @@ function FilaCarga({
   dias: ISODate[]
   hoy: string
   atenuada?: boolean
+  esTotal?: boolean
 }) {
   return (
-    <tr className={`carga-fila${atenuada ? ' carga-fila--sin' : ''}`}>
+    <tr className={`carga-fila${atenuada ? ' carga-fila--sin' : ''}${esTotal ? ' carga-fila--total' : ''}`}>
       <td className="fija fija--frente carga-vacia" />
       <td className="fija fija--sf carga-vacia" />
       <td className="fija fija--tarea carga-fila__nombre">{nombre}</td>
@@ -806,10 +827,12 @@ function FilaGanttRow({
   const sinFecha = !tarea.fechaObjetivo
   const vencidaOHoy = !!tarea.fechaObjetivo && tarea.fechaObjetivo <= hoy
 
-  // 2.1/2.3: la celda es clickeable para planificar (tarea sin fecha, en
-  // cualquier dia) o replanificar (tarea de hoy/vencida, en un dia futuro).
+  // 2.1/2.3: la celda es clickeable para planificar (tarea sin fecha) o
+  // replanificar (tarea de hoy/vencida), en CUALQUIER dia — tambien
+  // pasados, para registrar tareas que ya ocurrieron con su fecha real
+  // (si la nueva fecha ya vencio y no se marca hecha, queda atrasada).
   const celdaPlanificable = (d: ISODate) =>
-    puedeEditar && !marcas.has(d) && (sinFecha || (vencidaOHoy && d > hoy))
+    puedeEditar && !marcas.has(d) && (sinFecha || vencidaOHoy)
 
   function clickCelda(e: React.MouseEvent, d: ISODate) {
     if (celdaPlanificable(d)) {
@@ -832,7 +855,9 @@ function FilaGanttRow({
       // 2.2: de hoy o vencida no se borra; se marca lista o se replanifica.
       mostrarAviso(e, 'No puedes eliminar tareas que ya pasaron')
     } else {
-      // 2.1: clic sobre marca futura la borra; queda "sin planificar".
+      // 2.1: clic sobre marca futura la borra. Si la marca venia de una
+      // replanificacion, el repo la DESHACE (vuelve a la fecha anterior y
+      // elimina el registro); si no, la tarea queda "sin planificar".
       actions.cambiarFechaObjetivo(tarea.id, null)
     }
   }

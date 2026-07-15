@@ -62,6 +62,45 @@ button { font-family: inherit; cursor: pointer; }
   overflow-y: auto;
 }
 
+/* Punto 6: sidebar con dos modos. En "escondida" la columna se contrae a
+   una franja de iconos (uno por proyecto) siempre clicable; al pasar el
+   mouse por la zona, la sidebar completa se despliega ENCIMA del contenido
+   (overlay: la grilla no se reacomoda) y se repliega al salir. */
+.sidebar-zona { position: relative; display: flex; min-height: 0; }
+.sidebar-zona .sidebar { flex: 1; min-width: 0; }
+
+.app--sidebar-escondida { grid-template-columns: 54px 1fr; }
+.sidebar-mini {
+  width: 54px; background: #1f2b36; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; padding: 12px 0; flex: none;
+}
+.sidebar-mini__btn {
+  background: rgba(255,255,255,.08); border: none; color: #cfd8dc;
+  width: 28px; height: 28px; border-radius: 7px; cursor: pointer;
+  font-size: 14px; line-height: 1; margin-bottom: 6px;
+}
+.sidebar-mini__btn:hover { background: rgba(255,255,255,.18); color: #fff; }
+.sidebar-mini__proy {
+  width: 32px; height: 32px; border-radius: 9px; border: none; cursor: pointer;
+  color: #fff; font-size: 14px; font-weight: 800; opacity: .82;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sidebar-mini__proy:hover { opacity: 1; }
+.sidebar-mini__proy--activo { opacity: 1; outline: 2px solid #fff; outline-offset: 1px; }
+
+.app--sidebar-escondida .sidebar {
+  /* Se despliega AL LADO de la franja (no encima): la franja de iconos
+     queda siempre visible y clicable, como pide el punto 6. */
+  position: absolute; top: 0; left: 54px; bottom: 0; width: 244px; z-index: 1600;
+  opacity: 0; pointer-events: none; transform: translateX(-10px);
+  transition: opacity .16s ease, transform .16s ease;
+  box-shadow: 10px 0 34px rgba(15, 24, 32, .38);
+  border-left: 1px solid #2c3b48;
+}
+.app--sidebar-escondida .sidebar-zona:hover .sidebar {
+  opacity: 1; pointer-events: auto; transform: none;
+}
+
 .main {
   display: flex;
   flex-direction: column;
@@ -78,12 +117,23 @@ button { font-family: inherit; cursor: pointer; }
 /* ---------- Sidebar ---------- */
 
 .sidebar__brand {
-  padding: 16px 18px;
+  padding: 16px 14px 16px 18px;
   font-weight: 700;
   font-size: 15px;
   color: #fff;
   border-bottom: 1px solid #2c3b48;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
+.sidebar__plegar {
+  background: rgba(255,255,255,.08); border: none; color: #cfd8dc;
+  width: 26px; height: 26px; border-radius: 7px; cursor: pointer;
+  font-size: 13px; line-height: 1; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sidebar__plegar:hover { background: rgba(255,255,255,.18); color: #fff; }
 .sidebar__brand small { display: block; font-weight: 400; color: #8aa0b2; font-size: 11px; margin-top: 2px; }
 
 .sidebar__section {
@@ -200,14 +250,18 @@ tr.fila--morado > td { background: var(--morado-suave); }
 .col-check { width: 44px; text-align: center; }
 .col-resp { width: 96px; }
 .col-fecha { width: 118px; white-space: nowrap; }
-.col-estado { width: 176px; white-space: nowrap; }
+.col-estado { width: 124px; }
 table.tareas .col-estado { text-align: center; }
 
-/* Punto 1: columna Estado — la categoria en texto, como refuerzo del color
-   de fila (chip blanco con texto del color de gestion). */
+/* Columna Estado — la categoria en texto, como refuerzo del color de fila.
+   Pill de TAMAÑO FIJO (punto 3): mismo ancho para todas las categorias;
+   los textos de dos palabras se reparten en dos lineas dentro del pill. */
 .estado-chip {
-  display: inline-block; font-size: 11px; font-weight: 700; border-radius: 5px;
-  padding: 2px 8px; background: #fff; border: 1px solid var(--gris-linea);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 108px; min-height: 20px; box-sizing: border-box;
+  font-size: 10.5px; font-weight: 700; border-radius: 5px; text-align: center;
+  white-space: normal; overflow-wrap: break-word; line-height: 1.15;
+  padding: 2px 6px; background: #fff; border: 1px solid var(--gris-linea);
   color: var(--gris-texto);
 }
 .estado-chip--verde { color: var(--verde-check); border-color: #bfdcc4; }
@@ -489,12 +543,19 @@ td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { 
   border-right-color: transparent; z-index: 3;
 }
 
-/* Fila "Sin asignar" (punto 4): tareas sin responsable por dia */
+/* Fila "Sin asignar": tareas sin responsable por dia */
 .gantt tr.carga-fila--sin td.carga-fila__nombre { color: var(--gris-texto); font-style: italic; }
 .avatar--sin {
   background: #fff; border: 1.5px dashed var(--gris-borde);
   color: var(--gris-texto); font-weight: 700;
 }
+
+/* Fila "Total": suma por dia de todas las personas + sin asignar */
+.gantt tr.carga-fila--total td { border-top: 1px solid var(--gris-borde); background: #fafbfc; }
+.gantt tr.carga-fila--total td.fija { background: #fafbfc; }
+.gantt tr.carga-fila--total td.carga-fila__nombre,
+.gantt tr.carga-fila--total td.carga-celda { font-weight: 700; }
+.avatar--total { background: #37474f; color: #fff; font-weight: 700; }
 .carga-celda { font-size: 12px; color: var(--texto); text-align: center; }
 .gantt-scroll {
   overflow: auto; border: 1px solid var(--gris-borde); border-radius: 8px; background: #fff;

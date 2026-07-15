@@ -227,13 +227,20 @@ export class SupabaseRepo implements Repo {
   ): Promise<{ tarea: Tarea; historial: Replanificacion[] }> {
     // El RPC setea el actor y actualiza en la misma transaccion; el trigger
     // (5.6) inserta el registro de historial automaticamente. `nueva = null`
-    // desplanifica; el trigger de la migracion 10 rechaza borrar vencidas.
+    // borra la marca via desplanificar_tarea (migracion 11): deshace la
+    // ultima replanificacion si existe, o deja la tarea sin planificar; y
+    // rechaza borrar fechas de hoy o vencidas.
     const row = unwrap(
-      await this.db.rpc('replanificar_tarea', {
-        p_tarea: id,
-        p_nueva: nueva,
-        p_actor: actorId ?? null,
-      }),
+      nueva === null
+        ? await this.db.rpc('desplanificar_tarea', {
+            p_tarea: id,
+            p_actor: actorId ?? null,
+          })
+        : await this.db.rpc('replanificar_tarea', {
+            p_tarea: id,
+            p_nueva: nueva,
+            p_actor: actorId ?? null,
+          }),
     )
     const tareaRow = Array.isArray(row) ? row[0] : row
     const hist = unwrap(
