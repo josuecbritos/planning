@@ -99,6 +99,18 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   franja de íconos (uno por proyecto) siempre clicable; al pasar el mouse la barra
   completa se despliega al lado y se repliega al salir. La preferencia se recuerda
   por usuario entre sesiones.
+- **Filtros guardables:** por Fecha Objetivo (relativas Hoy / Esta semana /
+  Próxima semana / Este mes — semana de lunes a domingo — o rango fijo),
+  Responsable y Estado, con multi-selección ("o" dentro del campo, "y" entre
+  campos). Se guardan con nombre, **privados por usuario y por proyecto**, y se
+  aplican/actualizan/renombran/eliminan desde el desplegable. En la tabla filtran
+  filas; en la Gantt, responsable y estado filtran tareas y **la fecha define el
+  horizonte visible**.
+- **Modo oscuro:** botón manual (🌙/☀ al pie de la sidebar; no sigue al sistema
+  operativo), persistente por usuario. Los cinco colores de estado conservan su
+  identidad con variantes ajustadas para fondo oscuro; el rastro de fechas
+  anteriores queda visible incluso en tareas hechas (memoria histórica de la
+  grilla; el color de fila y los contadores sí las tratan como Hecha).
 - **Permisos por cliente (§7):** cada usuario cliente tiene su configuración
   (crear frentes/sub frentes/tareas; editar fechas, marcar hechas, editar,
   archivar/eliminar, asignar responsable — cada uno con alcance "todas" o "solo

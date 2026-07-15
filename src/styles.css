@@ -31,10 +31,64 @@
   --fondo: #f4f6f8;
   --panel: #ffffff;
 
+  /* Superficies (tarjetas, celdas, menus). En modo oscuro cambian juntas. */
+  --superficie: #ffffff;
+  --superficie-2: #fafbfc;
+  --superficie-3: #eef1f4;
+  /* Velo de hover sobre superficies (negro en claro, blanco en oscuro). */
+  --velo: rgba(0, 0, 0, .05);
+  --velo-fuerte: rgba(0, 0, 0, .08);
+
   --semana-borde: #b0bac3;
 
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: var(--texto);
+}
+
+/*
+ * Modo oscuro (punto 4): se activa a mano (boton en el pie de la sidebar,
+ * no sigue al sistema operativo) y se recuerda por usuario. Los colores de
+ * gestion conservan su identidad: mismo tono por estado, con el ajuste
+ * minimo de luminosidad para que las FILAS COMPLETAS de color sigan
+ * legibles sobre fondo oscuro sin volverse dominantes.
+ */
+[data-tema='oscuro'] {
+  --texto: #e3e9ee;
+  --fondo: #10161c;
+  --panel: #1a232c;
+
+  --superficie: #1a232c;
+  --superficie-2: #212c36;
+  --superficie-3: #26323d;
+  --velo: rgba(255, 255, 255, .07);
+  --velo-fuerte: rgba(255, 255, 255, .12);
+
+  --gris-sf: #2b3742;
+  --gris-borde: #46545f;
+  --gris-linea: #303d48;
+  --gris-texto: #9cadba;
+  --semana-borde: #4e5f6d;
+
+  /* Estados: mismos colores, ajustados a fondo oscuro */
+  --verde: #2e8636;
+  --verde-oscuro: #256d2c;
+  --verde-suave: #1d3625;
+  --verde-check: #7ccb84;
+
+  --rojo: #e05a55;
+  --rojo-suave: #43231f;
+  --rojo-tenue: #a75c55;
+
+  --ambar: #f0a827;
+  --ambar-suave: #3b3115;
+  --ambar-texto: #e3b95d;
+
+  --morado: #9b59c7;
+  --morado-suave: #362141;
+  --morado-texto: #cfa6e8;
+
+  --hoy: #5b9bd5;
+  --hoy-col: rgba(91, 155, 213, 0.12);
 }
 
 * { box-sizing: border-box; }
@@ -193,7 +247,7 @@ button { font-family: inherit; cursor: pointer; }
 .counters { display: flex; gap: 10px; flex-wrap: wrap; }
 .counter {
   display: flex; align-items: center; gap: 8px;
-  border: 1px solid var(--gris-borde); border-radius: 8px; padding: 6px 12px; background: #fff;
+  border: 1px solid var(--gris-borde); border-radius: 8px; padding: 6px 12px; background: var(--superficie);
 }
 .counter__num { font-size: 17px; font-weight: 700; line-height: 1; }
 .counter__lbl { font-size: 11.5px; color: var(--gris-texto); }
@@ -222,7 +276,7 @@ button { font-family: inherit; cursor: pointer; }
    bordes al congelarse; los bordes se reparten right/bottom + left/top de
    la tabla para no duplicarse. Filas compactas (padding reducido). */
 table.tareas {
-  width: 100%; border-collapse: separate; border-spacing: 0; background: #fff;
+  width: 100%; border-collapse: separate; border-spacing: 0; background: var(--superficie);
   border-left: 1px solid var(--gris-borde); border-top: 1px solid var(--gris-borde);
 }
 table.tareas th, table.tareas td {
@@ -231,7 +285,7 @@ table.tareas th, table.tareas td {
   vertical-align: middle;
 }
 table.tareas th {
-  background: #fafbfc; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em;
+  background: var(--superficie-2); font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em;
   color: var(--gris-texto); font-weight: 700;
   /* Encabezados congelados al hacer scroll vertical */
   position: sticky; top: 0; z-index: 10;
@@ -258,10 +312,12 @@ table.tareas .col-estado { text-align: center; }
    los textos de dos palabras se reparten en dos lineas dentro del pill. */
 .estado-chip {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 108px; min-height: 20px; box-sizing: border-box;
+  /* Tamaño fijo unico: mismo ANCHO y mismo ALTO en todas las categorias;
+     los textos de dos palabras se acomodan en dos lineas adentro. */
+  width: 108px; height: 30px; box-sizing: border-box;
   font-size: 10.5px; font-weight: 700; border-radius: 5px; text-align: center;
   white-space: normal; overflow-wrap: break-word; line-height: 1.15;
-  padding: 2px 6px; background: #fff; border: 1px solid var(--gris-linea);
+  padding: 2px 6px; background: var(--superficie); border: 1px solid var(--gris-linea);
   color: var(--gris-texto);
 }
 .estado-chip--verde { color: var(--verde-check); border-color: #bfdcc4; }
@@ -290,7 +346,7 @@ table.tareas .col-estado { text-align: center; }
 /* Control moderno de Hecha: circulo estilo Monday/Todoist */
 .check-hecha {
   width: 22px; height: 22px; border-radius: 50%;
-  border: 2px solid var(--gris-borde); background: #fff;
+  border: 2px solid var(--gris-borde); background: var(--superficie);
   color: transparent; font-size: 12px; font-weight: 800; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
   cursor: pointer; padding: 0; transition: all .12s;
@@ -311,8 +367,8 @@ table.tareas .col-estado { text-align: center; }
   padding: 3px 5px; border-radius: 5px; width: 100%;
 }
 .fecha-input:hover { border-color: var(--gris-borde); }
-.fecha-input:focus { border-color: var(--verde); outline: none; background: #fff; }
-.fecha-input--editando { border-color: var(--verde); background: #fff; max-width: 160px; }
+.fecha-input:focus { border-color: var(--verde); outline: none; background: var(--superficie); }
+.fecha-input--editando { border-color: var(--verde); background: var(--superficie); max-width: 160px; }
 
 /* Fecha editable inline: texto con el formato unico; al click se abre el picker */
 .fecha-btn {
@@ -327,10 +383,10 @@ table.tareas .col-estado { text-align: center; }
 
 /* Texto editable en el lugar (titulos de tarea y sub frente) */
 .inline-text { cursor: text; border-radius: 4px; padding: 1px 3px; margin: -1px -3px; }
-.inline-text:hover { background: rgba(0,0,0,.05); }
+.inline-text:hover { background: var(--velo); }
 .inline-input {
   font: inherit; color: inherit; width: 100%;
-  border: 1px solid var(--verde); border-radius: 5px; padding: 3px 6px; background: #fff;
+  border: 1px solid var(--verde); border-radius: 5px; padding: 3px 6px; background: var(--superficie);
 }
 .inline-input:focus { outline: none; }
 .inline-input--subfrente { font-weight: 700; max-width: 420px; }
@@ -357,7 +413,7 @@ table.tareas .col-estado { text-align: center; }
 .resp-picker:hover .resp-picker__caret, .resp-picker[aria-expanded="true"] .resp-picker__caret { opacity: 1; }
 
 .resp-menu__inner {
-  z-index: 2500; min-width: 230px; background: #fff; border-radius: 12px;
+  z-index: 2500; min-width: 230px; background: var(--superficie); border-radius: 12px;
   box-shadow: 0 10px 36px rgba(15,24,32,.22); border: 1px solid var(--gris-linea);
   padding: 6px; display: flex; flex-direction: column; gap: 2px;
 }
@@ -374,7 +430,7 @@ table.tareas .col-estado { text-align: center; }
 .resp-menu__check { margin-left: auto; color: var(--verde-check); font-weight: 700; }
 
 /* Fila de creacion inline */
-.fila-nueva td { background: #f6fbf7; }
+.fila-nueva td { background: var(--verde-suave); }
 .fila-nueva .mudo { color: var(--gris-texto); }
 
 /* Boton fantasma para crear sub frente */
@@ -384,7 +440,7 @@ table.tareas .col-estado { text-align: center; }
 /* Indicador de replanificaciones junto al titulo (↻ ×N, solo tabla) */
 .replan-count {
   font-size: 11px; font-weight: 700; color: var(--ambar-texto);
-  background: rgba(0,0,0,.05); border-radius: 4px; padding: 1px 5px;
+  background: var(--velo); border-radius: 4px; padding: 1px 5px;
   white-space: nowrap; flex: none;
 }
 
@@ -393,7 +449,7 @@ table.tareas .col-estado { text-align: center; }
   background: none; border: none; font-size: 11px; color: var(--gris-texto);
   padding: 1px 4px; border-radius: 4px; cursor: pointer; flex: none;
 }
-.comentarios-chip:hover { background: rgba(0,0,0,.08); color: var(--texto); }
+.comentarios-chip:hover { background: var(--velo-fuerte); color: var(--texto); }
 
 /* Hilo de comentarios en el panel */
 .comentario-vacio { font-size: 12.5px; color: var(--gris-texto); font-style: italic; margin: 0 0 10px; }
@@ -415,7 +471,7 @@ table.tareas .col-estado { text-align: center; }
 
 .leyenda {
   display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
-  padding: 10px 16px; background: #fff; border: 1px solid var(--gris-borde);
+  padding: 10px 16px; background: var(--superficie); border: 1px solid var(--gris-borde);
   border-radius: 8px; margin: 16px 20px 0; font-size: 12.5px;
 }
 .leyenda__item { display: flex; align-items: center; gap: 7px; color: var(--texto); }
@@ -450,7 +506,7 @@ table.tareas .col-estado { text-align: center; }
 }
 .horizonte .toggle button { padding: 6px 12px; font-size: 12.5px; }
 .horizonte__rango { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--gris-texto); }
-.horizonte__fecha { border: 1px solid var(--gris-borde); background: #fff; width: auto; font-size: 12.5px; }
+.horizonte__fecha { border: 1px solid var(--gris-borde); background: var(--superficie); width: auto; font-size: 12.5px; }
 
 /* §6.3.20: aviso de tareas de fin de semana ocultas */
 .aviso-finde {
@@ -460,8 +516,8 @@ table.tareas .col-estado { text-align: center; }
 .aviso-finde .link-btn { color: var(--ambar-texto); font-weight: 700; }
 
 /* Columnas de fin de semana (modo semana completa) */
-.gantt th.dia.finde { background: #f1f3f5; color: #9aa7b1; }
-.gantt td.celda.finde { background: #f7f8f9; }
+.gantt th.dia.finde { background: var(--superficie-3); color: #9aa7b1; }
+.gantt td.celda.finde { background: var(--superficie-2); }
 
 /* Celda clickeable para planificar una tarea sin fecha (§6.4.21) */
 .gantt td.celda--planificable { cursor: copy; }
@@ -474,6 +530,62 @@ table.tareas .col-estado { text-align: center; }
 /* Recordatorio de gestos sobre la grilla */
 .gantt-ayuda { margin: 0; font-size: 12px; color: var(--gris-texto); }
 .gantt-ayuda b { color: var(--texto); font-weight: 600; }
+.horizonte-filtro {
+  font-size: 12px; color: var(--gris-texto); font-style: italic;
+  padding: 6px 10px; border: 1px dashed var(--gris-borde); border-radius: 7px;
+}
+
+/* ---------- Filtros guardables (punto 3) ---------- */
+.filtros-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.filtros-bar__label { font-size: 12px; font-weight: 700; color: var(--gris-texto); text-transform: uppercase; letter-spacing: .04em; }
+.filtros-bar__sep { flex: 1; }
+.filtros-bar__limpiar { font-size: 12.5px; }
+.filtro-desplegable { position: relative; }
+.filtro-btn {
+  font: inherit; font-size: 12.5px; padding: 6px 12px; cursor: pointer;
+  background: var(--superficie); border: 1px solid var(--gris-borde); border-radius: 8px;
+  color: var(--texto);
+}
+.filtro-btn:hover { border-color: var(--verde); }
+.filtro-btn--activo { border-color: var(--verde); background: var(--verde-suave); font-weight: 700; }
+.filtro-btn--abierto { border-color: var(--verde); }
+.filtro-btn__caret { font-size: 9px; color: var(--gris-texto); }
+.filtro-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 1900;
+  min-width: 230px; background: var(--superficie); border: 1px solid var(--gris-linea);
+  border-radius: 10px; box-shadow: 0 12px 36px rgba(15,24,32,.18); padding: 6px;
+}
+.filtro-menu--derecha { left: auto; right: 0; }
+.filtro-menu__grupo {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--gris-texto); padding: 6px 8px 2px;
+}
+.filtro-menu__vacio { font-size: 12.5px; color: var(--gris-texto); padding: 8px 10px; }
+.filtro-op {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  font: inherit; font-size: 13px; padding: 6px 9px; border: none; background: none;
+  border-radius: 7px; cursor: pointer; color: var(--texto);
+}
+.filtro-op:hover { background: var(--velo); }
+.filtro-op--on { background: var(--verde-suave); font-weight: 700; }
+.filtro-op--check input[type='checkbox'] { width: 15px; height: 15px; accent-color: var(--verde); flex: none; }
+.filtro-op--quitar { color: var(--rojo); font-size: 12.5px; margin-top: 4px; }
+.filtro-dot { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+.filtro-rango { display: flex; align-items: center; gap: 6px; padding: 4px 8px 8px; font-size: 12px; color: var(--gris-texto); }
+.filtro-rango .fecha-input { width: auto; font-size: 12px; border: 1px solid var(--gris-borde); background: var(--superficie); }
+.filtro-guardado { display: flex; align-items: center; gap: 2px; border-radius: 7px; padding-right: 4px; }
+.filtro-guardado:hover { background: var(--velo); }
+.filtro-guardado__aplicar {
+  flex: 1; text-align: left; font: inherit; font-size: 13px; font-weight: 600;
+  border: none; background: none; padding: 7px 9px; cursor: pointer; color: var(--texto);
+  border-radius: 7px;
+}
+.filtro-guardado .icon-btn { opacity: 0; }
+.filtro-guardado:hover .icon-btn { opacity: 1; }
+.filtro-guardado .icon-btn:disabled { opacity: .25; cursor: default; }
 
 /* Mini-aviso (2.2): "No puedes eliminar tareas que ya pasaron" */
 .mini-aviso {
@@ -491,7 +603,7 @@ table.tareas .col-estado { text-align: center; }
 .con-mas { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
 .con-mas__acciones { display: inline-flex; gap: 2px; }
 .mas-btn {
-  border: none; background: rgba(0,0,0,.08); color: inherit;
+  border: none; background: var(--velo-fuerte); color: inherit;
   width: 18px; height: 18px; border-radius: 4px; font-size: 12px; line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
   opacity: 0; transition: opacity .12s; padding: 0; flex: none; position: relative;
@@ -520,7 +632,7 @@ td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { 
    columnas congeladas (.fija--*) — una celda con colSpan no queda sticky —
    neutralizando el color de frente/sub frente; asi los nombres permanecen
    visibles al hacer scroll horizontal, igual que el resto de la grilla. */
-.gantt tr.carga-fila td.fija { background: #fff; color: var(--texto); font-weight: 400; }
+.gantt tr.carga-fila td.fija { background: var(--superficie); color: var(--texto); font-weight: 400; }
 .gantt td.carga-vacia { border-right-color: transparent; }
 .gantt tr.carga-fila td.carga-fila__nombre {
   font-size: 12.5px; font-weight: 600; text-align: right; padding: 4px 10px;
@@ -533,9 +645,9 @@ td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { 
    congelada) para no depender del ancho de la columna Frente. */
 .gantt tr.carga-sep td {
   border-top: 2px solid var(--gris-borde); border-bottom: 1px solid var(--gris-borde);
-  background: #eef1f4; height: 24px;
+  background: var(--superficie-3); height: 24px;
 }
-.gantt tr.carga-sep td.fija { background: #eef1f4; }
+.gantt tr.carga-sep td.fija { background: var(--superficie-3); }
 .gantt tr.carga-sep td.carga-sep__label {
   font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
   color: var(--gris-texto); text-align: left; vertical-align: middle;
@@ -546,19 +658,19 @@ td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { 
 /* Fila "Sin asignar": tareas sin responsable por dia */
 .gantt tr.carga-fila--sin td.carga-fila__nombre { color: var(--gris-texto); font-style: italic; }
 .avatar--sin {
-  background: #fff; border: 1.5px dashed var(--gris-borde);
+  background: var(--superficie); border: 1.5px dashed var(--gris-borde);
   color: var(--gris-texto); font-weight: 700;
 }
 
 /* Fila "Total": suma por dia de todas las personas + sin asignar */
-.gantt tr.carga-fila--total td { border-top: 1px solid var(--gris-borde); background: #fafbfc; }
-.gantt tr.carga-fila--total td.fija { background: #fafbfc; }
+.gantt tr.carga-fila--total td { border-top: 1px solid var(--gris-borde); background: var(--superficie-2); }
+.gantt tr.carga-fila--total td.fija { background: var(--superficie-2); }
 .gantt tr.carga-fila--total td.carga-fila__nombre,
 .gantt tr.carga-fila--total td.carga-celda { font-weight: 700; }
 .avatar--total { background: #37474f; color: #fff; font-weight: 700; }
 .carga-celda { font-size: 12px; color: var(--texto); text-align: center; }
 .gantt-scroll {
-  overflow: auto; border: 1px solid var(--gris-borde); border-radius: 8px; background: #fff;
+  overflow: auto; border: 1px solid var(--gris-borde); border-radius: 8px; background: var(--superficie);
   max-height: calc(100vh - 250px);
 }
 table.gantt { border-collapse: separate; border-spacing: 0; }
@@ -568,14 +680,14 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    declarados (120/150/240/60): overflow-wrap anywhere evita que una palabra
    larga ensanche la columna y desplace el anclaje (break-word no reduce el
    ancho minimo intrinseco dentro de una tabla). */
-.gantt .fija { position: sticky; background: #fff; z-index: 2; overflow-wrap: anywhere; }
+.gantt .fija { position: sticky; background: var(--superficie); z-index: 2; overflow-wrap: anywhere; }
 .gantt .fija--frente { left: 0; width: 120px; min-width: 120px; max-width: 120px; }
 .gantt .fija--sf { left: 120px; width: 150px; min-width: 150px; max-width: 150px; }
 .gantt .fija--tarea { left: 270px; width: 240px; min-width: 240px; max-width: 240px; }
 .gantt .fija--resp { left: 510px; width: 60px; min-width: 60px; max-width: 60px; box-shadow: 2px 0 4px rgba(0,0,0,.08); }
 
 .gantt thead th {
-  position: sticky; top: 0; z-index: 3; background: #fafbfc; text-align: center;
+  position: sticky; top: 0; z-index: 3; background: var(--superficie-2); text-align: center;
   font-size: 11px; color: var(--gris-texto); font-weight: 700; padding: 4px 2px;
 }
 .gantt thead .fija { z-index: 4; }
@@ -669,10 +781,10 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 /* ---------- Botones ---------- */
 
 .btn {
-  border: 1px solid var(--gris-borde); background: #fff; color: var(--texto);
+  border: 1px solid var(--gris-borde); background: var(--superficie); color: var(--texto);
   border-radius: 7px; padding: 6px 12px; font-size: 13px; font-weight: 600;
 }
-.btn:hover { background: #f4f6f8; }
+.btn:hover { background: var(--superficie-3); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn--primary { background: var(--verde); border-color: var(--verde); color: #fff; }
 .btn--primary:hover { background: var(--verde-oscuro); }
@@ -684,7 +796,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   border: none; background: none; color: var(--gris-texto); font-size: 13px;
   padding: 2px 5px; border-radius: 5px; line-height: 1;
 }
-.icon-btn:hover { background: rgba(0,0,0,.08); color: var(--texto); }
+.icon-btn:hover { background: var(--velo-fuerte); color: var(--texto); }
 
 /* Tooltip explicativo inmediato sobre los iconos de accion */
 .icon-btn[data-tip] { position: relative; }
@@ -743,7 +855,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .subfrente__tools { display: inline-flex; gap: 2px; }
 
 .col-acc { width: 66px; white-space: nowrap; text-align: center; }
-.fila-add td { background: #fafbfc; padding: 6px 10px; }
+.fila-add td { background: var(--superficie-2); padding: 6px 10px; }
 
 /* ---------- Modales ---------- */
 
@@ -752,7 +864,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   display: flex; align-items: center; justify-content: center; padding: 20px;
 }
 .modal-card {
-  background: #fff; border-radius: 12px; width: 100%; max-width: 460px;
+  background: var(--superficie); border-radius: 12px; width: 100%; max-width: 460px;
   box-shadow: 0 20px 60px rgba(0,0,0,.3); overflow: hidden;
 }
 .modal-card--ancha { max-width: 620px; }
@@ -768,7 +880,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .campo > span { display: block; font-size: 12px; font-weight: 600; color: var(--gris-texto); margin-bottom: 5px; }
 .campo input, .campo textarea, .campo select {
   width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--gris-borde);
-  border-radius: 7px; color: var(--texto); background: #fff;
+  border-radius: 7px; color: var(--texto); background: var(--superficie);
 }
 .campo input:focus, .campo textarea:focus, .campo select:focus { outline: none; border-color: var(--verde); }
 .campo textarea { resize: vertical; }
@@ -787,7 +899,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   background: linear-gradient(160deg, #1f2b36 0%, #2c4a3d 100%); padding: 20px;
 }
 .login__card {
-  background: #fff; border-radius: 14px; padding: 28px 30px; width: 100%; max-width: 420px;
+  background: var(--superficie); border-radius: 14px; padding: 28px 30px; width: 100%; max-width: 420px;
   box-shadow: 0 24px 70px rgba(0,0,0,.35);
 }
 .login__brand { font-size: 22px; font-weight: 800; margin-bottom: 20px; }
@@ -796,7 +908,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .login__usuarios { display: flex; flex-direction: column; gap: 8px; }
 .login__usuario {
   display: flex; align-items: center; gap: 12px; text-align: left;
-  border: 1px solid var(--gris-borde); background: #fff; border-radius: 10px; padding: 10px 12px;
+  border: 1px solid var(--gris-borde); background: var(--superficie); border-radius: 10px; padding: 10px 12px;
 }
 .login__usuario:hover { border-color: var(--verde); background: var(--verde-suave); }
 .login__usuario-info { display: flex; flex-direction: column; }
@@ -812,6 +924,8 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .sesion__info small { font-size: 10.5px; color: var(--gris-texto); }
 .sesion__salir { color: var(--gris-texto); }
 .sesion__salir:hover { color: var(--rojo); }
+.sesion__acciones { display: inline-flex; align-items: center; gap: 8px; }
+.sesion__tema { font-size: 12px; }
 
 /* ---------- Modulo de Usuarios ---------- */
 
@@ -840,7 +954,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .permisos { padding: 18px 24px 22px; }
 .permisos__intro { font-size: 13px; color: var(--gris-texto); margin: 0 0 16px; }
 .permisos__alcance { font-size: 11.5px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--gris-texto); }
-.permisos-lista { border: 1px solid var(--gris-linea); border-radius: 10px; background: #fff; }
+.permisos-lista { border: 1px solid var(--gris-linea); border-radius: 10px; background: var(--superficie); }
 .permiso-item {
   display: flex; align-items: center; justify-content: space-between; gap: 18px;
   padding: 11px 16px;
@@ -850,7 +964,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .permiso-item__label small { display: block; font-size: 12px; font-weight: 400; color: var(--gris-texto); margin-top: 2px; }
 .seg {
   display: inline-flex; border: 1px solid var(--gris-borde); border-radius: 8px;
-  overflow: hidden; background: #fff; flex: none;
+  overflow: hidden; background: var(--superficie); flex: none;
 }
 .seg__btn {
   border: none; background: transparent; font: inherit; font-size: 12.5px;
@@ -870,7 +984,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .asignaciones { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .asignacion {
   display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
-  border: 1px solid var(--gris-borde); border-radius: 14px; padding: 3px 6px 3px 10px; background: #fff;
+  border: 1px solid var(--gris-borde); border-radius: 14px; padding: 3px 6px 3px 10px; background: var(--superficie);
 }
 .asignar-select {
   font: inherit; font-size: 12.5px; color: var(--gris-texto);
@@ -896,7 +1010,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 .panel-detalle {
   position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 92vw;
-  background: #fff; box-shadow: -12px 0 40px rgba(15,24,32,.22); z-index: 1500;
+  background: var(--superficie); box-shadow: -12px 0 40px rgba(15,24,32,.22); z-index: 1500;
   padding: 18px 22px; overflow-y: auto;
 }
 .panel-detalle__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
@@ -943,7 +1057,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 .archivadas {
   border: 1px dashed var(--gris-borde); border-top: none; border-radius: 0 0 8px 8px;
-  background: #fafbfc; padding: 6px 12px; font-size: 12.5px; color: var(--gris-texto);
+  background: var(--superficie-2); padding: 6px 12px; font-size: 12.5px; color: var(--gris-texto);
 }
 .archivadas summary { cursor: pointer; font-weight: 600; }
 .archivadas ul { list-style: none; margin: 6px 0 4px; padding: 0; }
@@ -975,7 +1089,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;
 }
 .resumen-card {
-  text-align: left; background: #fff; border: 1px solid var(--gris-borde); border-radius: 12px;
+  text-align: left; background: var(--superficie); border: 1px solid var(--gris-borde); border-radius: 12px;
   padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; font: inherit;
 }
 .resumen-card:hover { border-color: var(--verde); box-shadow: 0 4px 16px rgba(0,0,0,.08); }
@@ -997,3 +1111,16 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .stat--verde b { color: var(--verde-check); }
 .stat--rojo, .stat--rojo b { color: var(--rojo); font-weight: 700; }
 .stat--ambar, .stat--ambar b { color: var(--ambar-texto); font-weight: 700; }
+
+/* ---------- Ajustes puntuales del modo oscuro (punto 4) ---------- */
+
+[data-tema='oscuro'] .toggle button.activo { box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+[data-tema='oscuro'] .mas-btn:hover { background: rgba(255,255,255,.22); }
+[data-tema='oscuro'] .gantt th.dia.finde { color: var(--gris-texto); }
+[data-tema='oscuro'] .aviso-finde { border-color: #5c4c22; }
+[data-tema='oscuro'] .estado-chip--verde { border-color: #3f6a49; }
+[data-tema='oscuro'] .estado-chip--rojo { border-color: #7a4340; }
+[data-tema='oscuro'] .estado-chip--ambar { border-color: #77622c; }
+[data-tema='oscuro'] .estado-chip--morado { border-color: #6b4a80; }
+[data-tema='oscuro'] .chip-rol--cliente { background: #1f3a52; color: #8ec3f2; }
+[data-tema='oscuro'] .gantt th.dia.hoy-head small { color: #d7e7f7; }

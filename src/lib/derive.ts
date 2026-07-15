@@ -83,24 +83,29 @@ export function fechaVigente(t: Tarea): ISODate | undefined {
 
 /**
  * Marcas de la grilla Gantt para una tarea (6.4 actualizado):
- *  - Hecha: solo la marca verde en la fecha vigente ("hecha es terminal";
- *    no arrastra rastro ni señal de tarde). Queda en la fecha planificada,
- *    no en el dia en que se marco: la marca no se mueve al marcar hecha.
- *  - Abierta: rastro rojo tenue por cada fecha anterior + marca principal
- *    en la fecha objetivo (✕ en plazo, ■ roja si vencida).
- *  - Sin fecha: sin marcas.
+ *  - Rastro tenue por cada fecha anterior del historial, SIEMPRE — tambien
+ *    en tareas hechas: es memoria historica de la grilla, no una alerta
+ *    ("hecha es terminal" aplica al color de fila y a los contadores, que
+ *    dejan de tratarla como replanificada, no al rastro).
+ *  - Hecha: marca verde en la fecha vigente (la planificada, no el dia en
+ *    que se marco), sin señal de tarde.
+ *  - Abierta: marca principal en la fecha objetivo (✕ en plazo, ■ roja si
+ *    vencida).
+ *  - Sin fecha: solo el rastro (si lo hubiera).
  */
 export function marcasDe(state: AppState, t: Tarea, hoy: string): MarcaGantt[] {
-  if (t.hecha) {
-    const fecha = fechaVigente(t)
-    return fecha ? [{ fecha, tipo: 'hecha' }] : []
-  }
-
   const marcas: MarcaGantt[] = []
-  const replan = tieneHistorial(state, t.id)
   for (const h of historialDe(state, t.id)) {
     marcas.push({ fecha: h.fechaAnterior, tipo: 'anterior' })
   }
+
+  if (t.hecha) {
+    const fecha = fechaVigente(t)
+    if (fecha) marcas.push({ fecha, tipo: 'hecha' })
+    return marcas
+  }
+
+  const replan = tieneHistorial(state, t.id)
   if (t.fechaObjetivo) {
     const vencida = cmp(t.fechaObjetivo, hoy) < 0
     marcas.push({

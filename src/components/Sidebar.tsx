@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { AppState, Proyecto, Usuario } from '../types'
-import type { Actions, FrenteSel, Pantalla, SidebarModo } from '../App'
+import type { Actions, FrenteSel, Pantalla, SidebarModo, Tema } from '../App'
 import type { Can } from '../lib/permisos'
 import { TextPromptModal } from './TextPromptModal'
 import { ProyectoModal } from './ProyectoModal'
@@ -22,6 +22,9 @@ interface Props {
   /** Punto 6: modo actual de la barra (fija / escondida) y su alternador. */
   sidebarModo: SidebarModo
   onToggleSidebar: () => void
+  /** Punto 4: tema claro/oscuro (boton manual, persistente por usuario). */
+  tema: Tema
+  onToggleTema: () => void
   onSelectProyecto: (id: string) => void
   onSelectFrente: (f: FrenteSel) => void
   onSelectPantalla: (p: Pantalla) => void
@@ -47,6 +50,8 @@ export function Sidebar({
   usuario,
   sidebarModo,
   onToggleSidebar,
+  tema,
+  onToggleTema,
   onSelectProyecto,
   onSelectFrente,
   onSelectPantalla,
@@ -207,7 +212,17 @@ export function Sidebar({
             <small>{usuario.rol === 'admin' ? 'Admin' : 'Cliente'}</small>
           </span>
         </span>
-        <button className="link-btn sesion__salir" onClick={onLogout}>Salir</button>
+        <span className="sesion__acciones">
+          <button
+            className="sidebar__plegar sesion__tema"
+            title={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            aria-label={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            onClick={onToggleTema}
+          >
+            {tema === 'oscuro' ? '☀' : '🌙'}
+          </button>
+          <button className="link-btn sesion__salir" onClick={onLogout}>Salir</button>
+        </span>
       </div>
 
       {modal?.tipo === 'proyecto-nuevo' && (
