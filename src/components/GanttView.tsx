@@ -36,8 +36,12 @@ import { InlineText } from './InlineText'
 //  - contenedores vacios muestran "+ agregar" que se convierte en input
 // Al pie, filas de carga por persona (§6.5) + fila "Sin asignar".
 
-/** Modos del horizonte. Siempre arranca en 'hoy'; no se persiste. */
-type ModoHorizonte = 'hoy' | 'rango' | 'todo'
+/**
+ * Modos del horizonte. Siempre arranca en 'hoy'; no se persiste. El antiguo
+ * "Rango personalizado" se elimino: un rango especifico se pide con el
+ * filtro de fechas (rango fijo), que ya se traduce al horizonte.
+ */
+type ModoHorizonte = 'hoy' | 'todo'
 
 interface Props {
   state: AppState
@@ -131,10 +135,6 @@ function ventanaHoy(hoy: ISODate): { desde: ISODate; hasta: ISODate } {
 export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, actions, onAbrirTarea }: Props) {
   // Horizonte: por defecto "Alrededor de hoy"; no se persiste.
   const [modo, setModo] = useState<ModoHorizonte>('hoy')
-  const [rango, setRango] = useState<{ desde: ISODate; hasta: ISODate }>(() => {
-    const v = ventanaHoy(hoy)
-    return { desde: v.desde, hasta: addDays(v.desde, 32) }
-  })
   // §6.3.19: solo dias habiles (default) o semana completa de 7 dias.
   const [soloHabiles, setSoloHabiles] = useState(true)
   const [crearEn, setCrearEn] = useState<CrearEn | null>(null)
@@ -289,10 +289,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
       return soloHabiles ? diasHabiles(desde, hasta) : diasCalendario(desde, hasta)
     }
 
-    if (modo === 'rango' && rango.desde && rango.hasta && cmp(rango.desde, rango.hasta) <= 0) {
-      desde = rango.desde
-      hasta = rango.hasta
-    } else if (modo === 'todo' && filasTarea.length > 0) {
+    if (modo === 'todo' && filasTarea.length > 0) {
       const fechas: ISODate[] = [hoy]
       for (const { tarea } of filasTarea) {
         if (tarea.fechaOriginal) fechas.push(tarea.fechaOriginal)
@@ -313,7 +310,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
     }
 
     return soloHabiles ? diasHabiles(desde, hasta) : diasCalendario(desde, hasta)
-  }, [filasTarea, state.historial, hoy, modo, rango, soloHabiles, filtro.fecha])
+  }, [filasTarea, state.historial, hoy, modo, soloHabiles, filtro.fecha])
 
   // §6.3.20: en modo dias habiles, tareas con fecha de finde quedan ocultas.
   const ocultasFinde = useMemo(() => {
@@ -456,32 +453,10 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
               <button className={modo === 'hoy' ? 'activo' : ''} onClick={() => setModo('hoy')} title="2 semanas atras + semana actual + 2 adelante, fijo">
                 Alrededor de hoy
               </button>
-              <button className={modo === 'rango' ? 'activo' : ''} onClick={() => setModo('rango')}>
-                Rango
-              </button>
-              <button className={modo === 'todo' ? 'activo' : ''} onClick={() => setModo('todo')}>
+              <button className={modo === 'todo' ? 'activo' : ''} onClick={() => setModo('todo')} title="De la primera a la ultima tarea">
                 Todo el proyecto
               </button>
             </div>
-          )}
-          {!filtro.fecha && modo === 'rango' && (
-            <span className="horizonte__rango">
-              <input
-                type="date"
-                className="fecha-input horizonte__fecha"
-                value={rango.desde}
-                aria-label="Desde"
-                onChange={(e) => setRango((r) => ({ ...r, desde: e.target.value }))}
-              />
-              –
-              <input
-                type="date"
-                className="fecha-input horizonte__fecha"
-                value={rango.hasta}
-                aria-label="Hasta"
-                onChange={(e) => setRango((r) => ({ ...r, hasta: e.target.value }))}
-              />
-            </span>
           )}
         </div>
       </div>

@@ -78,7 +78,8 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   **solo días hábiles** (default) y **semana completa (7 días)**, con aviso de
   tareas de fin de semana ocultas.
 - **Horizonte del Gantt:** *Alrededor de hoy* (default fijo: 2 semanas atrás +
-  actual + 2 adelante, no persistido), *Rango personalizado* y *Todo el proyecto*.
+  actual + 2 adelante, no persistido) y *Todo el proyecto*. Para ver un rango
+  específico se usa el filtro de fechas con rango fijo, que define el horizonte.
 - **Gantt editable — estándar por clics (sin arrastre):** clic izquierdo en una
   celda vacía planifica la tarea ese día; clic izquierdo sobre una marca **futura**
   la borra — si la marca venía de una replanificación, borrarla **deshace ese
