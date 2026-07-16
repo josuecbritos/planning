@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Tarea, Usuario } from './types'
 import { HOY as HOY_SIM } from './data/seed'
 import { makeRepo } from './data'
@@ -94,6 +94,10 @@ export default function App() {
   const [proyectoActivoId, setProyectoActivoId] = useState<string | null>(null)
   // Panel lateral de detalle (7.2): id de la tarea abierta, o null.
   const [tareaDetalleId, setTareaDetalleId] = useState<string | null>(null)
+  // Contenedor con scroll de la vista de proyecto. Se mide el alto de la
+  // barra de filtros (que es sticky, punto 2) para que el encabezado de la
+  // tabla se congele JUSTO debajo, sin taparse ni superponerse.
+  const contentRef = useRef<HTMLDivElement>(null)
 
   const esAdmin: boolean = sesion?.rol === 'admin'
   const can = useMemo(() => makeCan(sesion ?? null), [sesion])
@@ -359,6 +363,23 @@ export default function App() {
 
   const abrirDetalle = useCallback((tareaId: string) => setTareaDetalleId(tareaId), [])
 
+  // Punto 2: mide el alto de la barra de filtros (sticky) y lo publica en
+  // --filtros-h para que el thead de la tabla se congele justo debajo.
+  useEffect(() => {
+    const content = contentRef.current
+    if (!content) return
+    const bar = content.querySelector<HTMLElement>('.filtros-bar')
+    if (!bar) {
+      content.style.removeProperty('--filtros-h')
+      return
+    }
+    const update = () => content.style.setProperty('--filtros-h', `${bar.offsetHeight}px`)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(bar)
+    return () => ro.disconnect()
+  }, [pantalla, vista, proyectoActivoId])
+
   const tareasVisibles = useMemo<Tarea[]>(() => {
     if (!state || !proyectoActivoId) return []
     const frenteIds = new Set(state.frentes.filter((f) => f.proyectoId === proyectoActivoId).map((f) => f.id))
@@ -519,7 +540,7 @@ export default function App() {
               contadores={contadores}
               hoy={HOY}
             />
-            <div className="content">
+            <div className="content" ref={contentRef}>
               <FiltrosBar
                 contexto={proyecto.id}
                 usuarioId={sesion.id}
