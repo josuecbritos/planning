@@ -311,8 +311,9 @@ table.tareas th, table.tareas td {
 table.tareas th {
   background: var(--superficie-2); font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em;
   color: var(--gris-texto); font-weight: 700;
-  /* Encabezados congelados al hacer scroll vertical */
-  position: sticky; top: 0; z-index: 10;
+  /* Encabezados congelados JUSTO debajo de la barra de filtros sticky
+     (--filtros-h la mide App); sin la barra, se congelan al tope. */
+  position: sticky; top: var(--filtros-h, 0); z-index: 10;
 }
 
 /* Contenido centrado en Hecha, responsable y fechas.
@@ -570,8 +571,11 @@ table.tareas .col-estado { text-align: center; }
 /* ---------- Filtros guardables (punto 3; estetica modernizada) ---------- */
 .filtros-bar {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  /* Separado del sidebar y del contenido (el texto no queda pegado). */
-  margin: 14px 20px 4px;
+  /* Punto 2: fijos en la parte superior al hacer scroll de la vista. El
+     margen se pasa a padding para que la franja sticky incluya el aire y
+     tape las filas que pasan por debajo (fondo opaco). */
+  position: sticky; top: 0; z-index: 30; background: var(--fondo);
+  margin: 0; padding: 14px 20px 8px;
 }
 .filtros-bar__label {
   display: inline-flex; align-items: center; gap: 6px; margin-right: 2px;
@@ -780,6 +784,15 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .gantt td.fija--sf {
   background: var(--gris-sf); font-weight: 600; font-size: 12px;
   vertical-align: middle; text-align: center; padding: 8px 8px;
+}
+/* Punto 3: rotula pegajosa. La celda cede su padding al envoltorio absoluto,
+   que un efecto (JS) centra en la porcion visible del bloque. Sin JS (o con
+   el bloque entero visible) queda centrada por top:0/height:100%. */
+.gantt td.fija--rotula { padding: 0; }
+.gantt td.fija--rotula .fija-nombre {
+  position: absolute; left: 0; right: 0; top: 0; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  padding: 8px 8px; box-sizing: border-box; overflow: hidden;
 }
 .gantt td.fija--tarea { font-weight: 600; padding: 4px 10px; font-size: 12.5px; }
 .gantt td.fija--tarea.tarea-cell--verde { background: var(--verde-suave); }
@@ -1329,7 +1342,7 @@ table.tareas td.col-fecha { font-size: 12px; }
   .counter__num { font-size: 12.5px; }
   .counter__lbl { font-size: 9px; }
   .counter__swatch { width: 8px; height: 8px; }
-  .filtros-bar { margin: 10px 12px 2px; gap: 6px; }
+  .filtros-bar { margin: 0; padding: 10px 12px 6px; gap: 6px; }
   .filtro-btn { padding: 5px 10px; font-size: 11.5px; }
 
   /* ---------- 1. Vista tabla: cinco columnas bien proporcionadas ----------

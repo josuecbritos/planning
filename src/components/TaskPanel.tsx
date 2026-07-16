@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AppState, Tarea } from '../types'
 import type { Actions } from '../App'
 import type { Can } from '../lib/permisos'
@@ -20,10 +20,26 @@ interface Props {
 }
 
 export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
+  const asideRef = useRef<HTMLElement>(null)
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  // Cerrar al hacer clic fuera del panel (además del botón ✕ y Escape). El
+  // listener se difiere un tick para que el mismo clic que abre el panel no
+  // lo cierre de inmediato; los clics DENTRO del panel no lo cierran.
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (asideRef.current && !asideRef.current.contains(e.target as Node)) onClose()
+    }
+    const id = window.setTimeout(() => document.addEventListener('mousedown', onDown), 0)
+    return () => {
+      window.clearTimeout(id)
+      document.removeEventListener('mousedown', onDown)
+    }
   }, [onClose])
 
   const color = colorTarea(state, tarea, hoy)
@@ -38,7 +54,7 @@ export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
     : []
 
   return (
-    <aside className="panel-detalle">
+    <aside className="panel-detalle" ref={asideRef}>
       <div className="panel-detalle__head">
         <span className={`hovercard__estado hc-estado--${color}`}>
           {tarea.archivada ? 'Archivada' : CATEGORIA_LABEL[cat]}

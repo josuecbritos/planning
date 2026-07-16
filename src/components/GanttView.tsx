@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AppState, Frente, ISODate, SubFrente, Tarea, TipoMarca, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
@@ -140,6 +140,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
   const [crearEn, setCrearEn] = useState<CrearEn | null>(null)
   const [aviso, setAviso] = useState<Aviso | null>(null)
   const avisoTimer = useRef<number | undefined>(undefined)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   function mostrarAviso(e: React.MouseEvent, texto: string) {
     setAviso({ x: Math.min(e.clientX, window.innerWidth - 280), y: e.clientY + 14, texto })
@@ -404,6 +405,53 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
     }
   }
 
+  // Punto 3: mantiene el nombre de cada frente/sub frente visible mientras
+  // su bloque este en pantalla. Reposiciona el envoltorio absoluto para
+  // centrarlo en la INTERSECCION del bloque con la banda visible (bajo el
+  // encabezado congelado). Si el bloque cabe entero, queda centrado.
+  useLayoutEffect(() => {
+    const scroll = scrollRef.current
+    if (!scroll) return
+    const thead = scroll.querySelector('thead')
+    let raf = 0
+    const posicionar = () => {
+      raf = 0
+      const sr = scroll.getBoundingClientRect()
+      const headH = thead ? thead.getBoundingClientRect().height : 0
+      const bandTop = sr.top + headH
+      const bandBottom = sr.bottom
+      scroll.querySelectorAll<HTMLElement>('td.fija--rotula').forEach((td) => {
+        const label = td.firstElementChild as HTMLElement | null
+        if (!label) return
+        const cr = td.getBoundingClientRect()
+        const visTop = Math.max(cr.top, bandTop)
+        const visBottom = Math.min(cr.bottom, bandBottom)
+        if (visBottom <= visTop) {
+          // Bloque fuera de la banda: el nombre se va con el (sin recalcular).
+          label.style.top = '0px'
+          label.style.height = `${cr.height}px`
+          return
+        }
+        label.style.top = `${visTop - cr.top}px`
+        label.style.height = `${visBottom - visTop}px`
+      })
+    }
+    const solicitar = () => {
+      if (!raf) raf = requestAnimationFrame(posicionar)
+    }
+    posicionar()
+    scroll.addEventListener('scroll', solicitar, { passive: true })
+    window.addEventListener('resize', solicitar)
+    const ro = new ResizeObserver(solicitar)
+    ro.observe(scroll)
+    return () => {
+      scroll.removeEventListener('scroll', solicitar)
+      window.removeEventListener('resize', solicitar)
+      ro.disconnect()
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [filas, dias, soloHabiles, modo])
+
   if (filas.length === 0) {
     return (
       <div className="gantt-wrap">
@@ -457,7 +505,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
         </div>
       </div>
       <div className="gantt-wrap">
-        <div className="gantt-scroll">
+        <div className="gantt-scroll" ref={scrollRef}>
           {/* 2.1: sin menu contextual del navegador sobre la grilla (el clic
               derecho es el gesto de marcar lista). */}
           <table className="gantt" onContextMenu={(e) => e.preventDefault()}>
@@ -673,42 +721,50 @@ function FilaGanttRow({
 }) {
   // -- Celdas fijas de frente / sub frente (con "+" para crear hermanos) --
 
+  // El nombre va en un envoltorio absoluto (.fija-nombre): un efecto lo
+  // reposiciona para que quede centrado en la porcion VISIBLE del bloque
+  // (punto 3), acompañando el scroll cuando el frente/sub es mas alto que
+  // la pantalla y quedando centrado cuando cabe entero.
   const celdaFrente = (frente: Frente, span: number) => (
-    <td className="fija fija--frente" rowSpan={span}>
-      <span className="con-mas">
-        {frente.nombre}
-        {can.crearFrentes && (
-          <button
-            className="mas-btn"
-            data-tip="Agregar frente debajo"
-            aria-label="Agregar frente debajo"
-            onClick={(e) =>
-              abrirCrear(e, { tipo: 'frente', despuesDe: { id: frente.id, orden: frente.orden }, contenedorId: frente.proyectoId })
-            }
-          >
-            +
-          </button>
-        )}
+    <td className="fija fija--frente fija--rotula" rowSpan={span}>
+      <span className="fija-nombre">
+        <span className="con-mas">
+          {frente.nombre}
+          {can.crearFrentes && (
+            <button
+              className="mas-btn"
+              data-tip="Agregar frente debajo"
+              aria-label="Agregar frente debajo"
+              onClick={(e) =>
+                abrirCrear(e, { tipo: 'frente', despuesDe: { id: frente.id, orden: frente.orden }, contenedorId: frente.proyectoId })
+              }
+            >
+              +
+            </button>
+          )}
+        </span>
       </span>
     </td>
   )
 
   const celdaSub = (frente: Frente, sub: SubFrente, span: number) => (
-    <td className="fija fija--sf" rowSpan={span}>
-      <span className="con-mas">
-        {sub.nombre}
-        {can.crearSubFrentes && (
-          <button
-            className="mas-btn"
-            data-tip="Agregar sub frente debajo"
-            aria-label="Agregar sub frente debajo"
-            onClick={(e) =>
-              abrirCrear(e, { tipo: 'sub', despuesDe: { id: sub.id, orden: sub.orden }, contenedorId: frente.id })
-            }
-          >
-            +
-          </button>
-        )}
+    <td className="fija fija--sf fija--rotula" rowSpan={span}>
+      <span className="fija-nombre">
+        <span className="con-mas">
+          {sub.nombre}
+          {can.crearSubFrentes && (
+            <button
+              className="mas-btn"
+              data-tip="Agregar sub frente debajo"
+              aria-label="Agregar sub frente debajo"
+              onClick={(e) =>
+                abrirCrear(e, { tipo: 'sub', despuesDe: { id: sub.id, orden: sub.orden }, contenedorId: frente.id })
+              }
+            >
+              +
+            </button>
+          )}
+        </span>
       </span>
     </td>
   )

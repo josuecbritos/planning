@@ -116,7 +116,8 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   filas; en la Gantt, responsable y estado filtran tareas y **la fecha define el
   horizonte visible** — con la excepción de **Sin fecha**, que en la Gantt filtra
   (muestra solo las tareas sin fecha, como filas sin marca, planificables ahí
-  mismo) sin tocar el horizonte.
+  mismo) sin tocar el horizonte. En la tabla, los filtros quedan **fijos arriba**
+  al hacer scroll y los encabezados de columna se congelan justo debajo.
 - **Modo oscuro:** botón manual (🌙/☀ al pie de la sidebar; no sigue al sistema
   operativo), persistente por usuario. Los cinco colores de estado conservan su
   identidad con variantes ajustadas para fondo oscuro; el rastro de fechas
@@ -171,7 +172,8 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   Proyecto se fusiona dentro de Ubicación (ruta completa) y sale Fecha Original.
 - **Panel lateral de detalle** (backlog de 7.2): click sobre una tarea o una marca del
   Gantt abre un panel con el detalle completo, la línea de tiempo del historial y las
-  acciones operativas (marcar hecha, replanificar, archivar) para admins.
+  acciones operativas (marcar hecha, replanificar, archivar) para admins. Se cierra
+  con ✕, con Escape o al hacer click fuera.
 - **Archivo de canceladas (6.3)**: archivar una tarea la saca del plan (vistas y
   contadores) conservando su historial; queda consultable por sub frente y puede
   restaurarse. Distinto de eliminar (definitivo).
