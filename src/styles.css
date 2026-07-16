@@ -1253,7 +1253,7 @@ table.tareas .col-fecha,
 .subfrente__count {
   font-family: var(--mono);
 }
-table.tareas .col-fecha { font-size: 12px; }
+table.tareas td.col-fecha { font-size: 12px; }
 .carga-celda { font-size: 11px; }
 
 /* Status chips: etiqueta rectangular, mono en mayusculas (colores intactos) */
@@ -1332,36 +1332,55 @@ table.tareas .col-fecha { font-size: 12px; }
   .filtros-bar { margin: 10px 12px 2px; gap: 6px; }
   .filtro-btn { padding: 5px 10px; font-size: 11.5px; }
 
-  /* ---------- 1. Vista tabla: cinco columnas que caben ---------- */
+  /* ---------- 1. Vista tabla: cinco columnas bien proporcionadas ----------
+     Tarea (la informacion principal) recibe todo el ancho sobrante: las
+     demas columnas son compactas y de ancho fijo. Nada se desborda de su
+     celda (envoltura controlada) y la tabla ocupa el 100% del ancho. */
   .tabla-wrap { padding: 12px; }
   /* layout fijo: ademas de caber, TODOS los sub frentes reparten las
      columnas igual (fix del punto 4: formatos distintos entre tablas). */
-  table.tareas { table-layout: fixed; }
-  table.tareas th, table.tareas td { padding: 4px 5px; font-size: 12px; }
-  table.tareas th { font-size: 8.5px; }
-  table.tareas .col-orig { display: none; }
-  .col-check { width: 30px; }
-  .check-hecha { width: 19px; height: 19px; font-size: 10px; }
-  .col-resp { width: 40px; }
+  table.tareas { table-layout: fixed; width: 100%; }
+  table.tareas th, table.tareas td { padding: 4px 4px; font-size: 12px; }
+  table.tareas th { font-size: 8.5px; overflow: hidden; }
+  /* En layout fijo, display:none dejaria la columna RESERVADA (franja
+     vacia): se colapsa a ancho 0 para que Tarea reciba ese espacio. */
+  table.tareas .col-orig {
+    width: 0; max-width: 0; padding: 0; border: none;
+    font-size: 0; overflow: hidden;
+  }
+  /* Envoltura controlada: los nombres largos quiebran DENTRO de su celda,
+     nunca invaden a la vecina. */
+  table.tareas td { overflow-wrap: anywhere; }
+  .tarea-cell__row { flex-wrap: wrap; row-gap: 1px; min-width: 0; }
+  .tarea-cell .inline-text, .tarea-cell__link { overflow-wrap: anywhere; min-width: 0; }
+  .col-check { width: 26px; }
+  table.tareas td.col-check { padding-left: 2px; padding-right: 2px; }
+  .check-hecha { width: 18px; height: 18px; font-size: 9px; border-width: 1.5px; }
+  .col-resp { width: 34px; }
+  table.tareas td.col-resp { padding-left: 1px; padding-right: 1px; }
   .avatar { width: 24px; height: 24px; font-size: 10px; }
-  .col-estado { width: 86px; }
-  .estado-chip { width: 80px; height: 28px; font-size: 7.5px; padding: 2px 3px; }
-  .col-fecha { width: 82px; }
-  table.tareas .col-fecha { font-size: 10.5px; white-space: normal; }
+  /* el caret del selector no cabe junto al avatar: el avatar ya es el boton */
+  .resp-picker__caret { display: none; }
+  .col-estado { width: 62px; }
+  .estado-chip { width: 54px; height: 26px; font-size: 6.5px; padding: 2px 2px; letter-spacing: .02em; }
+  .col-fecha { width: 64px; }
+  table.tareas td.col-fecha { font-size: 9px; white-space: nowrap; padding-left: 2px; padding-right: 2px; }
+  .fecha-btn, .fecha-input { padding: 2px 1px; }
   /* acciones: queda solo ⓘ (acceso al detalle), compacto */
-  .col-acc { width: 30px; }
+  .col-acc { width: 26px; }
+  table.tareas td.col-acc { padding-left: 1px; padding-right: 1px; }
   .col-acc .icon-btn[aria-label='Archivar'],
   .col-acc .icon-btn[aria-label='Eliminar'] { display: none; }
   .subfrente__titulo { font-size: 12.5px; padding: 6px 8px; }
-  .replan-count { font-size: 10px; }
-  .comentarios-chip { font-size: 10px; }
+  .replan-count { font-size: 9px; padding: 0 3px; }
+  .comentarios-chip { font-size: 9px; }
 
   /* ---------- 8.2 Mis Tareas: cinco columnas, ruta completa ---------- */
   .usuarios-wrap { padding: 12px; }
   .mistareas .col-proyecto { display: none; }
   .ruta-proy { display: inline; }
-  .mistareas .col-ruta { width: 120px; }
-  .mistareas .mipanel-ruta { font-size: 10px; }
+  .mistareas .col-ruta { width: 84px; }
+  .mistareas .mipanel-ruta { font-size: 9px; }
 
   .gantt-toolbar { margin: 10px 12px 0; }
   .gantt-wrap { padding: 8px 12px 20px; }
@@ -1373,3 +1392,9 @@ table.tareas .col-fecha { font-size: 12px; }
   .gantt td.fija--tarea { font-size: 11px; padding: 3px 6px; }
   .gantt td.fija--frente, .gantt td.fija--sf { font-size: 10.5px; padding: 6px 6px; }
 }
+
+/* Encabezados ordenables (punto 3): clic cicla ↑ / ↓ / orden original */
+.th-orden { cursor: pointer; user-select: none; white-space: nowrap; }
+.th-orden:hover { color: var(--texto); }
+.th-orden--activa { color: var(--texto); }
+.th-orden__flecha { margin-left: 3px; font-size: 10px; color: var(--texto); }
