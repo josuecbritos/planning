@@ -1272,3 +1272,104 @@ table.tareas .col-fecha { font-size: 12px; }
 .campo input, .campo textarea, .campo select { border-color: var(--borde-input); }
 .fecha-input--editando { border-color: var(--borde-input); }
 .fecha-input--editando:focus { outline: none; border-color: var(--primario); box-shadow: inset 0 0 0 1px var(--primario); }
+
+/* =====================================================================
+   Optimizacion MOBILE (≤768px). Todo vive dentro de la media query:
+   el desktop queda exactamente igual. Los puntos de la reforma de Mis
+   Tareas que distinguen mobile (fusion Proyecto→Ubicacion, sin Fecha
+   Original) tambien se resuelven aca.
+   ===================================================================== */
+
+/* Boton flotante ☰ y velo del menu movil (ocultos en desktop) */
+.movil-menu {
+  display: none; position: fixed; bottom: 14px; left: 14px; z-index: 2200;
+  width: 46px; height: 46px; border-radius: 999px;
+  border: 1px solid var(--gris-borde); background: var(--primario);
+  color: var(--sobre-primario); font-size: 18px; line-height: 1; cursor: pointer;
+  align-items: center; justify-content: center;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.25);
+}
+.movil-velo { display: none; }
+/* La ruta con proyecto de Mis Tareas es exclusiva de mobile (8.2) */
+.ruta-proy { display: none; }
+
+@media (max-width: 768px) {
+  /* ---------- 3. Sidebar superpuesta (no ocupa ancho fijo) ---------- */
+  .app, .app--sidebar-escondida { display: block; }
+  .main { height: 100vh; height: 100dvh; }
+  .movil-menu { display: inline-flex; }
+  .movil-velo {
+    display: block; position: fixed; inset: 0;
+    background: rgba(10, 10, 12, .45); z-index: 2050;
+  }
+  .sidebar-zona {
+    position: fixed; top: 0; left: 0; bottom: 0; width: min(300px, 84vw);
+    z-index: 2100; transform: translateX(-100%); transition: transform .18s ease;
+  }
+  .app--movil-abierta .sidebar-zona {
+    transform: none; box-shadow: 12px 0 40px rgba(0, 0, 0, .4);
+  }
+  /* El modo escondida (franja + hover) es de escritorio: se neutraliza. */
+  .sidebar-mini { display: none; }
+  .sidebar__plegar { display: none; }
+  .app--sidebar-escondida .sidebar {
+    position: static; opacity: 1; pointer-events: auto; transform: none;
+    width: auto; box-shadow: none; border-left: none;
+  }
+
+  /* ---------- 2. Encabezados superiores compactos ---------- */
+  .topbar { padding: 8px 12px; gap: 8px; }
+  .topbar__row { gap: 8px; }
+  .topbar__title { font-size: 15px; }
+  .topbar__title small { font-size: 11px; margin-left: 6px; }
+  .hoy-chip { font-size: 9.5px; padding: 2px 6px; }
+  .toggle button { padding: 4px 10px; font-size: 11.5px; }
+  .counters { gap: 5px; }
+  .counter { padding: 3px 7px; gap: 5px; border-radius: 4px; }
+  .counter__num { font-size: 12.5px; }
+  .counter__lbl { font-size: 9px; }
+  .counter__swatch { width: 8px; height: 8px; }
+  .filtros-bar { margin: 10px 12px 2px; gap: 6px; }
+  .filtro-btn { padding: 5px 10px; font-size: 11.5px; }
+
+  /* ---------- 1. Vista tabla: cinco columnas que caben ---------- */
+  .tabla-wrap { padding: 12px; }
+  /* layout fijo: ademas de caber, TODOS los sub frentes reparten las
+     columnas igual (fix del punto 4: formatos distintos entre tablas). */
+  table.tareas { table-layout: fixed; }
+  table.tareas th, table.tareas td { padding: 4px 5px; font-size: 12px; }
+  table.tareas th { font-size: 8.5px; }
+  table.tareas .col-orig { display: none; }
+  .col-check { width: 30px; }
+  .check-hecha { width: 19px; height: 19px; font-size: 10px; }
+  .col-resp { width: 40px; }
+  .avatar { width: 24px; height: 24px; font-size: 10px; }
+  .col-estado { width: 86px; }
+  .estado-chip { width: 80px; height: 28px; font-size: 7.5px; padding: 2px 3px; }
+  .col-fecha { width: 82px; }
+  table.tareas .col-fecha { font-size: 10.5px; white-space: normal; }
+  /* acciones: queda solo ⓘ (acceso al detalle), compacto */
+  .col-acc { width: 30px; }
+  .col-acc .icon-btn[aria-label='Archivar'],
+  .col-acc .icon-btn[aria-label='Eliminar'] { display: none; }
+  .subfrente__titulo { font-size: 12.5px; padding: 6px 8px; }
+  .replan-count { font-size: 10px; }
+  .comentarios-chip { font-size: 10px; }
+
+  /* ---------- 8.2 Mis Tareas: cinco columnas, ruta completa ---------- */
+  .usuarios-wrap { padding: 12px; }
+  .mistareas .col-proyecto { display: none; }
+  .ruta-proy { display: inline; }
+  .mistareas .col-ruta { width: 120px; }
+  .mistareas .mipanel-ruta { font-size: 10px; }
+
+  .gantt-toolbar { margin: 10px 12px 0; }
+  .gantt-wrap { padding: 8px 12px 20px; }
+  .gantt-scroll { -webkit-overflow-scrolling: touch; max-height: calc(100dvh - 220px); }
+  .gantt .fija--frente { left: 0; width: 76px; min-width: 76px; max-width: 76px; }
+  .gantt .fija--sf { left: 76px; width: 96px; min-width: 96px; max-width: 96px; }
+  .gantt .fija--tarea { left: 172px; width: 140px; min-width: 140px; max-width: 140px; }
+  .gantt .fija--resp { left: 312px; width: 40px; min-width: 40px; max-width: 40px; }
+  .gantt td.fija--tarea { font-size: 11px; padding: 3px 6px; }
+  .gantt td.fija--frente, .gantt td.fija--sf { font-size: 10.5px; padding: 6px 6px; }
+}

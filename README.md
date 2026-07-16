@@ -5,7 +5,7 @@ controlada al cliente. Implementa las vistas **Tabla** (tipo Monday) y **Gantt**
 (grilla tipo Excel) con la lógica de estados derivados y colores de la sección 6
 del Documento Funcional, el **CRUD** completo sobre **Supabase** (Fase 1),
 **login con roles Admin/Cliente + acceso por proyecto** (Fase 2, Módulo 1) y el
-**pulido de la Fase 3**: Mi Panel, panel lateral de detalle, archivo de
+**pulido de la Fase 3**: Mis Tareas, panel lateral de detalle, archivo de
 canceladas e indicadores por proyecto.
 
 ## Dos modos de ejecución
@@ -159,9 +159,12 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   es una capa de conveniencia, no la barrera de seguridad.
 
 **Fase 3 — Pulido**
-- **Mi Panel (Módulo 3)**: todas mis tareas de todos los proyectos, ordenadas con las
-  vencidas primero, filtro por estado (todas / pendientes / vencidas / replanificadas
-  abiertas / hechas) y por proyecto.
+- **Mis Tareas (Módulo 3)**: únicamente las tareas donde el usuario
+  es responsable, de todos sus proyectos, con las vencidas primero. Mismo formato que
+  las demás tablas (check, pills, colores de fila) con columnas Proyecto y Ubicación;
+  usa el sistema común de filtros (Fecha Objetivo / Estado / **Proyecto**) con
+  guardados propios del contexto, separados de los de cada proyecto. En mobile,
+  Proyecto se fusiona dentro de Ubicación (ruta completa) y sale Fecha Original.
 - **Panel lateral de detalle** (backlog de 7.2): click sobre una tarea o una marca del
   Gantt abre un panel con el detalle completo, la línea de tiempo del historial y las
   acciones operativas (marcar hecha, replanificar, archivar) para admins.
@@ -237,7 +240,7 @@ docs/
 - **Fase 1 — Uso interno:** ✅ base de datos + CRUD + las dos vistas. Sin login.
 - **Fase 2 — Clientes:** ✅ login, roles admin/cliente, asignación de proyectos por
   cliente, RLS real (Módulo 1).
-- **Fase 3 — Pulido:** ✅ Mi Panel (Módulo 3), panel lateral de detalle, archivo de
+- **Fase 3 — Pulido:** ✅ Mis Tareas (Módulo 3), panel lateral de detalle, archivo de
   canceladas, indicadores por proyecto.
 
 Con esto, el alcance de la Versión 1 del Documento Funcional v3.1 está completo.

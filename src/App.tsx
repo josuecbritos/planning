@@ -27,7 +27,7 @@ import { LoginPage } from './components/LoginPage'
 import { UsersView } from './components/UsersView'
 import { TaskPanel } from './components/TaskPanel'
 import { FiltrosBar } from './components/FiltrosBar'
-import { MiPanelView } from './components/MiPanelView'
+import { MisTareasView } from './components/MisTareasView'
 import { ResumenView } from './components/ResumenView'
 import { AceptarInvitacion } from './components/AceptarInvitacion'
 
@@ -87,6 +87,9 @@ export default function App() {
   const [filtro, setFiltro] = useState<Filtro>({})
   // Tema claro/oscuro (punto 4): boton manual, persistente por usuario.
   const [tema, setTema] = useState<Tema>('claro')
+  // Mobile: la sidebar se superpone al contenido al llamarla (boton ☰) y
+  // se cierra al elegir una opcion. Sin efecto en desktop (CSS lo esconde).
+  const [movilSidebar, setMovilSidebar] = useState(false)
   const [frenteSel, setFrenteSel] = useState<FrenteSel>('todos')
   const [proyectoActivoId, setProyectoActivoId] = useState<string | null>(null)
   // Panel lateral de detalle (7.2): id de la tarea abierta, o null.
@@ -340,11 +343,18 @@ export default function App() {
     setFrenteSel('todos')
     setPantalla('proyectos')
     setFiltro({})
+    setMovilSidebar(false)
+  }, [])
+
+  const onSelectFrente = useCallback((f: FrenteSel) => {
+    setFrenteSel(f)
+    setMovilSidebar(false)
   }, [])
 
   const onSelectPantalla = useCallback((p: Pantalla) => {
     setPantalla(p)
     setTareaDetalleId(null)
+    setMovilSidebar(false)
   }, [])
 
   const abrirDetalle = useCallback((tareaId: string) => setTareaDetalleId(tareaId), [])
@@ -408,7 +418,21 @@ export default function App() {
     : []
 
   return (
-    <div className={`app${sidebarModo === 'escondida' ? ' app--sidebar-escondida' : ''}`}>
+    <div
+      className={`app${sidebarModo === 'escondida' ? ' app--sidebar-escondida' : ''}${
+        movilSidebar ? ' app--movil-abierta' : ''
+      }`}
+    >
+      {/* Mobile: boton flotante que llama a la sidebar superpuesta; se
+          cierra al elegir una opcion. Oculto en desktop via CSS. */}
+      <button
+        className="movil-menu"
+        aria-label={movilSidebar ? 'Cerrar menu' : 'Abrir menu'}
+        onClick={() => setMovilSidebar((v) => !v)}
+      >
+        {movilSidebar ? '✕' : '☰'}
+      </button>
+      {movilSidebar && <div className="movil-velo" onClick={() => setMovilSidebar(false)} />}
       {/* Punto 6: en modo escondida queda una franja de iconos siempre
           clicable; al pasar el mouse, la sidebar completa se despliega
           encima y se repliega al salir. */}
@@ -452,7 +476,7 @@ export default function App() {
           tema={tema}
           onToggleTema={toggleTema}
           onSelectProyecto={onSelectProyecto}
-          onSelectFrente={setFrenteSel}
+          onSelectFrente={onSelectFrente}
           onSelectPantalla={onSelectPantalla}
           onLogout={onLogout}
           actions={actions}
@@ -469,11 +493,13 @@ export default function App() {
         {pantalla === 'usuarios' && esAdmin ? (
           <UsersView state={state} usuarioActual={sesion} actions={actions} />
         ) : pantalla === 'mipanel' && esAdmin ? (
-          <MiPanelView
+          <MisTareasView
             state={state}
             usuario={sesion}
             proyectos={proyectosVisibles}
             hoy={HOY}
+            can={can}
+            actions={actions}
             onAbrirTarea={abrirDetalle}
           />
         ) : pantalla === 'resumen' ? (
@@ -495,7 +521,7 @@ export default function App() {
             />
             <div className="content">
               <FiltrosBar
-                proyectoId={proyecto.id}
+                contexto={proyecto.id}
                 usuarioId={sesion.id}
                 candidatos={candidatosFiltro}
                 filtro={filtro}

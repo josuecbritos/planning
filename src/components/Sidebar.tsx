@@ -7,7 +7,7 @@ import { ProyectoModal } from './ProyectoModal'
 import { Wordmark } from './Wordmark'
 
 // Barra lateral. Los clientes ven solo sus proyectos asignados y sin ninguna
-// accion de edicion; los admins tienen CRUD, Mi Panel y Administracion.
+// accion de edicion; los admins tienen CRUD, Mis Tareas y Administracion.
 // La sesion (usuario + salir) vive en el pie, visible en toda pantalla.
 
 interface Props {
@@ -108,7 +108,7 @@ export function Sidebar({
             className={`nav-frente nav-pantalla${pantalla === 'mipanel' ? ' nav-frente--activo' : ''}`}
             onClick={() => onSelectPantalla('mipanel')}
           >
-            <span>Mi Panel</span>
+            <span>Mis Tareas</span>
           </button>
         )}
       </div>

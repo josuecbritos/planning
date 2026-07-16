@@ -24,6 +24,9 @@ export interface Filtro {
   responsables?: string[]
   /** Categorias del modelo ("o" entre si). */
   estados?: Categoria[]
+  /** IDs de proyectos ("o" entre si). Solo aplica en Mis Tareas, que cruza
+   *  tareas de varios proyectos; en las vistas de proyecto no se usa. */
+  proyectos?: string[]
 }
 
 /** Filtro guardado: privado por usuario y por proyecto, con nombre. */
@@ -45,7 +48,8 @@ export function filtroVacio(f: Filtro): boolean {
     !f.fecha &&
     !f.sinFecha &&
     !(f.responsables && f.responsables.length) &&
-    !(f.estados && f.estados.length)
+    !(f.estados && f.estados.length) &&
+    !(f.proyectos && f.proyectos.length)
   )
 }
 
