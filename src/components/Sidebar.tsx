@@ -4,6 +4,7 @@ import type { Actions, FrenteSel, Pantalla, SidebarModo, Tema } from '../App'
 import type { Can } from '../lib/permisos'
 import { TextPromptModal } from './TextPromptModal'
 import { ProyectoModal } from './ProyectoModal'
+import { Wordmark } from './Wordmark'
 
 // Barra lateral. Los clientes ven solo sus proyectos asignados y sin ninguna
 // accion de edicion; los admins tienen CRUD, Mi Panel y Administracion.
@@ -80,7 +81,7 @@ export function Sidebar({
   return (
     <nav className="sidebar">
       <div className="sidebar__brand">
-        <span>Andotek Planning</span>
+        <Wordmark claro />
         <button
           className="sidebar__plegar"
           title={
