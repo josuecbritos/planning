@@ -107,9 +107,12 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   Próxima semana / Este mes — semana de lunes a domingo —, rango fijo o
   **Sin fecha**), Responsable (incluye **Sin asignar**) y Estado, con
   multi-selección ("o" dentro del campo, "y" entre campos). Se guardan con nombre, **privados por usuario y por proyecto**, y se
-  aplican/actualizan/renombran/eliminan desde el desplegable. En la tabla filtran
+  aplican/actualizan/renombran/eliminan desde el desplegable; cada campo tiene su
+  "Limpiar filtro" además del Limpiar global. En la tabla filtran
   filas; en la Gantt, responsable y estado filtran tareas y **la fecha define el
-  horizonte visible**.
+  horizonte visible** — con la excepción de **Sin fecha**, que en la Gantt filtra
+  (muestra solo las tareas sin fecha, como filas sin marca, planificables ahí
+  mismo) sin tocar el horizonte.
 - **Modo oscuro:** botón manual (🌙/☀ al pie de la sidebar; no sigue al sistema
   operativo), persistente por usuario. Los cinco colores de estado conservan su
   identidad con variantes ajustadas para fondo oscuro; el rastro de fechas

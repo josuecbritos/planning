@@ -149,22 +149,19 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
             }}
           />
         </div>
-        <div className="filtro-menu__grupo">Especiales</div>
-        <label className="filtro-op filtro-op--check">
-          <input
-            type="checkbox"
-            checked={!!filtro.sinFecha}
-            onChange={() => onCambiar({ ...filtro, sinFecha: filtro.sinFecha ? undefined : true })}
-          />
-          <span className="avatar avatar--sin">?</span>
-          <span>Sin fecha</span>
-        </label>
+        {/* Mismo formato que las demas opciones del campo (punto 1). */}
+        <button
+          className={`filtro-op${filtro.sinFecha ? ' filtro-op--on' : ''}`}
+          onClick={() => onCambiar({ ...filtro, sinFecha: filtro.sinFecha ? undefined : true })}
+        >
+          Sin fecha
+        </button>
         {(filtro.fecha || filtro.sinFecha) && (
           <button
             className="filtro-op filtro-op--quitar"
             onClick={() => onCambiar({ ...filtro, fecha: undefined, sinFecha: undefined })}
           >
-            Quitar filtro de fecha
+            Limpiar filtro
           </button>
         )}
       </Desplegable>
@@ -187,6 +184,14 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
           <span>Sin asignar</span>
         </label>
         {candidatos.length === 0 && <div className="filtro-menu__vacio">Sin personas en este proyecto.</div>}
+        {nResp > 0 && (
+          <button
+            className="filtro-op filtro-op--quitar"
+            onClick={() => onCambiar({ ...filtro, responsables: undefined })}
+          >
+            Limpiar filtro
+          </button>
+        )}
       </Desplegable>
 
       <Desplegable etiqueta={nEst ? `Estado (${nEst})` : 'Estado'} activo={nEst > 0}>
@@ -197,6 +202,14 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
             <span>{CATEGORIA_LABEL[c]}</span>
           </label>
         ))}
+        {nEst > 0 && (
+          <button
+            className="filtro-op filtro-op--quitar"
+            onClick={() => onCambiar({ ...filtro, estados: undefined })}
+          >
+            Limpiar filtro
+          </button>
+        )}
       </Desplegable>
 
       {activo && (

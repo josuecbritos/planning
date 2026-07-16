@@ -155,10 +155,15 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
         state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
   )
 
-  // Punto 3: responsable/estado filtran las tareas mostradas en la grilla
-  // (la fecha del filtro no: define el horizonte). Con filtro de tareas
-  // activo, los contenedores sin coincidencias se omiten.
-  const hayFiltroTareas = filtraTareas(filtro)
+  // Responsable/estado filtran las tareas mostradas en la grilla (la fecha
+  // del filtro no: define el horizonte). EXCEPCION: "Sin fecha" — una tarea
+  // sin fecha no esta en ningun dia, asi que no puede traducirse a un
+  // horizonte; en su lugar FILTRA: quedan solo las tareas sin fecha (filas
+  // sin marcas, planificables con un clic) y el horizonte no cambia. Con
+  // filtro de tareas activo, los contenedores sin coincidencias se omiten.
+  const hayFiltroTareas = filtraTareas(filtro) || !!filtro.sinFecha
+  const pasaEnGantt = (t: Tarea) =>
+    pasaFiltroTareas(state, t, filtro, hoy) && (!filtro.sinFecha || !t.fechaObjetivo)
 
   // -- Filas (incluye contenedores vacios §6.4.26 e inputs inline §6.4.25) --
   const filas = useMemo<FilaGantt[]>(() => {
@@ -179,12 +184,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
       } else {
         for (const sf of subs) {
           const tareas = state.tareas
-            .filter(
-              (t) =>
-                t.subFrenteId === sf.id &&
-                !t.archivada &&
-                (!hayFiltroTareas || pasaFiltroTareas(state, t, filtro, hoy)),
-            )
+            .filter((t) => t.subFrenteId === sf.id && !t.archivada && (!hayFiltroTareas || pasaEnGantt(t)))
             .sort((a, b) => a.orden - b.orden)
           const filasSub: FilaGantt[] = []
           if (tareas.length === 0) {
