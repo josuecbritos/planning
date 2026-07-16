@@ -421,13 +421,9 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
     <div>
       <div className="gantt-toolbar">
         <Legend />
-        {can.algunoDeTareas && (
-          <p className="gantt-ayuda">
-            Clic en un dia (pasado o futuro): planifica, o replanifica una atrasada · Clic en la
-            marca futura: la quita (si venia de una replanificacion, la deshace) ·{' '}
-            <b>Clic derecho en la marca: alterna lista</b>
-          </p>
-        )}
+        {/* La leyenda de instrucciones se elimino (punto 1): cada celda
+            explica SOLO lo que aplica ahi via tooltip contextual (punto 2).
+            El aviso de tareas de fin de semana ocultas se mantiene. */}
         <div className="horizonte">
           {ocultasFinde > 0 && (
             <span className="aviso-finde">
@@ -847,6 +843,23 @@ function FilaGanttRow({
   const celdaPlanificable = (d: ISODate) =>
     puedeEditar && !marcas.has(d) && (sinFecha || vencidaOHoy)
 
+  // Tooltip contextual de la celda (punto 2): indica solo lo que aplica
+  // AHI, segun el estado de la celda y los permisos del usuario.
+  const tipCelda = (d: ISODate, tipo: TipoMarca | undefined): string | undefined => {
+    if (tipo === 'hecha') {
+      return can.marcarHechas(tarea) ? 'Clic derecho: no lista' : undefined
+    }
+    const esPrincipal = tipo === 'pendiente' || tipo === 'incumplida' || tipo === 'incumplida_replan'
+    if (esPrincipal) {
+      if (!puedeEditar && !can.marcarHechas(tarea)) return undefined
+      return vencidaOHoy
+        ? 'Clic derecho: lista · Para replanificar, haz clic en otro día'
+        : 'Clic: quitar · Clic derecho: lista'
+    }
+    if (tipo === 'anterior') return undefined
+    return celdaPlanificable(d) ? 'Clic para planificar' : undefined
+  }
+
   function clickCelda(e: React.MouseEvent, d: ISODate) {
     if (celdaPlanificable(d)) {
       actions.cambiarFechaObjetivo(tarea.id, d)
@@ -955,6 +968,7 @@ function FilaGanttRow({
           <td
             key={d}
             className={`celda${esLunes(d) ? ' lunes' : ''}${esHoy ? ' col-hoy' : ''}${esFinDeSemana(d) ? ' finde' : ''}${celdaPlanificable(d) ? ' celda--planificable' : ''}`}
+            data-tip={tipCelda(d, tipo)}
             onClick={puedeEditar ? (e) => clickCelda(e, d) : undefined}
           >
             {tipo && (

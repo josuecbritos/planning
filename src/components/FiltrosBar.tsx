@@ -3,6 +3,7 @@ import type { Usuario } from '../types'
 import { CATEGORIA_LABEL, type Categoria } from '../lib/derive'
 import {
   FECHA_RELATIVA_LABEL,
+  RESP_SIN_ASIGNAR,
   etiquetaFecha,
   filtroVacio,
   type FechaRelativa,
@@ -95,8 +96,14 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
       </span>
 
       <Desplegable
-        etiqueta={filtro.fecha ? `Fecha: ${etiquetaFecha(filtro.fecha)}` : 'Fecha'}
-        activo={!!filtro.fecha}
+        etiqueta={
+          filtro.fecha
+            ? `Fecha: ${etiquetaFecha(filtro.fecha)}${filtro.sinFecha ? ' + sin fecha' : ''}`
+            : filtro.sinFecha
+              ? 'Fecha: Sin fecha'
+              : 'Fecha'
+        }
+        activo={!!filtro.fecha || !!filtro.sinFecha}
       >
         <div className="filtro-menu__grupo">Relativas (se recalculan)</div>
         {RELATIVAS.map((r) => (
@@ -142,8 +149,21 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
             }}
           />
         </div>
-        {filtro.fecha && (
-          <button className="filtro-op filtro-op--quitar" onClick={() => onCambiar({ ...filtro, fecha: undefined })}>
+        <div className="filtro-menu__grupo">Especiales</div>
+        <label className="filtro-op filtro-op--check">
+          <input
+            type="checkbox"
+            checked={!!filtro.sinFecha}
+            onChange={() => onCambiar({ ...filtro, sinFecha: filtro.sinFecha ? undefined : true })}
+          />
+          <span className="avatar avatar--sin">?</span>
+          <span>Sin fecha</span>
+        </label>
+        {(filtro.fecha || filtro.sinFecha) && (
+          <button
+            className="filtro-op filtro-op--quitar"
+            onClick={() => onCambiar({ ...filtro, fecha: undefined, sinFecha: undefined })}
+          >
             Quitar filtro de fecha
           </button>
         )}
@@ -157,6 +177,15 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
             <span>{u.nombre}</span>
           </label>
         ))}
+        <label className="filtro-op filtro-op--check">
+          <input
+            type="checkbox"
+            checked={filtro.responsables?.includes(RESP_SIN_ASIGNAR) ?? false}
+            onChange={() => toggleResp(RESP_SIN_ASIGNAR)}
+          />
+          <span className="avatar avatar--sin">?</span>
+          <span>Sin asignar</span>
+        </label>
         {candidatos.length === 0 && <div className="filtro-menu__vacio">Sin personas en este proyecto.</div>}
       </Desplegable>
 

@@ -89,7 +89,10 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   se marca lista o se replanifica con un clic en **cualquier día, pasado o futuro**
   (sirve para registrar tareas que ya ocurrieron con su fecha real; cuenta como
   replanificación); **clic derecho sobre la marca alterna lista / no lista**
-  (el menú contextual del navegador queda suprimido sobre la grilla). La ✓ de una
+  (el menú contextual del navegador queda suprimido sobre la grilla). Cada celda
+  explica su gesto con un **tooltip contextual** (con retardo corto) según su
+  estado — planificar, quitar/deshacer, marcar lista o replanificar — en vez de
+  una leyenda permanente. La ✓ de una
   lista queda en su última fecha planificada. "+" al pasar el mouse crea un hermano
   justo debajo (frente/sub frente/tarea) **inline en la propia grilla**, igual que
   los "+ agregar" de contenedores vacíos. Al pie, **filas de carga por persona**
@@ -101,9 +104,9 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   completa se despliega al lado y se repliega al salir. La preferencia se recuerda
   por usuario entre sesiones.
 - **Filtros guardables:** por Fecha Objetivo (relativas Hoy / Esta semana /
-  Próxima semana / Este mes — semana de lunes a domingo — o rango fijo),
-  Responsable y Estado, con multi-selección ("o" dentro del campo, "y" entre
-  campos). Se guardan con nombre, **privados por usuario y por proyecto**, y se
+  Próxima semana / Este mes — semana de lunes a domingo —, rango fijo o
+  **Sin fecha**), Responsable (incluye **Sin asignar**) y Estado, con
+  multi-selección ("o" dentro del campo, "y" entre campos). Se guardan con nombre, **privados por usuario y por proyecto**, y se
   aplican/actualizan/renombran/eliminan desde el desplegable. En la tabla filtran
   filas; en la Gantt, responsable y estado filtran tareas y **la fecha define el
   horizonte visible**.

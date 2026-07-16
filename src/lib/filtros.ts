@@ -13,9 +13,14 @@ export type FiltroFecha =
   | { tipo: 'relativa'; valor: FechaRelativa }
   | { tipo: 'rango'; desde?: ISODate; hasta?: ISODate }
 
+/** Valor especial del filtro de responsable: tareas SIN responsable. */
+export const RESP_SIN_ASIGNAR = '__sin_asignar__'
+
 export interface Filtro {
   fecha?: FiltroFecha
-  /** IDs de responsables ("o" entre si). */
+  /** Incluir tareas SIN fecha objetivo ("o" con el criterio de fecha). */
+  sinFecha?: boolean
+  /** IDs de responsables ("o" entre si; acepta RESP_SIN_ASIGNAR). */
   responsables?: string[]
   /** Categorias del modelo ("o" entre si). */
   estados?: Categoria[]
@@ -36,7 +41,12 @@ export const FECHA_RELATIVA_LABEL: Record<FechaRelativa, string> = {
 }
 
 export function filtroVacio(f: Filtro): boolean {
-  return !f.fecha && !(f.responsables && f.responsables.length) && !(f.estados && f.estados.length)
+  return (
+    !f.fecha &&
+    !f.sinFecha &&
+    !(f.responsables && f.responsables.length) &&
+    !(f.estados && f.estados.length)
+  )
 }
 
 /** true si el filtro restringe TAREAS (responsable/estado; la fecha no en Gantt). */
@@ -82,7 +92,9 @@ export function etiquetaFecha(f: FiltroFecha): string {
 /** Parte comun a ambas vistas: responsable y estado ("y" entre campos). */
 export function pasaFiltroTareas(state: AppState, t: Tarea, f: Filtro, hoy: ISODate): boolean {
   if (f.responsables && f.responsables.length > 0) {
-    if (!t.responsableId || !f.responsables.includes(t.responsableId)) return false
+    const conResponsable = !!t.responsableId && f.responsables.includes(t.responsableId)
+    const sinAsignar = !t.responsableId && f.responsables.includes(RESP_SIN_ASIGNAR)
+    if (!conResponsable && !sinAsignar) return false
   }
   if (f.estados && f.estados.length > 0) {
     if (!f.estados.includes(categoriaDe(state, t, hoy))) return false
@@ -93,12 +105,18 @@ export function pasaFiltroTareas(state: AppState, t: Tarea, f: Filtro, hoy: ISOD
 /** Filtro completo (vista tabla): fecha + responsable + estado. */
 export function pasaFiltroCompleto(state: AppState, t: Tarea, f: Filtro, hoy: ISODate): boolean {
   if (!pasaFiltroTareas(state, t, f, hoy)) return false
-  if (f.fecha) {
-    // Se filtra por Fecha Objetivo; sin fecha no hay coincidencia posible.
-    if (!t.fechaObjetivo) return false
-    const { desde, hasta } = rangoDeFecha(f.fecha, hoy)
-    if (desde && t.fechaObjetivo < desde) return false
-    if (hasta && t.fechaObjetivo > hasta) return false
+  if (f.fecha || f.sinFecha) {
+    if (!t.fechaObjetivo) {
+      // Sin fecha objetivo: solo pasa si el filtro pide "Sin fecha".
+      if (!f.sinFecha) return false
+    } else if (f.fecha) {
+      const { desde, hasta } = rangoDeFecha(f.fecha, hoy)
+      if (desde && t.fechaObjetivo < desde) return false
+      if (hasta && t.fechaObjetivo > hasta) return false
+    } else {
+      // Solo "Sin fecha" activo: las tareas con fecha quedan fuera.
+      return false
+    }
   }
   return true
 }
