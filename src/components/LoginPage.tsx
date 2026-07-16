@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Usuario } from '../types'
+import { Wordmark } from './Wordmark'
 
 // Pantalla de acceso. En Supabase: email + password. En modo Local: selector
 // de usuario ("entrar como…") para demostrar los roles sin backend.
@@ -35,7 +36,7 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
     <div className="login">
       <div className="login__card">
         <div className="login__brand">
-          Andotek Planning
+          <Wordmark />
           <small>Herramienta de Planificacion de Proyectos</small>
         </div>
 
