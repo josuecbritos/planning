@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react'
+import { ordenar, valorOrden, type Orden } from '../lib/orden'
+import { ThOrden } from './ThOrden'
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import type { Can } from '../lib/permisos'
@@ -31,6 +33,9 @@ interface Props {
 
 export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, actions, onAbrirTarea }: Props) {
   const filtrando = !filtroVacio(filtro)
+  // Orden por columna (punto 3): global a todos los sub frentes, sin
+  // mezclarlos; no se persiste (estado de componente, se pierde al salir).
+  const [orden, setOrden] = useState<Orden | null>(null)
   const frentes = state.frentes
     .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
     .sort((a, b) => a.orden - b.orden)
@@ -55,6 +60,8 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
           can={can}
           filtro={filtro}
           filtrando={filtrando}
+          orden={orden}
+          onOrden={setOrden}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
         />
@@ -74,6 +81,8 @@ function FrentePagina({
   can,
   filtro,
   filtrando,
+  orden,
+  onOrden,
   actions,
   onAbrirTarea,
 }: {
@@ -84,6 +93,8 @@ function FrentePagina({
   can: Can
   filtro: Filtro
   filtrando: boolean
+  orden: Orden | null
+  onOrden: (o: Orden | null) => void
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -114,6 +125,8 @@ function FrentePagina({
           can={can}
           filtro={filtro}
           filtrando={filtrando}
+          orden={orden}
+          onOrden={onOrden}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
         />
@@ -180,6 +193,8 @@ function SubFrenteTabla({
   can,
   filtro,
   filtrando,
+  orden,
+  onOrden,
   actions,
   onAbrirTarea,
 }: {
@@ -190,6 +205,8 @@ function SubFrenteTabla({
   can: Can
   filtro: Filtro
   filtrando: boolean
+  orden: Orden | null
+  onOrden: (o: Orden | null) => void
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -197,9 +214,15 @@ function SubFrenteTabla({
     .filter((t) => t.subFrenteId === sub.id)
     .sort((a, b) => a.orden - b.orden)
   // Las archivadas (canceladas, 6.3) salen del plan; quedan consultables abajo.
-  const tareas = todas.filter(
+  const visibles = todas.filter(
     (t) => !t.archivada && (!filtrando || pasaFiltroCompleto(state, t, filtro, hoy)),
   )
+  // Punto 3: el orden se aplica DENTRO del sub frente (no se mezclan);
+  // sin orden activo queda la secuencia manual del trabajo.
+  const tareas =
+    orden && orden.campo !== 'proyecto'
+      ? ordenar(visibles, orden, (t) => valorOrden(state, t, orden.campo as Exclude<typeof orden.campo, 'proyecto'>, hoy))
+      : visibles
   const archivadas = filtrando ? [] : todas.filter((t) => t.archivada)
 
   return (
@@ -236,11 +259,11 @@ function SubFrenteTabla({
                 la Original queda al final como referencia. */}
             <th className="col-check">Hecha</th>
             <th>Tarea</th>
-            <th className="col-resp">Resp.</th>
-            <th className="col-estado">Estado</th>
-            <th className="col-fecha">Fecha Objetivo</th>
+            <ThOrden campo="resp" orden={orden} onCambiar={onOrden} className="col-resp">Resp.</ThOrden>
+            <ThOrden campo="estado" orden={orden} onCambiar={onOrden} className="col-estado">Estado</ThOrden>
+            <ThOrden campo="objetivo" orden={orden} onCambiar={onOrden} className="col-fecha">Fecha Objetivo</ThOrden>
             {/* col-orig: en mobile esta columna se oculta (5 columnas). */}
-            <th className="col-fecha col-orig">Fecha Original</th>
+            <ThOrden campo="original" orden={orden} onCambiar={onOrden} className="col-fecha col-orig">Fecha Original</ThOrden>
             {can.algunoDeTareas && <th className="col-acc"></th>}
           </tr>
         </thead>

@@ -103,6 +103,10 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   franja de íconos (uno por proyecto) siempre clicable; al pasar el mouse la barra
   completa se despliega al lado y se repliega al salir. La preferencia se recuerda
   por usuario entre sesiones.
+- **Orden por columna** (proyectos y Mis Tareas): clic en el encabezado cicla
+  ascendente ↑ / descendente ↓ / orden original (el manual). Es global a todos
+  los sub frentes sin mezclarlos (la flecha aparece en todos); Estado ordena por
+  gravedad, no alfabético; es independiente de los filtros y no se persiste.
 - **Filtros guardables:** por Fecha Objetivo (relativas Hoy / Esta semana /
   Próxima semana / Este mes — semana de lunes a domingo —, rango fijo o
   **Sin fecha**), Responsable (incluye **Sin asignar**) y Estado, con
