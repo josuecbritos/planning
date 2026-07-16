@@ -505,8 +505,6 @@ table.tareas .col-estado { text-align: center; }
   gap: 10px; flex-wrap: wrap; min-height: 34px;
 }
 .horizonte .toggle button { padding: 6px 12px; font-size: 12.5px; }
-.horizonte__rango { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--gris-texto); }
-.horizonte__fecha { border: 1px solid var(--gris-borde); background: var(--superficie); width: auto; font-size: 12.5px; }
 
 /* §6.3.20: aviso de tareas de fin de semana ocultas */
 .aviso-finde {
@@ -535,53 +533,88 @@ table.tareas .col-estado { text-align: center; }
   padding: 6px 10px; border: 1px dashed var(--gris-borde); border-radius: 7px;
 }
 
-/* ---------- Filtros guardables (punto 3) ---------- */
+/* ---------- Filtros guardables (punto 3; estetica modernizada) ---------- */
 .filtros-bar {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin: 0 0 12px;
+  /* Separado del sidebar y del contenido (el texto no queda pegado). */
+  margin: 14px 20px 4px;
 }
-.filtros-bar__label { font-size: 12px; font-weight: 700; color: var(--gris-texto); text-transform: uppercase; letter-spacing: .04em; }
+.filtros-bar__label {
+  display: inline-flex; align-items: center; gap: 6px; margin-right: 2px;
+  font-size: 12.5px; font-weight: 700; color: var(--gris-texto);
+}
+.filtros-bar__label svg { flex: none; }
 .filtros-bar__sep { flex: 1; }
 .filtros-bar__limpiar { font-size: 12.5px; }
 .filtro-desplegable { position: relative; }
+
+/* Pills de campo: forma capsula, sombra suave, transiciones */
 .filtro-btn {
-  font: inherit; font-size: 12.5px; padding: 6px 12px; cursor: pointer;
-  background: var(--superficie); border: 1px solid var(--gris-borde); border-radius: 8px;
-  color: var(--texto);
+  display: inline-flex; align-items: center; gap: 7px;
+  font: inherit; font-size: 12.5px; font-weight: 600; padding: 7px 14px;
+  cursor: pointer; color: var(--texto);
+  background: var(--superficie); border: 1px solid var(--gris-borde); border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(15, 24, 32, .06);
+  transition: border-color .13s ease, box-shadow .13s ease, background .13s ease, color .13s ease;
 }
-.filtro-btn:hover { border-color: var(--verde); }
-.filtro-btn--activo { border-color: var(--verde); background: var(--verde-suave); font-weight: 700; }
-.filtro-btn--abierto { border-color: var(--verde); }
-.filtro-btn__caret { font-size: 9px; color: var(--gris-texto); }
+.filtro-btn:hover { border-color: var(--verde); box-shadow: 0 2px 8px rgba(15, 24, 32, .10); }
+.filtro-btn--abierto { border-color: var(--verde); box-shadow: 0 2px 8px rgba(15, 24, 32, .10); }
+.filtro-btn--activo { background: var(--verde); border-color: var(--verde); color: #fff; }
+.filtro-btn--activo .filtro-btn__caret { color: rgba(255, 255, 255, .8); }
+.filtro-btn__caret {
+  font-size: 9px; color: var(--gris-texto); line-height: 1;
+  transition: transform .15s ease;
+}
+.filtro-btn--abierto .filtro-btn__caret { transform: rotate(180deg); }
+.filtro-btn--guardar {
+  border-style: dashed; color: var(--verde-check); box-shadow: none;
+}
+.filtro-btn--guardar:hover:not(:disabled) { background: var(--verde-suave); }
+.filtro-btn--guardar:disabled {
+  color: var(--gris-texto); border-color: var(--gris-linea); cursor: default;
+  background: none; box-shadow: none;
+}
+
+/* Menus desplegables: radio amplio, sombra en capas, entrada animada */
 .filtro-menu {
-  position: absolute; top: calc(100% + 6px); left: 0; z-index: 1900;
-  min-width: 230px; background: var(--superficie); border: 1px solid var(--gris-linea);
-  border-radius: 10px; box-shadow: 0 12px 36px rgba(15,24,32,.18); padding: 6px;
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 1900;
+  min-width: 244px; background: var(--superficie); border: 1px solid var(--gris-linea);
+  border-radius: 14px; padding: 8px;
+  box-shadow: 0 18px 46px rgba(15, 24, 32, .16), 0 2px 8px rgba(15, 24, 32, .08);
+  animation: filtro-menu-in .13s ease-out;
+}
+@keyframes filtro-menu-in {
+  from { opacity: 0; transform: translateY(-5px) scale(.98); }
+  to { opacity: 1; transform: none; }
 }
 .filtro-menu--derecha { left: auto; right: 0; }
 .filtro-menu__grupo {
-  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
-  color: var(--gris-texto); padding: 6px 8px 2px;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--gris-texto); padding: 8px 10px 3px;
 }
-.filtro-menu__vacio { font-size: 12.5px; color: var(--gris-texto); padding: 8px 10px; }
+.filtro-menu__vacio { font-size: 12.5px; color: var(--gris-texto); padding: 10px 12px; }
 .filtro-op {
-  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
-  font: inherit; font-size: 13px; padding: 6px 9px; border: none; background: none;
-  border-radius: 7px; cursor: pointer; color: var(--texto);
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  font: inherit; font-size: 13px; padding: 8px 10px; border: none; background: none;
+  border-radius: 9px; cursor: pointer; color: var(--texto);
+  transition: background .1s ease;
 }
 .filtro-op:hover { background: var(--velo); }
-.filtro-op--on { background: var(--verde-suave); font-weight: 700; }
-.filtro-op--check input[type='checkbox'] { width: 15px; height: 15px; accent-color: var(--verde); flex: none; }
-.filtro-op--quitar { color: var(--rojo); font-size: 12.5px; margin-top: 4px; }
+.filtro-op--on { background: var(--verde-suave); font-weight: 700; color: var(--verde-check); }
+.filtro-op--check input[type='checkbox'] { width: 15px; height: 15px; accent-color: var(--verde); flex: none; cursor: pointer; }
+.filtro-op--quitar { color: var(--rojo); font-size: 12.5px; margin-top: 4px; justify-content: center; }
 .filtro-dot { width: 12px; height: 12px; border-radius: 4px; flex: none; }
-.filtro-rango { display: flex; align-items: center; gap: 6px; padding: 4px 8px 8px; font-size: 12px; color: var(--gris-texto); }
-.filtro-rango .fecha-input { width: auto; font-size: 12px; border: 1px solid var(--gris-borde); background: var(--superficie); }
-.filtro-guardado { display: flex; align-items: center; gap: 2px; border-radius: 7px; padding-right: 4px; }
+.filtro-rango { display: flex; align-items: center; gap: 6px; padding: 4px 10px 10px; font-size: 12px; color: var(--gris-texto); }
+.filtro-rango .fecha-input {
+  width: auto; font-size: 12px; border: 1px solid var(--gris-borde); background: var(--superficie);
+  color: var(--texto); border-radius: 7px; padding: 5px 7px;
+}
+.filtro-guardado { display: flex; align-items: center; gap: 2px; border-radius: 9px; padding-right: 4px; }
 .filtro-guardado:hover { background: var(--velo); }
 .filtro-guardado__aplicar {
   flex: 1; text-align: left; font: inherit; font-size: 13px; font-weight: 600;
-  border: none; background: none; padding: 7px 9px; cursor: pointer; color: var(--texto);
-  border-radius: 7px;
+  border: none; background: none; padding: 8px 10px; cursor: pointer; color: var(--texto);
+  border-radius: 9px;
 }
 .filtro-guardado .icon-btn { opacity: 0; }
 .filtro-guardado:hover .icon-btn { opacity: 1; }

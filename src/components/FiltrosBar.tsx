@@ -82,7 +82,17 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
 
   return (
     <div className="filtros-bar">
-      <span className="filtros-bar__label">Filtrar</span>
+      <span className="filtros-bar__label">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M4 5h16l-6.5 8v5.2L10.5 20v-7L4 5z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+        </svg>
+        Filtrar
+      </span>
 
       <Desplegable
         etiqueta={filtro.fecha ? `Fecha: ${etiquetaFecha(filtro.fecha)}` : 'Fecha'}
@@ -205,12 +215,12 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
       </Desplegable>
 
       <button
-        className="btn btn--ghost btn--sm"
+        className="filtro-btn filtro-btn--guardar"
         disabled={!activo}
         title={activo ? 'Guardar la combinacion actual con un nombre' : 'Arma un filtro para poder guardarlo'}
         onClick={() => setModal({ tipo: 'guardar' })}
       >
-        Guardar filtro…
+        + Guardar filtro
       </button>
 
       {modal?.tipo === 'guardar' && (
