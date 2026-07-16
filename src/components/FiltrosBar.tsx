@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { Usuario } from '../types'
+import type { Proyecto, Usuario } from '../types'
 import { CATEGORIA_LABEL, type Categoria } from '../lib/derive'
 import {
   FECHA_RELATIVA_LABEL,
@@ -34,15 +34,20 @@ function uid(): string {
 }
 
 interface Props {
-  proyectoId: string
+  /** Contexto de guardado: el id del proyecto, o 'mis-tareas' (los filtros
+   *  guardados son privados por usuario Y por contexto; no se mezclan). */
+  contexto: string
   usuarioId: string
-  candidatos: Usuario[]
+  /** Personas filtrables. Ausente = el campo Responsable no aplica. */
+  candidatos?: Usuario[]
+  /** Proyectos filtrables. Ausente = el campo Proyecto no aplica. */
+  proyectos?: Proyecto[]
   filtro: Filtro
   onCambiar: (f: Filtro) => void
 }
 
-export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambiar }: Props) {
-  const clave = `planificador.filtros.${usuarioId}.${proyectoId}`
+export function FiltrosBar({ contexto, usuarioId, candidatos, proyectos, filtro, onCambiar }: Props) {
+  const clave = `planificador.filtros.${usuarioId}.${contexto}`
   const [guardados, setGuardados] = useState<FiltroGuardado[]>([])
   const [modal, setModal] = useState<{ tipo: 'guardar' } | { tipo: 'renombrar'; id: string; nombre: string } | null>(null)
 
@@ -67,6 +72,7 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
   const activo = !filtroVacio(filtro)
   const nResp = filtro.responsables?.length ?? 0
   const nEst = filtro.estados?.length ?? 0
+  const nProy = filtro.proyectos?.length ?? 0
 
   const toggleResp = (id: string) => {
     const set = new Set(filtro.responsables ?? [])
@@ -79,6 +85,12 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
     if (set.has(c)) set.delete(c)
     else set.add(c)
     onCambiar({ ...filtro, estados: set.size ? [...set] : undefined })
+  }
+  const toggleProyecto = (id: string) => {
+    const set = new Set(filtro.proyectos ?? [])
+    if (set.has(id)) set.delete(id)
+    else set.add(id)
+    onCambiar({ ...filtro, proyectos: set.size ? [...set] : undefined })
   }
 
   return (
@@ -166,6 +178,7 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
         )}
       </Desplegable>
 
+      {candidatos && (
       <Desplegable etiqueta={nResp ? `Responsable (${nResp})` : 'Responsable'} activo={nResp > 0}>
         {candidatos.map((u) => (
           <label key={u.id} className="filtro-op filtro-op--check">
@@ -193,6 +206,32 @@ export function FiltrosBar({ proyectoId, usuarioId, candidatos, filtro, onCambia
           </button>
         )}
       </Desplegable>
+      )}
+
+      {proyectos && (
+        <Desplegable etiqueta={nProy ? `Proyecto (${nProy})` : 'Proyecto'} activo={nProy > 0}>
+          {proyectos.map((p) => (
+            <label key={p.id} className="filtro-op filtro-op--check">
+              <input
+                type="checkbox"
+                checked={filtro.proyectos?.includes(p.id) ?? false}
+                onChange={() => toggleProyecto(p.id)}
+              />
+              <span className="filtro-dot" style={{ background: p.color ?? '#607d8b' }} />
+              <span>{p.nombre}</span>
+            </label>
+          ))}
+          {proyectos.length === 0 && <div className="filtro-menu__vacio">Sin proyectos.</div>}
+          {nProy > 0 && (
+            <button
+              className="filtro-op filtro-op--quitar"
+              onClick={() => onCambiar({ ...filtro, proyectos: undefined })}
+            >
+              Limpiar filtro
+            </button>
+          )}
+        </Desplegable>
+      )}
 
       <Desplegable etiqueta={nEst ? `Estado (${nEst})` : 'Estado'} activo={nEst > 0}>
         {ESTADOS.map((c) => (

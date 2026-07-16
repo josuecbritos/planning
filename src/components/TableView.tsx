@@ -239,7 +239,8 @@ function SubFrenteTabla({
             <th className="col-resp">Resp.</th>
             <th className="col-estado">Estado</th>
             <th className="col-fecha">Fecha Objetivo</th>
-            <th className="col-fecha">Fecha Original</th>
+            {/* col-orig: en mobile esta columna se oculta (5 columnas). */}
+            <th className="col-fecha col-orig">Fecha Original</th>
             {can.algunoDeTareas && <th className="col-acc"></th>}
           </tr>
         </thead>
@@ -393,7 +394,7 @@ function NuevaTareaFila({
           aria-label="Fecha objetivo de la nueva tarea"
         />
       </td>
-      <td className="col-fecha mudo">{fechaObjetivo ? formatoFecha(fechaObjetivo) : '—'}</td>
+      <td className="col-fecha col-orig mudo">{fechaObjetivo ? formatoFecha(fechaObjetivo) : '—'}</td>
       <td className="col-acc">
         <button className="icon-btn" title="Guardar (Enter)" onMouseDown={(e) => e.preventDefault()} onClick={guardar}>✓</button>
         <button className="icon-btn" title="Cerrar (Esc)" onMouseDown={(e) => e.preventDefault()} onClick={() => { setTitulo(''); setActiva(false) }}>✕</button>
@@ -511,8 +512,8 @@ function TareaFila({
         )}
       </td>
 
-      {/* Siempre visible, sin enfasis especial cuando difiere (punto 5). */}
-      <td className="col-fecha">{tarea.fechaOriginal ? formatoFecha(tarea.fechaOriginal) : '—'}</td>
+      {/* Siempre visible en desktop, sin enfasis; en mobile se oculta. */}
+      <td className="col-fecha col-orig">{tarea.fechaOriginal ? formatoFecha(tarea.fechaOriginal) : '—'}</td>
 
       {can.algunoDeTareas && (
         <td className="col-acc">
