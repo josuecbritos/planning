@@ -14,6 +14,7 @@ import {
 } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { CAMPOS_MIS_TAREAS, ordenarMulti, valorOrden, type OrdenMulti } from '../lib/orden'
+import { useVistaCongelada } from '../lib/vistaCongelada'
 import { FiltrosBar } from './FiltrosBar'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
@@ -49,6 +50,8 @@ export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, on
   // guarde como vista; el "orden base" aqui es el propio de Mis Tareas
   // (atrasadas primero, luego por fecha).
   const [orden, setOrden] = useState<OrdenMulti>([])
+  // P1: nonce para re-snapshot de la vista congelada ("Actualizar vista").
+  const [snapNonce, setSnapNonce] = useState(0)
 
   // Todas mis tareas activas, de todos los proyectos visibles.
   const misFilas = useMemo<FilaMisTareas[]>(() => {
@@ -90,6 +93,24 @@ export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, on
     )
   }, [misFilas, filtro, filtrando, orden, state, hoy])
 
+  // P1: la vista se congela con filtro y/u orden activo (misma "foto" que en
+  // las tablas de proyecto). Editar una tarea no la saca ni la reordena; el
+  // control "Actualizar vista" recalcula.
+  const activo = filtrando || orden.length > 0
+  const frescoIds = useMemo(() => filtradas.map((f) => f.tarea.id), [filtradas])
+  const existentesIds = useMemo(() => misFilas.map((f) => f.tarea.id), [misFilas])
+  const firma = JSON.stringify([usuario.id, filtro, orden, snapNonce])
+  const { congelada, visibleIds, indice, stale } = useVistaCongelada(frescoIds, existentesIds, activo, firma)
+  const mostradas = useMemo(
+    () =>
+      congelada
+        ? misFilas
+            .filter((f) => visibleIds.has(f.tarea.id))
+            .sort((a, b) => (indice.get(a.tarea.id) ?? 0) - (indice.get(b.tarea.id) ?? 0))
+        : filtradas,
+    [congelada, visibleIds, indice, misFilas, filtradas],
+  )
+
   const atrasadas = misFilas.filter(({ tarea }) => esAtrasada(categoriaDe(state, tarea, hoy))).length
 
   return (
@@ -117,6 +138,8 @@ export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, on
         orden={orden}
         onCambiarOrden={setOrden}
         camposOrden={CAMPOS_MIS_TAREAS}
+        stale={stale}
+        onActualizarVista={() => setSnapNonce((n) => n + 1)}
       />
 
       <table className="tareas mistareas">
@@ -132,7 +155,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, on
           </tr>
         </thead>
         <tbody>
-          {filtradas.map((fila) => (
+          {mostradas.map((fila) => (
             <FilaTarea
               key={fila.tarea.id}
               fila={fila}
@@ -143,7 +166,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, on
               onAbrirTarea={onAbrirTarea}
             />
           ))}
-          {filtradas.length === 0 && (
+          {mostradas.length === 0 && (
             <tr>
               <td colSpan={7} className="vacio-inline">
                 {filtrando ? 'Ninguna tarea coincide con el filtro activo.' : 'Sin tareas a tu cargo.'}

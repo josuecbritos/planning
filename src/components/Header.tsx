@@ -11,11 +11,13 @@ interface Props {
   modo: 'memoria' | 'supabase'
   vista: Vista
   onVista: (v: Vista) => void
+  /** P5: en mobile no hay Gantt, así que se oculta el toggle de vistas. */
+  mostrarToggle: boolean
   contadores: Contadores
   hoy: string
 }
 
-export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Props) {
+export function Header({ proyecto, modo, vista, onVista, mostrarToggle, contadores, hoy }: Props) {
   const c = contadores
   return (
     <header className="topbar">
@@ -26,14 +28,16 @@ export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Prop
         </h1>
         <div className="topbar__row" style={{ gap: 12 }}>
           <span className="hoy-chip">Hoy{modo === 'supabase' ? '' : ' (simulado)'}: <b>{formatoFecha(hoy)}</b></span>
-          <div className="toggle">
-            <button className={vista === 'tabla' ? 'activo' : ''} onClick={() => onVista('tabla')}>
-              Tabla
-            </button>
-            <button className={vista === 'gantt' ? 'activo' : ''} onClick={() => onVista('gantt')}>
-              Gantt
-            </button>
-          </div>
+          {mostrarToggle && (
+            <div className="toggle">
+              <button className={vista === 'tabla' ? 'activo' : ''} onClick={() => onVista('tabla')}>
+                Tabla
+              </button>
+              <button className={vista === 'gantt' ? 'activo' : ''} onClick={() => onVista('gantt')}>
+                Gantt
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { Proyecto, Usuario } from '../types'
 import { CATEGORIA_LABEL, type Categoria } from '../lib/derive'
 import {
@@ -51,6 +52,12 @@ interface Props {
   onCambiarOrden: (o: OrdenMulti) => void
   /** Campos ordenables de este contexto (proyecto o Mis Tareas). */
   camposOrden: CampoOrdenOpc[]
+  /** P4: ¿estamos en la Gantt? Solo ahí se puede ACTIVAR "En horizonte visible". */
+  vistaGantt?: boolean
+  /** P1: la foto quedó desactualizada → mostrar "Actualizar vista". */
+  stale?: boolean
+  /** P1: recalcula la foto (re-snapshot). */
+  onActualizarVista?: () => void
 }
 
 export function FiltrosBar({
@@ -63,6 +70,9 @@ export function FiltrosBar({
   orden,
   onCambiarOrden,
   camposOrden,
+  vistaGantt = false,
+  stale = false,
+  onActualizarVista,
 }: Props) {
   const clave = `planificador.filtros.${usuarioId}.${contexto}`
   const [guardados, setGuardados] = useState<FiltroGuardado[]>([])
@@ -207,6 +217,30 @@ export function FiltrosBar({
         >
           Sin fecha
         </button>
+        {/* P4: "En horizonte visible (Gantt)" — solo en contexto de proyecto
+            (no en Mis Tareas, que cruza proyectos y no tiene un horizonte único).
+            Solo se ACTIVA desde la Gantt; desde la tabla puede desactivarse si ya
+            está activa. Excluyente: reemplaza cualquier otra selección de fecha. */}
+        {contexto !== 'mis-tareas' && (
+          <button
+            className={`filtro-op${filtro.fecha?.tipo === 'horizonte' ? ' filtro-op--on' : ''}`}
+            disabled={!vistaGantt && filtro.fecha?.tipo !== 'horizonte'}
+            title={
+              !vistaGantt && filtro.fecha?.tipo !== 'horizonte'
+                ? 'Se activa desde la Gantt'
+                : 'Tareas con fecha dentro del horizonte visible de la Gantt, más las sin fecha'
+            }
+            onClick={() =>
+              onCambiar({
+                ...filtro,
+                sinFecha: undefined,
+                fecha: filtro.fecha?.tipo === 'horizonte' ? undefined : { tipo: 'horizonte' },
+              })
+            }
+          >
+            En horizonte visible (Gantt)
+          </button>
+        )}
         {(filtro.fecha || filtro.sinFecha) && (
           <button
             className="filtro-op filtro-op--quitar"
@@ -357,6 +391,18 @@ export function FiltrosBar({
 
       <span className="filtros-bar__sep" />
 
+      {/* P1: aparece solo cuando la foto quedó desactualizada por una edición;
+          recalcula la vista (saca lo que ya no calza, reordena) y desaparece. */}
+      {stale && onActualizarVista && (
+        <button
+          className="filtro-btn filtro-btn--actualizar"
+          title="La vista quedó desactualizada por una edición: recalcular filtro y orden"
+          onClick={onActualizarVista}
+        >
+          ↻ Actualizar vista
+        </button>
+      )}
+
       <Desplegable etiqueta={`Vistas${guardados.length ? ` (${guardados.length})` : ''}`} activo={false} alDerecha>
         {guardados.length === 0 && <div className="filtro-menu__vacio">Aun no guardas vistas en este proyecto.</div>}
         {guardados.map((g) => (
@@ -448,32 +494,74 @@ function Desplegable({
   children: ReactNode
 }) {
   const [abierto, setAbierto] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  // P3: el menú se renderiza en un PORTAL con position: fixed anclado al botón,
+  // para que NUNCA lo recorte el overflow del contenedor (p. ej. la tabla corta
+  // de Mis Tareas). Se reposiciona al hacer scroll o resize mientras está abierto.
+  const [pos, setPos] = useState<{ top: number; left?: number; right?: number } | null>(null)
+
+  const recolocar = () => {
+    const b = btnRef.current
+    if (!b) return
+    const r = b.getBoundingClientRect()
+    setPos(
+      alDerecha
+        ? { top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) }
+        : { top: r.bottom + 6, left: r.left },
+    )
+  }
+
+  useLayoutEffect(() => {
+    if (abierto) recolocar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abierto])
 
   useEffect(() => {
     if (!abierto) return
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false)
+      const t = e.target as Node
+      if (btnRef.current?.contains(t) || menuRef.current?.contains(t)) return
+      setAbierto(false)
     }
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setAbierto(false)
+    const onMover = () => recolocar()
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
+    // capture: atrapa el scroll de cualquier contenedor, no solo el de la ventana.
+    window.addEventListener('scroll', onMover, true)
+    window.addEventListener('resize', onMover)
     return () => {
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onMover, true)
+      window.removeEventListener('resize', onMover)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abierto])
 
   return (
-    <div className="filtro-desplegable" ref={ref}>
+    <div className="filtro-desplegable">
       <button
+        ref={btnRef}
         className={`filtro-btn${activo ? ' filtro-btn--activo' : ''}${abierto ? ' filtro-btn--abierto' : ''}`}
         aria-expanded={abierto}
         onClick={() => setAbierto((v) => !v)}
       >
         {etiqueta} <span className="filtro-btn__caret">▾</span>
       </button>
-      {abierto && <div className={`filtro-menu${alDerecha ? ' filtro-menu--derecha' : ''}`}>{children}</div>}
+      {abierto &&
+        pos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className={`filtro-menu filtro-menu--portal${alDerecha ? ' filtro-menu--derecha' : ''}`}
+            style={{ position: 'fixed', top: pos.top, left: pos.left, right: pos.right }}
+          >
+            {children}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
