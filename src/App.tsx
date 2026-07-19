@@ -74,6 +74,36 @@ const FILTRO_VACIO: Filtro = {}
 const ORDEN_VACIO: OrdenMulti = []
 const VISTA_VACIA: VistaProyecto = { filtro: FILTRO_VACIO, orden: ORDEN_VACIO }
 
+// --- Tema: sigue al sistema del dispositivo por defecto, con override manual ---
+// Si el usuario tocó el interruptor, esa elección (guardada en localStorage,
+// por usuario) manda; si nunca lo tocó, se sigue el modo del sistema
+// (prefers-color-scheme), en vivo. El override sobrevive porque es explícito.
+
+/** Preferencia EXPLÍCITA del usuario, o null si no eligió (→ sigue el sistema). */
+function leerTemaPref(usuarioId: string | null): Tema | null {
+  if (!usuarioId) return null
+  try {
+    const v = localStorage.getItem(`planificador.tema.${usuarioId}`)
+    return v === 'claro' || v === 'oscuro' ? v : null
+  } catch {
+    return null
+  }
+}
+
+/** ¿El sistema del dispositivo pide modo oscuro? */
+function sistemaPrefiereOscuro(): boolean {
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  } catch {
+    return false
+  }
+}
+
+/** Tema efectivo: el override del usuario si existe; si no, el del sistema. */
+function temaEfectivo(usuarioId: string | null): Tema {
+  return leerTemaPref(usuarioId) ?? (sistemaPrefiereOscuro() ? 'oscuro' : 'claro')
+}
+
 export default function App() {
   const repo = useMemo(() => makeRepo(), [])
   const auth = useMemo(() => makeAuth(repo), [repo])
@@ -98,8 +128,9 @@ export default function App() {
   // estado (aplicar un filtro/orden en A no afecta a B); es momentaneo (vive
   // en memoria) salvo que se guarde como vista. Mapa keyed por id de proyecto.
   const [vistasProyecto, setVistasProyecto] = useState<Record<string, VistaProyecto>>({})
-  // Tema claro/oscuro (punto 4): boton manual, persistente por usuario.
-  const [tema, setTema] = useState<Tema>('claro')
+  // Tema claro/oscuro: por defecto sigue el modo del sistema; el interruptor
+  // manual (persistente por usuario) actúa como override una vez usado.
+  const [tema, setTema] = useState<Tema>(() => temaEfectivo(null))
   // Mobile: la sidebar se superpone al contenido al llamarla (boton ☰) y
   // se cierra al elegir una opcion. Sin efecto en desktop (CSS lo esconde).
   const [movilSidebar, setMovilSidebar] = useState(false)
@@ -137,18 +168,27 @@ export default function App() {
     document.documentElement.dataset.tema = tema
   }, [tema])
 
-  // Cargar la preferencia de tema del usuario (sin sesion: claro).
+  // Tema efectivo al cambiar de sesión: el override del usuario si eligió uno;
+  // si no, el modo del sistema del dispositivo.
   useEffect(() => {
-    if (!sesion) {
-      setTema('claro')
+    setTema(temaEfectivo(sesion?.id ?? null))
+  }, [sesion])
+
+  // Mientras el usuario NO haya fijado un override, seguir EN VIVO el modo del
+  // sistema: si el teléfono cambia de claro a oscuro (o al revés), la app
+  // acompaña. Con override activo, se respeta la elección manual.
+  useEffect(() => {
+    let mq: MediaQueryList
+    try {
+      mq = window.matchMedia('(prefers-color-scheme: dark)')
+    } catch {
       return
     }
-    try {
-      const v = localStorage.getItem(`planificador.tema.${sesion.id}`)
-      setTema(v === 'oscuro' ? 'oscuro' : 'claro')
-    } catch {
-      /* storage no disponible: queda el default */
+    const onChange = () => {
+      if (leerTemaPref(sesion?.id ?? null) === null) setTema(mq.matches ? 'oscuro' : 'claro')
     }
+    mq.addEventListener?.('change', onChange)
+    return () => mq.removeEventListener?.('change', onChange)
   }, [sesion])
 
   const toggleTema = useCallback(() => {
@@ -489,6 +529,16 @@ export default function App() {
         onClick={() => setMovilSidebar((v) => !v)}
       >
         {movilSidebar ? '✕' : '☰'}
+      </button>
+      {/* Interruptor de tema visible y alcanzable en mobile (además del que
+          vive en el pie de la sidebar). Oculto en desktop via CSS. */}
+      <button
+        className="movil-tema"
+        aria-label={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        title={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        onClick={toggleTema}
+      >
+        {tema === 'oscuro' ? '☀' : '🌙'}
       </button>
       {movilSidebar && <div className="movil-velo" onClick={() => setMovilSidebar(false)} />}
       {/* Punto 6: en modo escondida queda una franja de iconos siempre

@@ -142,8 +142,12 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   sin marca, planificables ahí mismo) sin tocar el horizonte. En la tabla, los
   filtros quedan **fijos arriba** al hacer scroll y los encabezados de columna se
   congelan justo debajo.
-- **Modo oscuro:** botón manual (🌙/☀ al pie de la sidebar; no sigue al sistema
-  operativo), persistente por usuario. Los cinco colores de estado conservan su
+- **Modo oscuro:** por defecto **sigue el modo del sistema** del dispositivo
+  (`prefers-color-scheme`), en vivo — un teléfono en oscuro ve la app oscura sin
+  configurar nada. El botón 🌙/☀ es un **override manual** persistente por usuario:
+  una vez que eliges claro u oscuro, esa elección manda por sobre el sistema. El
+  botón vive al pie de la sidebar y, en mobile, también como **botón flotante
+  junto al ☰** (siempre alcanzable). Los cinco colores de estado conservan su
   identidad con variantes ajustadas para fondo oscuro; el rastro de fechas
   anteriores queda visible incluso en tareas hechas (memoria histórica de la
   grilla; el color de fila y los contadores sí las tratan como Hecha).
