@@ -603,6 +603,10 @@ table.tareas .col-desv { text-align: center; }
 .filtro-btn--abierto { border-color: var(--primario); }
 .filtro-btn--activo { background: var(--primario); border-color: var(--primario); color: var(--sobre-primario); }
 .filtro-btn--activo .filtro-btn__caret { color: inherit; opacity: .7; }
+/* P1 "Actualizar vista": realce discreto en azul (no el naranja de marca ni el
+   ámbar de estado), para no competir con la semántica de colores. */
+.filtro-btn--actualizar { border-color: var(--hoy); color: var(--hoy); background: var(--hoy-col); }
+.filtro-btn--actualizar:hover { border-color: var(--hoy); background: rgba(21, 101, 192, 0.16); }
 .filtro-btn__caret {
   font-size: 9px; color: var(--gris-texto); line-height: 1;
   transition: transform .15s ease;
@@ -630,6 +634,9 @@ table.tareas .col-desv { text-align: center; }
   to { opacity: 1; transform: none; }
 }
 .filtro-menu--derecha { left: auto; right: 0; }
+/* P3: en portal (position:fixed anclado al botón) va por encima del contenido
+   y de los botones flotantes de mobile, sin recorte del contenedor. */
+.filtro-menu--portal { z-index: 2400; max-height: 80vh; overflow-y: auto; }
 .filtro-menu__grupo {
   font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
   color: var(--gris-texto); padding: 8px 10px 3px;
@@ -642,6 +649,8 @@ table.tareas .col-desv { text-align: center; }
   transition: background .1s ease;
 }
 .filtro-op:hover { background: var(--velo); }
+.filtro-op:disabled { opacity: .4; cursor: default; }
+.filtro-op:disabled:hover { background: none; }
 .filtro-op--on { background: var(--velo-fuerte); font-weight: 700; }
 .filtro-op--check input[type='checkbox'] { width: 15px; height: 15px; accent-color: var(--primario); flex: none; cursor: pointer; }
 .filtro-op--quitar { color: var(--rojo); font-size: 12.5px; margin-top: 4px; justify-content: center; }
@@ -795,6 +804,11 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 }
 .gantt thead .fija { z-index: 4; }
 .gantt thead tr.semana th { border-bottom: 1px solid var(--gris-borde); }
+/* P2: las DOS bandas del encabezado quedan fijas al scroll vertical — la de
+   rango/período arriba (top:0) y la de días justo debajo (top = alto de la
+   banda de rango, medido por JS en --gantt-semana-h). Las celdas fijas de la
+   izquierda abarcan ambas (rowSpan 2) y quedan en top:0. */
+.gantt thead tr:not(.semana) th.dia { top: var(--gantt-semana-h, 22px); }
 
 .gantt th.dia { min-width: 30px; width: 30px; padding: 2px; font-weight: 600; line-height: 1.25; }
 .gantt th.dia small { display: block; font-size: 9.5px; color: #90a0ad; font-weight: 500; }

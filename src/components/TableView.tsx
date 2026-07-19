@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
+import { useVistaCongelada } from '../lib/vistaCongelada'
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import type { Can } from '../lib/permisos'
@@ -27,13 +28,19 @@ interface Props {
   filtro: Filtro
   /** Orden multinivel activo (punto 4): parte de la vista, por proyecto. */
   orden: OrdenMulti
+  /** P1: nonce que fuerza el re-snapshot de la vista congelada ("Actualizar"). */
+  snapshotNonce: number
+  /** P1: informa si la foto quedó desactualizada (para "Actualizar vista"). */
+  onStale: (stale: boolean) => void
   actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
 }
 
-export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, actions, onAbrirTarea }: Props) {
+export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, snapshotNonce, onStale, actions, onAbrirTarea }: Props) {
   const filtrando = !filtroVacio(filtro)
+  // P1: la vista se congela cuando hay filtro y/u orden activo.
+  const activo = filtrando || orden.length > 0
   const frentes = state.frentes
     .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
     .sort((a, b) => a.orden - b.orden)
@@ -45,6 +52,34 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
       (u.rol === 'admin' ||
         state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
   )
+
+  // P1: lista FRESCA de ids (filtro+orden aplicados ahora) y existentes del
+  // scope, recorriendo frentes→subs→tareas igual que el render. La foto se
+  // toma de aquí y se compara contra esto para saber si está desactualizada.
+  const { frescoIds, existentesIds } = useMemo(() => {
+    const fresco: string[] = []
+    const existentes: string[] = []
+    for (const f of frentes) {
+      const subs = state.subFrentes.filter((sf) => sf.frenteId === f.id).sort((a, b) => a.orden - b.orden)
+      for (const sf of subs) {
+        const todas = state.tareas
+          .filter((t) => t.subFrenteId === sf.id && !t.archivada)
+          .sort((a, b) => a.orden - b.orden)
+        for (const t of todas) existentes.push(t.id)
+        const visibles = todas.filter((t) => !filtrando || pasaFiltroCompleto(state, t, filtro, hoy))
+        const ordenadas = ordenarMulti(visibles, orden, (t, campo) =>
+          valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
+        )
+        for (const t of ordenadas) fresco.push(t.id)
+      }
+    }
+    return { frescoIds: fresco, existentesIds: existentes }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, proyectoId, frenteSel, filtrando, filtro, orden, hoy])
+
+  const firma = JSON.stringify([proyectoId, frenteSel, filtro, orden, snapshotNonce])
+  const { congelada, visibleIds, indice, stale } = useVistaCongelada(frescoIds, existentesIds, activo, firma)
+  useEffect(() => onStale(stale), [stale, onStale])
 
   return (
     <div className="tabla-wrap">
@@ -59,6 +94,9 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           filtro={filtro}
           filtrando={filtrando}
           orden={orden}
+          congelada={congelada}
+          visibleIds={visibleIds}
+          indice={indice}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
         />
@@ -79,6 +117,9 @@ function FrentePagina({
   filtro,
   filtrando,
   orden,
+  congelada,
+  visibleIds,
+  indice,
   actions,
   onAbrirTarea,
 }: {
@@ -90,6 +131,9 @@ function FrentePagina({
   filtro: Filtro
   filtrando: boolean
   orden: OrdenMulti
+  congelada: boolean
+  visibleIds: Set<string>
+  indice: Map<string, number>
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -97,12 +141,16 @@ function FrentePagina({
     .filter((sf) => sf.frenteId === frente.id)
     .sort((a, b) => a.orden - b.orden)
 
-  // Con filtro activo, los contenedores sin coincidencias se omiten.
+  // Con filtro activo, los contenedores sin coincidencias se omiten. La foto
+  // congelada manda: un sub muestra las tareas de su foto (aunque una edición
+  // las haya sacado del filtro); se omite solo si su foto quedó vacía.
   const coincidencias = (subId: string) =>
-    state.tareas.filter(
-      (t) => t.subFrenteId === subId && !t.archivada && pasaFiltroCompleto(state, t, filtro, hoy),
-    ).length
-  const subsVisibles = filtrando ? subs.filter((sf) => coincidencias(sf.id) > 0) : subs
+    congelada
+      ? state.tareas.some((t) => t.subFrenteId === subId && visibleIds.has(t.id))
+      : state.tareas.some(
+          (t) => t.subFrenteId === subId && !t.archivada && pasaFiltroCompleto(state, t, filtro, hoy),
+        )
+  const subsVisibles = filtrando ? subs.filter((sf) => coincidencias(sf.id)) : subs
   if (filtrando && subsVisibles.length === 0) return null
 
   return (
@@ -121,6 +169,9 @@ function FrentePagina({
           filtro={filtro}
           filtrando={filtrando}
           orden={orden}
+          congelada={congelada}
+          visibleIds={visibleIds}
+          indice={indice}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
         />
@@ -188,6 +239,9 @@ function SubFrenteTabla({
   filtro,
   filtrando,
   orden,
+  congelada,
+  visibleIds,
+  indice,
   actions,
   onAbrirTarea,
 }: {
@@ -199,21 +253,27 @@ function SubFrenteTabla({
   filtro: Filtro
   filtrando: boolean
   orden: OrdenMulti
+  congelada: boolean
+  visibleIds: Set<string>
+  indice: Map<string, number>
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
   const todas = state.tareas
     .filter((t) => t.subFrenteId === sub.id)
     .sort((a, b) => a.orden - b.orden)
-  // Las archivadas (canceladas, 6.3) salen del plan; quedan consultables abajo.
-  const visibles = todas.filter(
-    (t) => !t.archivada && (!filtrando || pasaFiltroCompleto(state, t, filtro, hoy)),
-  )
-  // Punto 4: el orden multinivel se aplica DENTRO del sub frente (las tareas
-  // no se mezclan entre sub frentes); sin reglas queda la secuencia manual.
-  const tareas = ordenarMulti(visibles, orden, (t, campo) =>
-    valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
-  )
+  // P1: con la vista congelada, se muestran EXACTAMENTE las tareas de la foto
+  // (membresía + orden congelados): editar una tarea no la saca ni la reordena.
+  // Sin congelar (vista live), se filtra y ordena en vivo.
+  const tareas = congelada
+    ? todas
+        .filter((t) => visibleIds.has(t.id))
+        .sort((a, b) => (indice.get(a.id) ?? 0) - (indice.get(b.id) ?? 0))
+    : ordenarMulti(
+        todas.filter((t) => !t.archivada && (!filtrando || pasaFiltroCompleto(state, t, filtro, hoy))),
+        orden,
+        (t, campo) => valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
+      )
   const archivadas = filtrando ? [] : todas.filter((t) => t.archivada)
 
   return (

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AppState, Frente, ISODate, SubFrente, Tarea, TipoMarca, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
@@ -14,7 +14,8 @@ import {
   inicioSemana,
 } from '../lib/dates'
 import { colorTarea, fechaVigente, marcasDe } from '../lib/derive'
-import { filtraTareas, pasaFiltroTareas, rangoDeFecha, type Filtro } from '../lib/filtros'
+import { fechaFiltraGantt, filtraTareas, pasaFechaGantt, pasaFiltroTareas, rangoDeFecha, type Filtro } from '../lib/filtros'
+import { useVistaCongelada } from '../lib/vistaCongelada'
 import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
 import type { Can } from '../lib/permisos'
 import { Marca } from './Marca'
@@ -56,6 +57,13 @@ interface Props {
   /** Orden multinivel (punto 4): reordena las filas dentro de cada bloque de
    *  sub frente, sin mezclarlas entre bloques. */
   orden: OrdenMulti
+  /** P4: la Gantt escribe el rango del horizonte al filtro cuando "En horizonte
+   *  visible" está activo, para que la tabla use el mismo rango. */
+  onCambiarFiltro: (f: Filtro) => void
+  /** P1: nonce que fuerza el re-snapshot de la vista congelada. */
+  snapshotNonce: number
+  /** P1: informa si la foto quedó desactualizada (para "Actualizar vista"). */
+  onStale: (stale: boolean) => void
   actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
@@ -136,7 +144,7 @@ function ventanaHoy(hoy: ISODate): { desde: ISODate; hasta: ISODate } {
   }
 }
 
-export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, actions, onAbrirTarea }: Props) {
+export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, onCambiarFiltro, snapshotNonce, onStale, actions, onAbrirTarea }: Props) {
   // Horizonte: por defecto "Alrededor de hoy"; no se persiste.
   const [modo, setModo] = useState<ModoHorizonte>('hoy')
   // §6.3.19: solo dias habiles (default) o semana completa de 7 dias.
@@ -166,9 +174,43 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   // horizonte; en su lugar FILTRA: quedan solo las tareas sin fecha (filas
   // sin marcas, planificables con un clic) y el horizonte no cambia. Con
   // filtro de tareas activo, los contenedores sin coincidencias se omiten.
-  const hayFiltroTareas = filtraTareas(filtro) || !!filtro.sinFecha
+  const hayFiltroTareas = filtraTareas(filtro) || fechaFiltraGantt(filtro)
   const pasaEnGantt = (t: Tarea) =>
-    pasaFiltroTareas(state, t, filtro, hoy) && (!filtro.sinFecha || !t.fechaObjetivo)
+    pasaFiltroTareas(state, t, filtro, hoy) && pasaFechaGantt(filtro, t, hoy)
+
+  // P1: vista congelada. Se congela con filtro y/u orden activo. `frescoIds`
+  // recorre frentes→subs→tareas aplicando el filtro/orden actual; la foto se
+  // compara contra esto para saber si quedó desactualizada por una edición.
+  const activo = hayFiltroTareas || orden.length > 0
+  const { frescoIds, existentesIds } = useMemo(() => {
+    const fresco: string[] = []
+    const existentes: string[] = []
+    const frentesOrd = state.frentes
+      .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
+      .sort((a, b) => a.orden - b.orden)
+    for (const f of frentesOrd) {
+      const subs = state.subFrentes.filter((sf) => sf.frenteId === f.id).sort((a, b) => a.orden - b.orden)
+      for (const sf of subs) {
+        const todas = state.tareas
+          .filter((t) => t.subFrenteId === sf.id && !t.archivada)
+          .sort((a, b) => a.orden - b.orden)
+        for (const t of todas) existentes.push(t.id)
+        const visibles = todas.filter(
+          (t) => !hayFiltroTareas || (pasaFiltroTareas(state, t, filtro, hoy) && pasaFechaGantt(filtro, t, hoy)),
+        )
+        const ord = ordenarMulti(visibles, orden, (t, campo) =>
+          valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
+        )
+        for (const t of ord) fresco.push(t.id)
+      }
+    }
+    return { frescoIds: fresco, existentesIds: existentes }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, proyectoId, frenteSel, hayFiltroTareas, filtro, orden, hoy])
+
+  const firma = JSON.stringify([proyectoId, frenteSel, filtro, orden, snapshotNonce])
+  const { congelada, visibleIds, indice, stale } = useVistaCongelada(frescoIds, existentesIds, activo, firma)
+  useEffect(() => onStale(stale), [stale, onStale])
 
   // -- Filas (incluye contenedores vacios §6.4.26 e inputs inline §6.4.25) --
   const filas = useMemo<FilaGantt[]>(() => {
@@ -188,14 +230,22 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         if (!hayFiltroTareas) filasFrente.push({ tipo: 'vacio-frente', frente: f, esPrimeraGlobal: false })
       } else {
         for (const sf of subs) {
-          const manual = state.tareas
-            .filter((t) => t.subFrenteId === sf.id && !t.archivada && (!hayFiltroTareas || pasaEnGantt(t)))
+          const todasSub = state.tareas
+            .filter((t) => t.subFrenteId === sf.id && !t.archivada)
             .sort((a, b) => a.orden - b.orden)
-          // Punto 4: el orden del menu reordena DENTRO del bloque de sub frente
-          // (no mezcla tareas entre bloques); sin reglas queda el orden manual.
-          const tareas = ordenarMulti(manual, orden, (t, campo) =>
-            valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
-          )
+          // Punto 4: el orden reordena DENTRO del bloque de sub frente (no mezcla
+          // entre bloques). P1: con la vista congelada se muestran EXACTAMENTE las
+          // tareas de la foto (membresía + orden), sin sacar ni reordenar por
+          // ediciones; sin congelar, se filtra y ordena en vivo.
+          const tareas = congelada
+            ? todasSub
+                .filter((t) => visibleIds.has(t.id))
+                .sort((a, b) => (indice.get(a.id) ?? 0) - (indice.get(b.id) ?? 0))
+            : ordenarMulti(
+                todasSub.filter((t) => !hayFiltroTareas || pasaEnGantt(t)),
+                orden,
+                (t, campo) => valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
+              )
           const filasSub: FilaGantt[] = []
           if (tareas.length === 0) {
             if (hayFiltroTareas) continue
@@ -276,7 +326,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
       out.push({ tipo: 'input-frente', esPrimeraGlobal: out.length === 0 })
     }
     return out
-  }, [state, proyectoId, frenteSel, crearEn, filtro, orden, hoy, hayFiltroTareas])
+  }, [state, proyectoId, frenteSel, crearEn, filtro, orden, hoy, hayFiltroTareas, congelada, visibleIds, indice])
 
   const filasTarea = useMemo(
     () => filas.filter((f): f is Extract<FilaGantt, { tipo: 'tarea' }> => f.tipo === 'tarea'),
@@ -290,7 +340,10 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     let desde: ISODate
     let hasta: ISODate
 
-    const rangoFiltro = filtro.fecha ? rangoDeFecha(filtro.fecha, hoy) : null
+    // "En horizonte visible" NO fija el horizonte (el horizonte lo define el
+    // modo); al revés, el rango se DERIVA del horizonte (efecto más abajo).
+    const rangoFiltro =
+      filtro.fecha && filtro.fecha.tipo !== 'horizonte' ? rangoDeFecha(filtro.fecha, hoy) : null
     if (rangoFiltro && (rangoFiltro.desde || rangoFiltro.hasta)) {
       const v = ventanaHoy(hoy)
       desde = rangoFiltro.desde ?? v.desde
@@ -321,6 +374,18 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
 
     return soloHabiles ? diasHabiles(desde, hasta) : diasCalendario(desde, hasta)
   }, [filasTarea, state.historial, hoy, modo, soloHabiles, filtro.fecha])
+
+  // P4: con "En horizonte visible" activo, sincroniza el rango del filtro con
+  // el horizonte visible actual (primer y último día). Así la tabla filtra por
+  // el mismo rango. Solo escribe si cambió, para no ciclar.
+  useEffect(() => {
+    if (filtro.fecha?.tipo !== 'horizonte') return
+    const desde = dias[0]
+    const hasta = dias[dias.length - 1]
+    if (!desde || !hasta) return
+    if (filtro.fecha.desde === desde && filtro.fecha.hasta === hasta) return
+    onCambiarFiltro({ ...filtro, fecha: { tipo: 'horizonte', desde, hasta } })
+  }, [dias, filtro, onCambiarFiltro])
 
   // §6.3.20: en modo dias habiles, tareas con fecha de finde quedan ocultas.
   const ocultasFinde = useMemo(() => {
@@ -427,6 +492,12 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
       raf = 0
       const sr = scroll.getBoundingClientRect()
       const headH = thead ? thead.getBoundingClientRect().height : 0
+      // P2: publica el alto de la banda de rango (fila superior del thead) para
+      // que la banda de días se congele JUSTO debajo (segunda banda sticky).
+      const semanaRow = thead?.querySelector<HTMLElement>('tr.semana')
+      if (semanaRow) {
+        scroll.style.setProperty('--gantt-semana-h', `${Math.round(semanaRow.getBoundingClientRect().height)}px`)
+      }
       const bandTop = sr.top + headH
       const bandBottom = sr.bottom
       const bandH = bandBottom - bandTop
@@ -506,7 +577,9 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
               Semana completa
             </button>
           </div>
-          {filtro.fecha ? (
+          {/* "En horizonte visible" NO fija el horizonte: deja el toggle de modo
+              disponible (su rango se deriva del horizonte elegido). */}
+          {filtro.fecha && filtro.fecha.tipo !== 'horizonte' ? (
             <span className="horizonte-filtro" title="Quita el filtro de fecha para volver a elegir el horizonte">
               Horizonte definido por el filtro de fecha
             </span>

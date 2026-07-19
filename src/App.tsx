@@ -121,6 +121,10 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [vista, setVista] = useState<Vista>('tabla')
   const [pantalla, setPantalla] = useState<Pantalla>('proyectos')
+  // P1: vista congelada ("foto"). El nonce fuerza el re-snapshot al tocar
+  // "Actualizar vista"; `vistaStale` lo reporta la vista activa (tabla/Gantt).
+  const [snapshotNonce, setSnapshotNonce] = useState(0)
+  const [vistaStale, setVistaStale] = useState(false)
   // Punto 6: modo de la sidebar. Primera preferencia persistente de la app
   // (por usuario, sobrevive a recargas y sesiones posteriores).
   const [sidebarModo, setSidebarModo] = useState<SidebarModo>('fija')
@@ -134,6 +138,16 @@ export default function App() {
   // Mobile: la sidebar se superpone al contenido al llamarla (boton ☰) y
   // se cierra al elegir una opcion. Sin efecto en desktop (CSS lo esconde).
   const [movilSidebar, setMovilSidebar] = useState(false)
+  // ¿Viewport mobile? En mobile no existe la Gantt (P5): la grilla no funciona
+  // en pantalla angosta, así que la vista se fuerza a Tabla y se oculta el
+  // toggle de vistas. Desktop mantiene Tabla + Gantt.
+  const [esMovil, setEsMovil] = useState(() => {
+    try {
+      return window.matchMedia('(max-width: 768px)').matches
+    } catch {
+      return false
+    }
+  })
   const [frenteSel, setFrenteSel] = useState<FrenteSel>('todos')
   const [proyectoActivoId, setProyectoActivoId] = useState<string | null>(null)
   // Panel lateral de detalle (7.2): id de la tarea abierta, o null.
@@ -167,6 +181,19 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.tema = tema
   }, [tema])
+
+  // Seguir el ancho del viewport para saber si estamos en mobile (P5).
+  useEffect(() => {
+    let mq: MediaQueryList
+    try {
+      mq = window.matchMedia('(max-width: 768px)')
+    } catch {
+      return
+    }
+    const onChange = () => setEsMovil(mq.matches)
+    mq.addEventListener?.('change', onChange)
+    return () => mq.removeEventListener?.('change', onChange)
+  }, [])
 
   // Tema efectivo al cambiar de sesión: el override del usuario si eligió uno;
   // si no, el modo del sistema del dispositivo.
@@ -395,11 +422,25 @@ export default function App() {
     setProyectoActivoId(null)
   }, [auth])
 
+  // P1: "Actualizar vista" recalcula la foto (nuevo snapshot) y baja el flag.
+  const actualizarVista = useCallback(() => {
+    setSnapshotNonce((n) => n + 1)
+    setVistaStale(false)
+  }, [])
+
+  // Cambiar de vista/proyecto recalcula la foto naturalmente (no cuenta como
+  // "edición"): se baja el flag de desactualizada por si venía de la anterior.
+  const cambiarVista = useCallback((v: Vista) => {
+    setVista(v)
+    setVistaStale(false)
+  }, [])
+
   const onSelectProyecto = useCallback((id: string) => {
     setProyectoActivoId(id)
     setFrenteSel('todos')
     setPantalla('proyectos')
     // Punto 3: NO se limpia el filtro/orden — cada proyecto conserva el suyo.
+    setVistaStale(false)
     setMovilSidebar(false)
   }, [])
 
@@ -408,6 +449,8 @@ export default function App() {
   const vistaActiva = proyectoActivoId ? vistasProyecto[proyectoActivoId] ?? VISTA_VACIA : VISTA_VACIA
   const setFiltro = useCallback(
     (f: Filtro) => {
+      // Cambiar el filtro recalcula la foto (no es una "edición" de datos).
+      setVistaStale(false)
       setVistasProyecto((prev) => {
         if (!proyectoActivoId) return prev
         const cur = prev[proyectoActivoId] ?? VISTA_VACIA
@@ -418,6 +461,7 @@ export default function App() {
   )
   const setOrden = useCallback(
     (o: OrdenMulti) => {
+      setVistaStale(false)
       setVistasProyecto((prev) => {
         if (!proyectoActivoId) return prev
         const cur = prev[proyectoActivoId] ?? VISTA_VACIA
@@ -429,6 +473,7 @@ export default function App() {
 
   const onSelectFrente = useCallback((f: FrenteSel) => {
     setFrenteSel(f)
+    setVistaStale(false)
     setMovilSidebar(false)
   }, [])
 
@@ -504,6 +549,8 @@ export default function App() {
 
   const proyecto = proyectosVisibles.find((p) => p.id === proyectoActivoId) ?? null
   const tareaDetalle = tareaDetalleId ? state.tareas.find((t) => t.id === tareaDetalleId) ?? null : null
+  // P5: en mobile la Gantt no existe; la vista efectiva se fuerza a Tabla.
+  const vistaEfectiva: Vista = esMovil ? 'tabla' : vista
 
   // Candidatos a responsable del proyecto activo (para el filtro).
   const candidatosFiltro = proyecto
@@ -623,7 +670,8 @@ export default function App() {
               proyecto={proyecto}
               modo={repo.modo}
               vista={vista}
-              onVista={setVista}
+              onVista={cambiarVista}
+              mostrarToggle={!esMovil}
               contadores={contadores}
               hoy={HOY}
             />
@@ -637,8 +685,11 @@ export default function App() {
                 orden={vistaActiva.orden}
                 onCambiarOrden={setOrden}
                 camposOrden={CAMPOS_PROYECTO}
+                vistaGantt={vistaEfectiva === 'gantt'}
+                stale={vistaStale}
+                onActualizarVista={actualizarVista}
               />
-              {vista === 'tabla' ? (
+              {vistaEfectiva === 'tabla' ? (
                 <TableView
                   state={state}
                   proyectoId={proyecto.id}
@@ -647,6 +698,8 @@ export default function App() {
                   can={can}
                   filtro={vistaActiva.filtro}
                   orden={vistaActiva.orden}
+                  snapshotNonce={snapshotNonce}
+                  onStale={setVistaStale}
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                 />
@@ -659,6 +712,9 @@ export default function App() {
                   can={can}
                   filtro={vistaActiva.filtro}
                   orden={vistaActiva.orden}
+                  onCambiarFiltro={setFiltro}
+                  snapshotNonce={snapshotNonce}
+                  onStale={setVistaStale}
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                 />

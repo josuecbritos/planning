@@ -89,6 +89,11 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 - **Horizonte del Gantt:** *Alrededor de hoy* (default fijo: 2 semanas atrás +
   actual + 2 adelante, no persistido) y *Todo el proyecto*. Para ver un rango
   específico se usa el filtro de fechas con rango fijo, que define el horizonte.
+  Al hacer scroll vertical, **ambas bandas del encabezado** (rango/período arriba
+  + días abajo) quedan **fijas** como un único bloque sticky.
+- **En mobile la Gantt no se ofrece** (la grilla no funciona en pantalla
+  angosta): dentro de un proyecto solo queda la Tabla, sin toggle de vistas. Mis
+  Tareas se abre desde el menú izquierdo. En desktop se mantienen Tabla y Gantt.
 - **Gantt editable — estándar por clics (sin arrastre):** clic izquierdo en una
   celda vacía planifica la tarea ese día; clic izquierdo sobre una marca **futura**
   la borra — si la marca venía de una replanificación, borrarla **deshace ese
@@ -141,7 +146,20 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   fecha**, que en la Gantt filtra (muestra solo las tareas sin fecha, como filas
   sin marca, planificables ahí mismo) sin tocar el horizonte. En la tabla, los
   filtros quedan **fijos arriba** al hacer scroll y los encabezados de columna se
-  congelan justo debajo.
+  congelan justo debajo. Los desplegables de filtro se muestran **por encima del
+  contenedor** (no se recortan aunque la tabla sea corta, p. ej. en Mis Tareas).
+- **"En horizonte visible (Gantt)"** (opción del filtro de Fecha): muestra las
+  tareas con Fecha Objetivo **dentro del horizonte actual** de la Gantt, más las
+  **sin fecha**. Solo se **activa desde la Gantt**; una vez activa **filtra ambas
+  vistas** (tabla y Gantt) usando ese mismo rango; se puede **desactivar desde
+  cualquier vista**. Es un modo de fecha excluyente y momentáneo (el rango es
+  siempre "lo que está visible ahora").
+- **Vista congelada ("foto"):** con un filtro y/u orden activo, el conjunto de
+  filas visibles y su orden quedan **congelados**: editar una tarea (planificar,
+  mover fecha, marcar hecha, renombrar, reasignar) **no la saca de la vista ni la
+  reordena**, aunque deje de calzar. Cuando la foto queda desactualizada aparece,
+  junto a "Vistas", un control discreto **"Actualizar vista"** que la recalcula (y
+  desaparece). Sin filtro ni orden, la vista es **live**. Aplica a tabla y Gantt.
 - **Modo oscuro:** por defecto **sigue el modo del sistema** del dispositivo
   (`prefers-color-scheme`), en vivo — un teléfono en oscuro ve la app oscura sin
   configurar nada. El botón 🌙/☀ es un **override manual** persistente por usuario:
