@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import type { AlcancePermiso, PermisosCliente, Usuario } from '../types'
+import type { AlcancePermiso, PermisosTareas } from '../types'
 import { Modal } from './Modal'
 
-// Configuracion de permisos por cliente (§7.29-30): cada permiso es una
-// fila de una lista; los que actuan sobre tareas se controlan con un
-// selector segmentado de tres posiciones que hace el ALCANCE explicito:
-// [ No | Solo asignadas | Todas ].
+// Set de OCHO permisos sobre tareas, POR ACCESO (usuario × proyecto). El
+// mismo componente sirve para clientes y para consultores invitados a
+// proyectos ajenos (3.2): cada permiso es una fila; los que actuan sobre
+// tareas se controlan con un selector segmentado de tres posiciones que
+// hace el ALCANCE explicito: [ No | Solo asignadas | Todas ].
 
 type PermisoTarea = 'editarFechas' | 'marcarHechas' | 'editarTareas' | 'archivarEliminar' | 'asignarResponsable'
 type PermisoCreacion = 'crearFrentes' | 'crearSubFrentes' | 'crearTareas'
@@ -25,7 +26,7 @@ const SOBRE_TAREAS: { key: PermisoTarea; label: string; hint?: string }[] = [
 ]
 
 /** Selector segmentado generico (2 o 3 posiciones). */
-function Seg<T extends string | boolean>({
+export function Seg<T extends string | boolean>({
   opciones,
   valor,
   onChange,
@@ -55,13 +56,18 @@ function Seg<T extends string | boolean>({
 }
 
 interface Props {
-  usuario: Usuario
-  onGuardar: (permisos: PermisosCliente) => void
+  /** Nombre de la persona configurada (para el titulo). */
+  nombre: string
+  /** Proyecto al que pertenece el acceso (los permisos son POR PROYECTO). */
+  contexto?: string
+  /** Permisos actuales del acceso (nacen con el default del rol, 4). */
+  permisos: PermisosTareas
+  onGuardar: (permisos: PermisosTareas) => void
   onClose: () => void
 }
 
-export function PermisosModal({ usuario, onGuardar, onClose }: Props) {
-  const [permisos, setPermisos] = useState<PermisosCliente>({ ...(usuario.permisos ?? {}) })
+export function PermisosModal({ nombre, contexto, permisos: iniciales, onGuardar, onClose }: Props) {
+  const [permisos, setPermisos] = useState<PermisosTareas>({ ...iniciales })
 
   const setCreacion = (k: PermisoCreacion, v: boolean) =>
     setPermisos((p) => ({ ...p, [k]: v }))
@@ -69,10 +75,11 @@ export function PermisosModal({ usuario, onGuardar, onClose }: Props) {
     setPermisos((p) => ({ ...p, [k]: v }))
 
   return (
-    <Modal titulo={`Permisos de ${usuario.nombre}`} onClose={onClose} ancho>
+    <Modal titulo={`Permisos de ${nombre}${contexto ? ` en ${contexto}` : ''}`} onClose={onClose} ancho>
       <div className="permisos">
         <p className="permisos__intro">
-          Configuracion propia de este cliente. Sin permisos activos, solo lectura.
+          Permisos de este acceso (por usuario y por proyecto). Nacen con el
+          default del rol; ajustables permiso a permiso.
         </p>
 
         <h4 className="permisos__grupo">Crear elementos</h4>
@@ -122,7 +129,7 @@ export function PermisosModal({ usuario, onGuardar, onClose }: Props) {
 
         <p className="permisos__nota">
           <strong>Solo asignadas</strong>: unicamente las tareas cuyo responsable es este
-          cliente. <strong>Todas</strong>: cualquier tarea de sus proyectos.
+          usuario. <strong>Todas</strong>: cualquier tarea del proyecto.
         </p>
 
         <div className="modal-acciones">

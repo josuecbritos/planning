@@ -15,9 +15,12 @@ interface Props {
   mostrarToggle: boolean
   contadores: Contadores
   hoy: string
+  /** Miembros del proyecto (roles punto 7): presente si el usuario puede
+   *  verlos (admin o dueño). */
+  onMiembros?: () => void
 }
 
-export function Header({ proyecto, modo, vista, onVista, mostrarToggle, contadores, hoy }: Props) {
+export function Header({ proyecto, modo, vista, onVista, mostrarToggle, contadores, hoy, onMiembros }: Props) {
   const c = contadores
   return (
     <header className="topbar">
@@ -27,6 +30,11 @@ export function Header({ proyecto, modo, vista, onVista, mostrarToggle, contador
           <small>{c.total} tareas</small>
         </h1>
         <div className="topbar__row" style={{ gap: 12 }}>
+          {onMiembros && (
+            <button className="btn btn--ghost btn--sm" onClick={onMiembros} title="Personas con acceso a este proyecto">
+              Miembros
+            </button>
+          )}
           <span className="hoy-chip">Hoy{modo === 'supabase' ? '' : ' (simulado)'}: <b>{formatoFecha(hoy)}</b></span>
           {mostrarToggle && (
             <div className="toggle">

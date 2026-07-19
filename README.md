@@ -22,8 +22,8 @@ simulada (30-oct-2024) para que el dataset de demo muestre tareas hechas, vencid
 y futuras; en Supabase, "hoy" es la fecha real del sistema.
 
 **Login por modo:** en Supabase el login es real (email + contraseña, Supabase Auth).
-En modo Local es un selector "entrar como…" con los usuarios del seed (2 admins y
-1 cliente), pensado para demostrar los roles sin backend.
+En modo Local es un selector "entrar como…" con los usuarios del seed (2 admins,
+1 consultor con proyecto propio y 1 cliente), para demostrar los roles sin backend.
 
 ## Ejecutar
 
@@ -169,14 +169,40 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   identidad con variantes ajustadas para fondo oscuro; el rastro de fechas
   anteriores queda visible incluso en tareas hechas (memoria histórica de la
   grilla; el color de fila y los contadores sí las tratan como Hecha).
-- **Permisos por cliente (§7):** cada usuario cliente tiene su configuración
-  (crear frentes/sub frentes/tareas; editar fechas, marcar hechas, editar,
-  archivar/eliminar, asignar responsable — cada uno con alcance "todas" o "solo
-  asignadas"). Se configuran desde el Módulo de Usuarios (🔑) y se refuerzan en
-  la base de datos (RLS + trigger campo a campo).
+- **Roles y permisos (reestructuración):** tres roles — **Admin** (ve y
+  gestiona absolutamente todo; puede haber **varios admins**), **Consultor**
+  (los proyectos que **él creó** + los que el admin le asigne; no ve los de
+  otros consultores) y **Cliente** (solo los proyectos donde lo invitan).
+  **Principio rector — dueño vs invitado:** si creaste el proyecto tienes
+  **control total** dentro de él, sin configuración de permisos; si te
+  invitaron/asignaron, operas según los permisos configurados **en tu acceso**
+  (un invitado es un invitado, sea cliente o consultor). El admin queda fuera
+  del principio: control total en todo.
+- **Dos niveles de permisos:** (1) **Permisos de proyecto** del consultor
+  (crear proyectos, archivar/eliminar los suyos, invitar clientes, configurar
+  permisos de sus clientes) — pantalla propia (🔧 en Usuarios), los configura
+  el admin. (2) **Set de ocho sobre tareas**, POR ACCESO (usuario × proyecto):
+  crear frentes/sub frentes/tareas; editar fechas, marcar hechas, editar,
+  archivar/eliminar, asignar responsable — con alcance "todas" o "solo
+  asignadas" (asignar con "solo asignadas" = puede soltar lo suyo, no tomar lo
+  ajeno). El mismo componente (🔑) sirve para clientes y consultores invitados.
+  Todo se refuerza en la base de datos (RLS + triggers campo a campo).
+- **Defaults por rol (al crear/asignar):** consultor → crear proyectos ✓,
+  archivar/eliminar los suyos ✓, invitar clientes ✓, configurar permisos ✗.
+  Cliente (ejecutor del plan) → crear tareas ✓, fechas y hechas "solo
+  asignadas", asignar responsable "todas", estructura ✗. Consultor invitado a
+  proyecto ajeno → todo habilitado ("un colega, no un cliente"). Ajustables
+  caso a caso; ya no arranca todo en "No". **Los comentarios no se configuran:
+  todos comentan siempre** (append-only).
+- **Miembros:** el dueño de un proyecto ve **quiénes** están asignados
+  (botón "Miembros" en el encabezado), pero **no sus permisos**; configura solo
+  a los clientes de sus proyectos y solo con el permiso habilitado. Solo el
+  admin asigna consultores a proyectos (propios o ajenos).
 - **Alta por invitación (§8):** el admin crea el usuario y le envía un correo con
-  enlace (caduca en 7 días, reenviable); el invitado define su contraseña. Ver
-  DEPLOY.md para configurar el proveedor de correo y las Edge Functions.
+  enlace (caduca en 7 días, reenviable); el invitado define su contraseña. Un
+  consultor con el permiso "invitar clientes" también puede invitar a los
+  clientes de sus proyectos. Ver DEPLOY.md para el proveedor de correo y las
+  Edge Functions.
 
 **CRUD (Fase 1) — con interacción inline (Bloque 2)**
 - Proyectos: crear / editar (nombre, descripción, color, estado) / eliminar. Multi-proyecto.
@@ -188,26 +214,39 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   la fecha abre el calendario; elegir guarda), archivar y eliminar.
 - **Comentarios acumulables** por tarea (N5): hilo con autor y fecha, append-only —
   cada comentario suma, nunca reemplaza. Chip 💬 en la fila; el hilo vive en el
-  panel de detalle. Comentan los admins; el cliente lo lee.
+  panel de detalle. **Todos los miembros comentan, siempre**; no se editan.
 
 **Historial de replanificaciones (5.6)**
 - En Supabase, un **trigger nativo** registra cada cambio de `fecha_objetivo`, de modo
   que ningún camino de edición lo eluda (recomendación del documento). El actor se pasa
   vía el RPC `replanificar_tarea`. En modo Local, la misma regla se aplica en código.
 
-**Usuarios y roles (Fase 2 — Módulo 1 / 7.1)**
+**Usuarios y roles (Fase 2 — reestructurado)**
 - **Login**: Supabase Auth (email + contraseña). El Admin crea al usuario con su email;
   cuando esa persona inicia sesión por primera vez, un trigger vincula su cuenta.
-- **Módulo de Usuarios** (solo Admins): listar, crear, editar, desactivar/reactivar,
-  y asignar/desasignar proyectos a usuarios Cliente, proyecto a proyecto (tabla 5.7).
-- **Regla de 2 Admins** (5.1): el sistema admite exactamente 2 admins activos. La regla
-  vive como trigger en la base de datos y la UI deshabilita la opción al llegar al límite.
-- **Cliente**: ve **solo los proyectos asignados**, con las mismas vistas Tabla y Gantt
-  (sin diferencia visual, como pide 4.3) pero **solo lectura**: sin botones de edición,
-  sin checkbox, sin replanificar, sin módulo de usuarios.
-- **RLS real**: las políticas de Postgres garantizan a nivel de base de datos que el
-  cliente solo lee sus proyectos asignados y que solo los admins escriben — la interfaz
-  es una capa de conveniencia, no la barrera de seguridad.
+- **Módulo de Usuarios** (solo Admins): listar, crear (con 3 roles y defaults),
+  editar, desactivar/reactivar; asignar proyectos a **consultores y clientes**
+  (cualquier proyecto, propio o de otro consultor); 🔧 permisos de proyecto del
+  consultor; 🔑 permisos del acceso (por proyecto).
+- **Sin límite de admins**: se eliminó la regla de "exactamente 2".
+- **RLS real**: las políticas de Postgres garantizan a nivel de base de datos la
+  visibilidad por rol (admin todo; consultor dueño + asignados; cliente
+  invitados) y la escritura por permisos — la interfaz es una capa de
+  conveniencia, no la barrera de seguridad. `scripts/validar-rls.mjs` la valida
+  rol por rol contra la API.
+
+**Migración a roles (runbook — aplicar en este orden)**
+0. **Respaldo**: export manual de la base (Dashboard → Database, o `pg_dump`).
+   El plan gratuito no trae backups automáticos.
+1. **Migración 12** (`20260707000012_roles_y_permisos.sql`): modelo + backfill
+   (rol consultor, dueño = admin creador, accesos generalizados con permisos,
+   los clientes demo conservan su configuración) + RLS completa. Todo junto.
+2. **Redeploy de la Edge Function** `invitar-usuario` (`supabase functions deploy
+   invitar-usuario`): ahora autoriza también a consultores con permiso.
+3. **Compuerta de validación** (crítica): `node scripts/validar-rls.mjs` con las
+   credenciales de prueba (ver cabecera del script). Verifica rol por rol que la
+   RLS **impide** el acceso indebido — no solo que la UI lo oculta.
+4. **Recién entonces** invitar usuarios reales.
 
 **Fase 3 — Pulido**
 - **Mis Tareas (Módulo 3)**: únicamente las tareas donde el usuario
@@ -249,6 +288,15 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 - `supabase/migrations/20260707000006_estados_y_fechas.sql` — fechas opcionales
   (la tarea nace sin fecha; la primera fija `fecha_original` sin historial) y
   anclaje de toda fecha al día hábil más cercano, ambos como triggers.
+- `supabase/migrations/20260707000012_roles_y_permisos.sql` — **reestructuración
+  de roles**: rol `consultor` y fin del límite de 2 admins; dueño de proyecto
+  (`creado_por`, con backfill al admin creador); `acceso_cliente_proyecto` →
+  `acceso_proyecto` con `permisos` jsonb POR ACCESO (backfill desde
+  `usuario.permisos`: los clientes demo conservan su configuración);
+  `usuario.permisos_proyecto` para consultores; defaults por rol vía triggers;
+  y **RLS reescrita completa** (dueño vs invitado). Corrige de paso el
+  historial de replanificaciones para invitados (trigger security definer) y
+  habilita comentar a todos los miembros. **Aplicar con el runbook de arriba.**
 
 Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
 mismo email que registraste en el Módulo de Usuarios). Al primer login se vinculan.

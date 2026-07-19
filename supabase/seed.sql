@@ -1,8 +1,8 @@
 -- =====================================================================
 -- Seed inicial (opcional) — se ejecuta con `supabase db reset`.
--- Regla 5.1: exactamente 2 Admins. Los responsables de tareas solo
--- pueden ser esos 2 admins (5.5). Se incluye un usuario Cliente de demo
--- con acceso al proyecto (5.7).
+-- Roles reestructurados: admins (varios permitidos), consultores (dueños
+-- de sus proyectos) y clientes invitados. El dueño del proyecto es
+-- proyecto.creado_por.
 -- =====================================================================
 
 insert into usuario (id, nombre, iniciales, email, rol) values
@@ -11,15 +11,16 @@ insert into usuario (id, nombre, iniciales, email, rol) values
   ('55555555-5555-5555-5555-555555555555', 'Cliente Arauco', 'CA', 'contacto@arauco.cl', 'cliente')
 on conflict (id) do nothing;
 
--- Proyecto de arranque.
+-- Proyecto de arranque (dueño: el admin que lo creo).
 insert into proyecto (id, nombre, descripcion, color, estado, creado_por) values
   ('aaaaaaaa-0000-0000-0000-000000000001', 'Plan PGP Arauco',
    'Implementacion del Plan de Gestion de Procesos — cliente Arauco.',
    '#2e7d32', 'activo', '22222222-2222-2222-2222-222222222222')
 on conflict (id) do nothing;
 
--- El cliente de demo tiene acceso al proyecto (tabla 5.7).
-insert into acceso_cliente_proyecto (usuario_id, proyecto_id) values
+-- El cliente de demo esta invitado al proyecto (su acceso nace con el
+-- default del rol via trigger aplicar_default_acceso).
+insert into acceso_proyecto (usuario_id, proyecto_id) values
   ('55555555-5555-5555-5555-555555555555', 'aaaaaaaa-0000-0000-0000-000000000001')
 on conflict do nothing;
 

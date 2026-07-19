@@ -1,12 +1,15 @@
 import { useState } from 'react'
-import type { AppState, Usuario } from '../types'
+import type { AppState, Proyecto, Usuario } from '../types'
 import type { Actions } from '../App'
 import { UsuarioModal } from './UsuarioModal'
 import { PermisosModal } from './PermisosModal'
+import { PermisosProyectoModal } from './PermisosProyectoModal'
 import { supabaseConfigured, getClient } from '../data/client'
 
-// Modulo de Usuarios (7.1). Solo accesible para Admins:
-// listar, crear, editar, desactivar usuarios y asignar proyectos a Clientes.
+// Modulo de Usuarios (7.1, reestructurado por roles-y-permisos). Solo para
+// Admins: listar, crear, editar y desactivar usuarios; asignar proyectos a
+// consultores y clientes (6); configurar permisos de proyecto del consultor
+// (3.1) y el set de ocho POR ACCESO (3.2, mismo componente para ambos roles).
 
 interface Props {
   state: AppState
@@ -17,8 +20,12 @@ interface Props {
 type ModalState =
   | { tipo: 'nuevo' }
   | { tipo: 'editar'; usuario: Usuario }
-  | { tipo: 'permisos'; usuario: Usuario }
+  | { tipo: 'permisos-acceso'; usuario: Usuario; proyecto: Proyecto }
+  | { tipo: 'permisos-proyecto'; usuario: Usuario }
   | null
+
+const ROL_ORDEN: Record<Usuario['rol'], number> = { admin: 0, consultor: 1, cliente: 2 }
+const ROL_LABEL: Record<Usuario['rol'], string> = { admin: 'Admin', consultor: 'Consultor', cliente: 'Cliente' }
 
 export function UsersView({ state, usuarioActual, actions }: Props) {
   const [modal, setModal] = useState<ModalState>(null)
@@ -43,11 +50,8 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
     }
   }
 
-  const adminsActivos = state.usuarios.filter((u) => u.rol === 'admin' && u.activo).length
-  const adminsCompletos = adminsActivos >= 2
-
   const usuarios = [...state.usuarios].sort((a, b) => {
-    if (a.rol !== b.rol) return a.rol === 'admin' ? -1 : 1
+    if (a.rol !== b.rol) return ROL_ORDEN[a.rol] - ROL_ORDEN[b.rol]
     return a.nombre.localeCompare(b.nombre)
   })
 
@@ -57,7 +61,8 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
         <div>
           <h2>Usuarios</h2>
           <p className="usuarios-sub">
-            {adminsActivos}/2 admins activos · Los clientes solo ven los proyectos que se les asignen.
+            Admins: todo · Consultores: sus proyectos + asignados · Clientes: solo invitados.
+            Los permisos nacen con el default del rol.
           </p>
         </div>
         <button className="btn btn--primary" onClick={() => setModal({ tipo: 'nuevo' })}>
@@ -74,7 +79,7 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
             <th>Email</th>
             <th>Rol</th>
             <th>Estado</th>
-            <th>Proyectos asignados</th>
+            <th>Proyectos</th>
             <th className="col-acc"></th>
           </tr>
         </thead>
@@ -87,7 +92,8 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
               state={state}
               actions={actions}
               onEditar={() => setModal({ tipo: 'editar', usuario: u })}
-              onPermisos={() => setModal({ tipo: 'permisos', usuario: u })}
+              onPermisosAcceso={(proyecto) => setModal({ tipo: 'permisos-acceso', usuario: u, proyecto })}
+              onPermisosProyecto={() => setModal({ tipo: 'permisos-proyecto', usuario: u })}
               onInvitar={() => invitar(u)}
               invitando={invitandoId === u.id}
             />
@@ -96,23 +102,35 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
       </table>
 
       {modal?.tipo === 'nuevo' && (
-        <UsuarioModal
-          adminsCompletos={adminsCompletos}
-          onSubmit={(d) => actions.createUsuario(d)}
+        <UsuarioModal onSubmit={(d) => actions.createUsuario(d)} onClose={() => setModal(null)} />
+      )}
+      {modal?.tipo === 'permisos-acceso' && (
+        <PermisosModal
+          nombre={modal.usuario.nombre}
+          contexto={modal.proyecto.nombre}
+          permisos={
+            state.accesos.find(
+              (a) => a.usuarioId === modal.usuario.id && a.proyectoId === modal.proyecto.id,
+            )?.permisos ?? {}
+          }
+          onGuardar={(permisos) =>
+            actions.updateAccesoPermisos(modal.usuario.id, modal.proyecto.id, permisos)
+          }
           onClose={() => setModal(null)}
         />
       )}
-      {modal?.tipo === 'permisos' && (
-        <PermisosModal
+      {modal?.tipo === 'permisos-proyecto' && (
+        <PermisosProyectoModal
           usuario={modal.usuario}
-          onGuardar={(permisos) => actions.updateUsuario(modal.usuario.id, { permisos })}
+          onGuardar={(permisosProyecto) =>
+            actions.updateUsuario(modal.usuario.id, { permisosProyecto })
+          }
           onClose={() => setModal(null)}
         />
       )}
       {modal?.tipo === 'editar' && (
         <UsuarioModal
           usuario={modal.usuario}
-          adminsCompletos={adminsCompletos}
           onSubmit={(d) => actions.updateUsuario(modal.usuario.id, { nombre: d.nombre, iniciales: d.iniciales })}
           onClose={() => setModal(null)}
         />
@@ -127,7 +145,8 @@ function UsuarioFila({
   state,
   actions,
   onEditar,
-  onPermisos,
+  onPermisosAcceso,
+  onPermisosProyecto,
   onInvitar,
   invitando,
 }: {
@@ -136,7 +155,8 @@ function UsuarioFila({
   state: AppState
   actions: Actions
   onEditar: () => void
-  onPermisos: () => void
+  onPermisosAcceso: (proyecto: Proyecto) => void
+  onPermisosProyecto: () => void
   onInvitar: () => void
   invitando: boolean
 }) {
@@ -144,8 +164,11 @@ function UsuarioFila({
   const proyectosAsignados = accesos
     .map((a) => state.proyectos.find((p) => p.id === a.proyectoId))
     .filter((p): p is NonNullable<typeof p> => Boolean(p))
+  // Dueño de (consultores): control total, sin permisos que configurar.
+  const proyectosPropios = state.proyectos.filter((p) => p.duenoId === usuario.id)
+  // Asignables: cualquier proyecto que no sea suyo ni este ya asignado (6).
   const proyectosDisponibles = state.proyectos.filter(
-    (p) => !accesos.some((a) => a.proyectoId === p.id),
+    (p) => p.duenoId !== usuario.id && !accesos.some((a) => a.proyectoId === p.id),
   )
 
   return (
@@ -159,9 +182,7 @@ function UsuarioFila({
       </td>
       <td>{usuario.email}</td>
       <td>
-        <span className={`chip-rol chip-rol--${usuario.rol}`}>
-          {usuario.rol === 'admin' ? 'Admin' : 'Cliente'}
-        </span>
+        <span className={`chip-rol chip-rol--${usuario.rol}`}>{ROL_LABEL[usuario.rol]}</span>
       </td>
       <td>{usuario.activo ? 'Activo' : 'Inactivo'}</td>
       <td>
@@ -169,10 +190,24 @@ function UsuarioFila({
           <span className="usuarios-todos">Todos (Admin)</span>
         ) : (
           <div className="asignaciones">
+            {proyectosPropios.map((p) => (
+              <span key={p.id} className="asignacion asignacion--propia" title="Dueño: control total, sin permisos que configurar">
+                <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
+                {p.nombre}
+                <span className="chip-dueno">Dueño</span>
+              </span>
+            ))}
             {proyectosAsignados.map((p) => (
               <span key={p.id} className="asignacion">
                 <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
                 {p.nombre}
+                <button
+                  className="icon-btn"
+                  title={`Permisos en ${p.nombre}`}
+                  onClick={() => onPermisosAcceso(p)}
+                >
+                  🔑
+                </button>
                 <button
                   className="icon-btn"
                   title="Quitar acceso"
@@ -196,16 +231,18 @@ function UsuarioFila({
                 ))}
               </select>
             )}
-            {proyectosAsignados.length === 0 && proyectosDisponibles.length === 0 && (
-              <span className="usuarios-sin">Sin proyectos</span>
-            )}
+            {proyectosPropios.length === 0 &&
+              proyectosAsignados.length === 0 &&
+              proyectosDisponibles.length === 0 && (
+                <span className="usuarios-sin">Sin proyectos</span>
+              )}
           </div>
         )}
       </td>
       <td className="col-acc">
         <button className="icon-btn" title="Editar" onClick={onEditar}>✎</button>
-        {usuario.rol === 'cliente' && (
-          <button className="icon-btn" title="Permisos" onClick={onPermisos}>🔑</button>
+        {usuario.rol === 'consultor' && (
+          <button className="icon-btn" title="Permisos de proyecto (3.1)" onClick={onPermisosProyecto}>🔧</button>
         )}
         {supabaseConfigured && !usuario.authId && usuario.activo && (
           <button

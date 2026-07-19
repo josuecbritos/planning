@@ -1074,7 +1074,34 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 }
 .chip-rol { font-size: 11.5px; font-weight: 700; border-radius: 6px; padding: 3px 9px; }
 .chip-rol--admin { background: var(--verde-suave); color: var(--verde-check); }
+.chip-rol--consultor { background: var(--ambar-suave); color: var(--ambar-texto); }
 .chip-rol--cliente { background: #e3f2fd; color: #1565c0; }
+/* Dueño de proyecto (roles): control total, sin permisos que configurar. */
+.chip-dueno {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  font-family: var(--mono); border-radius: 6px; padding: 2px 7px;
+  background: var(--primario); color: var(--sobre-primario);
+}
+.asignacion--propia { opacity: .92; }
+
+/* Miembros del proyecto (roles punto 7) */
+.miembros-lista { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.miembro {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--gris-linea); border-radius: 8px; padding: 8px 10px;
+}
+.miembro__info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.miembro__info small { color: var(--gris-texto); }
+.miembro__acciones { display: inline-flex; gap: 2px; }
+.miembros-vacio { color: var(--gris-texto); font-size: 13px; padding: 8px 4px; list-style: none; }
+.miembros-agregar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.miembros-nuevo { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.miembros-nuevo input {
+  font: inherit; font-size: 13px; padding: 6px 9px;
+  border: 1px solid var(--gris-borde); border-radius: 6px;
+  background: var(--superficie); color: var(--texto);
+}
+.miembros-nota { width: 100%; font-size: 12px; color: var(--gris-texto); margin: 4px 0 0; }
 .usuarios-todos, .usuarios-sin { font-size: 12.5px; color: var(--gris-texto); font-style: italic; }
 .usuarios-aviso {
   font-size: 12.5px; color: var(--verde-check); background: var(--verde-suave);

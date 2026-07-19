@@ -87,7 +87,7 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
                   <span className="resp-badge">{u.iniciales}</span>
                   <span className="login__usuario-info">
                     <b>{u.nombre}</b>
-                    <small>{u.rol === 'admin' ? 'Admin' : 'Cliente'} · {u.email}</small>
+                    <small>{u.rol === 'admin' ? 'Admin' : u.rol === 'consultor' ? 'Consultor' : 'Cliente'} · {u.email}</small>
                   </span>
                 </button>
               ))}

@@ -1,6 +1,7 @@
-import type { Acceso, AppState, Comentario, Frente, Proyecto, Replanificacion, SubFrente, Tarea, Usuario } from '../types'
+import type { Acceso, AppState, Comentario, Frente, PermisosTareas, Proyecto, Replanificacion, SubFrente, Tarea, Usuario } from '../types'
 import { hoyISO } from '../lib/dates'
-import { initialState } from './seed'
+import { DEFAULT_PERMISOS_PROYECTO, defaultPermisosTareas } from '../lib/permisos'
+import { initialState, proyectoConsultor } from './seed'
 import type {
   NuevaTarea,
   NuevoFrente,
@@ -63,12 +64,58 @@ function load(): AppState {
           }
         }
       }
+      migrarRoles(s)
       return s
     }
   } catch {
     /* ignora storage no disponible o corrupto */
   }
   return clone(initialState)
+}
+
+/**
+ * Migracion de roles-y-permisos sobre estados locales previos (espejo del
+ * backfill SQL, punto 9): dueño a cada proyecto (el primer admin), permisos
+ * del usuario copiados A SU ACCESO (los clientes demo conservan su
+ * configuracion), defaults de proyecto a los consultores, y el consultor de
+ * demo con su proyecto si no existen.
+ */
+function migrarRoles(s: AppState) {
+  const primerAdmin = s.usuarios.find((u) => u.rol === 'admin' && u.activo)
+  for (const p of s.proyectos) {
+    if (!p.duenoId) p.duenoId = primerAdmin?.id
+  }
+  for (const a of s.accesos) {
+    if (a.permisos === undefined) {
+      // Campo legado usuario.permisos (modelo anterior, global por usuario).
+      const legado = (s.usuarios.find((u) => u.id === a.usuarioId) as { permisos?: PermisosTareas } | undefined)
+        ?.permisos
+      a.permisos = legado ? clone(legado) : {}
+    }
+  }
+  for (const u of s.usuarios) {
+    delete (u as { permisos?: PermisosTareas }).permisos
+    if (u.rol === 'consultor' && !u.permisosProyecto) {
+      u.permisosProyecto = { ...DEFAULT_PERMISOS_PROYECTO }
+    }
+  }
+  // Consultor de demo + su proyecto propio (para ejercitar dueño vs invitado).
+  if (!s.usuarios.some((u) => u.rol === 'consultor')) {
+    const demo = initialState.usuarios.find((u) => u.id === 'u-consultor')
+    if (demo && !s.usuarios.some((u) => u.email === demo.email)) s.usuarios.push(clone(demo))
+    if (!s.proyectos.some((p) => p.id === proyectoConsultor.id)) {
+      s.proyectos.push(clone(proyectoConsultor))
+      for (const f of initialState.frentes.filter((f) => f.proyectoId === proyectoConsultor.id)) {
+        s.frentes.push(clone(f))
+        for (const sf of initialState.subFrentes.filter((x) => x.frenteId === f.id)) {
+          s.subFrentes.push(clone(sf))
+          for (const t of initialState.tareas.filter((x) => x.subFrenteId === sf.id)) {
+            if (!s.tareas.some((x) => x.id === t.id)) s.tareas.push(clone(t))
+          }
+        }
+      }
+    }
+  }
 }
 
 export class MemoryRepo implements Repo {
@@ -103,6 +150,8 @@ export class MemoryRepo implements Repo {
       descripcion: input.descripcion,
       color: input.color,
       estado: input.estado ?? 'activo',
+      // El creador es el dueño (2): control total dentro del proyecto.
+      duenoId: input.creadoPor,
     }
     this.state.proyectos.push(p)
     this.persist()
@@ -217,15 +266,7 @@ export class MemoryRepo implements Repo {
   }
 
   // -- Modulo de Usuarios (7.1) --
-
-  /** Regla 5.1: exactamente 2 Admins activos (misma regla que el trigger SQL). */
-  private validarLimiteAdmins(candidato: Usuario) {
-    if (candidato.rol !== 'admin' || !candidato.activo) return
-    const otros = this.state.usuarios.filter(
-      (u) => u.rol === 'admin' && u.activo && u.id !== candidato.id,
-    ).length
-    if (otros >= 2) throw new Error('El sistema admite exactamente 2 usuarios Admin activos')
-  }
+  // Sin limite de admins (1): el sistema admite cualquier cantidad.
 
   async createUsuario(input: NuevoUsuario): Promise<Usuario> {
     const email = input.email.trim().toLowerCase()
@@ -239,8 +280,9 @@ export class MemoryRepo implements Repo {
       email,
       rol: input.rol,
       activo: true,
+      // Defaults por rol (4): el consultor nace con sus permisos de proyecto.
+      permisosProyecto: input.rol === 'consultor' ? { ...DEFAULT_PERMISOS_PROYECTO } : undefined,
     }
-    this.validarLimiteAdmins(u)
     this.state.usuarios.push(u)
     this.persist()
     return clone(u)
@@ -249,8 +291,6 @@ export class MemoryRepo implements Repo {
   async updateUsuario(id: string, patch: PatchUsuario): Promise<Usuario> {
     const u = this.state.usuarios.find((x) => x.id === id)
     if (!u) throw new Error('Usuario no encontrado')
-    const candidato = { ...u, ...patch }
-    this.validarLimiteAdmins(candidato)
     Object.assign(u, patch)
     this.persist()
     return clone(u)
@@ -261,7 +301,14 @@ export class MemoryRepo implements Repo {
       (a) => a.usuarioId === usuarioId && a.proyectoId === proyectoId,
     )
     if (existente) return clone(existente)
-    const a: Acceso = { usuarioId, proyectoId, fechaAsignacion: new Date().toISOString() }
+    // El acceso nace con el default del rol del usuario (4); ajustable luego.
+    const rol = this.state.usuarios.find((u) => u.id === usuarioId)?.rol ?? 'cliente'
+    const a: Acceso = {
+      usuarioId,
+      proyectoId,
+      fechaAsignacion: new Date().toISOString(),
+      permisos: defaultPermisosTareas(rol),
+    }
     this.state.accesos.push(a)
     this.persist()
     return clone(a)
@@ -272,6 +319,20 @@ export class MemoryRepo implements Repo {
       (a) => !(a.usuarioId === usuarioId && a.proyectoId === proyectoId),
     )
     this.persist()
+  }
+
+  async updateAccesoPermisos(
+    usuarioId: string,
+    proyectoId: string,
+    permisos: PermisosTareas,
+  ): Promise<Acceso> {
+    const a = this.state.accesos.find(
+      (x) => x.usuarioId === usuarioId && x.proyectoId === proyectoId,
+    )
+    if (!a) throw new Error('Acceso no encontrado')
+    a.permisos = { ...permisos }
+    this.persist()
+    return clone(a)
   }
 
   async addComentario(tareaId: string, texto: string, autorId?: string): Promise<Comentario> {

@@ -1,7 +1,13 @@
 // Modelo de datos — Documento Funcional v3.1, seccion 5.
 // El dummy trabaja en memoria; las fechas se manejan como 'YYYY-MM-DD' (Date sin hora).
 
-export type Rol = 'admin' | 'cliente'
+/**
+ * Roles (reestructuración roles-y-permisos):
+ *  - admin: ve y gestiona TODO (sin límite de cantidad de admins).
+ *  - consultor: sus proyectos (dueño) + los que el admin le asigne.
+ *  - cliente: solo los proyectos donde lo invitan.
+ */
+export type Rol = 'admin' | 'consultor' | 'cliente'
 export type EstadoProyecto = 'activo' | 'pausado' | 'cerrado'
 
 /** Fecha ISO corta, ej. '2024-10-30'. */
@@ -11,11 +17,12 @@ export type ISODate = string
 export type AlcancePermiso = 'todas' | 'asignadas'
 
 /**
- * Permisos configurables por usuario cliente (§7.29). Los que actuan sobre
- * tareas llevan alcance: 'todas' las del proyecto o solo las 'asignadas' al
- * cliente. Ausente/false = no puede. Los admins ignoran esta estructura.
+ * Set de ocho permisos sobre tareas. Vive EN EL ACCESO (por usuario y por
+ * proyecto): gobierna a los INVITADOS de un proyecto ajeno — clientes y
+ * consultores por igual ("un invitado es un invitado"). El admin y el dueño
+ * del proyecto lo ignoran (control total). Ausente/false = no puede.
  */
-export interface PermisosCliente {
+export interface PermisosTareas {
   crearFrentes?: boolean
   crearSubFrentes?: boolean
   crearTareas?: boolean
@@ -24,6 +31,17 @@ export interface PermisosCliente {
   editarTareas?: false | AlcancePermiso
   archivarEliminar?: false | AlcancePermiso
   asignarResponsable?: false | AlcancePermiso
+}
+
+/**
+ * Permisos de NIVEL PROYECTO de un consultor (3.1). Los configura el admin,
+ * consultor por consultor. Ausente/false = no puede.
+ */
+export interface PermisosProyecto {
+  crearProyectos?: boolean
+  archivarEliminarProyectos?: boolean
+  invitarClientes?: boolean
+  configurarPermisosClientes?: boolean
 }
 
 export interface Usuario {
@@ -36,15 +54,20 @@ export interface Usuario {
   activo: boolean
   /** Vinculo con Supabase Auth (null hasta que la persona inicia sesion). */
   authId?: string
-  /** Configuracion de permisos (solo rol cliente; §7.28). */
-  permisos?: PermisosCliente
+  /** Permisos de nivel proyecto (solo rol consultor; 3.1). */
+  permisosProyecto?: PermisosProyecto
 }
 
-/** Acceso de Cliente a Proyecto (5.7). Los Admin no la necesitan (ven todo). */
+/**
+ * Acceso de un usuario (cliente O consultor) a un proyecto ajeno, con sus
+ * permisos asociados (set de ocho, por acceso). El dueño y los admins no
+ * necesitan fila: su control es total.
+ */
 export interface Acceso {
   usuarioId: string
   proyectoId: string
   fechaAsignacion: string
+  permisos?: PermisosTareas
 }
 
 export interface Proyecto {
@@ -53,6 +76,8 @@ export interface Proyecto {
   descripcion?: string
   color?: string
   estado: EstadoProyecto
+  /** Dueño/creador (2): control total dentro del proyecto. */
+  duenoId?: string
 }
 
 export interface Frente {

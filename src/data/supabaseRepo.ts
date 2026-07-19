@@ -39,16 +39,19 @@ function unwrap(res: { data: unknown; error: { message: string } | null }): any 
 
 const toUsuario = (r: Row): Usuario => ({
   id: r.id, nombre: r.nombre, iniciales: r.iniciales ?? '', email: r.email, rol: r.rol,
-  activo: r.activo, authId: r.auth_id ?? undefined, permisos: r.permisos ?? undefined,
+  activo: r.activo, authId: r.auth_id ?? undefined,
+  permisosProyecto: r.permisos_proyecto ?? undefined,
 })
 const toAcceso = (r: Row): Acceso => ({
   usuarioId: r.usuario_id, proyectoId: r.proyecto_id, fechaAsignacion: r.fecha_asignacion,
+  permisos: r.permisos ?? undefined,
 })
 const toComentario = (r: Row): Comentario => ({
   id: r.id, tareaId: r.tarea_id, autorId: r.autor_id ?? undefined, texto: r.texto, timestamp: r.timestamp,
 })
 const toProyecto = (r: Row): Proyecto => ({
   id: r.id, nombre: r.nombre, descripcion: r.descripcion ?? undefined, color: r.color ?? undefined, estado: r.estado,
+  duenoId: r.creado_por ?? undefined, // creado_por ES el dueño (2)
 })
 const toFrente = (r: Row): Frente => ({
   id: r.id, proyectoId: r.proyecto_id, nombre: r.nombre, orden: r.orden,
@@ -96,7 +99,7 @@ export class SupabaseRepo implements Repo {
       this.db.from('sub_frente').select('*').order('orden'),
       this.db.from('tarea').select('*').order('orden'),
       this.db.from('replanificacion').select('*').order('numero_cambio'),
-      this.db.from('acceso_cliente_proyecto').select('*'),
+      this.db.from('acceso_proyecto').select('*'),
       this.db.from('comentario').select('*').order('timestamp'),
     ])
     return {
@@ -250,7 +253,8 @@ export class SupabaseRepo implements Repo {
   }
 
   // -- Modulo de Usuarios (7.1) --
-  // El limite de 2 admins lo garantiza el trigger `limitar_admins` en la BD.
+  // Sin limite de admins (1). Los defaults por rol los garantizan los
+  // triggers de la BD (aplicar_default_consultor / aplicar_default_acceso).
 
   async createUsuario(input: NuevoUsuario): Promise<Usuario> {
     const iniciales = (
@@ -272,7 +276,7 @@ export class SupabaseRepo implements Repo {
     if ('iniciales' in patch) upd.iniciales = patch.iniciales
     if ('activo' in patch) upd.activo = patch.activo
     if ('rol' in patch) upd.rol = patch.rol
-    if ('permisos' in patch) upd.permisos = patch.permisos ?? {}
+    if ('permisosProyecto' in patch) upd.permisos_proyecto = patch.permisosProyecto ?? {}
     const row = unwrap(await this.db.from('usuario').update(upd).eq('id', id).select().single())
     return toUsuario(row)
   }
@@ -280,7 +284,7 @@ export class SupabaseRepo implements Repo {
   async asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso> {
     const row = unwrap(
       await this.db
-        .from('acceso_cliente_proyecto')
+        .from('acceso_proyecto')
         .upsert({ usuario_id: usuarioId, proyecto_id: proyectoId })
         .select()
         .single(),
@@ -291,12 +295,29 @@ export class SupabaseRepo implements Repo {
   async quitarAcceso(usuarioId: string, proyectoId: string): Promise<void> {
     unwrap(
       await this.db
-        .from('acceso_cliente_proyecto')
+        .from('acceso_proyecto')
         .delete()
         .eq('usuario_id', usuarioId)
         .eq('proyecto_id', proyectoId)
         .select(),
     )
+  }
+
+  async updateAccesoPermisos(
+    usuarioId: string,
+    proyectoId: string,
+    permisos: import('../types').PermisosTareas,
+  ): Promise<Acceso> {
+    const row = unwrap(
+      await this.db
+        .from('acceso_proyecto')
+        .update({ permisos })
+        .eq('usuario_id', usuarioId)
+        .eq('proyecto_id', proyectoId)
+        .select()
+        .single(),
+    )
+    return toAcceso(row)
   }
 
   async addComentario(tareaId: string, texto: string, autorId?: string): Promise<Comentario> {

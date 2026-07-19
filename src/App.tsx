@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { AppState, Tarea, Usuario } from './types'
+import type { AppState, PermisosTareas, Tarea, Usuario } from './types'
 import { HOY as HOY_SIM } from './data/seed'
 import { makeRepo } from './data'
 import { makeAuth } from './auth'
 import { supabaseConfigured } from './data/client'
 import { hoyISO } from './lib/dates'
 import { contar } from './lib/derive'
-import { makeCan } from './lib/permisos'
+import { esDuenoDe, makeCan, puedeCrearProyectos } from './lib/permisos'
 import type { Filtro } from './lib/filtros'
 import { CAMPOS_PROYECTO, type OrdenMulti } from './lib/orden'
 import * as apply from './data/apply'
@@ -29,6 +29,7 @@ import { UsersView } from './components/UsersView'
 import { TaskPanel } from './components/TaskPanel'
 import { FiltrosBar } from './components/FiltrosBar'
 import { MisTareasView } from './components/MisTareasView'
+import { MiembrosModal } from './components/MiembrosModal'
 import { ResumenView } from './components/ResumenView'
 import { AceptarInvitacion } from './components/AceptarInvitacion'
 
@@ -61,6 +62,8 @@ export interface Actions {
   updateUsuario: (id: string, p: PatchUsuario) => Promise<void>
   asignarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>
   quitarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>
+  /** Configura el set de ocho DE UN ACCESO (usuario × proyecto). */
+  updateAccesoPermisos: (usuarioId: string, proyectoId: string, permisos: PermisosTareas) => Promise<void>
   addComentario: (tareaId: string, texto: string) => Promise<void>
 }
 
@@ -152,13 +155,20 @@ export default function App() {
   const [proyectoActivoId, setProyectoActivoId] = useState<string | null>(null)
   // Panel lateral de detalle (7.2): id de la tarea abierta, o null.
   const [tareaDetalleId, setTareaDetalleId] = useState<string | null>(null)
+  // Miembros del proyecto activo (roles punto 7): modal abierto/cerrado.
+  const [miembrosAbierto, setMiembrosAbierto] = useState(false)
   // Contenedor con scroll de la vista de proyecto. Se mide el alto de la
   // barra de filtros (que es sticky, punto 2) para que el encabezado de la
   // tabla se congele JUSTO debajo, sin taparse ni superponerse.
   const contentRef = useRef<HTMLDivElement>(null)
 
   const esAdmin: boolean = sesion?.rol === 'admin'
-  const can = useMemo(() => makeCan(sesion ?? null), [sesion])
+  // Can por PROYECTO ACTIVO (principio dueño vs invitado): admin y dueño
+  // hacen todo; un invitado opera según los permisos de su acceso.
+  const can = useMemo(
+    () => makeCan(state, sesion ?? null, proyectoActivoId),
+    [state, sesion, proyectoActivoId],
+  )
 
   // Comprobar sesion vigente al arrancar.
   useEffect(() => {
@@ -271,14 +281,15 @@ export default function App() {
     }
   }, [repo, sesion])
 
-  // Proyectos visibles segun el rol: admin todo; cliente solo asignados.
-  // (En Supabase la RLS ya filtra en el servidor; aqui se refuerza en la UI
-  //  y se resuelve el modo Local.)
+  // Proyectos visibles segun el rol (1): admin todo; consultor los SUYOS
+  // (dueño) + los asignados; cliente solo los asignados. (En Supabase la RLS
+  // ya filtra en el servidor; aqui se refuerza en la UI y se resuelve el
+  // modo Local.)
   const proyectosVisibles = useMemo(() => {
     if (!state || !sesion) return []
     if (sesion.rol === 'admin') return state.proyectos
     const ids = new Set(state.accesos.filter((a) => a.usuarioId === sesion.id).map((a) => a.proyectoId))
-    return state.proyectos.filter((p) => ids.has(p.id))
+    return state.proyectos.filter((p) => p.duenoId === sesion.id || ids.has(p.id))
   }, [state, sesion])
 
   // Seleccion inicial / correccion de proyecto activo.
@@ -395,6 +406,11 @@ export default function App() {
         run(async () => {
           await repo.quitarAcceso(usuarioId, proyectoId)
           return (s) => apply.removeAcceso(s, usuarioId, proyectoId)
+        }),
+      updateAccesoPermisos: (usuarioId, proyectoId, permisos) =>
+        run(async () => {
+          const a = await repo.updateAccesoPermisos(usuarioId, proyectoId, permisos)
+          return (s) => apply.upsertAcceso(s, a)
         }),
       addComentario: (tareaId, texto) =>
         run(async () => {
@@ -552,15 +568,21 @@ export default function App() {
   // P5: en mobile la Gantt no existe; la vista efectiva se fuerza a Tabla.
   const vistaEfectiva: Vista = esMovil ? 'tabla' : vista
 
-  // Candidatos a responsable del proyecto activo (para el filtro).
+  // Candidatos a responsable del proyecto activo: admins, el dueño y los
+  // usuarios con acceso.
   const candidatosFiltro = proyecto
     ? state.usuarios.filter(
         (u) =>
           u.activo &&
           (u.rol === 'admin' ||
+            u.id === proyecto.duenoId ||
             state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyecto.id)),
       )
     : []
+  // Miembros (7): el admin y el dueño pueden abrir la lista del proyecto.
+  const puedeVerMiembros = !!proyecto && (esAdmin || esDuenoDe(state, sesion, proyecto.id))
+  // Mis Tareas: para el personal de la consultora (admins y consultores).
+  const conMisTareas = esAdmin || sesion.rol === 'consultor'
 
   return (
     <div
@@ -624,6 +646,8 @@ export default function App() {
           frenteSel={frenteSel}
           pantalla={pantalla}
           esAdmin={esAdmin}
+          conMisTareas={conMisTareas}
+          puedeCrearProyecto={puedeCrearProyectos(sesion)}
           can={can}
           usuario={sesion}
           sidebarModo={sidebarModo}
@@ -647,13 +671,12 @@ export default function App() {
 
         {pantalla === 'usuarios' && esAdmin ? (
           <UsersView state={state} usuarioActual={sesion} actions={actions} />
-        ) : pantalla === 'mipanel' && esAdmin ? (
+        ) : pantalla === 'mipanel' && conMisTareas ? (
           <MisTareasView
             state={state}
             usuario={sesion}
             proyectos={proyectosVisibles}
             hoy={HOY}
-            can={can}
             actions={actions}
             onAbrirTarea={abrirDetalle}
           />
@@ -674,6 +697,7 @@ export default function App() {
               mostrarToggle={!esMovil}
               contadores={contadores}
               hoy={HOY}
+              onMiembros={puedeVerMiembros ? () => setMiembrosAbierto(true) : undefined}
             />
             <div className="content" ref={contentRef}>
               <FiltrosBar
@@ -723,7 +747,7 @@ export default function App() {
           </>
         ) : (
           <div className="vacio">
-            {esAdmin ? (
+            {esAdmin || puedeCrearProyectos(sesion) ? (
               <>
                 <p>No hay ningun proyecto seleccionado.</p>
                 <p>Crea uno desde la barra lateral para empezar.</p>
@@ -743,6 +767,18 @@ export default function App() {
           can={can}
           actions={actions}
           onClose={() => setTareaDetalleId(null)}
+        />
+      )}
+
+      {/* Miembros del proyecto (7): el dueño ve QUIENES están, no sus
+          permisos; configura solo lo que sus permisos de proyecto habilitan. */}
+      {miembrosAbierto && proyecto && (
+        <MiembrosModal
+          state={state}
+          proyecto={proyecto}
+          sesion={sesion}
+          actions={actions}
+          onClose={() => setMiembrosAbierto(false)}
         />
       )}
     </div>
