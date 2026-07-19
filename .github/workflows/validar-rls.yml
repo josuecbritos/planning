@@ -1,0 +1,51 @@
+# =====================================================================
+# Compuerta de validación de RLS — se corre A MANO desde GitHub:
+#   pestaña Actions → "Validar RLS (compuerta)" → Run workflow.
+#
+# Requiere estos secrets del repo (Settings → Secrets and variables →
+# Actions → New repository secret):
+#
+#   SUPABASE_URL             https://<proyecto>.supabase.co
+#   SUPABASE_ANON_KEY        anon key (Settings → API en Supabase)
+#   RLS_ADMIN_EMAIL / RLS_ADMIN_PASS            (obligatorio)
+#   RLS_CONSULTOR_A_EMAIL / RLS_CONSULTOR_A_PASS (opcional)
+#   RLS_CONSULTOR_B_EMAIL / RLS_CONSULTOR_B_PASS (opcional)
+#   RLS_CLIENTE_EMAIL / RLS_CLIENTE_PASS         (opcional)
+#
+# Los roles opcionales que falten se omiten con aviso; para validar el
+# modelo completo conviene tener los 4. El job termina en verde si la
+# compuerta pasa y en rojo ("⛔ LA COMPUERTA NO PASA") si la RLS deja
+# pasar algo indebido.
+# =====================================================================
+name: Validar RLS (compuerta)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validar-rls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Correr compuerta de RLS
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          RLS_ADMIN_EMAIL: ${{ secrets.RLS_ADMIN_EMAIL }}
+          RLS_ADMIN_PASS: ${{ secrets.RLS_ADMIN_PASS }}
+          RLS_CONSULTOR_A_EMAIL: ${{ secrets.RLS_CONSULTOR_A_EMAIL }}
+          RLS_CONSULTOR_A_PASS: ${{ secrets.RLS_CONSULTOR_A_PASS }}
+          RLS_CONSULTOR_B_EMAIL: ${{ secrets.RLS_CONSULTOR_B_EMAIL }}
+          RLS_CONSULTOR_B_PASS: ${{ secrets.RLS_CONSULTOR_B_PASS }}
+          RLS_CLIENTE_EMAIL: ${{ secrets.RLS_CLIENTE_EMAIL }}
+          RLS_CLIENTE_PASS: ${{ secrets.RLS_CLIENTE_PASS }}
+        run: node scripts/validar-rls.mjs

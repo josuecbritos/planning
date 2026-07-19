@@ -243,9 +243,13 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
    los clientes demo conservan su configuración) + RLS completa. Todo junto.
 2. **Redeploy de la Edge Function** `invitar-usuario` (`supabase functions deploy
    invitar-usuario`): ahora autoriza también a consultores con permiso.
-3. **Compuerta de validación** (crítica): `node scripts/validar-rls.mjs` con las
-   credenciales de prueba (ver cabecera del script). Verifica rol por rol que la
-   RLS **impide** el acceso indebido — no solo que la UI lo oculta.
+3. **Compuerta de validación** (crítica): correr `scripts/validar-rls.mjs`, que
+   verifica rol por rol que la RLS **impide** el acceso indebido — no solo que
+   la UI lo oculta. Sin entorno local, se corre desde **GitHub Actions**:
+   cargar los secrets del repo (ver cabecera de
+   `.github/workflows/validar-rls.yml`) y lanzar el workflow **"Validar RLS
+   (compuerta)"** desde la pestaña Actions (Run workflow). Verde = pasa;
+   rojo = la RLS deja pasar algo indebido.
 4. **Recién entonces** invitar usuarios reales.
 
 **Fase 3 — Pulido**
