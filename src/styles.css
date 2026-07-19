@@ -1341,6 +1341,16 @@ table.tareas td.col-fecha { font-size: 12px; }
   box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.25);
 }
 .movil-velo { display: none; }
+/* Interruptor de tema flotante en mobile, junto al ☰ (superficie, para
+   distinguirlo del botón primario del menú). Oculto en desktop. */
+.movil-tema {
+  display: none; position: fixed; bottom: 14px; left: 68px; z-index: 2200;
+  width: 46px; height: 46px; border-radius: 999px;
+  border: 1px solid var(--gris-borde); background: var(--superficie);
+  color: var(--texto); font-size: 18px; line-height: 1; cursor: pointer;
+  align-items: center; justify-content: center;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.25);
+}
 /* La ruta con proyecto de Mis Tareas es exclusiva de mobile (8.2) */
 .ruta-proy { display: none; }
 
@@ -1349,6 +1359,7 @@ table.tareas td.col-fecha { font-size: 12px; }
   .app, .app--sidebar-escondida { display: block; }
   .main { height: 100vh; height: 100dvh; }
   .movil-menu { display: inline-flex; }
+  .movil-tema { display: inline-flex; }
   .movil-velo {
     display: block; position: fixed; inset: 0;
     background: rgba(10, 10, 12, .45); z-index: 2050;
