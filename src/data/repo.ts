@@ -57,7 +57,7 @@ export interface NuevoUsuario {
   email: string
   rol: Rol
 }
-export type PatchUsuario = Partial<Pick<Usuario, 'nombre' | 'iniciales' | 'activo' | 'rol' | 'permisos'>>
+export type PatchUsuario = Partial<Pick<Usuario, 'nombre' | 'iniciales' | 'activo' | 'rol' | 'permisosProyecto'>>
 
 export interface Repo {
   /** Nombre corto del backend activo, para mostrar en la UI. */
@@ -105,9 +105,16 @@ export interface Repo {
 
   createUsuario(input: NuevoUsuario): Promise<Usuario>
   updateUsuario(id: string, patch: PatchUsuario): Promise<Usuario>
-  /** Asigna un proyecto a un usuario Cliente (tabla 5.7). */
+  /** Asigna un proyecto a un usuario (cliente o consultor). El acceso nace
+   *  con los permisos por DEFECTO del rol del usuario (4). */
   asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso>
   quitarAcceso(usuarioId: string, proyectoId: string): Promise<void>
+  /** Configura el set de ocho permisos DE ESE ACCESO (usuario × proyecto). */
+  updateAccesoPermisos(
+    usuarioId: string,
+    proyectoId: string,
+    permisos: import('../types').PermisosTareas,
+  ): Promise<Acceso>
 
   /** Agrega un comentario al hilo de la tarea (N5, append-only). */
   addComentario(tareaId: string, texto: string, autorId?: string): Promise<Comentario>

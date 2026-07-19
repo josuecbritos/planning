@@ -17,17 +17,24 @@ export const HOY: ISODate = '2024-10-30'
 // responsables DV/JB/FS/IC. (El Excel real tiene 93 tareas; aqui una muestra
 // que ejercita todos los estados y colores de la seccion 6.)
 
-// Regla 5.1: exactamente 2 Admins. Los responsables solo pueden ser esos 2
-// (5.5). Se incluye un Cliente de demo con acceso al proyecto (5.7).
+// Roles (reestructuración): 2 admins (titular), un consultor de demo con
+// proyecto propio (para ejercitar dueño vs invitado) y un cliente de demo
+// invitado al proyecto Arauco.
 export const usuarios: Usuario[] = [
   { id: 'u-dv', nombre: 'Daniela Vera', iniciales: 'DV', email: 'dv@consultora.cl', rol: 'admin', activo: true },
   { id: 'u-jb', nombre: 'Josue Britos', iniciales: 'JB', email: 'jb@consultora.cl', rol: 'admin', activo: true },
+  {
+    id: 'u-consultor', nombre: 'Carla Soto', iniciales: 'CS', email: 'cs@consultora.cl',
+    rol: 'consultor', activo: true,
+    // Default 4.1: autonomía sobre lo suyo; configurar permisos queda en el admin.
+    permisosProyecto: { crearProyectos: true, archivarEliminarProyectos: true, invitarClientes: true, configurarPermisosClientes: false },
+  },
   { id: 'u-cliente', nombre: 'Cliente Arauco', iniciales: 'CA', email: 'contacto@arauco.cl', rol: 'cliente', activo: true },
 ]
 
 // Las iniciales FS/IC del plan original se reparten entre los 2 admins.
 const respId: Record<string, string> = {
-  DV: 'u-dv', JB: 'u-jb', FS: 'u-dv', IC: 'u-jb',
+  DV: 'u-dv', JB: 'u-jb', FS: 'u-dv', IC: 'u-jb', CS: 'u-consultor',
 }
 
 export const proyecto: Proyecto = {
@@ -36,6 +43,18 @@ export const proyecto: Proyecto = {
   descripcion: 'Implementacion del Plan de Gestion de Procesos — cliente Arauco.',
   color: '#2e7d32',
   estado: 'activo',
+  duenoId: 'u-dv', // la cuenta admin que lo creo (9)
+}
+
+/** Proyecto PROPIO del consultor de demo: el admin lo ve; el otro consultor
+ *  y el cliente, no (1). */
+export const proyectoConsultor: Proyecto = {
+  id: 'p-consultor',
+  nombre: 'Diagnostico Pyme Andina',
+  descripcion: 'Proyecto propio de la consultora Carla Soto.',
+  color: '#1565c0',
+  estado: 'activo',
+  duenoId: 'u-consultor',
 }
 
 // -- Frentes y Sub Frentes --
@@ -43,6 +62,7 @@ export const proyecto: Proyecto = {
 const frentes: Frente[] = [
   { id: 'f-lev', proyectoId: proyecto.id, nombre: 'Levantamiento', orden: 1 },
   { id: 'f-dis', proyectoId: proyecto.id, nombre: 'Diseño', orden: 2 },
+  { id: 'f-diag', proyectoId: proyectoConsultor.id, nombre: 'Diagnostico', orden: 1 },
 ]
 
 const subFrentes: SubFrente[] = [
@@ -51,6 +71,7 @@ const subFrentes: SubFrente[] = [
   { id: 'sf-ope', frenteId: 'f-lev', nombre: 'Procesos Operacionales', orden: 3 },
   { id: 'sf-arq', frenteId: 'f-dis', nombre: 'Arquitectura de datos', orden: 1 },
   { id: 'sf-par', frenteId: 'f-dis', nombre: 'Configuracion y parametrizacion', orden: 2 },
+  { id: 'sf-ent', frenteId: 'f-diag', nombre: 'Entrevistas iniciales', orden: 1 },
 ]
 
 // -- Autoria compacta de tareas --
@@ -103,6 +124,12 @@ const seeds: Record<string, Seed[]> = {
     { titulo: 'Plan de pruebas de configuracion', resp: 'IC', original: '2024-11-18' },
     { titulo: 'Ambiente de QA disponible', resp: 'FS', original: '2024-11-22' },
     { titulo: 'Checklist de go-live', resp: 'DV' }, // nace sin fecha (1.2)
+  ],
+  // Proyecto propio del consultor de demo (visible para admin y para CS).
+  'sf-ent': [
+    { titulo: 'Entrevista con gerencia', resp: 'CS', original: '2024-10-28', real: '2024-10-28' },
+    { titulo: 'Levantamiento de procesos clave', resp: 'CS', original: '2024-11-05' },
+    { titulo: 'Informe de diagnostico', resp: 'CS', original: '2024-11-14' },
   ],
 }
 
@@ -158,14 +185,16 @@ const { tareas, historial } = build()
 
 export const initialState: AppState = {
   usuarios,
-  proyectos: [proyecto],
+  proyectos: [proyecto, proyectoConsultor],
   frentes,
   subFrentes,
   tareas,
   historial,
-  // El cliente de demo tiene acceso al proyecto (5.7).
+  // El cliente de demo esta invitado al proyecto Arauco. Conserva su
+  // configuracion previa (9): permisos vacios = solo lectura. Los usuarios
+  // NUEVOS que se asignen nacen con el default de su rol.
   accesos: [
-    { usuarioId: 'u-cliente', proyectoId: proyecto.id, fechaAsignacion: '2024-10-01T00:00:00Z' },
+    { usuarioId: 'u-cliente', proyectoId: proyecto.id, fechaAsignacion: '2024-10-01T00:00:00Z', permisos: {} },
   ],
   // Un hilo de ejemplo para exhibir los comentarios acumulables (N5).
   comentarios: [

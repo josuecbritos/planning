@@ -160,11 +160,12 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     avisoTimer.current = window.setTimeout(() => setAviso(null), 2400)
   }
 
-  // Candidatos a responsable: admins + clientes con acceso a ESTE proyecto.
+  // Candidatos a responsable: admins, el dueño y quienes tienen acceso.
   const candidatos = state.usuarios.filter(
     (u) =>
       u.activo &&
       (u.rol === 'admin' ||
+        state.proyectos.some((p) => p.id === proyectoId && p.duenoId === u.id) ||
         state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
   )
 
@@ -457,7 +458,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     const { tipo, despuesDe, contenedorId } = crearEn
     // Insertar justo debajo del hermano: se corren los ordenes siguientes.
     // (Los clientes crean al final: el corrimiento exige editar hermanos.)
-    const insertar = can.esAdmin && despuesDe ? despuesDe.orden + 1 : undefined
+    const insertar = can.controlTotal && despuesDe ? despuesDe.orden + 1 : undefined
     if (tipo === 'frente') {
       if (insertar !== undefined) {
         const hermanos = state.frentes.filter((f) => f.proyectoId === contenedorId && f.orden >= insertar)

@@ -2,18 +2,26 @@ import { useState } from 'react'
 import type { Rol, Usuario } from '../types'
 import { Modal } from './Modal'
 
-// Crear / editar usuario (Modulo 7.1). El rol solo se elige al crear; el
-// limite de 2 admins deshabilita esa opcion cuando ya hay 2 activos.
+// Crear / editar usuario (Modulo 7.1, reestructurado). Tres roles, sin
+// limite de admins (1). El usuario nace con los permisos por DEFECTO de su
+// rol (4), ajustables despues: consultor → permisos de proyecto (🔧);
+// clientes y consultores invitados → set de ocho por acceso (🔑).
 
 interface Props {
   usuario?: Usuario
-  /** true si ya existen 2 admins activos (deshabilita crear otro). */
-  adminsCompletos: boolean
   onSubmit: (datos: { nombre: string; iniciales?: string; email: string; rol: Rol }) => void
   onClose: () => void
 }
 
-export function UsuarioModal({ usuario, adminsCompletos, onSubmit, onClose }: Props) {
+const AYUDA_ROL: Record<Rol, string> = {
+  admin: 'Ve y gestiona absolutamente todo. Puede haber varios admins.',
+  consultor:
+    'Gestiona SUS proyectos y los que se le asignen. Nace con: crear proyectos, archivar/eliminar los suyos e invitar clientes (configurar permisos queda en el admin).',
+  cliente:
+    'Solo ve los proyectos donde lo inviten. Nace con: crear tareas, fechas y hecho en las suyas, y asignar responsable en todas.',
+}
+
+export function UsuarioModal({ usuario, onSubmit, onClose }: Props) {
   const edicion = Boolean(usuario)
   const [nombre, setNombre] = useState(usuario?.nombre ?? '')
   const [iniciales, setIniciales] = useState(usuario?.iniciales ?? '')
@@ -27,8 +35,6 @@ export function UsuarioModal({ usuario, adminsCompletos, onSubmit, onClose }: Pr
     onSubmit({ nombre: nombre.trim(), iniciales: iniciales.trim() || undefined, email: email.trim(), rol })
     onClose()
   }
-
-  const bloquearAdmin = !edicion && adminsCompletos
 
   return (
     <Modal titulo={edicion ? 'Editar usuario' : 'Nuevo usuario'} onClose={onClose}>
@@ -50,13 +56,10 @@ export function UsuarioModal({ usuario, adminsCompletos, onSubmit, onClose }: Pr
           <span>Rol</span>
           <select value={rol} onChange={(e) => setRol(e.target.value as Rol)} disabled={edicion}>
             <option value="cliente">Cliente</option>
-            <option value="admin" disabled={bloquearAdmin}>
-              Admin{bloquearAdmin ? ' (ya hay 2 activos)' : ''}
-            </option>
+            <option value="consultor">Consultor</option>
+            <option value="admin">Admin</option>
           </select>
-          {!edicion && (
-            <small className="ayuda">El sistema admite exactamente 2 usuarios Admin activos.</small>
-          )}
+          {!edicion && <small className="ayuda">{AYUDA_ROL[rol]}</small>}
         </label>
         <div className="modal-acciones">
           <button type="button" className="btn" onClick={onClose}>Cancelar</button>

@@ -1,5 +1,7 @@
-// Edge Function: invitar-usuario (§8.32-34)
-// El admin autenticado invita (o reinvita) a un usuario: se genera un token
+// Edge Function: invitar-usuario (§8.32-34, actualizada por roles-y-permisos)
+// Un ADMIN invita (o reinvita) a cualquier usuario. Un CONSULTOR con el
+// permiso de proyecto `invitarClientes` puede invitar CLIENTES que tengan
+// acceso a alguno de SUS proyectos (de los que es dueño). Se genera un token
 // con caducidad de 7 dias y se envia el correo con el enlace via Resend.
 //
 // Secrets requeridos (supabase secrets set):
@@ -30,29 +32,48 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    // 1) El invocador debe ser un admin activo.
+    // 1) Perfil del invocador (admin o consultor).
     const jwt = req.headers.get('Authorization')?.replace('Bearer ', '')
     if (!jwt) return responder(401, { error: 'Sin sesion' })
     const { data: quien } = await admin.auth.getUser(jwt)
     if (!quien.user) return responder(401, { error: 'Sesion invalida' })
     const { data: perfil } = await admin
       .from('usuario')
-      .select('id, rol, activo')
+      .select('id, rol, activo, permisos_proyecto')
       .eq('auth_id', quien.user.id)
       .maybeSingle()
-    if (!perfil || perfil.rol !== 'admin' || !perfil.activo) {
-      return responder(403, { error: 'Solo los admins pueden invitar' })
-    }
+    if (!perfil || !perfil.activo) return responder(403, { error: 'Sin permiso para invitar' })
 
     // 2) Usuario a invitar.
     const { usuarioId } = await req.json()
     const { data: usuario } = await admin
       .from('usuario')
-      .select('id, nombre, email, activo, auth_id')
+      .select('id, nombre, email, rol, activo, auth_id')
       .eq('id', usuarioId)
       .maybeSingle()
     if (!usuario || !usuario.activo) return responder(404, { error: 'Usuario no encontrado o inactivo' })
     if (usuario.auth_id) return responder(409, { error: 'El usuario ya tiene cuenta activa' })
+
+    // 2b) Autorizacion: admin → cualquiera. Consultor → solo con el permiso
+    // invitarClientes, y solo CLIENTES con acceso a un proyecto SUYO.
+    let autorizado = perfil.rol === 'admin'
+    if (!autorizado && perfil.rol === 'consultor') {
+      const pp = (perfil.permisos_proyecto ?? {}) as Record<string, unknown>
+      if (pp.invitarClientes === true && usuario.rol === 'cliente') {
+        const { data: enMiProyecto } = await admin
+          .from('acceso_proyecto')
+          .select('proyecto_id, proyecto!inner(creado_por)')
+          .eq('usuario_id', usuario.id)
+          .eq('proyecto.creado_por', perfil.id)
+          .limit(1)
+        autorizado = Boolean(enMiProyecto && enMiProyecto.length > 0)
+      }
+    }
+    if (!autorizado) {
+      return responder(403, {
+        error: 'Solo admins, o consultores con permiso, pueden invitar clientes de sus proyectos',
+      })
+    }
 
     // 3) Token nuevo con caducidad de 7 dias (reenviar reemplaza el anterior).
     const expira = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()

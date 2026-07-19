@@ -45,11 +45,12 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
     .sort((a, b) => a.orden - b.orden)
 
-  // Candidatos a responsable: admins + clientes con acceso a ESTE proyecto.
+  // Candidatos a responsable: admins, el dueño y quienes tienen acceso.
   const candidatos = state.usuarios.filter(
     (u) =>
       u.activo &&
       (u.rol === 'admin' ||
+        state.proyectos.some((p) => p.id === proyectoId && p.duenoId === u.id) ||
         state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
   )
 

@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import type { AppState, Proyecto, Usuario } from '../types'
 import type { Actions, FrenteSel, Pantalla, SidebarModo, Tema } from '../App'
-import type { Can } from '../lib/permisos'
+import { puedeEditarProyecto, puedeEliminarProyecto, type Can } from '../lib/permisos'
 import { TextPromptModal } from './TextPromptModal'
 import { ProyectoModal } from './ProyectoModal'
 import { Wordmark } from './Wordmark'
 
-// Barra lateral. Los clientes ven solo sus proyectos asignados y sin ninguna
-// accion de edicion; los admins tienen CRUD, Mis Tareas y Administracion.
-// La sesion (usuario + salir) vive en el pie, visible en toda pantalla.
+// Barra lateral (reestructurada por roles): cada quien ve sus proyectos
+// (admin todos; consultor los suyos + asignados; cliente los invitados) y
+// las acciones que su rol/permisos habilitan. La sesion vive en el pie.
 
 interface Props {
   state: AppState
@@ -18,6 +18,10 @@ interface Props {
   frenteSel: FrenteSel
   pantalla: Pantalla
   esAdmin: boolean
+  /** Mis Tareas: para el personal de la consultora (admins y consultores). */
+  conMisTareas: boolean
+  /** "+" de proyectos: admin o consultor con permiso crearProyectos. */
+  puedeCrearProyecto: boolean
   can: Can
   usuario: Usuario
   /** Punto 6: modo actual de la barra (fija / escondida) y su alternador. */
@@ -47,6 +51,8 @@ export function Sidebar({
   frenteSel,
   pantalla,
   esAdmin,
+  conMisTareas,
+  puedeCrearProyecto,
   can,
   usuario,
   sidebarModo,
@@ -103,7 +109,7 @@ export function Sidebar({
         >
           <span>Resumen</span>
         </button>
-        {esAdmin && (
+        {conMisTareas && (
           <button
             className={`nav-frente nav-pantalla${pantalla === 'mipanel' ? ' nav-frente--activo' : ''}`}
             onClick={() => onSelectPantalla('mipanel')}
@@ -115,7 +121,7 @@ export function Sidebar({
 
       <div className="sidebar__section">
         <span>Proyectos</span>
-        {esAdmin && (
+        {puedeCrearProyecto && (
           <button className="icon-btn" title="Nuevo proyecto" onClick={() => setModal({ tipo: 'proyecto-nuevo' })}>+</button>
         )}
       </div>
@@ -133,17 +139,21 @@ export function Sidebar({
 
               {activo && (
                 <div className="nav-frentes">
-                  {esAdmin && (
+                  {/* Editar: admin o dueño (control total, 2). Eliminar exige
+                      ademas el permiso archivarEliminarProyectos (3.1). */}
+                  {puedeEditarProyecto(state, usuario, p.id) && (
                     <div className="nav-proyecto__acciones">
                       <button className="link-btn" onClick={() => setModal({ tipo: 'proyecto-editar', id: p.id })}>Editar proyecto</button>
-                      <button
-                        className="link-btn link-btn--danger"
-                        onClick={() => {
-                          if (confirm(`¿Eliminar el proyecto "${p.nombre}" y todo su contenido?`)) actions.deleteProyecto(p.id)
-                        }}
-                      >
-                        Eliminar
-                      </button>
+                      {puedeEliminarProyecto(state, usuario, p.id) && (
+                        <button
+                          className="link-btn link-btn--danger"
+                          onClick={() => {
+                            if (confirm(`¿Eliminar el proyecto "${p.nombre}" y todo su contenido?`)) actions.deleteProyecto(p.id)
+                          }}
+                        >
+                          Eliminar
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -161,7 +171,7 @@ export function Sidebar({
                         <span>{f.nombre}</span>
                         <span className="nav-frente__count">{tareasEnFrente(f.id)}</span>
                       </button>
-                      {esAdmin && (
+                      {can.editarEstructura && (
                         <span className="nav-frente__tools">
                           <button className="icon-btn" title="Renombrar" onClick={() => setModal({ tipo: 'frente-editar', id: f.id, nombre: f.nombre })}>✎</button>
                           <button
@@ -210,7 +220,7 @@ export function Sidebar({
           <span className="resp-badge">{usuario.iniciales}</span>
           <span className="sesion__info">
             <b>{usuario.nombre}</b>
-            <small>{usuario.rol === 'admin' ? 'Admin' : 'Cliente'}</small>
+            <small>{usuario.rol === 'admin' ? 'Admin' : usuario.rol === 'consultor' ? 'Consultor' : 'Cliente'}</small>
           </span>
         </span>
         <span className="sesion__acciones">

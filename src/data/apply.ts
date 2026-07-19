@@ -52,6 +52,19 @@ export function removeAcceso(s: AppState, usuarioId: string, proyectoId: string)
   }
 }
 
+/** Reemplaza (o agrega) un acceso — para actualizar sus permisos. */
+export function upsertAcceso(s: AppState, a: Acceso): AppState {
+  const existe = s.accesos.some(
+    (x) => x.usuarioId === a.usuarioId && x.proyectoId === a.proyectoId,
+  )
+  return {
+    ...s,
+    accesos: existe
+      ? s.accesos.map((x) => (x.usuarioId === a.usuarioId && x.proyectoId === a.proyectoId ? a : x))
+      : [...s.accesos, a],
+  }
+}
+
 export function addComentario(s: AppState, c: Comentario): AppState {
   return { ...s, comentarios: [...s.comentarios, c] }
 }

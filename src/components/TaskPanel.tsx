@@ -120,7 +120,8 @@ export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
         </ol>
       </div>
 
-      <Comentarios state={state} tarea={tarea} puedeComentar={can.esAdmin} actions={actions} />
+      {/* 3.3: TODOS los miembros pueden comentar, siempre (append-only). */}
+      <Comentarios state={state} tarea={tarea} puedeComentar actions={actions} />
 
       {can.algunoDeTareas && (
         <div className="panel-detalle__acciones">

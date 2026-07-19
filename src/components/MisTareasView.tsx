@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { AppState, Proyecto, Tarea, Usuario } from '../types'
 import type { Actions } from '../App'
-import type { Can } from '../lib/permisos'
+import { makeCan, type Can } from '../lib/permisos'
 import { cmp, formatoFecha } from '../lib/dates'
 import {
   CATEGORIA_LABEL,
@@ -33,7 +33,6 @@ interface Props {
   usuario: Usuario
   proyectos: Proyecto[]
   hoy: string
-  can: Can
   actions: Actions
   onAbrirTarea: (tareaId: string) => void
 }
@@ -44,7 +43,13 @@ interface FilaMisTareas {
   ruta: string
 }
 
-export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, onAbrirTarea }: Props) {
+export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrirTarea }: Props) {
+  // Los permisos dependen del PROYECTO de cada tarea (dueño vs invitado):
+  // se resuelve un Can por proyecto visible.
+  const canPorProyecto = useMemo(
+    () => new Map(proyectos.map((p) => [p.id, makeCan(state, usuario, p.id)])),
+    [state, usuario, proyectos],
+  )
   const [filtro, setFiltro] = useState<Filtro>({})
   // Orden multinivel del menu "Ordenar" (punto 4). Momentaneo salvo que se
   // guarde como vista; el "orden base" aqui es el propio de Mis Tareas
@@ -161,7 +166,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, on
               fila={fila}
               state={state}
               hoy={hoy}
-              can={can}
+              can={canPorProyecto.get(fila.proyecto.id) ?? makeCan(state, usuario, null)}
               actions={actions}
               onAbrirTarea={onAbrirTarea}
             />
