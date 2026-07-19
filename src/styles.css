@@ -657,6 +657,29 @@ table.tareas .col-estado { text-align: center; }
 .filtro-guardado:hover .icon-btn { opacity: 1; }
 .filtro-guardado .icon-btn:disabled { opacity: .25; cursor: default; }
 
+/* Menu "Ordenar" (punto 4): reglas apiladas campo + direccion. */
+.orden-regla { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 9px; }
+.orden-regla:hover { background: var(--velo); }
+.orden-regla__prio {
+  flex: none; width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff; background: var(--primario);
+}
+.orden-regla__campo {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--texto);
+  border: 1px solid var(--gris-borde); background: var(--superficie);
+  border-radius: 6px; padding: 5px 7px; cursor: pointer;
+}
+.orden-regla__dir {
+  flex: none; width: 26px; height: 26px; font-size: 14px; font-weight: 700;
+  border: 1px solid var(--gris-borde); background: var(--superficie); color: var(--texto);
+  border-radius: 6px; cursor: pointer;
+}
+.orden-regla__dir:hover { border-color: var(--primario); color: var(--primario); }
+.orden-regla .icon-btn { flex: none; }
+.orden-regla .icon-btn:disabled { opacity: .25; cursor: default; }
+.orden-agregar { color: var(--primario); font-size: 12.5px; font-weight: 600; margin-top: 2px; }
+
 /* Mini-aviso (2.2): "No puedes eliminar tareas que ya pasaron" */
 .mini-aviso {
   position: fixed; z-index: 2700; max-width: 260px;
@@ -789,10 +812,13 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    que un efecto (JS) centra en la porcion visible del bloque. Sin JS (o con
    el bloque entero visible) queda centrada por top:0/height:100%. */
 .gantt td.fija--rotula { padding: 0; }
+/* El rotula tiene su ALTO NATURAL (una o dos lineas): un efecto ajusta su
+   `top` para centrarlo en la porcion visible y apoyarlo en el borde
+   inferior del bloque sin cortar lineas (punto 1). */
 .gantt td.fija--rotula .fija-nombre {
-  position: absolute; left: 0; right: 0; top: 0; height: 100%;
+  position: absolute; left: 0; right: 0; top: 0;
   display: flex; align-items: center; justify-content: center;
-  padding: 8px 8px; box-sizing: border-box; overflow: hidden;
+  padding: 8px 8px; box-sizing: border-box;
 }
 .gantt td.fija--tarea { font-weight: 600; padding: 4px 10px; font-size: 12.5px; }
 .gantt td.fija--tarea.tarea-cell--verde { background: var(--verde-suave); }
@@ -1354,7 +1380,17 @@ table.tareas td.col-fecha { font-size: 12px; }
      columnas igual (fix del punto 4: formatos distintos entre tablas). */
   table.tareas { table-layout: fixed; width: 100%; }
   table.tareas th, table.tareas td { padding: 4px 4px; font-size: 12px; }
-  table.tareas th { font-size: 8.5px; overflow: hidden; }
+  /* Títulos de columna: caben completos, envolviendo por palabra en dos
+     líneas si hace falta (nunca cortados a media palabra). Sin tracking
+     ni mayúsculas anchas que los ensancharían. */
+  table.tareas th {
+    font-size: 8px; letter-spacing: 0; line-height: 1.05;
+    white-space: normal; word-break: normal; overflow-wrap: normal;
+    vertical-align: middle;
+  }
+  /* Nombre de tarea más chico en mobile, equilibrado con los íconos de la
+     fila (↻×N, comentarios), sin dejar de ser el elemento principal. */
+  .tarea-cell, .tarea-cell__link, .tarea-cell .inline-text { font-size: 11px; line-height: 1.2; }
   /* En layout fijo, display:none dejaria la columna RESERVADA (franja
      vacia): se colapsa a ancho 0 para que Tarea reciba ese espacio. */
   table.tareas .col-orig {
@@ -1366,7 +1402,9 @@ table.tareas td.col-fecha { font-size: 12px; }
   table.tareas td { overflow-wrap: anywhere; }
   .tarea-cell__row { flex-wrap: wrap; row-gap: 1px; min-width: 0; }
   .tarea-cell .inline-text, .tarea-cell__link { overflow-wrap: anywhere; min-width: 0; }
-  .col-check { width: 26px; }
+  /* Encabezados con padding lateral mínimo para que el título quepa. */
+  table.tareas th { padding-left: 2px; padding-right: 2px; }
+  .col-check { width: 32px; }
   table.tareas td.col-check { padding-left: 2px; padding-right: 2px; }
   .check-hecha { width: 18px; height: 18px; font-size: 9px; border-width: 1.5px; }
   .col-resp { width: 34px; }
@@ -1405,9 +1443,3 @@ table.tareas td.col-fecha { font-size: 12px; }
   .gantt td.fija--tarea { font-size: 11px; padding: 3px 6px; }
   .gantt td.fija--frente, .gantt td.fija--sf { font-size: 10.5px; padding: 6px 6px; }
 }
-
-/* Encabezados ordenables (punto 3): clic cicla ↑ / ↓ / orden original */
-.th-orden { cursor: pointer; user-select: none; white-space: nowrap; }
-.th-orden:hover { color: var(--texto); }
-.th-orden--activa { color: var(--texto); }
-.th-orden__flecha { margin-left: 3px; font-size: 10px; color: var(--texto); }

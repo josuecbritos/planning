@@ -1,6 +1,7 @@
 import type { AppState, ISODate, Tarea } from '../types'
 import { addDays, inicioSemana } from './dates'
 import { categoriaDe, type Categoria } from './derive'
+import type { OrdenMulti } from './orden'
 
 // Filtros guardables (pedido punto 3). Campos: Fecha Objetivo (siempre esa
 // fecha), Responsable y Estado. Dentro de un campo los valores se combinan
@@ -29,11 +30,17 @@ export interface Filtro {
   proyectos?: string[]
 }
 
-/** Filtro guardado: privado por usuario y por proyecto, con nombre. */
+/**
+ * Vista guardada: privada por usuario y por proyecto, con nombre. Reune el
+ * filtro Y el orden como una sola unidad (filtros + orden = una vista). El
+ * campo `orden` es opcional para leer vistas antiguas (guardadas antes del
+ * menu de orden): ausente = sin orden.
+ */
 export interface FiltroGuardado {
   id: string
   nombre: string
   filtro: Filtro
+  orden?: OrdenMulti
 }
 
 export const FECHA_RELATIVA_LABEL: Record<FechaRelativa, string> = {

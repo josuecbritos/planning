@@ -1,24 +1,45 @@
 import type { AppState, Tarea } from '../types'
 import { categoriaDe, type Categoria } from './derive'
 
-// Ordenamiento por columna (proyectos y Mis Tareas). El clic sobre un
-// encabezado cicla ascendente → descendente → orden original (el manual).
-// Es una accion exploratoria: NO se persiste (al recargar vuelve el orden
-// original), y es independiente de los filtros.
+// Ordenamiento multinivel (menu "Ordenar", proyectos y Mis Tareas). Se apilan
+// varias reglas campo + direccion, que se aplican por prioridad (de arriba
+// hacia abajo): cada nivel desempata al anterior. Ordena DENTRO de cada sub
+// frente, sin mezclar tareas entre sub frentes. Se guarda junto con los
+// filtros como una sola "vista"; si no se guarda, es momentaneo (se pierde al
+// recargar).
 
 export type CampoOrden = 'resp' | 'estado' | 'objetivo' | 'original' | 'proyecto'
 
-export interface Orden {
+/** Direccion de una regla: 1 = ascendente (↑), -1 = descendente (↓). */
+export type Direccion = 1 | -1
+
+/** Una regla de orden: un campo y su direccion. */
+export interface ReglaOrden {
   campo: CampoOrden
-  dir: 1 | -1
+  dir: Direccion
 }
 
-/** Ciclo del clic: sin orden → ↑ → ↓ → sin orden. */
-export function siguienteOrden(actual: Orden | null, campo: CampoOrden): Orden | null {
-  if (!actual || actual.campo !== campo) return { campo, dir: 1 }
-  if (actual.dir === 1) return { campo, dir: -1 }
-  return null
+/** Orden multinivel: reglas apiladas por prioridad (la primera manda). */
+export type OrdenMulti = ReglaOrden[]
+
+/** Etiqueta de un campo ordenable, para el menu. */
+export interface CampoOrdenOpc {
+  campo: CampoOrden
+  label: string
 }
+
+/** Campos ordenables en tablas de proyecto y en la Gantt. */
+export const CAMPOS_PROYECTO: CampoOrdenOpc[] = [
+  { campo: 'resp', label: 'Responsable' },
+  { campo: 'estado', label: 'Estado' },
+  { campo: 'objetivo', label: 'Fecha Objetivo' },
+  // "Desviacion" aun no existe como columna: se usa Fecha Original de forma
+  // provisional (ver pedido de desviacion).
+  { campo: 'original', label: 'Fecha Original' },
+]
+
+/** En Mis Tareas se agrega Proyecto a los campos ordenables. */
+export const CAMPOS_MIS_TAREAS: CampoOrdenOpc[] = [...CAMPOS_PROYECTO, { campo: 'proyecto', label: 'Proyecto' }]
 
 /**
  * Estado NO es alfabetico: gravedad del modelo, de menos a mas critico
@@ -55,22 +76,27 @@ export function valorOrden(
 }
 
 /**
- * Ordena una copia de `items` por el valor extraido. Los sin valor van
- * SIEMPRE al final (en ambas direcciones); el sort es estable, asi que los
- * empates conservan el orden original.
+ * Ordena una copia de `items` aplicando las reglas por prioridad (la primera
+ * manda; las siguientes desempatan). Los sin valor de un campo van SIEMPRE al
+ * final de ese nivel (en ambas direcciones). Sin reglas devuelve `items` tal
+ * cual (el orden manual). El sort es estable: los empates totales conservan el
+ * orden de entrada.
  */
-export function ordenar<T>(
+export function ordenarMulti<T>(
   items: T[],
-  orden: Orden | null,
-  valor: (x: T) => string | number | undefined,
+  reglas: OrdenMulti,
+  valor: (x: T, campo: CampoOrden) => string | number | undefined,
 ): T[] {
-  if (!orden) return items
+  if (!reglas.length) return items
   return [...items].sort((a, b) => {
-    const va = valor(a)
-    const vb = valor(b)
-    if (va === vb) return 0
-    if (va === undefined) return 1
-    if (vb === undefined) return -1
-    return (va < vb ? -1 : 1) * orden.dir
+    for (const r of reglas) {
+      const va = valor(a, r.campo)
+      const vb = valor(b, r.campo)
+      if (va === vb) continue
+      if (va === undefined) return 1
+      if (vb === undefined) return -1
+      return (va < vb ? -1 : 1) * r.dir
+    }
+    return 0
   })
 }

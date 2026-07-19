@@ -103,21 +103,33 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   franja de íconos (uno por proyecto) siempre clicable; al pasar el mouse la barra
   completa se despliega al lado y se repliega al salir. La preferencia se recuerda
   por usuario entre sesiones.
-- **Orden por columna** (proyectos y Mis Tareas): clic en el encabezado cicla
-  ascendente ↑ / descendente ↓ / orden original (el manual). Es global a todos
-  los sub frentes sin mezclarlos (la flecha aparece en todos); Estado ordena por
-  gravedad, no alfabético; es independiente de los filtros y no se persiste.
-- **Filtros guardables:** por Fecha Objetivo (relativas Hoy / Esta semana /
-  Próxima semana / Este mes — semana de lunes a domingo —, rango fijo o
-  **Sin fecha**), Responsable (incluye **Sin asignar**) y Estado, con
-  multi-selección ("o" dentro del campo, "y" entre campos). Se guardan con nombre, **privados por usuario y por proyecto**, y se
-  aplican/actualizan/renombran/eliminan desde el desplegable; cada campo tiene su
-  "Limpiar filtro" además del Limpiar global. En la tabla filtran
-  filas; en la Gantt, responsable y estado filtran tareas y **la fecha define el
-  horizonte visible** — con la excepción de **Sin fecha**, que en la Gantt filtra
-  (muestra solo las tareas sin fecha, como filas sin marca, planificables ahí
-  mismo) sin tocar el horizonte. En la tabla, los filtros quedan **fijos arriba**
-  al hacer scroll y los encabezados de columna se congelan justo debajo.
+- **Menú "Ordenar"** (junto a Filtrar, en tabla y Gantt): ordenamiento
+  **multinivel** — se apilan varias reglas **campo + dirección** (↑ ascendente /
+  ↓ descendente) que se aplican por prioridad (de arriba hacia abajo; cada nivel
+  desempata al anterior). Se pueden **agregar niveles**, **reordenarlos** (subir /
+  bajar prioridad) y **eliminarlos**; cada campo aparece una sola vez. Campos:
+  Responsable · Estado · Fecha Objetivo · Fecha Original (más **Proyecto** en Mis
+  Tareas). Estado ordena por **gravedad** (Hecha → Pendiente → Pendiente
+  replanificada → Atrasada → Atrasada replanificada), no alfabético. Ordena
+  **dentro de cada sub frente** sin mezclar tareas entre sub frentes (en la Gantt,
+  reordena las filas del panel izquierdo dentro de cada bloque). Un orden aplicado
+  sin guardar es **momentáneo**; sólo persiste si se guarda como parte de una
+  vista. Ya **no se ordena** haciendo clic en el encabezado de columna.
+- **Filtros y orden guardables como "vista":** por Fecha Objetivo (relativas Hoy /
+  Esta semana / Próxima semana / Este mes — semana de lunes a domingo —, rango
+  fijo o **Sin fecha**), Responsable (incluye **Sin asignar**) y Estado, con
+  multi-selección ("o" dentro del campo, "y" entre campos). El **filtro y el orden
+  se guardan juntos** como una sola vista, con nombre, **privados por usuario y por
+  proyecto**; se aplican/actualizan/renombran/eliminan desde el desplegable
+  "Vistas". El **filtro y el orden son por proyecto**: aplicarlos en un proyecto
+  **no afecta** a otro; cada proyecto conserva su propio estado (momentáneo hasta
+  guardarlo como vista). Cada campo tiene su "Limpiar filtro" además del Limpiar
+  global. En la tabla filtran filas; en la Gantt, responsable y estado filtran
+  tareas y **la fecha define el horizonte visible** — con la excepción de **Sin
+  fecha**, que en la Gantt filtra (muestra solo las tareas sin fecha, como filas
+  sin marca, planificables ahí mismo) sin tocar el horizonte. En la tabla, los
+  filtros quedan **fijos arriba** al hacer scroll y los encabezados de columna se
+  congelan justo debajo.
 - **Modo oscuro:** botón manual (🌙/☀ al pie de la sidebar; no sigue al sistema
   operativo), persistente por usuario. Los cinco colores de estado conservan su
   identidad con variantes ajustadas para fondo oscuro; el rastro de fechas
