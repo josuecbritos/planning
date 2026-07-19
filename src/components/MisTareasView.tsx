@@ -5,7 +5,6 @@ import type { Can } from '../lib/permisos'
 import { cmp, formatoFecha } from '../lib/dates'
 import {
   CATEGORIA_LABEL,
-  atrasoHabiles,
   categoriaDe,
   colorTarea,
   esAtrasada,
@@ -252,7 +251,7 @@ function FilaTarea({
         )}
       </td>
 
-      <td className={`col-desv${atrasoHabiles(tarea) ? ' col-desv--mov' : ''}`}>{textoAtraso(tarea)}</td>
+      <td className="col-desv">{textoAtraso(tarea)}</td>
     </tr>
   )
 }

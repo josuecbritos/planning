@@ -3,7 +3,7 @@ import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../l
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import type { Can } from '../lib/permisos'
-import { CATEGORIA_LABEL, atrasoHabiles, categoriaDe, colorTarea, esAtrasada, nReplanificaciones, textoAtraso } from '../lib/derive'
+import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, nReplanificaciones, textoAtraso } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { formatoFecha } from '../lib/dates'
 import { HoverCard } from './HoverCard'
@@ -529,8 +529,8 @@ function TareaFila({
       </td>
 
       {/* Atraso: "N días" (hábiles) si se corrió hacia adelante, o "—".
-          Visible en desktop; en mobile se oculta. */}
-      <td className={`col-desv${atrasoHabiles(tarea) ? ' col-desv--mov' : ''}`}>{textoAtraso(tarea)}</td>
+          Mismo estilo que la fecha. Visible en desktop; en mobile se oculta. */}
+      <td className="col-desv">{textoAtraso(tarea)}</td>
 
       {can.algunoDeTareas && (
         <td className="col-acc">
