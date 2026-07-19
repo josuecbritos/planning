@@ -5,12 +5,12 @@ import type { Can } from '../lib/permisos'
 import { cmp, formatoFecha } from '../lib/dates'
 import {
   CATEGORIA_LABEL,
+  atrasoHabiles,
   categoriaDe,
   colorTarea,
-  desviacionHabiles,
   esAtrasada,
   nReplanificaciones,
-  textoDesviacion,
+  textoAtraso,
   type Categoria,
 } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
@@ -129,7 +129,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, on
             <th className="col-ruta">Ubicación</th>
             <th className="col-estado">Estado</th>
             <th className="col-fecha">Fecha Objetivo</th>
-            <th className="col-desv">Desviación</th>
+            <th className="col-desv">Atraso</th>
           </tr>
         </thead>
         <tbody>
@@ -252,7 +252,7 @@ function FilaTarea({
         )}
       </td>
 
-      <td className={`col-desv${desviacionHabiles(tarea) ? ' col-desv--mov' : ''}`}>{textoDesviacion(tarea)}</td>
+      <td className={`col-desv${atrasoHabiles(tarea) ? ' col-desv--mov' : ''}`}>{textoAtraso(tarea)}</td>
     </tr>
   )
 }

@@ -333,7 +333,7 @@ tr.fila--morado > td { background: var(--morado-suave); }
 .col-fecha { width: 118px; white-space: nowrap; }
 .col-estado { width: 124px; }
 table.tareas .col-estado { text-align: center; }
-/* Columna Desviación (punto 6): +N/-N días hábiles o "—". */
+/* Columna Atraso: "N días" hábiles corridos hacia adelante, o "—". */
 .col-desv { width: 104px; white-space: nowrap; }
 table.tareas .col-desv { text-align: center; }
 .col-desv--mov { font-weight: 600; }
@@ -1400,12 +1400,11 @@ table.tareas td.col-fecha { font-size: 12px; }
     white-space: normal; word-break: normal; overflow-wrap: normal;
     vertical-align: middle;
   }
-  /* Punto 2 (#109): TODA la fila a un único tamaño (13px) — nombre,
-     responsable, estado y fecha. Las tipografías no cambian (sans el nombre,
-     mono los datos); solo se unifica el tamaño. Los íconos secundarios de la
-     fila (↻×N, 💬) conservan su tamaño menor (tienen su propia regla). */
-  table.tareas tbody td { font-size: 13px; }
-  .tarea-cell, .tarea-cell__link, .tarea-cell .inline-text { font-size: 13px; line-height: 1.25; }
+  /* Corrección #109: se deshace el intento de unificar toda la fila a 13px
+     (empeoró el mobile). El estado y la fecha quedan como estaban; solo se
+     REDUCEN dos elementos que dominaban: el nombre de la tarea y las iniciales
+     del responsable, hasta quedar en proporción con el resto de la fila. */
+  .tarea-cell, .tarea-cell__link, .tarea-cell .inline-text { font-size: 10px; line-height: 1.2; }
   /* En layout fijo, display:none dejaria la columna RESERVADA (franja
      vacia): se colapsa a ancho 0 para que Tarea reciba ese espacio.
      (Desviación reemplaza a Fecha Original y se oculta igual en mobile.) */
@@ -1425,18 +1424,15 @@ table.tareas td.col-fecha { font-size: 12px; }
   .check-hecha { width: 18px; height: 18px; font-size: 9px; border-width: 1.5px; }
   .col-resp { width: 34px; }
   table.tareas td.col-resp { padding-left: 1px; padding-right: 1px; }
-  .avatar { width: 26px; height: 26px; font-size: 13px; }
+  /* Iniciales del responsable más chicas (segundo elemento que dominaba). */
+  .avatar { width: 24px; height: 24px; font-size: 8px; }
   /* el caret del selector no cabe junto al avatar: el avatar ya es el boton */
   .resp-picker__caret { display: none; }
-  /* Estado a 13px: el pill crece y envuelve el texto (alto automático). */
-  .col-estado { width: 90px; }
-  .estado-chip {
-    width: auto; min-width: 0; max-width: 100%; height: auto; min-height: 24px;
-    font-size: 13px; padding: 3px 7px; letter-spacing: 0; line-height: 1.15;
-  }
-  /* Fecha a 13px, envolviendo dentro de su celda si hace falta. */
-  .col-fecha { width: 84px; }
-  table.tareas td.col-fecha { font-size: 13px; white-space: normal; padding-left: 3px; padding-right: 3px; }
+  /* Estado y fecha quedan como estaban (no se tocan en esta corrección). */
+  .col-estado { width: 62px; }
+  .estado-chip { width: 54px; height: 26px; font-size: 6.5px; padding: 2px 2px; letter-spacing: .02em; }
+  .col-fecha { width: 64px; }
+  table.tareas td.col-fecha { font-size: 9px; white-space: nowrap; padding-left: 2px; padding-right: 2px; }
   .fecha-btn, .fecha-input { padding: 2px 1px; }
   /* acciones: queda solo ⓘ (acceso al detalle), compacto */
   .col-acc { width: 26px; }
