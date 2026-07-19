@@ -13,6 +13,9 @@ type Row = Record<string, any>
 const toUsuario = (r: Row): Usuario => ({
   id: r.id, nombre: r.nombre, iniciales: r.iniciales ?? '', email: r.email, rol: r.rol,
   activo: r.activo, authId: r.auth_id ?? undefined,
+  // Necesario para gobernar la UI del usuario en sesion (p.ej. el "+" de
+  // crear proyecto, que depende de permisos_proyecto.crearProyectos).
+  permisosProyecto: r.permisos_proyecto ?? undefined,
 })
 
 export class SupabaseAuth implements AuthService {
