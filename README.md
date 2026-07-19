@@ -75,12 +75,14 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   (sin historial, y la fecha original acompaña); solo cuenta como replanificación
   mover una fecha que **vence hoy o ya venció** — ahí la fecha original se congela
   ("la última fecha comprometida antes de empezar a atrasarse").
-- **Columna "Desviación"** (tabla y Mis Tareas desktop): reemplaza a Fecha
-  Original con el patrón baseline + variance. Muestra **+N / -N días hábiles**
-  entre la fecha comprometida original y la vigente (positivo si se corrió hacia
-  adelante, negativo si se adelantó), o **"—"** si no se movió. La columna vacía es
-  señal en sí misma. La fecha original exacta queda consultable en el panel de
-  información. El menú de orden ordena por la desviación (con signo).
+- **Columna "Atraso"** (tabla y Mis Tareas desktop): reemplaza a Fecha Original.
+  Muestra **"N días"** (hábiles) que la fecha vigente se corrió **hacia adelante**
+  respecto de la comprometida original, o **"—"** si no hay atraso — incluidos los
+  adelantos, que no interesan (un solo estado visual para "sin atraso"). Con el
+  encabezado "Atraso" la columna es autoexplicativa, sin signos. La columna vacía
+  es señal en sí misma. Font monoespaciado, como la fecha. La fecha original exacta
+  queda consultable en el panel de información. El menú de orden ordena por la
+  cantidad de días de atraso.
 - **Fechas en cualquier día**, incluidos sábado y domingo. La Gantt alterna entre
   **solo días hábiles** (default) y **semana completa (7 días)**, con aviso de
   tareas de fin de semana ocultas.
@@ -117,7 +119,7 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   renumera al resto. La dirección activa se **resalta**; volver a tocarla
   desactiva el campo. Es **multinivel** (varios campos con prioridad, armada por
   orden de activación). Campos: Responsable · Estado · Fecha Objetivo ·
-  **Desviación** (más **Proyecto** en Mis Tareas). Estado ordena por **gravedad**
+  **Atraso** (más **Proyecto** en Mis Tareas). Estado ordena por **gravedad**
   (Hecha → Pendiente → Pendiente replanificada → Atrasada → Atrasada
   replanificada), no alfabético. Ordena **dentro de cada sub frente** sin mezclar
   tareas entre sub frentes (en la Gantt, reordena las filas del panel izquierdo
@@ -191,7 +193,7 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   las demás tablas (check, pills, colores de fila) con columnas Proyecto y Ubicación;
   usa el sistema común de filtros (Fecha Objetivo / Estado / **Proyecto**) con
   guardados propios del contexto, separados de los de cada proyecto. En mobile,
-  Proyecto se fusiona dentro de Ubicación (ruta completa) y sale Desviación.
+  Proyecto se fusiona dentro de Ubicación (ruta completa) y sale Atraso.
 - **Panel lateral de detalle** (backlog de 7.2): click sobre una tarea o una marca del
   Gantt abre un panel con el detalle completo, la línea de tiempo del historial y las
   acciones operativas (marcar hecha, replanificar, archivar) para admins. Se cierra

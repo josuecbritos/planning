@@ -72,8 +72,8 @@ export function nReplanificaciones(state: AppState, tareaId: string): number {
 }
 
 /**
- * Desviación (punto 6): días HÁBILES entre la fecha comprometida original y la
- * vigente. >0 si se corrió hacia adelante, <0 si se adelantó, 0 si no cambió.
+ * Desviación en días HÁBILES entre la fecha comprometida original y la vigente.
+ * >0 si se corrió hacia adelante (atraso), <0 si se adelantó, 0 si no cambió.
  * `undefined` si falta la original o la vigente (no se puede calcular).
  */
 export function desviacionHabiles(t: Tarea): number | undefined {
@@ -82,12 +82,22 @@ export function desviacionHabiles(t: Tarea): number | undefined {
   return difDiasHabiles(t.fechaOriginal, vigente)
 }
 
-/** Texto de la columna Desviación: "+N días" / "-N días" / "—" (sin desvío). */
-export function textoDesviacion(t: Tarea): string {
+/**
+ * Atraso (punto 2): días hábiles que la tarea se corrió HACIA ADELANTE. Los
+ * adelantos y el "sin cambio" no son atraso (0); `undefined` si no se puede
+ * calcular. Ordena y se muestra por esta cantidad.
+ */
+export function atrasoHabiles(t: Tarea): number | undefined {
   const d = desviacionHabiles(t)
-  if (!d) return '—' // undefined (sin datos) o 0 (sin desvío): columna vacía
-  const abs = Math.abs(d)
-  return `${d > 0 ? '+' : '-'}${abs} día${abs === 1 ? '' : 's'}`
+  if (d === undefined) return undefined
+  return d > 0 ? d : 0
+}
+
+/** Texto de la columna Atraso: "N días" cuando hay atraso, "—" si no. */
+export function textoAtraso(t: Tarea): string {
+  const a = atrasoHabiles(t)
+  if (!a) return '—' // undefined, adelanto o sin atraso: columna vacía
+  return `${a} día${a === 1 ? '' : 's'}`
 }
 
 /**

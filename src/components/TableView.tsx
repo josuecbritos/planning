@@ -3,7 +3,7 @@ import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../l
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import type { Can } from '../lib/permisos'
-import { CATEGORIA_LABEL, categoriaDe, colorTarea, desviacionHabiles, esAtrasada, nReplanificaciones, textoDesviacion } from '../lib/derive'
+import { CATEGORIA_LABEL, atrasoHabiles, categoriaDe, colorTarea, esAtrasada, nReplanificaciones, textoAtraso } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { formatoFecha } from '../lib/dates'
 import { HoverCard } from './HoverCard'
@@ -254,9 +254,9 @@ function SubFrenteTabla({
             <th className="col-resp">Resp.</th>
             <th className="col-estado">Estado</th>
             <th className="col-fecha">Fecha Objetivo</th>
-            {/* Desviación (punto 6): reemplaza Fecha Original. En mobile se
+            {/* Atraso (días hábiles corridos hacia adelante). En mobile se
                 oculta (5 columnas), igual que hacía col-orig. */}
-            <th className="col-desv">Desviación</th>
+            <th className="col-desv">Atraso</th>
             {can.algunoDeTareas && <th className="col-acc"></th>}
           </tr>
         </thead>
@@ -528,9 +528,9 @@ function TareaFila({
         )}
       </td>
 
-      {/* Desviación (punto 6): +N/-N días hábiles, o "—" si no se movió.
+      {/* Atraso: "N días" (hábiles) si se corrió hacia adelante, o "—".
           Visible en desktop; en mobile se oculta. */}
-      <td className={`col-desv${desviacionHabiles(tarea) ? ' col-desv--mov' : ''}`}>{textoDesviacion(tarea)}</td>
+      <td className={`col-desv${atrasoHabiles(tarea) ? ' col-desv--mov' : ''}`}>{textoAtraso(tarea)}</td>
 
       {can.algunoDeTareas && (
         <td className="col-acc">
