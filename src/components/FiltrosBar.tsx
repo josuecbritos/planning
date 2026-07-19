@@ -10,13 +10,15 @@ import {
   type Filtro,
   type FiltroGuardado,
 } from '../lib/filtros'
+import type { CampoOrden, CampoOrdenOpc, Direccion, OrdenMulti } from '../lib/orden'
 import { TextPromptModal } from './TextPromptModal'
 import { Avatar } from './RespPicker'
 
-// Barra de filtros guardables (punto 3): Fecha Objetivo, Responsable y
-// Estado, con multi-seleccion por campo. Los guardados son privados por
-// usuario y por proyecto (localStorage), con nombre; se aplican desde el
-// desplegable y pueden actualizarse, renombrarse y eliminarse.
+// Barra de filtros + orden guardables (puntos 3 y 4): Fecha Objetivo,
+// Responsable y Estado con multi-seleccion, mas un menu "Ordenar" multinivel
+// (reglas campo + direccion). Filtro y orden se guardan juntos como una sola
+// "vista", privada por usuario y por proyecto (localStorage): se aplican desde
+// el desplegable y pueden actualizarse, renombrarse y eliminarse.
 
 const ESTADOS: Categoria[] = ['hecha', 'pendiente', 'pendiente_replan', 'atrasada', 'atrasada_replan']
 const ESTADO_COLOR: Record<Categoria, string> = {
@@ -44,9 +46,24 @@ interface Props {
   proyectos?: Proyecto[]
   filtro: Filtro
   onCambiar: (f: Filtro) => void
+  /** Orden multinivel activo (parte de la vista). */
+  orden: OrdenMulti
+  onCambiarOrden: (o: OrdenMulti) => void
+  /** Campos ordenables de este contexto (proyecto o Mis Tareas). */
+  camposOrden: CampoOrdenOpc[]
 }
 
-export function FiltrosBar({ contexto, usuarioId, candidatos, proyectos, filtro, onCambiar }: Props) {
+export function FiltrosBar({
+  contexto,
+  usuarioId,
+  candidatos,
+  proyectos,
+  filtro,
+  onCambiar,
+  orden,
+  onCambiarOrden,
+  camposOrden,
+}: Props) {
   const clave = `planificador.filtros.${usuarioId}.${contexto}`
   const [guardados, setGuardados] = useState<FiltroGuardado[]>([])
   const [modal, setModal] = useState<{ tipo: 'guardar' } | { tipo: 'renombrar'; id: string; nombre: string } | null>(null)
@@ -70,9 +87,34 @@ export function FiltrosBar({ contexto, usuarioId, candidatos, proyectos, filtro,
   }
 
   const activo = !filtroVacio(filtro)
+  const ordenActivo = orden.length > 0
   const nResp = filtro.responsables?.length ?? 0
   const nEst = filtro.estados?.length ?? 0
   const nProy = filtro.proyectos?.length ?? 0
+
+  const labelCampo = (c: CampoOrden) => camposOrden.find((x) => x.campo === c)?.label ?? c
+  // Solo un campo por regla: el selector ofrece los libres + el actual.
+  const camposLibres = (excepto: number) => {
+    const usados = new Set(orden.filter((_, i) => i !== excepto).map((r) => r.campo))
+    return camposOrden.filter((c) => !usados.has(c.campo))
+  }
+  const agregarNivel = () => {
+    const usados = new Set(orden.map((r) => r.campo))
+    const libre = camposOrden.find((c) => !usados.has(c.campo))
+    if (libre) onCambiarOrden([...orden, { campo: libre.campo, dir: 1 }])
+  }
+  const cambiarCampo = (i: number, campo: CampoOrden) =>
+    onCambiarOrden(orden.map((r, j) => (j === i ? { ...r, campo } : r)))
+  const alternarDir = (i: number) =>
+    onCambiarOrden(orden.map((r, j) => (j === i ? { ...r, dir: (r.dir === 1 ? -1 : 1) as Direccion } : r)))
+  const moverRegla = (i: number, delta: number) => {
+    const j = i + delta
+    if (j < 0 || j >= orden.length) return
+    const copia = [...orden]
+    ;[copia[i], copia[j]] = [copia[j], copia[i]]
+    onCambiarOrden(copia)
+  }
+  const eliminarRegla = (i: number) => onCambiarOrden(orden.filter((_, j) => j !== i))
 
   const toggleResp = (id: string) => {
     const set = new Set(filtro.responsables ?? [])
@@ -259,19 +301,103 @@ export function FiltrosBar({ contexto, usuarioId, candidatos, proyectos, filtro,
 
       <span className="filtros-bar__sep" />
 
-      <Desplegable etiqueta={`Guardados${guardados.length ? ` (${guardados.length})` : ''}`} activo={false} alDerecha>
-        {guardados.length === 0 && <div className="filtro-menu__vacio">Aun no guardas filtros en este proyecto.</div>}
+      {/* Punto 4: menu "Ordenar" multinivel, junto a Filtrar. Reglas campo +
+          direccion apiladas por prioridad; se guardan como parte de la vista. */}
+      <span className="filtros-bar__label">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M7 4v16M7 20l-3-3M7 4l3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M13 6h7M13 11h5M13 16h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+        Ordenar
+      </span>
+
+      <Desplegable etiqueta={ordenActivo ? `Orden (${orden.length})` : 'Ordenar'} activo={ordenActivo}>
+        {orden.length === 0 && (
+          <div className="filtro-menu__vacio">Sin orden aplicado. Se muestra el orden manual del plan.</div>
+        )}
+        {orden.map((regla, i) => (
+          <div key={i} className="orden-regla">
+            <span className="orden-regla__prio" title={`Prioridad ${i + 1}`}>{i + 1}</span>
+            <select
+              className="orden-regla__campo"
+              value={regla.campo}
+              aria-label={`Campo del nivel ${i + 1}`}
+              onChange={(e) => cambiarCampo(i, e.target.value as CampoOrden)}
+            >
+              {camposLibres(i).map((c) => (
+                <option key={c.campo} value={c.campo}>{c.label}</option>
+              ))}
+            </select>
+            <button
+              className="orden-regla__dir"
+              aria-label={`Direccion (${regla.dir === 1 ? 'ascendente' : 'descendente'}) de ${labelCampo(regla.campo)}`}
+              title={regla.dir === 1 ? 'Ascendente' : 'Descendente'}
+              onClick={() => alternarDir(i)}
+            >
+              {regla.dir === 1 ? '↑' : '↓'}
+            </button>
+            <button
+              className="icon-btn"
+              disabled={i === 0}
+              aria-label={`Subir prioridad de ${labelCampo(regla.campo)}`}
+              title="Subir prioridad"
+              onClick={() => moverRegla(i, -1)}
+            >
+              ▲
+            </button>
+            <button
+              className="icon-btn"
+              disabled={i === orden.length - 1}
+              aria-label={`Bajar prioridad de ${labelCampo(regla.campo)}`}
+              title="Bajar prioridad"
+              onClick={() => moverRegla(i, 1)}
+            >
+              ▼
+            </button>
+            <button
+              className="icon-btn"
+              aria-label={`Eliminar nivel ${labelCampo(regla.campo)}`}
+              title="Eliminar nivel"
+              onClick={() => eliminarRegla(i)}
+            >
+              🗑
+            </button>
+          </div>
+        ))}
+        {orden.length < camposOrden.length && (
+          <button className="filtro-op orden-agregar" onClick={agregarNivel}>
+            + Agregar nivel
+          </button>
+        )}
+        {ordenActivo && (
+          <button className="filtro-op filtro-op--quitar" onClick={() => onCambiarOrden([])}>
+            Limpiar orden
+          </button>
+        )}
+      </Desplegable>
+
+      <span className="filtros-bar__sep" />
+
+      <Desplegable etiqueta={`Vistas${guardados.length ? ` (${guardados.length})` : ''}`} activo={false} alDerecha>
+        {guardados.length === 0 && <div className="filtro-menu__vacio">Aun no guardas vistas en este proyecto.</div>}
         {guardados.map((g) => (
           <div key={g.id} className="filtro-guardado">
-            <button className="filtro-guardado__aplicar" title="Aplicar este filtro" onClick={() => onCambiar(g.filtro)}>
+            <button
+              className="filtro-guardado__aplicar"
+              title="Aplicar esta vista (filtro + orden)"
+              onClick={() => {
+                onCambiar(g.filtro)
+                onCambiarOrden(g.orden ?? [])
+              }}
+            >
               {g.nombre}
             </button>
             <button
               className="icon-btn"
-              data-tip="Actualizar con el filtro actual"
+              data-tip="Actualizar con el filtro y orden actuales"
               aria-label={`Actualizar ${g.nombre}`}
-              disabled={!activo}
-              onClick={() => persistir(guardados.map((x) => (x.id === g.id ? { ...x, filtro } : x)))}
+              disabled={!activo && !ordenActivo}
+              onClick={() => persistir(guardados.map((x) => (x.id === g.id ? { ...x, filtro, orden } : x)))}
             >
               💾
             </button>
@@ -297,19 +423,23 @@ export function FiltrosBar({ contexto, usuarioId, candidatos, proyectos, filtro,
 
       <button
         className="filtro-btn filtro-btn--guardar"
-        disabled={!activo}
-        title={activo ? 'Guardar la combinacion actual con un nombre' : 'Arma un filtro para poder guardarlo'}
+        disabled={!activo && !ordenActivo}
+        title={
+          activo || ordenActivo
+            ? 'Guardar la vista actual (filtro + orden) con un nombre'
+            : 'Arma un filtro u orden para poder guardar la vista'
+        }
         onClick={() => setModal({ tipo: 'guardar' })}
       >
-        + Guardar filtro
+        + Guardar vista
       </button>
 
       {modal?.tipo === 'guardar' && (
         <TextPromptModal
-          titulo="Guardar filtro"
-          label='Nombre (ej. "Mis atrasadas", "Lo de esta semana")'
+          titulo="Guardar vista"
+          label='Nombre (ej. "Mis atrasadas", "Por estado y fecha")'
           textoBoton="Guardar"
-          onSubmit={(nombre) => persistir([...guardados, { id: uid(), nombre, filtro }])}
+          onSubmit={(nombre) => persistir([...guardados, { id: uid(), nombre, filtro, orden }])}
           onClose={() => setModal(null)}
         />
       )}

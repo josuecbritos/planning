@@ -8,6 +8,7 @@ import { hoyISO } from './lib/dates'
 import { contar } from './lib/derive'
 import { makeCan } from './lib/permisos'
 import type { Filtro } from './lib/filtros'
+import { CAMPOS_PROYECTO, type OrdenMulti } from './lib/orden'
 import * as apply from './data/apply'
 import type {
   NuevaTarea,
@@ -63,6 +64,16 @@ export interface Actions {
   addComentario: (tareaId: string, texto: string) => Promise<void>
 }
 
+/** Vista de un proyecto (punto 3/4): filtro y orden viven juntos y son
+ *  propios de cada proyecto. Referencias estables para el estado "vacio". */
+interface VistaProyecto {
+  filtro: Filtro
+  orden: OrdenMulti
+}
+const FILTRO_VACIO: Filtro = {}
+const ORDEN_VACIO: OrdenMulti = []
+const VISTA_VACIA: VistaProyecto = { filtro: FILTRO_VACIO, orden: ORDEN_VACIO }
+
 export default function App() {
   const repo = useMemo(() => makeRepo(), [])
   const auth = useMemo(() => makeAuth(repo), [repo])
@@ -83,8 +94,10 @@ export default function App() {
   // Punto 6: modo de la sidebar. Primera preferencia persistente de la app
   // (por usuario, sobrevive a recargas y sesiones posteriores).
   const [sidebarModo, setSidebarModo] = useState<SidebarModo>('fija')
-  // Filtro activo del proyecto (punto 3). Se limpia al cambiar de proyecto.
-  const [filtro, setFiltro] = useState<Filtro>({})
+  // Punto 3/4: filtro + orden POR PROYECTO. Cada proyecto conserva su propio
+  // estado (aplicar un filtro/orden en A no afecta a B); es momentaneo (vive
+  // en memoria) salvo que se guarde como vista. Mapa keyed por id de proyecto.
+  const [vistasProyecto, setVistasProyecto] = useState<Record<string, VistaProyecto>>({})
   // Tema claro/oscuro (punto 4): boton manual, persistente por usuario.
   const [tema, setTema] = useState<Tema>('claro')
   // Mobile: la sidebar se superpone al contenido al llamarla (boton ☰) y
@@ -346,9 +359,33 @@ export default function App() {
     setProyectoActivoId(id)
     setFrenteSel('todos')
     setPantalla('proyectos')
-    setFiltro({})
+    // Punto 3: NO se limpia el filtro/orden — cada proyecto conserva el suyo.
     setMovilSidebar(false)
   }, [])
+
+  // Vista (filtro + orden) del proyecto activo; setters que solo tocan la
+  // entrada de ESE proyecto (punto 3: no se contaminan entre proyectos).
+  const vistaActiva = proyectoActivoId ? vistasProyecto[proyectoActivoId] ?? VISTA_VACIA : VISTA_VACIA
+  const setFiltro = useCallback(
+    (f: Filtro) => {
+      setVistasProyecto((prev) => {
+        if (!proyectoActivoId) return prev
+        const cur = prev[proyectoActivoId] ?? VISTA_VACIA
+        return { ...prev, [proyectoActivoId]: { ...cur, filtro: f } }
+      })
+    },
+    [proyectoActivoId],
+  )
+  const setOrden = useCallback(
+    (o: OrdenMulti) => {
+      setVistasProyecto((prev) => {
+        if (!proyectoActivoId) return prev
+        const cur = prev[proyectoActivoId] ?? VISTA_VACIA
+        return { ...prev, [proyectoActivoId]: { ...cur, orden: o } }
+      })
+    },
+    [proyectoActivoId],
+  )
 
   const onSelectFrente = useCallback((f: FrenteSel) => {
     setFrenteSel(f)
@@ -545,8 +582,11 @@ export default function App() {
                 contexto={proyecto.id}
                 usuarioId={sesion.id}
                 candidatos={candidatosFiltro}
-                filtro={filtro}
+                filtro={vistaActiva.filtro}
                 onCambiar={setFiltro}
+                orden={vistaActiva.orden}
+                onCambiarOrden={setOrden}
+                camposOrden={CAMPOS_PROYECTO}
               />
               {vista === 'tabla' ? (
                 <TableView
@@ -555,7 +595,8 @@ export default function App() {
                   frenteSel={frenteSel}
                   hoy={HOY}
                   can={can}
-                  filtro={filtro}
+                  filtro={vistaActiva.filtro}
+                  orden={vistaActiva.orden}
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                 />
@@ -566,7 +607,8 @@ export default function App() {
                   frenteSel={frenteSel}
                   hoy={HOY}
                   can={can}
-                  filtro={filtro}
+                  filtro={vistaActiva.filtro}
+                  orden={vistaActiva.orden}
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                 />

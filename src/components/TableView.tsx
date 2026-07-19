@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
-import { ordenar, valorOrden, type Orden } from '../lib/orden'
-import { ThOrden } from './ThOrden'
+import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import type { Can } from '../lib/permisos'
@@ -26,16 +25,15 @@ interface Props {
   can: Can
   /** Filtro activo (punto 3): en la tabla filtran los tres campos. */
   filtro: Filtro
+  /** Orden multinivel activo (punto 4): parte de la vista, por proyecto. */
+  orden: OrdenMulti
   actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
 }
 
-export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, actions, onAbrirTarea }: Props) {
+export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, actions, onAbrirTarea }: Props) {
   const filtrando = !filtroVacio(filtro)
-  // Orden por columna (punto 3): global a todos los sub frentes, sin
-  // mezclarlos; no se persiste (estado de componente, se pierde al salir).
-  const [orden, setOrden] = useState<Orden | null>(null)
   const frentes = state.frentes
     .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
     .sort((a, b) => a.orden - b.orden)
@@ -61,7 +59,6 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
           filtro={filtro}
           filtrando={filtrando}
           orden={orden}
-          onOrden={setOrden}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
         />
@@ -82,7 +79,6 @@ function FrentePagina({
   filtro,
   filtrando,
   orden,
-  onOrden,
   actions,
   onAbrirTarea,
 }: {
@@ -93,8 +89,7 @@ function FrentePagina({
   can: Can
   filtro: Filtro
   filtrando: boolean
-  orden: Orden | null
-  onOrden: (o: Orden | null) => void
+  orden: OrdenMulti
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -126,7 +121,6 @@ function FrentePagina({
           filtro={filtro}
           filtrando={filtrando}
           orden={orden}
-          onOrden={onOrden}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
         />
@@ -194,7 +188,6 @@ function SubFrenteTabla({
   filtro,
   filtrando,
   orden,
-  onOrden,
   actions,
   onAbrirTarea,
 }: {
@@ -205,8 +198,7 @@ function SubFrenteTabla({
   can: Can
   filtro: Filtro
   filtrando: boolean
-  orden: Orden | null
-  onOrden: (o: Orden | null) => void
+  orden: OrdenMulti
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -217,12 +209,11 @@ function SubFrenteTabla({
   const visibles = todas.filter(
     (t) => !t.archivada && (!filtrando || pasaFiltroCompleto(state, t, filtro, hoy)),
   )
-  // Punto 3: el orden se aplica DENTRO del sub frente (no se mezclan);
-  // sin orden activo queda la secuencia manual del trabajo.
-  const tareas =
-    orden && orden.campo !== 'proyecto'
-      ? ordenar(visibles, orden, (t) => valorOrden(state, t, orden.campo as Exclude<typeof orden.campo, 'proyecto'>, hoy))
-      : visibles
+  // Punto 4: el orden multinivel se aplica DENTRO del sub frente (las tareas
+  // no se mezclan entre sub frentes); sin reglas queda la secuencia manual.
+  const tareas = ordenarMulti(visibles, orden, (t, campo) =>
+    valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
+  )
   const archivadas = filtrando ? [] : todas.filter((t) => t.archivada)
 
   return (
@@ -254,16 +245,17 @@ function SubFrenteTabla({
       <table className="tareas">
         <thead>
           <tr>
-            {/* Orden (punto 5): primero COMO ESTA la tarea (Estado junto al
+            {/* Orden de columnas: primero COMO ESTA la tarea (Estado junto al
                 nombre), despues las fechas — la Objetivo es la operativa y
-                la Original queda al final como referencia. */}
+                la Original queda al final como referencia. El ordenamiento
+                ya no es por clic aqui (punto 4): se maneja desde "Ordenar". */}
             <th className="col-check">Hecha</th>
             <th>Tarea</th>
-            <ThOrden campo="resp" orden={orden} onCambiar={onOrden} className="col-resp">Resp.</ThOrden>
-            <ThOrden campo="estado" orden={orden} onCambiar={onOrden} className="col-estado">Estado</ThOrden>
-            <ThOrden campo="objetivo" orden={orden} onCambiar={onOrden} className="col-fecha">Fecha Objetivo</ThOrden>
+            <th className="col-resp">Resp.</th>
+            <th className="col-estado">Estado</th>
+            <th className="col-fecha">Fecha Objetivo</th>
             {/* col-orig: en mobile esta columna se oculta (5 columnas). */}
-            <ThOrden campo="original" orden={orden} onCambiar={onOrden} className="col-fecha col-orig">Fecha Original</ThOrden>
+            <th className="col-fecha col-orig">Fecha Original</th>
             {can.algunoDeTareas && <th className="col-acc"></th>}
           </tr>
         </thead>

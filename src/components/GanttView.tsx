@@ -15,6 +15,7 @@ import {
 } from '../lib/dates'
 import { colorTarea, fechaVigente, marcasDe } from '../lib/derive'
 import { filtraTareas, pasaFiltroTareas, rangoDeFecha, type Filtro } from '../lib/filtros'
+import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
 import type { Can } from '../lib/permisos'
 import { Marca } from './Marca'
 import { Avatar, RespPicker } from './RespPicker'
@@ -52,6 +53,9 @@ interface Props {
   /** Filtro activo (punto 3): responsable/estado filtran tareas; la parte
    *  de fecha NO filtra — se traduce al horizonte visible. */
   filtro: Filtro
+  /** Orden multinivel (punto 4): reordena las filas dentro de cada bloque de
+   *  sub frente, sin mezclarlas entre bloques. */
+  orden: OrdenMulti
   actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
@@ -132,7 +136,7 @@ function ventanaHoy(hoy: ISODate): { desde: ISODate; hasta: ISODate } {
   }
 }
 
-export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, actions, onAbrirTarea }: Props) {
+export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, actions, onAbrirTarea }: Props) {
   // Horizonte: por defecto "Alrededor de hoy"; no se persiste.
   const [modo, setModo] = useState<ModoHorizonte>('hoy')
   // §6.3.19: solo dias habiles (default) o semana completa de 7 dias.
@@ -184,9 +188,14 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
         if (!hayFiltroTareas) filasFrente.push({ tipo: 'vacio-frente', frente: f, esPrimeraGlobal: false })
       } else {
         for (const sf of subs) {
-          const tareas = state.tareas
+          const manual = state.tareas
             .filter((t) => t.subFrenteId === sf.id && !t.archivada && (!hayFiltroTareas || pasaEnGantt(t)))
             .sort((a, b) => a.orden - b.orden)
+          // Punto 4: el orden del menu reordena DENTRO del bloque de sub frente
+          // (no mezcla tareas entre bloques); sin reglas queda el orden manual.
+          const tareas = ordenarMulti(manual, orden, (t, campo) =>
+            valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
+          )
           const filasSub: FilaGantt[] = []
           if (tareas.length === 0) {
             if (hayFiltroTareas) continue
@@ -267,7 +276,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
       out.push({ tipo: 'input-frente', esPrimeraGlobal: out.length === 0 })
     }
     return out
-  }, [state, proyectoId, frenteSel, crearEn, filtro, hoy, hayFiltroTareas])
+  }, [state, proyectoId, frenteSel, crearEn, filtro, orden, hoy, hayFiltroTareas])
 
   const filasTarea = useMemo(
     () => filas.filter((f): f is Extract<FilaGantt, { tipo: 'tarea' }> => f.tipo === 'tarea'),
@@ -424,16 +433,17 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, acti
         const label = td.firstElementChild as HTMLElement | null
         if (!label) return
         const cr = td.getBoundingClientRect()
+        const labelH = label.offsetHeight
+        // Centro de la porcion visible del bloque (banda ∩ celda). El rotula
+        // se coloca centrado ahi, pero CLAMPEADO dentro de la celda: nunca
+        // sale del bloque, asi que al llegar al borde inferior se APOYA en el
+        // y muestra todas sus lineas (no se corta la de abajo, punto 1).
         const visTop = Math.max(cr.top, bandTop)
         const visBottom = Math.min(cr.bottom, bandBottom)
-        if (visBottom <= visTop) {
-          // Bloque fuera de la banda: el nombre se va con el (sin recalcular).
-          label.style.top = '0px'
-          label.style.height = `${cr.height}px`
-          return
-        }
-        label.style.top = `${visTop - cr.top}px`
-        label.style.height = `${visBottom - visTop}px`
+        const visCenter = visBottom > visTop ? (visTop + visBottom) / 2 : cr.top + cr.height / 2
+        let top = visCenter - cr.top - labelH / 2
+        top = Math.max(0, Math.min(top, cr.height - labelH))
+        label.style.top = `${top}px`
       })
     }
     const solicitar = () => {

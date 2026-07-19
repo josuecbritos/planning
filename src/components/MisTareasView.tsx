@@ -12,9 +12,8 @@ import {
   type Categoria,
 } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
-import { ordenar, valorOrden, type Orden } from '../lib/orden'
+import { CAMPOS_MIS_TAREAS, ordenarMulti, valorOrden, type OrdenMulti } from '../lib/orden'
 import { FiltrosBar } from './FiltrosBar'
-import { ThOrden } from './ThOrden'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
 import { CheckHecha } from './CheckHecha'
@@ -45,9 +44,10 @@ interface FilaMisTareas {
 
 export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, onAbrirTarea }: Props) {
   const [filtro, setFiltro] = useState<Filtro>({})
-  // Orden por columna (no se persiste; el "orden original" aqui es el
-  // propio de Mis Tareas: atrasadas primero, luego por fecha).
-  const [orden, setOrden] = useState<Orden | null>(null)
+  // Orden multinivel del menu "Ordenar" (punto 4). Momentaneo salvo que se
+  // guarde como vista; el "orden base" aqui es el propio de Mis Tareas
+  // (atrasadas primero, luego por fecha).
+  const [orden, setOrden] = useState<OrdenMulti>([])
 
   // Todas mis tareas activas, de todos los proyectos visibles.
   const misFilas = useMemo<FilaMisTareas[]>(() => {
@@ -82,11 +82,10 @@ export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, on
           if (filtro.proyectos && filtro.proyectos.length > 0 && !filtro.proyectos.includes(proyecto.id)) return false
           return pasaFiltroCompleto(state, tarea, filtro, hoy)
         })
-    if (!orden) return base
-    return ordenar(base, orden, (f) =>
-      orden.campo === 'proyecto'
+    return ordenarMulti(base, orden, (f, campo) =>
+      campo === 'proyecto'
         ? f.proyecto.nombre.toLowerCase()
-        : valorOrden(state, f.tarea, orden.campo, hoy),
+        : valorOrden(state, f.tarea, campo, hoy),
     )
   }, [misFilas, filtro, filtrando, orden, state, hoy])
 
@@ -114,6 +113,9 @@ export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, on
         proyectos={proyectos}
         filtro={filtro}
         onCambiar={setFiltro}
+        orden={orden}
+        onCambiarOrden={setOrden}
+        camposOrden={CAMPOS_MIS_TAREAS}
       />
 
       <table className="tareas mistareas">
@@ -121,11 +123,11 @@ export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, on
           <tr>
             <th className="col-check">Hecha</th>
             <th>Tarea</th>
-            <ThOrden campo="proyecto" orden={orden} onCambiar={setOrden} className="col-proyecto">Proyecto</ThOrden>
+            <th className="col-proyecto">Proyecto</th>
             <th className="col-ruta">Ubicación</th>
-            <ThOrden campo="estado" orden={orden} onCambiar={setOrden} className="col-estado">Estado</ThOrden>
-            <ThOrden campo="objetivo" orden={orden} onCambiar={setOrden} className="col-fecha">Fecha Objetivo</ThOrden>
-            <ThOrden campo="original" orden={orden} onCambiar={setOrden} className="col-fecha col-orig">Fecha Original</ThOrden>
+            <th className="col-estado">Estado</th>
+            <th className="col-fecha">Fecha Objetivo</th>
+            <th className="col-fecha col-orig">Fecha Original</th>
           </tr>
         </thead>
         <tbody>
