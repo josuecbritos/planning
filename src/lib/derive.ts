@@ -6,7 +6,7 @@ import type {
   Replanificacion,
   Tarea,
 } from '../types'
-import { cmp } from './dates'
+import { cmp, difDiasHabiles } from './dates'
 
 // Modelo de estados (definiciones cerradas): el usuario solo marca "hecha";
 // todo lo demas se deriva de la fecha y del historial. Toda tarea cae en
@@ -69,6 +69,25 @@ export function colorTarea(state: AppState, t: Tarea, hoy: string): ColorTarea {
 /** Cantidad de replanificaciones (para el indicador ↻ ×N de la tabla). */
 export function nReplanificaciones(state: AppState, tareaId: string): number {
   return state.historial.filter((h) => h.tareaId === tareaId).length
+}
+
+/**
+ * Desviación (punto 6): días HÁBILES entre la fecha comprometida original y la
+ * vigente. >0 si se corrió hacia adelante, <0 si se adelantó, 0 si no cambió.
+ * `undefined` si falta la original o la vigente (no se puede calcular).
+ */
+export function desviacionHabiles(t: Tarea): number | undefined {
+  const vigente = fechaVigente(t)
+  if (!t.fechaOriginal || !vigente) return undefined
+  return difDiasHabiles(t.fechaOriginal, vigente)
+}
+
+/** Texto de la columna Desviación: "+N días" / "-N días" / "—" (sin desvío). */
+export function textoDesviacion(t: Tarea): string {
+  const d = desviacionHabiles(t)
+  if (!d) return '—' // undefined (sin datos) o 0 (sin desvío): columna vacía
+  const abs = Math.abs(d)
+  return `${d > 0 ? '+' : '-'}${abs} día${abs === 1 ? '' : 's'}`
 }
 
 /**

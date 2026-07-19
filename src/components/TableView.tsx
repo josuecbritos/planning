@@ -3,7 +3,7 @@ import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../l
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import type { Can } from '../lib/permisos'
-import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, nReplanificaciones } from '../lib/derive'
+import { CATEGORIA_LABEL, categoriaDe, colorTarea, desviacionHabiles, esAtrasada, nReplanificaciones, textoDesviacion } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { formatoFecha } from '../lib/dates'
 import { HoverCard } from './HoverCard'
@@ -254,8 +254,9 @@ function SubFrenteTabla({
             <th className="col-resp">Resp.</th>
             <th className="col-estado">Estado</th>
             <th className="col-fecha">Fecha Objetivo</th>
-            {/* col-orig: en mobile esta columna se oculta (5 columnas). */}
-            <th className="col-fecha col-orig">Fecha Original</th>
+            {/* Desviación (punto 6): reemplaza Fecha Original. En mobile se
+                oculta (5 columnas), igual que hacía col-orig. */}
+            <th className="col-desv">Desviación</th>
             {can.algunoDeTareas && <th className="col-acc"></th>}
           </tr>
         </thead>
@@ -409,7 +410,7 @@ function NuevaTareaFila({
           aria-label="Fecha objetivo de la nueva tarea"
         />
       </td>
-      <td className="col-fecha col-orig mudo">{fechaObjetivo ? formatoFecha(fechaObjetivo) : '—'}</td>
+      <td className="col-desv mudo">—</td>
       <td className="col-acc">
         <button className="icon-btn" title="Guardar (Enter)" onMouseDown={(e) => e.preventDefault()} onClick={guardar}>✓</button>
         <button className="icon-btn" title="Cerrar (Esc)" onMouseDown={(e) => e.preventDefault()} onClick={() => { setTitulo(''); setActiva(false) }}>✕</button>
@@ -527,8 +528,9 @@ function TareaFila({
         )}
       </td>
 
-      {/* Siempre visible en desktop, sin enfasis; en mobile se oculta. */}
-      <td className="col-fecha col-orig">{tarea.fechaOriginal ? formatoFecha(tarea.fechaOriginal) : '—'}</td>
+      {/* Desviación (punto 6): +N/-N días hábiles, o "—" si no se movió.
+          Visible en desktop; en mobile se oculta. */}
+      <td className={`col-desv${desviacionHabiles(tarea) ? ' col-desv--mov' : ''}`}>{textoDesviacion(tarea)}</td>
 
       {can.algunoDeTareas && (
         <td className="col-acc">

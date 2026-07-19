@@ -7,8 +7,10 @@ import {
   CATEGORIA_LABEL,
   categoriaDe,
   colorTarea,
+  desviacionHabiles,
   esAtrasada,
   nReplanificaciones,
+  textoDesviacion,
   type Categoria,
 } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
@@ -127,7 +129,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, can, actions, on
             <th className="col-ruta">Ubicación</th>
             <th className="col-estado">Estado</th>
             <th className="col-fecha">Fecha Objetivo</th>
-            <th className="col-fecha col-orig">Fecha Original</th>
+            <th className="col-desv">Desviación</th>
           </tr>
         </thead>
         <tbody>
@@ -250,7 +252,7 @@ function FilaTarea({
         )}
       </td>
 
-      <td className="col-fecha col-orig">{tarea.fechaOriginal ? formatoFecha(tarea.fechaOriginal) : '—'}</td>
+      <td className={`col-desv${desviacionHabiles(tarea) ? ' col-desv--mov' : ''}`}>{textoDesviacion(tarea)}</td>
     </tr>
   )
 }

@@ -1,5 +1,5 @@
 import type { AppState, Tarea } from '../types'
-import { categoriaDe, type Categoria } from './derive'
+import { categoriaDe, desviacionHabiles, type Categoria } from './derive'
 
 // Ordenamiento multinivel (menu "Ordenar", proyectos y Mis Tareas). Se apilan
 // varias reglas campo + direccion, que se aplican por prioridad (de arriba
@@ -8,7 +8,7 @@ import { categoriaDe, type Categoria } from './derive'
 // filtros como una sola "vista"; si no se guarda, es momentaneo (se pierde al
 // recargar).
 
-export type CampoOrden = 'resp' | 'estado' | 'objetivo' | 'original' | 'proyecto'
+export type CampoOrden = 'resp' | 'estado' | 'objetivo' | 'desviacion' | 'proyecto'
 
 /** Direccion de una regla: 1 = ascendente (↑), -1 = descendente (↓). */
 export type Direccion = 1 | -1
@@ -33,9 +33,7 @@ export const CAMPOS_PROYECTO: CampoOrdenOpc[] = [
   { campo: 'resp', label: 'Responsable' },
   { campo: 'estado', label: 'Estado' },
   { campo: 'objetivo', label: 'Fecha Objetivo' },
-  // "Desviacion" aun no existe como columna: se usa Fecha Original de forma
-  // provisional (ver pedido de desviacion).
-  { campo: 'original', label: 'Fecha Original' },
+  { campo: 'desviacion', label: 'Desviación' },
 ]
 
 /** En Mis Tareas se agrega Proyecto a los campos ordenables. */
@@ -70,8 +68,9 @@ export function valorOrden(
       return GRAVEDAD[categoriaDe(state, t, hoy)]
     case 'objetivo':
       return t.fechaObjetivo
-    case 'original':
-      return t.fechaOriginal
+    case 'desviacion':
+      // Ordena numéricamente por la magnitud (con signo) de la desviación.
+      return desviacionHabiles(t)
   }
 }
 

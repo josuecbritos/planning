@@ -429,20 +429,28 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
       const headH = thead ? thead.getBoundingClientRect().height : 0
       const bandTop = sr.top + headH
       const bandBottom = sr.bottom
+      const bandH = bandBottom - bandTop
       scroll.querySelectorAll<HTMLElement>('td.fija--rotula').forEach((td) => {
         const label = td.firstElementChild as HTMLElement | null
         if (!label) return
         const cr = td.getBoundingClientRect()
         const labelH = label.offsetHeight
-        // Centro de la porcion visible del bloque (banda ∩ celda). El rotula
-        // se coloca centrado ahi, pero CLAMPEADO dentro de la celda: nunca
-        // sale del bloque, asi que al llegar al borde inferior se APOYA en el
-        // y muestra todas sus lineas (no se corta la de abajo, punto 1).
-        const visTop = Math.max(cr.top, bandTop)
-        const visBottom = Math.min(cr.bottom, bandBottom)
-        const visCenter = visBottom > visTop ? (visTop + visBottom) / 2 : cr.top + cr.height / 2
-        let top = visCenter - cr.top - labelH / 2
-        top = Math.max(0, Math.min(top, cr.height - labelH))
+        // Corrección #108 — dos casos según la altura del bloque:
+        //  - Bloque que CABE en la banda visible: título centrado en el
+        //    bloque, fijo (comportamiento normal, sin "sticky").
+        //  - Bloque MÁS ALTO que la banda: título "sticky" centrado en la
+        //    porción visible del bloque, CLAMPEADO dentro de sus bordes (no
+        //    se sale ni se recorta).
+        let top: number
+        if (cr.height <= bandH) {
+          top = (cr.height - labelH) / 2
+        } else {
+          const visTop = Math.max(cr.top, bandTop)
+          const visBottom = Math.min(cr.bottom, bandBottom)
+          const visCenter = (visTop + visBottom) / 2
+          top = visCenter - cr.top - labelH / 2
+          top = Math.max(0, Math.min(top, cr.height - labelH))
+        }
         label.style.top = `${top}px`
       })
     }

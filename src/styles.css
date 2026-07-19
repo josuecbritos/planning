@@ -275,7 +275,9 @@ button { font-family: inherit; cursor: pointer; }
 }
 .counter__num { font-size: 17px; font-weight: 700; line-height: 1; }
 .counter__lbl { font-size: 11.5px; color: var(--gris-texto); }
-.counter__swatch { width: 10px; height: 10px; border-radius: 3px; }
+.counter__swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+/* Pendiente: "sin color" = blanco con borde (punto 7). */
+.counter__swatch--vacio { background: #fff; border: 1px solid var(--gris-borde); }
 
 .counter--verde .counter__num { color: var(--verde-check); }
 .counter--rojo .counter__num { color: var(--rojo); }
@@ -331,6 +333,10 @@ tr.fila--morado > td { background: var(--morado-suave); }
 .col-fecha { width: 118px; white-space: nowrap; }
 .col-estado { width: 124px; }
 table.tareas .col-estado { text-align: center; }
+/* Columna Desviación (punto 6): +N/-N días hábiles o "—". */
+.col-desv { width: 104px; white-space: nowrap; }
+table.tareas .col-desv { text-align: center; }
+.col-desv--mov { font-weight: 600; }
 
 /* Columna Estado — la categoria en texto, como refuerzo del color de fila.
    Pill de TAMAÑO FIJO (punto 3): mismo ancho para todas las categorias;
@@ -657,28 +663,28 @@ table.tareas .col-estado { text-align: center; }
 .filtro-guardado:hover .icon-btn { opacity: 1; }
 .filtro-guardado .icon-btn:disabled { opacity: .25; cursor: default; }
 
-/* Menu "Ordenar" (punto 4): reglas apiladas campo + direccion. */
-.orden-regla { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 9px; }
-.orden-regla:hover { background: var(--velo); }
-.orden-regla__prio {
+/* Menu "Ordenar" (punto 4 / #111): lista directa de campos con ↑↓. */
+.orden-campo { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 9px; }
+.orden-campo:hover { background: var(--velo); }
+.orden-campo__prio {
   flex: none; width: 18px; height: 18px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; color: #fff; background: var(--primario);
+  font-size: 11px; font-weight: 700; color: #fff;
 }
-.orden-regla__campo {
-  flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--texto);
-  border: 1px solid var(--gris-borde); background: var(--superficie);
-  border-radius: 6px; padding: 5px 7px; cursor: pointer;
-}
-.orden-regla__dir {
+.orden-campo--activo .orden-campo__prio { background: var(--primario); }
+.orden-campo__label { flex: 1; min-width: 0; font-size: 13px; color: var(--texto); }
+.orden-campo__dir {
   flex: none; width: 26px; height: 26px; font-size: 14px; font-weight: 700;
-  border: 1px solid var(--gris-borde); background: var(--superficie); color: var(--texto);
-  border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--gris-borde); background: var(--superficie); color: var(--gris-texto);
+  border-radius: 6px; cursor: pointer; opacity: .55; transition: all .1s ease;
 }
-.orden-regla__dir:hover { border-color: var(--primario); color: var(--primario); }
-.orden-regla .icon-btn { flex: none; }
-.orden-regla .icon-btn:disabled { opacity: .25; cursor: default; }
-.orden-agregar { color: var(--primario); font-size: 12.5px; font-weight: 600; margin-top: 2px; }
+.orden-campo__dir:hover { border-color: var(--primario); color: var(--primario); opacity: 1; }
+.orden-campo__dir--on {
+  background: var(--primario); border-color: var(--primario); color: #fff; opacity: 1;
+}
+.orden-campo__dir--on:hover { color: #fff; }
+/* Punto 5: opcion "Seleccionar todos" al pie de Responsable/Estado. */
+.filtro-op--todos { color: var(--primario); font-size: 12.5px; font-weight: 600; justify-content: center; margin-top: 2px; }
 
 /* Mini-aviso (2.2): "No puedes eliminar tareas que ya pasaron" */
 .mini-aviso {
@@ -702,6 +708,11 @@ table.tareas .col-estado { text-align: center; }
   opacity: 0; transition: opacity .12s; padding: 0; flex: none; position: relative;
 }
 td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { opacity: 1; }
+/* Punto 3: en la Gantt, el nombre de frente/sub frente vive en un envoltorio
+   absoluto (.fija-nombre), asi que su .con-mas NO es hijo directo del td y el
+   selector de arriba no lo alcanzaba. Se muestra el "+" al pasar el mouse por
+   la celda-rotula, igual que el de tareas. */
+.gantt td.fija--rotula:hover .con-mas .mas-btn { opacity: 1; }
 .mas-btn:hover { background: rgba(0,0,0,.2); }
 .mas-btn[data-tip]:hover::after {
   content: attr(data-tip);
@@ -1282,6 +1293,7 @@ table.tareas th { font-size: 10px; }
 .carga-celda,
 .hoy-chip,
 table.tareas .col-fecha,
+table.tareas .col-desv,
 .fecha-btn,
 .fecha-input,
 .fecha-cadena,
@@ -1388,12 +1400,16 @@ table.tareas td.col-fecha { font-size: 12px; }
     white-space: normal; word-break: normal; overflow-wrap: normal;
     vertical-align: middle;
   }
-  /* Nombre de tarea más chico en mobile, equilibrado con los íconos de la
-     fila (↻×N, comentarios), sin dejar de ser el elemento principal. */
-  .tarea-cell, .tarea-cell__link, .tarea-cell .inline-text { font-size: 11px; line-height: 1.2; }
+  /* Punto 2 (#109): TODA la fila a un único tamaño (13px) — nombre,
+     responsable, estado y fecha. Las tipografías no cambian (sans el nombre,
+     mono los datos); solo se unifica el tamaño. Los íconos secundarios de la
+     fila (↻×N, 💬) conservan su tamaño menor (tienen su propia regla). */
+  table.tareas tbody td { font-size: 13px; }
+  .tarea-cell, .tarea-cell__link, .tarea-cell .inline-text { font-size: 13px; line-height: 1.25; }
   /* En layout fijo, display:none dejaria la columna RESERVADA (franja
-     vacia): se colapsa a ancho 0 para que Tarea reciba ese espacio. */
-  table.tareas .col-orig {
+     vacia): se colapsa a ancho 0 para que Tarea reciba ese espacio.
+     (Desviación reemplaza a Fecha Original y se oculta igual en mobile.) */
+  table.tareas .col-desv {
     width: 0; max-width: 0; padding: 0; border: none;
     font-size: 0; overflow: hidden;
   }
@@ -1409,13 +1425,18 @@ table.tareas td.col-fecha { font-size: 12px; }
   .check-hecha { width: 18px; height: 18px; font-size: 9px; border-width: 1.5px; }
   .col-resp { width: 34px; }
   table.tareas td.col-resp { padding-left: 1px; padding-right: 1px; }
-  .avatar { width: 24px; height: 24px; font-size: 10px; }
+  .avatar { width: 26px; height: 26px; font-size: 13px; }
   /* el caret del selector no cabe junto al avatar: el avatar ya es el boton */
   .resp-picker__caret { display: none; }
-  .col-estado { width: 62px; }
-  .estado-chip { width: 54px; height: 26px; font-size: 6.5px; padding: 2px 2px; letter-spacing: .02em; }
-  .col-fecha { width: 64px; }
-  table.tareas td.col-fecha { font-size: 9px; white-space: nowrap; padding-left: 2px; padding-right: 2px; }
+  /* Estado a 13px: el pill crece y envuelve el texto (alto automático). */
+  .col-estado { width: 90px; }
+  .estado-chip {
+    width: auto; min-width: 0; max-width: 100%; height: auto; min-height: 24px;
+    font-size: 13px; padding: 3px 7px; letter-spacing: 0; line-height: 1.15;
+  }
+  /* Fecha a 13px, envolviendo dentro de su celda si hace falta. */
+  .col-fecha { width: 84px; }
+  table.tareas td.col-fecha { font-size: 13px; white-space: normal; padding-left: 3px; padding-right: 3px; }
   .fecha-btn, .fecha-input { padding: 2px 1px; }
   /* acciones: queda solo ⓘ (acceso al detalle), compacto */
   .col-acc { width: 26px; }
