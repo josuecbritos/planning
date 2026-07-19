@@ -336,7 +336,6 @@ table.tareas .col-estado { text-align: center; }
 /* Columna Atraso: "N días" hábiles corridos hacia adelante, o "—". */
 .col-desv { width: 104px; white-space: nowrap; }
 table.tareas .col-desv { text-align: center; }
-.col-desv--mov { font-weight: 600; }
 
 /* Columna Estado — la categoria en texto, como refuerzo del color de fila.
    Pill de TAMAÑO FIJO (punto 3): mismo ancho para todas las categorias;
@@ -1304,7 +1303,8 @@ table.tareas .col-desv,
 .subfrente__count {
   font-family: var(--mono);
 }
-table.tareas td.col-fecha { font-size: 12px; }
+/* Atraso: exactamente el mismo estilo que la fecha (mono, 12px, sin negrita). */
+table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 .carga-celda { font-size: 11px; }
 
 /* Status chips: etiqueta rectangular, mono en mayusculas (colores intactos) */
@@ -1426,8 +1426,16 @@ table.tareas td.col-fecha { font-size: 12px; }
   /* Envoltura controlada: los nombres largos quiebran DENTRO de su celda,
      nunca invaden a la vecina. */
   table.tareas td { overflow-wrap: anywhere; }
-  .tarea-cell__row { flex-wrap: wrap; row-gap: 1px; min-width: 0; }
-  .tarea-cell .inline-text, .tarea-cell__link { overflow-wrap: anywhere; min-width: 0; }
+  /* Punto 1: ✓/nombre/↻×N/💬 fluyen INLINE como texto y envuelven de forma
+     natural solo cuando el conjunto supera el ancho de la celda (nunca un
+     elemento por línea). Se abandona el flex de escritorio a favor de flujo
+     inline; el nombre (dentro de .trigger de la HoverCard) es inline para que
+     su texto pueda quebrar y compartir línea con los íconos. */
+  .tarea-cell__row { display: block; min-width: 0; }
+  .tarea-cell__row .trigger,
+  .tarea-cell .inline-text,
+  .tarea-cell__link { display: inline; overflow-wrap: anywhere; min-width: 0; }
+  .tarea-cell__mark { display: inline; margin-right: 2px; }
   /* Encabezados con padding lateral mínimo para que el título quepa. */
   table.tareas th { padding-left: 2px; padding-right: 2px; }
   .col-check { width: 32px; }
@@ -1451,8 +1459,10 @@ table.tareas td.col-fecha { font-size: 12px; }
   .col-acc .icon-btn[aria-label='Archivar'],
   .col-acc .icon-btn[aria-label='Eliminar'] { display: none; }
   .subfrente__titulo { font-size: 12.5px; padding: 6px 8px; }
-  .replan-count { font-size: 9px; padding: 0 3px; }
-  .comentarios-chip { font-size: 9px; }
+  /* ↻×N y 💬 como unidades atómicas que fluyen inline con el nombre y
+     envuelven junto a él (no se parten ni saltan solas de línea). */
+  .replan-count { font-size: 9px; padding: 0 3px; display: inline-block; vertical-align: middle; margin-left: 4px; }
+  .comentarios-chip { font-size: 9px; display: inline-block; vertical-align: middle; margin-left: 4px; }
 
   /* ---------- 8.2 Mis Tareas: cinco columnas, ruta completa ---------- */
   .usuarios-wrap { padding: 12px; }
