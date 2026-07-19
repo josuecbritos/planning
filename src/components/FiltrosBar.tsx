@@ -92,29 +92,19 @@ export function FiltrosBar({
   const nEst = filtro.estados?.length ?? 0
   const nProy = filtro.proyectos?.length ?? 0
 
-  const labelCampo = (c: CampoOrden) => camposOrden.find((x) => x.campo === c)?.label ?? c
-  // Solo un campo por regla: el selector ofrece los libres + el actual.
-  const camposLibres = (excepto: number) => {
-    const usados = new Set(orden.filter((_, i) => i !== excepto).map((r) => r.campo))
-    return camposOrden.filter((c) => !usados.has(c.campo))
+  // Punto 4 (#111): activación directa. La prioridad = posición en `orden`
+  // (0 = prioridad 1). Tocar una dirección activa el campo como PRIORIDAD 1
+  // (al frente, el último activado manda); tocar la dirección ya activa lo
+  // desactiva y los demás se renumeran solos.
+  const prioridadDe = (campo: CampoOrden) => orden.findIndex((r) => r.campo === campo)
+  const toggleOrden = (campo: CampoOrden, dir: Direccion) => {
+    const actual = orden.find((r) => r.campo === campo)
+    if (actual && actual.dir === dir) {
+      onCambiarOrden(orden.filter((r) => r.campo !== campo))
+    } else {
+      onCambiarOrden([{ campo, dir }, ...orden.filter((r) => r.campo !== campo)])
+    }
   }
-  const agregarNivel = () => {
-    const usados = new Set(orden.map((r) => r.campo))
-    const libre = camposOrden.find((c) => !usados.has(c.campo))
-    if (libre) onCambiarOrden([...orden, { campo: libre.campo, dir: 1 }])
-  }
-  const cambiarCampo = (i: number, campo: CampoOrden) =>
-    onCambiarOrden(orden.map((r, j) => (j === i ? { ...r, campo } : r)))
-  const alternarDir = (i: number) =>
-    onCambiarOrden(orden.map((r, j) => (j === i ? { ...r, dir: (r.dir === 1 ? -1 : 1) as Direccion } : r)))
-  const moverRegla = (i: number, delta: number) => {
-    const j = i + delta
-    if (j < 0 || j >= orden.length) return
-    const copia = [...orden]
-    ;[copia[i], copia[j]] = [copia[j], copia[i]]
-    onCambiarOrden(copia)
-  }
-  const eliminarRegla = (i: number) => onCambiarOrden(orden.filter((_, j) => j !== i))
 
   const toggleResp = (id: string) => {
     const set = new Set(filtro.responsables ?? [])
@@ -128,6 +118,13 @@ export function FiltrosBar({
     else set.add(c)
     onCambiar({ ...filtro, estados: set.size ? [...set] : undefined })
   }
+  // Punto 5: "Seleccionar todos" en Responsable y Estado (no en Fecha). Con
+  // todo seleccionado, alterna a "deseleccionar todos".
+  const todosResp = [...(candidatos?.map((u) => u.id) ?? []), RESP_SIN_ASIGNAR]
+  const allResp = todosResp.length > 0 && todosResp.every((id) => filtro.responsables?.includes(id))
+  const toggleTodosResp = () => onCambiar({ ...filtro, responsables: allResp ? undefined : todosResp })
+  const allEstados = ESTADOS.every((c) => filtro.estados?.includes(c))
+  const toggleTodosEstados = () => onCambiar({ ...filtro, estados: allEstados ? undefined : [...ESTADOS] })
   const toggleProyecto = (id: string) => {
     const set = new Set(filtro.proyectos ?? [])
     if (set.has(id)) set.delete(id)
@@ -239,6 +236,10 @@ export function FiltrosBar({
           <span>Sin asignar</span>
         </label>
         {candidatos.length === 0 && <div className="filtro-menu__vacio">Sin personas en este proyecto.</div>}
+        {/* Punto 5: marcar/desmarcar todas las opciones de una vez. */}
+        <button className="filtro-op filtro-op--todos" onClick={toggleTodosResp}>
+          {allResp ? 'Deseleccionar todos' : 'Seleccionar todos'}
+        </button>
         {nResp > 0 && (
           <button
             className="filtro-op filtro-op--quitar"
@@ -283,6 +284,10 @@ export function FiltrosBar({
             <span>{CATEGORIA_LABEL[c]}</span>
           </label>
         ))}
+        {/* Punto 5: marcar/desmarcar todos los estados de una vez. */}
+        <button className="filtro-op filtro-op--todos" onClick={toggleTodosEstados}>
+          {allEstados ? 'Deseleccionar todos' : 'Seleccionar todos'}
+        </button>
         {nEst > 0 && (
           <button
             className="filtro-op filtro-op--quitar"
@@ -301,8 +306,9 @@ export function FiltrosBar({
 
       <span className="filtros-bar__sep" />
 
-      {/* Punto 4: menu "Ordenar" multinivel, junto a Filtrar. Reglas campo +
-          direccion apiladas por prioridad; se guardan como parte de la vista. */}
+      {/* Punto 4 (#111): menu "Ordenar" junto a Filtrar. Los campos estan a la
+          vista; tocar una direccion (↑/↓) activa/desactiva ese campo. El
+          numero muestra su prioridad (el ultimo activado manda). */}
       <span className="filtros-bar__label">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M7 4v16M7 20l-3-3M7 4l3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -312,69 +318,42 @@ export function FiltrosBar({
       </span>
 
       <Desplegable etiqueta={ordenActivo ? `Orden (${orden.length})` : 'Ordenar'} activo={ordenActivo}>
-        {orden.length === 0 && (
-          <div className="filtro-menu__vacio">Sin orden aplicado. Se muestra el orden manual del plan.</div>
-        )}
-        {orden.map((regla, i) => (
-          <div key={i} className="orden-regla">
-            <span className="orden-regla__prio" title={`Prioridad ${i + 1}`}>{i + 1}</span>
-            <select
-              className="orden-regla__campo"
-              value={regla.campo}
-              aria-label={`Campo del nivel ${i + 1}`}
-              onChange={(e) => cambiarCampo(i, e.target.value as CampoOrden)}
-            >
-              {camposLibres(i).map((c) => (
-                <option key={c.campo} value={c.campo}>{c.label}</option>
-              ))}
-            </select>
-            <button
-              className="orden-regla__dir"
-              aria-label={`Direccion (${regla.dir === 1 ? 'ascendente' : 'descendente'}) de ${labelCampo(regla.campo)}`}
-              title={regla.dir === 1 ? 'Ascendente' : 'Descendente'}
-              onClick={() => alternarDir(i)}
-            >
-              {regla.dir === 1 ? '↑' : '↓'}
-            </button>
-            <button
-              className="icon-btn"
-              disabled={i === 0}
-              aria-label={`Subir prioridad de ${labelCampo(regla.campo)}`}
-              title="Subir prioridad"
-              onClick={() => moverRegla(i, -1)}
-            >
-              ▲
-            </button>
-            <button
-              className="icon-btn"
-              disabled={i === orden.length - 1}
-              aria-label={`Bajar prioridad de ${labelCampo(regla.campo)}`}
-              title="Bajar prioridad"
-              onClick={() => moverRegla(i, 1)}
-            >
-              ▼
-            </button>
-            <button
-              className="icon-btn"
-              aria-label={`Eliminar nivel ${labelCampo(regla.campo)}`}
-              title="Eliminar nivel"
-              onClick={() => eliminarRegla(i)}
-            >
-              🗑
-            </button>
-          </div>
-        ))}
-        {orden.length < camposOrden.length && (
-          <button className="filtro-op orden-agregar" onClick={agregarNivel}>
-            + Agregar nivel
-          </button>
-        )}
-        {ordenActivo && (
-          <button className="filtro-op filtro-op--quitar" onClick={() => onCambiarOrden([])}>
-            Limpiar orden
-          </button>
-        )}
+        {camposOrden.map((c) => {
+          const prio = prioridadDe(c.campo)
+          const regla = prio >= 0 ? orden[prio] : null
+          return (
+            <div key={c.campo} className={`orden-campo${regla ? ' orden-campo--activo' : ''}`}>
+              <span className="orden-campo__prio">{prio >= 0 ? prio + 1 : ''}</span>
+              <span className="orden-campo__label">{c.label}</span>
+              <button
+                className={`orden-campo__dir${regla?.dir === 1 ? ' orden-campo__dir--on' : ''}`}
+                aria-label={`Ordenar ${c.label} ascendente`}
+                aria-pressed={regla?.dir === 1}
+                title="Ascendente"
+                onClick={() => toggleOrden(c.campo, 1)}
+              >
+                ↑
+              </button>
+              <button
+                className={`orden-campo__dir${regla?.dir === -1 ? ' orden-campo__dir--on' : ''}`}
+                aria-label={`Ordenar ${c.label} descendente`}
+                aria-pressed={regla?.dir === -1}
+                title="Descendente"
+                onClick={() => toggleOrden(c.campo, -1)}
+              >
+                ↓
+              </button>
+            </div>
+          )
+        })}
       </Desplegable>
+
+      {/* "Limpiar orden" vive FUERA del menu (junto al boton), como el de filtros. */}
+      {ordenActivo && (
+        <button className="link-btn filtros-bar__limpiar" onClick={() => onCambiarOrden([])}>
+          Limpiar orden
+        </button>
+      )}
 
       <span className="filtros-bar__sep" />
 

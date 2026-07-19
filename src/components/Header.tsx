@@ -40,10 +40,13 @@ export function Header({ proyecto, modo, vista, onVista, contadores, hoy }: Prop
       {/* Cinco categorias excluyentes, de menos a mas critica; suman el total (1.3). */}
       <div className="counters">
         <div className="counter counter--verde">
+          <span className="counter__swatch" style={{ background: 'var(--verde)' }} />
           <span className="counter__num">{c.hechas}</span>
           <span className="counter__lbl">Hechas</span>
         </div>
         <div className="counter">
+          {/* Pendiente = "sin color" de fila: cuadro blanco con borde. */}
+          <span className="counter__swatch counter__swatch--vacio" />
           <span className="counter__num">{c.pendientes}</span>
           <span className="counter__lbl">Pendientes</span>
         </div>

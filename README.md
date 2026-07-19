@@ -68,12 +68,19 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   el color pinta la **fila completa** con gravedad creciente — Hecha (verde ✓) ·
   Pendiente (sin color) · Pendiente replanificada (ámbar) · Atrasada (rojo) ·
   **Atrasada replanificada (morado, lo más crítico)**. "Hecha" es terminal. Los 5
-  contadores del encabezado suman el total. Junto al nombre, **↻ ×N** muestra las
-  replanificaciones (solo tabla).
+  contadores del encabezado suman el total y **cada uno lleva su cuadro de color**
+  (Pendientes = blanco con borde, "sin color"). Junto al nombre, **↻ ×N** muestra
+  las replanificaciones (solo tabla).
 - **Regla de replanificación (v2):** mover una fecha **futura** es planificación
   (sin historial, y la fecha original acompaña); solo cuenta como replanificación
   mover una fecha que **vence hoy o ya venció** — ahí la fecha original se congela
   ("la última fecha comprometida antes de empezar a atrasarse").
+- **Columna "Desviación"** (tabla y Mis Tareas desktop): reemplaza a Fecha
+  Original con el patrón baseline + variance. Muestra **+N / -N días hábiles**
+  entre la fecha comprometida original y la vigente (positivo si se corrió hacia
+  adelante, negativo si se adelantó), o **"—"** si no se movió. La columna vacía es
+  señal en sí misma. La fecha original exacta queda consultable en el panel de
+  información. El menú de orden ordena por la desviación (con signo).
 - **Fechas en cualquier día**, incluidos sábado y domingo. La Gantt alterna entre
   **solo días hábiles** (default) y **semana completa (7 días)**, con aviso de
   tareas de fin de semana ocultas.
@@ -103,28 +110,31 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   franja de íconos (uno por proyecto) siempre clicable; al pasar el mouse la barra
   completa se despliega al lado y se repliega al salir. La preferencia se recuerda
   por usuario entre sesiones.
-- **Menú "Ordenar"** (junto a Filtrar, en tabla y Gantt): ordenamiento
-  **multinivel** — se apilan varias reglas **campo + dirección** (↑ ascendente /
-  ↓ descendente) que se aplican por prioridad (de arriba hacia abajo; cada nivel
-  desempata al anterior). Se pueden **agregar niveles**, **reordenarlos** (subir /
-  bajar prioridad) y **eliminarlos**; cada campo aparece una sola vez. Campos:
-  Responsable · Estado · Fecha Objetivo · Fecha Original (más **Proyecto** en Mis
-  Tareas). Estado ordena por **gravedad** (Hecha → Pendiente → Pendiente
-  replanificada → Atrasada → Atrasada replanificada), no alfabético. Ordena
-  **dentro de cada sub frente** sin mezclar tareas entre sub frentes (en la Gantt,
-  reordena las filas del panel izquierdo dentro de cada bloque). Un orden aplicado
-  sin guardar es **momentáneo**; sólo persiste si se guarda como parte de una
-  vista. Ya **no se ordena** haciendo clic en el encabezado de columna.
+- **Menú "Ordenar"** (junto a Filtrar, en tabla y Gantt): la lista de campos
+  ordenables está **a la vista**, cada uno con controles **↑ ascendente / ↓
+  descendente**. Tocar una dirección **activa** ese campo como **prioridad 1**
+  (el último activado manda) y muestra su número; activar otro lo antepone y
+  renumera al resto. La dirección activa se **resalta**; volver a tocarla
+  desactiva el campo. Es **multinivel** (varios campos con prioridad, armada por
+  orden de activación). Campos: Responsable · Estado · Fecha Objetivo ·
+  **Desviación** (más **Proyecto** en Mis Tareas). Estado ordena por **gravedad**
+  (Hecha → Pendiente → Pendiente replanificada → Atrasada → Atrasada
+  replanificada), no alfabético. Ordena **dentro de cada sub frente** sin mezclar
+  tareas entre sub frentes (en la Gantt, reordena las filas del panel izquierdo
+  dentro de cada bloque). **"Limpiar orden"** vive fuera del menú, junto al botón.
+  Un orden sin guardar es **momentáneo**; sólo persiste si se guarda como parte de
+  una vista. No se ordena haciendo clic en el encabezado de columna.
 - **Filtros y orden guardables como "vista":** por Fecha Objetivo (relativas Hoy /
   Esta semana / Próxima semana / Este mes — semana de lunes a domingo —, rango
   fijo o **Sin fecha**), Responsable (incluye **Sin asignar**) y Estado, con
-  multi-selección ("o" dentro del campo, "y" entre campos). El **filtro y el orden
-  se guardan juntos** como una sola vista, con nombre, **privados por usuario y por
-  proyecto**; se aplican/actualizan/renombran/eliminan desde el desplegable
-  "Vistas". El **filtro y el orden son por proyecto**: aplicarlos en un proyecto
-  **no afecta** a otro; cada proyecto conserva su propio estado (momentáneo hasta
-  guardarlo como vista). Cada campo tiene su "Limpiar filtro" además del Limpiar
-  global. En la tabla filtran filas; en la Gantt, responsable y estado filtran
+  multi-selección ("o" dentro del campo, "y" entre campos). Responsable y Estado
+  incluyen **"Seleccionar todos"** (alterna a "Deseleccionar todos"). El **filtro y
+  el orden se guardan juntos** como una sola vista, con nombre, **privados por
+  usuario y por proyecto**; se aplican/actualizan/renombran/eliminan desde el
+  desplegable "Vistas". El **filtro y el orden son por proyecto**: aplicarlos en un
+  proyecto **no afecta** a otro; cada proyecto conserva su propio estado
+  (momentáneo hasta guardarlo como vista). Cada campo tiene su "Limpiar filtro"
+  además del Limpiar global. En la tabla filtran filas; en la Gantt, responsable y estado filtran
   tareas y **la fecha define el horizonte visible** — con la excepción de **Sin
   fecha**, que en la Gantt filtra (muestra solo las tareas sin fecha, como filas
   sin marca, planificables ahí mismo) sin tocar el horizonte. En la tabla, los
@@ -181,7 +191,7 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   las demás tablas (check, pills, colores de fila) con columnas Proyecto y Ubicación;
   usa el sistema común de filtros (Fecha Objetivo / Estado / **Proyecto**) con
   guardados propios del contexto, separados de los de cada proyecto. En mobile,
-  Proyecto se fusiona dentro de Ubicación (ruta completa) y sale Fecha Original.
+  Proyecto se fusiona dentro de Ubicación (ruta completa) y sale Desviación.
 - **Panel lateral de detalle** (backlog de 7.2): click sobre una tarea o una marca del
   Gantt abre un panel con el detalle completo, la línea de tiempo del historial y las
   acciones operativas (marcar hecha, replanificar, archivar) para admins. Se cierra
