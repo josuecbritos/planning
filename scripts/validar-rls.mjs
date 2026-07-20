@@ -54,7 +54,9 @@ async function sesion(email, pass) {
 }
 
 async function perfilDe(c) {
-  const { data } = await c.from('usuario').select('*')
+  // La tabla base `usuario` ya no permite SELECT directo desde el cliente
+  // (seguridad §3): la lista se lee por la vista enmascarada usuario_visible.
+  const { data } = await c.from('usuario_visible').select('*')
   const { data: yo } = await c.auth.getUser()
   return data?.find((u) => u.auth_id === yo.user.id)
 }

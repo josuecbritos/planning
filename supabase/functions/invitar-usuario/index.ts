@@ -12,9 +12,11 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
+// CORS acotado al origen de la app (punto 8). Fallback '*' si no hay SITE_URL.
 const cors = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get('SITE_URL') ?? '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Vary': 'Origin',
 }
 
 Deno.serve(async (req) => {
