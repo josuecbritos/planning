@@ -76,7 +76,9 @@ async function main() {
     process.exit(2)
   }
   const { data: todosProyectos } = await admin.from('proyecto').select('id, nombre, creado_por')
-  const { data: todosUsuarios } = await admin.from('usuario').select('id, rol, email')
+  // La tabla base `usuario` ya no permite SELECT directo (ni al admin, que es
+  // rol `authenticated`); se lee por la vista enmascarada (seguridad §3).
+  const { data: todosUsuarios } = await admin.from('usuario_visible').select('id, rol, email')
   const { data: todosAccesos } = await admin.from('acceso_proyecto').select('*')
   marca((todosProyectos?.length ?? 0) > 0, 'admin', 've todos los proyectos', `${todosProyectos?.length} proyectos`)
   marca((todosUsuarios?.length ?? 0) > 0, 'admin', 've todos los usuarios', `${todosUsuarios?.length} usuarios`)

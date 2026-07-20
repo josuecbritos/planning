@@ -8,6 +8,11 @@ del Documento Funcional, el **CRUD** completo sobre **Supabase** (Fase 1),
 **pulido de la Fase 3**: Mis Tareas, panel lateral de detalle, archivo de
 canceladas e indicadores por proyecto.
 
+> **Documentación:** para una visión general del producto (contexto, objetivos,
+> roles y arquitectura) ver [`docs/PROYECTO.md`](docs/PROYECTO.md). Antes de tocar
+> RLS, permisos, Edge Functions de auth o el despliegue, leer
+> [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md) (invariantes que no se deben romper).
+
 ## Dos modos de ejecución
 
 La app elige el backend automáticamente según las variables de entorno:
