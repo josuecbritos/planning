@@ -34,9 +34,9 @@ Deno.serve(async (req) => {
 
     // 1) Perfil del invocador (admin o consultor).
     const jwt = req.headers.get('Authorization')?.replace('Bearer ', '')
-    if (!jwt) return responder(401, { error: 'Sin sesion' })
+    if (!jwt) return responder(401, { error: 'Sin sesión' })
     const { data: quien } = await admin.auth.getUser(jwt)
-    if (!quien.user) return responder(401, { error: 'Sesion invalida' })
+    if (!quien.user) return responder(401, { error: 'Sesión inválida' })
     const { data: perfil } = await admin
       .from('usuario')
       .select('id, rol, activo, permisos_proyecto')
@@ -98,19 +98,19 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: Deno.env.get('EMAIL_FROM'),
         to: [usuario.email],
-        subject: 'Invitacion a Andotek Planning',
+        subject: 'Invitación a Andotek Planning',
         html: `
           <p>Hola ${usuario.nombre},</p>
           <p>Te invitaron a <b>Andotek Planning</b>. Para activar tu cuenta,
           define tu contraseña en el siguiente enlace:</p>
           <p><a href="${enlace}">${enlace}</a></p>
-          <p>El enlace caduca en 7 dias. Si expira, pide que te reenvien la invitacion.</p>
+          <p>El enlace caduca en 7 días. Si expira, pide que te reenvíen la invitación.</p>
         `,
       }),
     })
     if (!correo.ok) {
       const detalle = await correo.text()
-      return responder(502, { error: `Fallo el envio del correo: ${detalle}` })
+      return responder(502, { error: `Falló el envío del correo: ${detalle}` })
     }
 
     return responder(200, { ok: true, expira })
