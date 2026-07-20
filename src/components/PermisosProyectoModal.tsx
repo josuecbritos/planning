@@ -30,7 +30,7 @@ export function PermisosProyectoModal({ usuario, onGuardar, onClose }: Props) {
     <Modal titulo={`Permisos de proyecto de ${usuario.nombre}`} onClose={onClose} ancho>
       <div className="permisos">
         <p className="permisos__intro">
-          Que puede hacer este consultor A NIVEL DE PROYECTOS. Dentro de sus
+          Qué puede hacer este consultor A NIVEL DE PROYECTOS. Dentro de sus
           propios proyectos su control es total; en proyectos ajenos rige el
           set de permisos de su acceso.
         </p>
@@ -46,7 +46,7 @@ export function PermisosProyectoModal({ usuario, onGuardar, onClose }: Props) {
                 ariaLabel={label}
                 opciones={[
                   { v: false, label: 'No' },
-                  { v: true, label: 'Si' },
+                  { v: true, label: 'Sí' },
                 ]}
                 valor={!!permisos[key]}
                 onChange={(v) => setPermisos((p) => ({ ...p, [key]: v }))}

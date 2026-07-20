@@ -129,7 +129,7 @@ export function MiembrosModal({ state, proyecto, sesion, actions, onClose }: Pro
             </li>
           ))}
           {miembros.length === 0 && (
-            <li className="miembros-vacio">Nadie mas tiene acceso a este proyecto.</li>
+            <li className="miembros-vacio">Nadie más tiene acceso a este proyecto.</li>
           )}
         </ul>
 

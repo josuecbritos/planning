@@ -48,11 +48,11 @@ export class SupabaseAuth implements AuthService {
     const perfil = await this.perfilDe(data.user.id)
     if (!perfil) {
       await this.db.auth.signOut()
-      throw new Error('Tu cuenta no esta registrada en el sistema. Pide a un Admin que te cree como usuario.')
+      throw new Error('Tu cuenta no está registrada en el sistema. Pide a un Admin que te cree como usuario.')
     }
     if (!perfil.activo) {
       await this.db.auth.signOut()
-      throw new Error('Tu usuario esta desactivado.')
+      throw new Error('Tu usuario está desactivado.')
     }
     return perfil
   }

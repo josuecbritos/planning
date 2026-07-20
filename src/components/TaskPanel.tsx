@@ -77,10 +77,10 @@ export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
           </>
         )}
         <dt>Fecha comprometida original</dt>
-        <dd>{tarea.fechaOriginal ? formatoFecha(tarea.fechaOriginal) : 'Sin fecha aun'}</dd>
+        <dd>{tarea.fechaOriginal ? formatoFecha(tarea.fechaOriginal) : 'Sin fecha aún'}</dd>
         <dt>Fecha vigente</dt>
         <dd className={esAtrasada(cat) ? 'fecha-vencida' : ''}>
-          {tarea.fechaObjetivo ? formatoFecha(tarea.fechaObjetivo) : 'Sin fecha aun'}
+          {tarea.fechaObjetivo ? formatoFecha(tarea.fechaObjetivo) : 'Sin fecha aún'}
         </dd>
       </dl>
 
@@ -88,7 +88,7 @@ export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
         <h4>
           {hist.length === 0
             ? 'Sin replanificaciones'
-            : `Se movio ${hist.length} ${hist.length === 1 ? 'vez' : 'veces'}`}
+            : `Se movió ${hist.length} ${hist.length === 1 ? 'vez' : 'veces'}`}
         </h4>
         <ol className="panel-detalle__cadena">
           {cadena.map((f, i) => {
@@ -103,7 +103,7 @@ export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
                 <small>
                   {i === 0
                     ? 'Compromiso inicial'
-                    : `Replanificacion ${i}${autor ? ` · ${autor.iniciales}` : ''}`}
+                    : `Replanificación ${i}${autor ? ` · ${autor.iniciales}` : ''}`}
                   {esVigente && i > 0 ? ' · vigente' : ''}
                 </small>
               </li>
@@ -114,7 +114,7 @@ export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
           {tarea.hecha && tarea.fechaReal && (
             <li className="marcada-lista">
               <span className="fecha-cadena">{formatoFecha(tarea.fechaReal)}</span>
-              <small>Se marco lista este dia</small>
+              <small>Se marcó lista este día</small>
             </li>
           )}
         </ol>
@@ -206,7 +206,7 @@ function Comentarios({
     <div className="panel-detalle__comentarios">
       <h4>Comentarios {hilo.length > 0 && `(${hilo.length})`}</h4>
 
-      {hilo.length === 0 && <p className="comentario-vacio">Sin comentarios aun.</p>}
+      {hilo.length === 0 && <p className="comentario-vacio">Sin comentarios aún.</p>}
 
       <ul className="comentarios-hilo">
         {hilo.map((c) => {

@@ -203,7 +203,7 @@ export function Sidebar({
       {puedeVerUsuarios && (
         <>
           <div className="sidebar__section">
-            <span>{usuario.rol === 'admin' ? 'Administracion' : 'Equipo'}</span>
+            <span>{usuario.rol === 'admin' ? 'Administración' : 'Equipo'}</span>
           </div>
           <div className="nav-proyectos">
             <button

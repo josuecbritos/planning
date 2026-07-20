@@ -448,10 +448,10 @@ function NuevaTareaFila({
           ref={tituloRef}
           className="inline-input"
           autoFocus
-          placeholder="Titulo de la tarea… (Enter guarda y encadena)"
+          placeholder="Título de la tarea… (Enter guarda y encadena)"
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
-          aria-label="Titulo de la nueva tarea"
+          aria-label="Título de la nueva tarea"
         />
       </td>
       <td className="col-resp">
@@ -525,7 +525,7 @@ function TareaFila({
             <InlineText
               valor={tarea.titulo}
               onGuardar={(titulo) => actions.updateTarea(tarea.id, { titulo })}
-              ariaLabel={`Editar titulo: ${tarea.titulo}`}
+              ariaLabel={`Editar título: ${tarea.titulo}`}
               wrapDisplay={(nodo) => <HoverCard card={tooltip}>{nodo}</HoverCard>}
             />
           ) : (
@@ -542,7 +542,7 @@ function TareaFila({
             </HoverCard>
           )}
           {nReplan > 0 && (
-            <span className="replan-count" title={`Se replanifico ${nReplan} ${nReplan === 1 ? 'vez' : 'veces'}`}>
+            <span className="replan-count" title={`Se replanificó ${nReplan} ${nReplan === 1 ? 'vez' : 'veces'}`}>
               ↻ ×{nReplan}
             </span>
           )}

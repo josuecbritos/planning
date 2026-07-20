@@ -37,7 +37,7 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
       <div className="login__card">
         <div className="login__brand">
           <Wordmark />
-          <small>Herramienta de Planificacion de Proyectos</small>
+          <small>Herramienta de Planificación de Proyectos</small>
         </div>
 
         {modo === 'supabase' ? (
@@ -74,7 +74,7 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
         ) : (
           <>
             <p className="login__hint">
-              Modo <b>Local</b> (sin backend): elige con quien entrar para probar los roles.
+              Modo <b>Local</b> (sin backend): elige con quién entrar para probar los roles.
             </p>
             <div className="login__usuarios">
               {usuariosDemo.map((u) => (

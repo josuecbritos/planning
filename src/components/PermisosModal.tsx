@@ -94,7 +94,7 @@ export function PermisosModal({ nombre, contexto, permisos: iniciales, onGuardar
                 ariaLabel={label}
                 opciones={[
                   { v: false, label: 'No' },
-                  { v: true, label: 'Si' },
+                  { v: true, label: 'Sí' },
                 ]}
                 valor={!!permisos[key]}
                 onChange={(v) => setCreacion(key, v)}
@@ -104,7 +104,7 @@ export function PermisosModal({ nombre, contexto, permisos: iniciales, onGuardar
         </div>
 
         <h4 className="permisos__grupo">
-          Sobre tareas <span className="permisos__alcance">· alcance: en que tareas puede actuar</span>
+          Sobre tareas <span className="permisos__alcance">· alcance: en qué tareas puede actuar</span>
         </h4>
         <div className="permisos-lista">
           {SOBRE_TAREAS.map(({ key, label, hint }) => (
@@ -128,7 +128,7 @@ export function PermisosModal({ nombre, contexto, permisos: iniciales, onGuardar
         </div>
 
         <p className="permisos__nota">
-          <strong>Solo asignadas</strong>: unicamente las tareas cuyo responsable es este
+          <strong>Solo asignadas</strong>: únicamente las tareas cuyo responsable es este
           usuario. <strong>Todas</strong>: cualquier tarea del proyecto.
         </p>
 

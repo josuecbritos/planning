@@ -34,7 +34,7 @@ export function ProyectoModal({ proyecto, onSubmit, onClose }: Props) {
           <input autoFocus value={nombre} onChange={(e) => setNombre(e.target.value)} />
         </label>
         <label className="campo">
-          <span>Descripcion</span>
+          <span>Descripción</span>
           <textarea rows={2} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
         </label>
         <div className="campo">
