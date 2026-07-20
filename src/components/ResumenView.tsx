@@ -24,7 +24,7 @@ export function ResumenView({ state, proyectos, hoy, onAbrirProyecto }: Props) {
         <div>
           <h2>Resumen de proyectos</h2>
           <p className="usuarios-sub">
-            Rojo = atrasadas (exigen nueva fecha) · Ambar = replanificadas en plazo · Punto = atrasada y replanificada.
+            Rojo = atrasadas (exigen nueva fecha) · Ámbar = replanificadas en plazo · Punto = atrasada y replanificada.
           </p>
         </div>
       </div>

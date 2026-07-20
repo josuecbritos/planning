@@ -50,7 +50,7 @@ export function AceptarInvitacion({ token, onListo }: Props) {
       <div className="login__card">
         <div className="login__brand">
           Andotek Planning
-          <small>Activacion de cuenta</small>
+          <small>Activación de cuenta</small>
         </div>
 
         {!supabaseConfigured ? (
@@ -58,17 +58,17 @@ export function AceptarInvitacion({ token, onListo }: Props) {
         ) : ok !== null ? (
           <>
             <p className="login__hint">
-              ✅ Tu cuenta {ok && <b>({ok})</b>} quedo activa. Ya puedes iniciar sesion con tu contraseña.
+              ✅ Tu cuenta {ok && <b>({ok})</b>} quedó activa. Ya puedes iniciar sesión con tu contraseña.
             </p>
             <button className="btn btn--primary login__submit" onClick={onListo}>
-              Ir a iniciar sesion
+              Ir a iniciar sesión
             </button>
           </>
         ) : (
           <form onSubmit={activar}>
             <p className="login__hint">Define tu contraseña para activar la cuenta.</p>
             <label className="campo">
-              <span>Contraseña (minimo 8 caracteres)</span>
+              <span>Contraseña (mínimo 8 caracteres)</span>
               <input
                 type="password"
                 autoFocus

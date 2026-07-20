@@ -12,7 +12,7 @@ export const supabaseConfigured = Boolean(url && anonKey)
 let client: SupabaseClient | null = null
 
 export function getClient(): SupabaseClient {
-  if (!url || !anonKey) throw new Error('Supabase no esta configurado (revisa .env)')
+  if (!url || !anonKey) throw new Error('Supabase no está configurado (revisa .env)')
   if (!client) client = createClient(url, anonKey)
   return client
 }

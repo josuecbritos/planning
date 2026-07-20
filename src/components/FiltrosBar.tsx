@@ -404,7 +404,7 @@ export function FiltrosBar({
       )}
 
       <Desplegable etiqueta={`Vistas${guardados.length ? ` (${guardados.length})` : ''}`} activo={false} alDerecha>
-        {guardados.length === 0 && <div className="filtro-menu__vacio">Aun no guardas vistas en este proyecto.</div>}
+        {guardados.length === 0 && <div className="filtro-menu__vacio">Aún no guardas vistas en este proyecto.</div>}
         {guardados.map((g) => (
           <div key={g.id} className="filtro-guardado">
             <button

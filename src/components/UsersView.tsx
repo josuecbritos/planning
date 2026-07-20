@@ -62,9 +62,9 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
         body: { usuarioId: u.id },
       })
       if (error) throw new Error(error.message)
-      setAvisoInvitacion(`Invitacion enviada a ${u.email} (caduca en 7 dias).`)
+      setAvisoInvitacion(`Invitación enviada a ${u.email} (caduca en 7 días).`)
     } catch (e) {
-      setAvisoInvitacion(`No se pudo enviar la invitacion: ${(e as Error).message}`)
+      setAvisoInvitacion(`No se pudo enviar la invitación: ${(e as Error).message}`)
     } finally {
       setInvitandoId(null)
     }
@@ -276,7 +276,7 @@ function UsuarioFila({
         <span className="usuario-nombre">
           <span className="resp-badge">{usuario.iniciales}</span>
           {usuario.nombre}
-          {esYo && <span className="chip-yo">tu</span>}
+          {esYo && <span className="chip-yo">tú</span>}
         </span>
       </td>
       <td>{usuario.email}</td>
@@ -346,7 +346,7 @@ function UsuarioFila({
         {supabaseConfigured && !usuario.authId && usuario.activo && puedeInvitarCorreo && (
           <button
             className="icon-btn"
-            title={invitando ? 'Enviando…' : 'Enviar / reenviar invitacion por correo'}
+            title={invitando ? 'Enviando…' : 'Enviar / reenviar invitación por correo'}
             disabled={invitando}
             onClick={onInvitar}
           >

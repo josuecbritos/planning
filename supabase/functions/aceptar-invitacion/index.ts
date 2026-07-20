@@ -35,10 +35,10 @@ Deno.serve(async (req) => {
       .select('id, usuario_id, expira, usada')
       .eq('token', token)
       .maybeSingle()
-    if (!inv) return responder(404, { error: 'Invitacion no encontrada' })
-    if (inv.usada) return responder(409, { error: 'Esta invitacion ya fue usada' })
+    if (!inv) return responder(404, { error: 'Invitación no encontrada' })
+    if (inv.usada) return responder(409, { error: 'Esta invitación ya fue usada' })
     if (new Date(inv.expira) < new Date()) {
-      return responder(410, { error: 'La invitacion expiro (7 dias). Pide que te la reenvien.' })
+      return responder(410, { error: 'La invitación expiró (7 días). Pide que te la reenvíen.' })
     }
 
     const { data: usuario } = await admin
@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
       .eq('id', inv.usuario_id)
       .maybeSingle()
     if (!usuario || !usuario.activo) return responder(404, { error: 'Usuario no encontrado o inactivo' })
-    if (usuario.auth_id) return responder(409, { error: 'La cuenta ya esta activa: inicia sesion' })
+    if (usuario.auth_id) return responder(409, { error: 'La cuenta ya está activa: inicia sesión' })
 
     // Crea la cuenta con el email ya confirmado (el enlace por correo es la
     // verificacion). El trigger de BD enlaza usuario.auth_id por email.

@@ -598,7 +598,7 @@ export default function App() {
           cierra al elegir una opcion. Oculto en desktop via CSS. */}
       <button
         className="movil-menu"
-        aria-label={movilSidebar ? 'Cerrar menu' : 'Abrir menu'}
+        aria-label={movilSidebar ? 'Cerrar menú' : 'Abrir menú'}
         onClick={() => setMovilSidebar((v) => !v)}
       >
         {movilSidebar ? '✕' : '☰'}
@@ -753,11 +753,11 @@ export default function App() {
           <div className="vacio">
             {esAdmin || puedeCrearProyectos(sesion) ? (
               <>
-                <p>No hay ningun proyecto seleccionado.</p>
+                <p>No hay ningún proyecto seleccionado.</p>
                 <p>Crea uno desde la barra lateral para empezar.</p>
               </>
             ) : (
-              <p>Aun no tienes proyectos asignados. Contacta a tu consultor.</p>
+              <p>Aún no tienes proyectos asignados. Contacta a tu consultor.</p>
             )}
           </div>
         )}

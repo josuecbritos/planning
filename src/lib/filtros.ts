@@ -50,7 +50,7 @@ export interface FiltroGuardado {
 export const FECHA_RELATIVA_LABEL: Record<FechaRelativa, string> = {
   hoy: 'Hoy',
   semana: 'Esta semana',
-  proxima: 'Proxima semana',
+  proxima: 'Próxima semana',
   mes: 'Este mes',
 }
 

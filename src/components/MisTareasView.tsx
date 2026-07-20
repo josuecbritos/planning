@@ -231,7 +231,7 @@ function FilaTarea({
             </span>
           </HoverCard>
           {nReplan > 0 && (
-            <span className="replan-count" title={`Se replanifico ${nReplan} ${nReplan === 1 ? 'vez' : 'veces'}`}>
+            <span className="replan-count" title={`Se replanificó ${nReplan} ${nReplan === 1 ? 'vez' : 'veces'}`}>
               ↻ ×{nReplan}
             </span>
           )}

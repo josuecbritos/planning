@@ -575,9 +575,9 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           )}
           <div className="toggle">
             <button className={soloHabiles ? 'activo' : ''} onClick={() => setSoloHabiles(true)} title="Lunes a viernes">
-              Dias habiles
+              Días hábiles
             </button>
-            <button className={!soloHabiles ? 'activo' : ''} onClick={() => setSoloHabiles(false)} title="7 dias">
+            <button className={!soloHabiles ? 'activo' : ''} onClick={() => setSoloHabiles(false)} title="7 días">
               Semana completa
             </button>
           </div>
@@ -589,10 +589,10 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
             </span>
           ) : (
             <div className="toggle">
-              <button className={modo === 'hoy' ? 'activo' : ''} onClick={() => setModo('hoy')} title="2 semanas atras + semana actual + 2 adelante, fijo">
+              <button className={modo === 'hoy' ? 'activo' : ''} onClick={() => setModo('hoy')} title="2 semanas atrás + semana actual + 2 adelante, fijo">
                 Alrededor de hoy
               </button>
-              <button className={modo === 'todo' ? 'activo' : ''} onClick={() => setModo('todo')} title="De la primera a la ultima tarea">
+              <button className={modo === 'todo' ? 'activo' : ''} onClick={() => setModo('todo')} title="De la primera a la última tarea">
                 Todo el proyecto
               </button>
             </div>
@@ -689,7 +689,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
               {carga.total && (
                 <FilaCarga
                   nombre="Total"
-                  avatar={<span className="avatar avatar--total" title="Total de tareas por dia">Σ</span>}
+                  avatar={<span className="avatar avatar--total" title="Total de tareas por día">Σ</span>}
                   porDia={carga.total}
                   dias={dias}
                   hoy={hoy}
@@ -1059,7 +1059,7 @@ function FilaGanttRow({
             <InlineText
               valor={tarea.titulo}
               onGuardar={(titulo) => actions.updateTarea(tarea.id, { titulo })}
-              ariaLabel={`Editar titulo: ${tarea.titulo}`}
+              ariaLabel={`Editar título: ${tarea.titulo}`}
               wrapDisplay={(nodo) => <HoverCard card={tooltip}>{nodo}</HoverCard>}
             />
           ) : (
