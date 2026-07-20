@@ -281,13 +281,14 @@ export default function App() {
     }
   }, [repo, sesion])
 
-  // Proyectos visibles segun el rol (1): admin todo; consultor los SUYOS
-  // (dueño) + los asignados; cliente solo los asignados. (En Supabase la RLS
-  // ya filtra en el servidor; aqui se refuerza en la UI y se resuelve el
-  // modo Local.)
+  // Proyectos visibles = de los que ERES MIEMBRO (pedido §3): dueño o con
+  // acceso. Vale para TODOS los roles, admin incluido — el admin ya no queda
+  // asociado por default a cada proyecto; se agrega/saca desde el Módulo de
+  // Usuarios. Su poder no cambia: sigue viendo y gestionando cualquier
+  // proyecto desde ahí (donde la lista es completa), pero su barra lateral
+  // solo muestra los proyectos donde es miembro.
   const proyectosVisibles = useMemo(() => {
     if (!state || !sesion) return []
-    if (sesion.rol === 'admin') return state.proyectos
     const ids = new Set(state.accesos.filter((a) => a.usuarioId === sesion.id).map((a) => a.proyectoId))
     return state.proyectos.filter((p) => p.duenoId === sesion.id || ids.has(p.id))
   }, [state, sesion])
@@ -583,6 +584,9 @@ export default function App() {
   const puedeVerMiembros = !!proyecto && (esAdmin || esDuenoDe(state, sesion, proyecto.id))
   // Mis Tareas: para el personal de la consultora (admins y consultores).
   const conMisTareas = esAdmin || sesion.rol === 'consultor'
+  // Módulo de Usuarios (§4): admin (todo) o consultor (acotado a sus proyectos:
+  // ve a la gente con acceso a ellos y gestiona a los clientes según permisos).
+  const puedeVerUsuarios = esAdmin || sesion.rol === 'consultor'
 
   return (
     <div
@@ -645,7 +649,7 @@ export default function App() {
           proyectoActivoId={proyectoActivoId}
           frenteSel={frenteSel}
           pantalla={pantalla}
-          esAdmin={esAdmin}
+          puedeVerUsuarios={puedeVerUsuarios}
           conMisTareas={conMisTareas}
           puedeCrearProyecto={puedeCrearProyectos(sesion)}
           can={can}
@@ -669,7 +673,7 @@ export default function App() {
           </div>
         )}
 
-        {pantalla === 'usuarios' && esAdmin ? (
+        {pantalla === 'usuarios' && puedeVerUsuarios ? (
           <UsersView state={state} usuarioActual={sesion} actions={actions} />
         ) : pantalla === 'mipanel' && conMisTareas ? (
           <MisTareasView

@@ -18,6 +18,7 @@ import { fechaFiltraGantt, filtraTareas, pasaFechaGantt, pasaFiltroTareas, rango
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
 import type { Can } from '../lib/permisos'
+import { EmptyFrentes } from './EmptyFrentes'
 import { Marca } from './Marca'
 import { Avatar, RespPicker } from './RespPicker'
 import { Legend } from './Legend'
@@ -545,9 +546,11 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   if (filas.length === 0) {
     return (
       <div className="gantt-wrap">
-        {hayFiltroTareas
-          ? 'Ninguna tarea coincide con el filtro activo.'
-          : 'Este proyecto aun no tiene frentes.'}
+        {hayFiltroTareas ? (
+          'Ninguna tarea coincide con el filtro activo.'
+        ) : (
+          <EmptyFrentes proyectoId={proyectoId} puedeCrear={can.crearFrentes} actions={actions} />
+        )}
       </div>
     )
   }

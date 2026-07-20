@@ -17,7 +17,8 @@ interface Props {
   proyectoActivoId: string | null
   frenteSel: FrenteSel
   pantalla: Pantalla
-  esAdmin: boolean
+  /** Módulo de Usuarios: admin (todo) o consultor (acotado a sus proyectos). */
+  puedeVerUsuarios: boolean
   /** Mis Tareas: para el personal de la consultora (admins y consultores). */
   conMisTareas: boolean
   /** "+" de proyectos: admin o consultor con permiso crearProyectos. */
@@ -50,7 +51,7 @@ export function Sidebar({
   proyectoActivoId,
   frenteSel,
   pantalla,
-  esAdmin,
+  puedeVerUsuarios,
   conMisTareas,
   puedeCrearProyecto,
   can,
@@ -199,9 +200,11 @@ export function Sidebar({
         {proyectos.length === 0 && <div className="nav-vacio">Sin proyectos.</div>}
       </div>
 
-      {esAdmin && (
+      {puedeVerUsuarios && (
         <>
-          <div className="sidebar__section"><span>Administracion</span></div>
+          <div className="sidebar__section">
+            <span>{usuario.rol === 'admin' ? 'Administracion' : 'Equipo'}</span>
+          </div>
           <div className="nav-proyectos">
             <button
               className={`nav-frente${pantalla === 'usuarios' ? ' nav-frente--activo' : ''}`}
@@ -209,7 +212,7 @@ export function Sidebar({
               onClick={() => onSelectPantalla('usuarios')}
             >
               <span>Usuarios</span>
-              <span className="nav-frente__count">{state.usuarios.length}</span>
+              {usuario.rol === 'admin' && <span className="nav-frente__count">{state.usuarios.length}</span>}
             </button>
           </div>
         </>
