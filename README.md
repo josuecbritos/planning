@@ -325,9 +325,20 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   `registrar_replanificacion` (perdida al pasarla a security definer en la 12).
   La replanificación se evalúa sobre la fecha de **origen**: mover una fecha
   futura es planificación (sin ↻), no replanificación.
+- `supabase/migrations/20260707000014_seguridad_auth_y_historial.sql` y
+  `…20260707000015_seguridad_exposicion_y_execute.sql` — **correcciones de
+  seguridad post-auditoría**: enlace auth↔usuario atado a invitación usada
+  (defensa C1), autor del historial derivado de la sesión (M1), `search_path`
+  fijo (L1), `acceso_select` acotada + vista `usuario_visible` que enmascara
+  email/permisos (M2), y `revoke execute` de funciones internas sin romper la
+  RLS (L2/L3). **Aplicar con `docs/runbook-seguridad.md`.**
 
 Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
 mismo email que registraste en el Módulo de Usuarios). Al primer login se vinculan.
+**Importante (seguridad, migración 14):** el enlace auth↔usuario ahora exige una
+invitación **usada**; el flujo normal es invitar desde el Módulo de Usuarios y que
+la persona active su cuenta por el enlace del correo. Para el **primer admin** de
+una instalación nueva (sin invitación), enlazar su `auth_id` manualmente por SQL.
 
 ## Estructura
 

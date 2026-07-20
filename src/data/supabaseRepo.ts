@@ -11,6 +11,7 @@ import type {
   Usuario,
 } from '../types'
 import { getClient } from './client'
+import { DEFAULT_PERMISOS_PROYECTO } from '../lib/permisos'
 import type {
   NuevaTarea,
   NuevoFrente,
@@ -93,7 +94,9 @@ export class SupabaseRepo implements Repo {
 
   async loadState(): Promise<AppState> {
     const [u, p, f, sf, t, h, a, c] = await Promise.all([
-      this.db.from('usuario').select('*').order('nombre'),
+      // Vista con email/permisos enmascarados (seguridad §3): la tabla base ya
+      // no permite SELECT directo desde el cliente.
+      this.db.from('usuario_visible').select('*').order('nombre'),
       this.db.from('proyecto').select('*').order('fecha_creacion'),
       this.db.from('frente').select('*').order('orden'),
       this.db.from('sub_frente').select('*').order('orden'),
@@ -260,14 +263,22 @@ export class SupabaseRepo implements Repo {
     const iniciales = (
       input.iniciales ?? input.nombre.split(/\s+/).map((p) => p[0]).join('').slice(0, 2)
     ).toUpperCase()
+    const email = input.email.trim().toLowerCase()
+    // La tabla base solo permite RETURNING de columnas no sensibles (§3). El
+    // email lo conocemos (lo insertamos) y permisos_proyecto lo pone el trigger
+    // con el default del rol; se reconstruye para el estado local.
     const row = unwrap(
       await this.db
         .from('usuario')
-        .insert({ nombre: input.nombre, iniciales, email: input.email.trim().toLowerCase(), rol: input.rol })
-        .select()
+        .insert({ nombre: input.nombre, iniciales, email, rol: input.rol })
+        .select('id, nombre, iniciales, rol, activo, auth_id')
         .single(),
     )
-    return toUsuario(row)
+    return toUsuario({
+      ...row,
+      email,
+      permisos_proyecto: input.rol === 'consultor' ? DEFAULT_PERMISOS_PROYECTO : undefined,
+    })
   }
 
   async updateUsuario(id: string, patch: PatchUsuario): Promise<Usuario> {
@@ -277,7 +288,10 @@ export class SupabaseRepo implements Repo {
     if ('activo' in patch) upd.activo = patch.activo
     if ('rol' in patch) upd.rol = patch.rol
     if ('permisosProyecto' in patch) upd.permisos_proyecto = patch.permisosProyecto ?? {}
-    const row = unwrap(await this.db.from('usuario').update(upd).eq('id', id).select().single())
+    // Aplica el cambio y relee por la vista (solo admin llega aquí) para traer
+    // email/permisos ya desenmascarados; la tabla base no expone esas columnas.
+    unwrap(await this.db.from('usuario').update(upd).eq('id', id).select('id').single())
+    const row = unwrap(await this.db.from('usuario_visible').select('*').eq('id', id).single())
     return toUsuario(row)
   }
 

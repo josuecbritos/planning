@@ -27,8 +27,9 @@ export class SupabaseAuth implements AuthService {
   }
 
   private async perfilDe(authId: string): Promise<Usuario | null> {
-    // La RLS permite a cada usuario leer su propia fila.
-    const { data, error } = await this.db.from('usuario').select('*').eq('auth_id', authId).maybeSingle()
+    // Vista con email/permisos (seguridad §3): para la propia fila los muestra
+    // completos; la tabla base ya no permite SELECT directo desde el cliente.
+    const { data, error } = await this.db.from('usuario_visible').select('*').eq('auth_id', authId).maybeSingle()
     if (error) throw new Error(error.message)
     return data ? toUsuario(data) : null
   }
