@@ -7,6 +7,7 @@ import type { Can } from '../lib/permisos'
 import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, nReplanificaciones, textoAtraso } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { formatoFecha } from '../lib/dates'
+import { EmptyFrentes } from './EmptyFrentes'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
 import { InlineText } from './InlineText'
@@ -103,7 +104,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         />
       ))}
       {frentes.length === 0 && (
-        <p className="vacio-inline">Este proyecto aun no tiene frentes. Crea uno desde la barra lateral.</p>
+        <EmptyFrentes proyectoId={proyectoId} puedeCrear={can.crearFrentes} actions={actions} />
       )}
     </div>
   )

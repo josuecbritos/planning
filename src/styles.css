@@ -901,6 +901,20 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .vacio-inline { font-size: 13px; font-style: italic; }
 .nav-vacio { color: #8e8e96; font-size: 13px; }
 
+/* §2: estado vacío de un proyecto sin frentes, con "Agregar frente" en el
+   cuerpo de la Gantt y la Tabla. */
+.vacio-frentes {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
+  padding: 28px 24px; color: var(--gris-texto);
+}
+.vacio-frentes p { margin: 0; }
+.vacio-frentes .mudo { font-size: 13px; font-style: italic; }
+.vacio-frentes__form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.vacio-frentes__form input {
+  padding: 7px 10px; border: 1px solid var(--borde); border-radius: 8px;
+  background: var(--fondo); color: var(--texto); font: inherit; min-width: 220px;
+}
+
 .banner-error {
   background: var(--rojo-suave); color: var(--rojo); border-bottom: 1px solid var(--rojo-tenue);
   padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;

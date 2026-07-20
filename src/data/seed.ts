@@ -190,10 +190,14 @@ export const initialState: AppState = {
   subFrentes,
   tareas,
   historial,
-  // El cliente de demo esta invitado al proyecto Arauco. Conserva su
-  // configuracion previa (9): permisos vacios = solo lectura. Los usuarios
-  // NUEVOS que se asignen nacen con el default de su rol.
+  // Accesos = membresías (pedido §3: ser miembro = ver el proyecto en la
+  // barra). El admin ya NO queda asociado por default a cada proyecto; DV es
+  // dueño de Arauco (lo ve por eso) y JB se sumó como miembro (se ve cómo un
+  // admin puede ser miembro sin ser dueño; se agrega/saca desde Usuarios). El
+  // cliente de demo conserva su config previa (9): permisos vacíos = solo
+  // lectura. Los usuarios NUEVOS que se asignen nacen con el default del rol.
   accesos: [
+    { usuarioId: 'u-jb', proyectoId: proyecto.id, fechaAsignacion: '2024-10-01T00:00:00Z', permisos: {} },
     { usuarioId: 'u-cliente', proyectoId: proyecto.id, fechaAsignacion: '2024-10-01T00:00:00Z', permisos: {} },
   ],
   // Un hilo de ejemplo para exhibir los comentarios acumulables (N5).

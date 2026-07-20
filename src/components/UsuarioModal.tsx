@@ -9,6 +9,8 @@ import { Modal } from './Modal'
 
 interface Props {
   usuario?: Usuario
+  /** §4: el consultor solo puede crear CLIENTES; fija el rol y oculta el selector. */
+  soloCliente?: boolean
   onSubmit: (datos: { nombre: string; iniciales?: string; email: string; rol: Rol }) => void
   onClose: () => void
 }
@@ -21,12 +23,12 @@ const AYUDA_ROL: Record<Rol, string> = {
     'Solo ve los proyectos donde lo inviten. Nace con: crear tareas, fechas y hecho en las suyas, y asignar responsable en todas.',
 }
 
-export function UsuarioModal({ usuario, onSubmit, onClose }: Props) {
+export function UsuarioModal({ usuario, soloCliente, onSubmit, onClose }: Props) {
   const edicion = Boolean(usuario)
   const [nombre, setNombre] = useState(usuario?.nombre ?? '')
   const [iniciales, setIniciales] = useState(usuario?.iniciales ?? '')
   const [email, setEmail] = useState(usuario?.email ?? '')
-  const [rol, setRol] = useState<Rol>(usuario?.rol ?? 'cliente')
+  const [rol, setRol] = useState<Rol>(soloCliente ? 'cliente' : usuario?.rol ?? 'cliente')
   const valido = nombre.trim().length > 0 && /\S+@\S+\.\S+/.test(email)
 
   function submit(e: React.FormEvent) {
@@ -52,15 +54,19 @@ export function UsuarioModal({ usuario, onSubmit, onClose }: Props) {
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={edicion} />
           {edicion && <small className="ayuda">El email se usa para el login y no se edita.</small>}
         </label>
-        <label className="campo">
-          <span>Rol</span>
-          <select value={rol} onChange={(e) => setRol(e.target.value as Rol)} disabled={edicion}>
-            <option value="cliente">Cliente</option>
-            <option value="consultor">Consultor</option>
-            <option value="admin">Admin</option>
-          </select>
-          {!edicion && <small className="ayuda">{AYUDA_ROL[rol]}</small>}
-        </label>
+        {soloCliente ? (
+          <p className="ayuda">Se creará como <b>Cliente</b>. {AYUDA_ROL.cliente}</p>
+        ) : (
+          <label className="campo">
+            <span>Rol</span>
+            <select value={rol} onChange={(e) => setRol(e.target.value as Rol)} disabled={edicion}>
+              <option value="cliente">Cliente</option>
+              <option value="consultor">Consultor</option>
+              <option value="admin">Admin</option>
+            </select>
+            {!edicion && <small className="ayuda">{AYUDA_ROL[rol]}</small>}
+          </label>
+        )}
         <div className="modal-acciones">
           <button type="button" className="btn" onClick={onClose}>Cancelar</button>
           <button type="submit" className="btn btn--primary" disabled={!valido}>

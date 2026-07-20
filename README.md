@@ -198,6 +198,12 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   (botón "Miembros" en el encabezado), pero **no sus permisos**; configura solo
   a los clientes de sus proyectos y solo con el permiso habilitado. Solo el
   admin asigna consultores a proyectos (propios o ajenos).
+- **Ser miembro = ver el proyecto en la barra lateral.** El admin **no** queda
+  asociado por default a cada proyecto (ni a los que crean los consultores): se
+  **agrega o saca** a sí mismo como miembro desde el Módulo de Usuarios. Su
+  poder no cambia — sigue viendo y gestionando cualquier proyecto desde ahí —,
+  pero su barra solo muestra los proyectos donde es miembro. La lista de
+  miembros de un proyecto no incluye admins que no se agregaron.
 - **Alta por invitación (§8):** el admin crea el usuario y le envía un correo con
   enlace (caduca en 7 días, reenviable); el invitado define su contraseña. Un
   consultor con el permiso "invitar clientes" también puede invitar a los
@@ -206,8 +212,10 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 
 **CRUD (Fase 1) — con interacción inline (Bloque 2)**
 - Proyectos: crear / editar (nombre, descripción, color, estado) / eliminar. Multi-proyecto.
-- Frentes: crear / renombrar / eliminar (sidebar). Sub Frentes: **crear y renombrar
-  inline** en la tabla (sin ventanas) / eliminar.
+- Frentes: crear / renombrar / eliminar (sidebar). Un proyecto **sin frentes**
+  ofrece además **"Agregar frente"** en el cuerpo de la Gantt y la Tabla, para
+  crear el primero sin ir a la sidebar (si tienes el permiso). Sub Frentes:
+  **crear y renombrar inline** en la tabla (sin ventanas) / eliminar.
 - Tareas: **creación inline** ("+ Tarea" abre una fila vacía con el cursor en el
   título; Enter guarda y encadena la siguiente), **edición inline** de título y
   responsable (click directo en la celda), marcar hecha, replanificar (un click en
@@ -224,10 +232,15 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 **Usuarios y roles (Fase 2 — reestructurado)**
 - **Login**: Supabase Auth (email + contraseña). El Admin crea al usuario con su email;
   cuando esa persona inicia sesión por primera vez, un trigger vincula su cuenta.
-- **Módulo de Usuarios** (solo Admins): listar, crear (con 3 roles y defaults),
+- **Módulo de Usuarios** — **Admins**: listar, crear (con 3 roles y defaults),
   editar, desactivar/reactivar; asignar proyectos a **consultores y clientes**
-  (cualquier proyecto, propio o de otro consultor); 🔧 permisos de proyecto del
-  consultor; 🔑 permisos del acceso (por proyecto).
+  (cualquier proyecto, propio o de otro consultor, e **incluirse/excluirse a sí
+  mismos** como miembro); 🔧 permisos de proyecto del consultor; 🔑 permisos del
+  acceso (por proyecto). **Consultores** acceden al **mismo módulo, acotado**:
+  ven solo a la gente con acceso a **sus** proyectos (clientes y otros
+  consultores); invitan y configuran a los **clientes** de esos proyectos según
+  sus permisos (`invitarClientes` / `configurarPermisosClientes`); a los demás
+  consultores los ven pero no los editan; no ven usuarios ni proyectos ajenos.
 - **Sin límite de admins**: se eliminó la regla de "exactamente 2".
 - **RLS real**: las políticas de Postgres garantizan a nivel de base de datos la
   visibilidad por rol (admin todo; consultor dueño + asignados; cliente
@@ -243,14 +256,20 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
    los clientes demo conservan su configuración) + RLS completa. Todo junto.
 2. **Redeploy de la Edge Function** `invitar-usuario` (`supabase functions deploy
    invitar-usuario`): ahora autoriza también a consultores con permiso.
-3. **Compuerta de validación** (crítica): correr `scripts/validar-rls.mjs`, que
+3. **Migración 13** (`20260707000013_fix_replan_fecha_origen.sql`): corrige la
+   regla de replanificación (§1 del pedido post-validación). La migración 12,
+   al pasar el trigger de historial a `security definer`, perdió la guardia
+   `old.fecha_objetivo <= current_date`; sin ella, mover una fecha **futura**
+   contaba como replanificación. La migración 13 la restaura (evaluar sobre la
+   fecha de **origen**). Se aplica sola, sin dependencias de datos.
+4. **Compuerta de validación** (crítica): correr `scripts/validar-rls.mjs`, que
    verifica rol por rol que la RLS **impide** el acceso indebido — no solo que
    la UI lo oculta. Sin entorno local, se corre desde **GitHub Actions**:
    cargar los secrets del repo (ver cabecera de
    `.github/workflows/validar-rls.yml`) y lanzar el workflow **"Validar RLS
    (compuerta)"** desde la pestaña Actions (Run workflow). Verde = pasa;
    rojo = la RLS deja pasar algo indebido.
-4. **Recién entonces** invitar usuarios reales.
+5. **Recién entonces** invitar usuarios reales.
 
 **Fase 3 — Pulido**
 - **Mis Tareas (Módulo 3)**: únicamente las tareas donde el usuario
@@ -301,6 +320,11 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   y **RLS reescrita completa** (dueño vs invitado). Corrige de paso el
   historial de replanificaciones para invitados (trigger security definer) y
   habilita comentar a todos los miembros. **Aplicar con el runbook de arriba.**
+- `supabase/migrations/20260707000013_fix_replan_fecha_origen.sql` — fix §1
+  post-validación: restaura la guardia `old.fecha_objetivo <= current_date` en
+  `registrar_replanificacion` (perdida al pasarla a security definer en la 12).
+  La replanificación se evalúa sobre la fecha de **origen**: mover una fecha
+  futura es planificación (sin ↻), no replanificación.
 
 Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
 mismo email que registraste en el Módulo de Usuarios). Al primer login se vinculan.
