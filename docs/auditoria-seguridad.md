@@ -6,7 +6,7 @@
 
 ## 1. Resumen ejecutivo
 
-La base de seguridad es **sólida**: todas las tablas con datos tienen RLS activa, la política permisiva inicial fue removida, el principio "dueño vs invitado" se hace cumplir en la base (no solo en la interfaz) y los secretos no están expuestos ni en el código ni en el historial de Git. La compuerta automatizada (34/34) ya confirmó el comportamiento de accesos.
+La base de seguridad es **sólida**: todas las tablas con datos tienen RLS activa, la política permisiva inicial fue removida, el principio "dueño vs invitado" se hace cumplir en la base (no solo en la interfaz) y los secretos no están expuestos ni en el código ni en el historial de Git. La compuerta automatizada (en verde) ya confirmó el comportamiento de accesos.
 
 Hay **un punto que hay que verificar sí o sí antes de salir en vivo**: que el **registro público de cuentas esté deshabilitado** en Supabase Auth. Si estuviera habilitado, alguien podría apropiarse de una cuenta ya creada (incluso de admin) registrándose con su correo. Todo lo demás son debilidades menores o de endurecimiento: una atribución de historial falsificable, permisos/correos de colegas visibles por API más allá de lo que la interfaz muestra, política de contraseñas floja y ajustes de hardening (search_path, RPC de funciones internas, headers HTTP). Ningún dato de proyecto de un cliente se filtra a quien no corresponde.
 
@@ -71,7 +71,7 @@ El Advisor marca 22 funciones llamables vía `/rest/v1/rpc/…`. El fix **no es 
 - **Funciones de trigger** (`registrar_replanificacion`, `validar_cambios_frente`, `validar_cambios_subfrente`, `validar_permisos_tarea`, `aplicar_default_acceso`, `aplicar_default_consultor`, `default_dueno_proyecto`, `vincular_usuario_auth`): **se puede revocar `EXECUTE` a `anon` y `authenticated`** sin romper nada — se disparan por el trigger, no por llamada directa. Cierra la superficie de RPC. **Seguro.**
 - **Predicados de la RLS** (`es_admin`, `es_cliente`, `es_dueno_proyecto`, `es_invitado_proyecto`, `tiene_acceso_proyecto`, `rol_actual`, `usuario_actual_id`, `permiso_proyecto`, `permiso_bool_en`, `permiso_tarea_en`, `permisos_en`, `invitado_puede_editar_algo_en`, `comparte_proyecto`): **NO revocar `EXECUTE` a `authenticated`** — la evaluación de las políticas RLS las llama como el rol que consulta; revocar **rompería la RLS**. Riesgo residual mínimo: solo devuelven un booleano sobre el **propio** usuario, sin datos. A lo sumo revocar a `anon` (que no tiene sesión) como reducción de superficie.
 - **RPC legítimas** (`replanificar_tarea`, `desplanificar_tarea`): mantener `EXECUTE` para `authenticated`, revocar a `anon`.
-- **Después de aplicar, re-confirmar con la compuerta 34/34.**
+- **Después de aplicar, re-confirmar con la compuerta (en verde, todas las pruebas OK).**
 
 #### L3 · `proyecto_de_subfrente` filtra el id de proyecto de cualquier sub frente
 
@@ -100,7 +100,7 @@ Ambas funciones usan `Access-Control-Allow-Origin: '*'`. Es **aceptable** aquí:
 **RLS y políticas**
 - ✅ Las 9 tablas con datos tienen **RLS habilitada** (`usuario`, `proyecto`, `frente`, `sub_frente`, `tarea`, `replanificacion`, `acceso_proyecto`, `comentario`, `invitacion`). Ninguna tabla con datos queda sin RLS.
 - ✅ La política permisiva inicial `fase1_all USING (true)` fue **eliminada en las 7 tablas** (migración 2). No queda ningún `USING (true)` vivo en el esquema.
-- ✅ **Visibilidad correcta por rol** en los SELECT: admin todo; dueño/invitado por proyecto; cliente solo invitados. Confirmado además por la compuerta 34/34.
+- ✅ **Visibilidad correcta por rol** en los SELECT: admin todo; dueño/invitado por proyecto; cliente solo invitados. Confirmado además por la compuerta (en verde).
 - ✅ El **principio dueño-vs-invitado se cumple en la base**, no solo en la UI: policies + triggers de validación campo a campo (`validar_permisos_tarea`, `validar_cambios_frente/subfrente`).
 - ✅ `proyecto_select` usa **expresión directa sobre la fila** (evita el bug de recursión/snapshot del `RETURNING`, ya resuelto en la migración 4).
 - ✅ Las **tablas relacionadas** (`comentario`, `replanificacion`, `acceso_proyecto`) tienen SELECT acotado por `tiene_acceso_proyecto` → no filtran datos de proyectos ajenos.
