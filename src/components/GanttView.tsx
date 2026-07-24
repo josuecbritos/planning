@@ -946,7 +946,11 @@ function FilaGanttRow({
       className="fija fija--proy"
       rowSpan={span}
       style={{ background: proyecto?.color ?? '#607d8b' }}
-      title={proyecto?.nombre}
+      // #192: `data-tip` (globo propio, inmediato) en vez del `title` nativo,
+      // cuyo retardo lo fija el navegador y no se puede ajustar. El nombre
+      // completo sigue en el DOM, así que los lectores de pantalla lo leen
+      // aunque el rótulo se trunque visualmente.
+      data-tip={proyecto?.nombre}
     >
       <span className="proy-rotulo">
         <span className="proy-rotulo__txt">{proyecto?.nombre ?? '—'}</span>

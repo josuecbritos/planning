@@ -179,6 +179,12 @@ button { font-family: inherit; cursor: pointer; }
 .app--sidebar-escondida .sidebar-zona:hover .sidebar {
   opacity: 1; pointer-events: auto; transform: none;
 }
+/* #191: un solo control de plegado visible a la vez. Con la barra desplegada
+   (hover sobre la zona) manda el de la cabecera, así que el del riel se
+   oculta. SIN transición: si se desvaneciera, habría un instante con los dos.
+   `visibility` conserva el hueco, de modo que los iconos del riel (campana,
+   proyectos) no saltan al ocultarse. */
+.app--sidebar-escondida .sidebar-zona:hover .sidebar-mini__btn { visibility: hidden; }
 
 .main {
   display: flex;
@@ -813,6 +819,23 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    el bloque del frente. El envoltorio absoluto le da alto definido, que es lo
    que permite truncar con "…" cuando el nombre no cabe (el nombre completo
    queda en el tooltip del td). */
+/* #192: tooltip del nombre de proyecto — mismo globo e inmediatez que los
+   iconos de acción (los `data-tip` de la app no tienen retardo; el que se
+   percibía era el del `title` NATIVO, que lo controla el navegador). Se abre
+   hacia la DERECHA: la columna es angosta y está pegada al borde izquierdo,
+   donde un globo centrado quedaría recortado por el scroll de la grilla.
+   La celda ya es `sticky` (posicionada), así que ancla el globo sin
+   necesidad de `position: relative` — ponerlo rompería la columna congelada.
+   Al pasar el mouse sube su z-index para que el globo no quede por debajo de
+   la columna de Frente, que es su hermana sticky y se pinta después. */
+.gantt td.fija--proy[data-tip]:hover { z-index: 130; }
+.gantt td.fija--proy[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%);
+  background: #1a1a1b; color: #fff; font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 5px; white-space: nowrap;
+  z-index: 130; pointer-events: none;
+}
 .gantt td.fija--proy .proy-rotulo {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
