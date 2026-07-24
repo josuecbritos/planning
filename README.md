@@ -4,14 +4,19 @@ Herramienta de planificación de proyectos con gestión interna y visibilidad
 controlada al cliente. Implementa las vistas **Tabla** (tipo Monday) y **Gantt**
 (grilla tipo Excel) con la lógica de estados derivados y colores de la sección 6
 del Documento Funcional, el **CRUD** completo sobre **Supabase** (Fase 1),
-**login con roles Admin/Cliente + acceso por proyecto** (Fase 2, Módulo 1) y el
-**pulido de la Fase 3**: Mis Tareas, panel lateral de detalle, archivo de
-canceladas e indicadores por proyecto.
+**tres roles (Admin / Consultor / Cliente) con principio dueño vs invitado y
+acceso por proyecto** (Fase 2, Módulo 1), el **pulido de la Fase 3** (Mis
+Tareas, panel lateral de detalle, archivo de canceladas e indicadores por
+proyecto) y los módulos de escritorio posteriores: **Administración →
+Proyectos**, **Usuarios** con alta por invitación y **notificaciones in-app**.
 
-> **Documentación:** para una visión general del producto (contexto, objetivos,
-> roles y arquitectura) ver [`docs/PROYECTO.md`](docs/PROYECTO.md). Antes de tocar
-> RLS, permisos, Edge Functions de auth o el despliegue, leer
-> [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md) (invariantes que no se deben romper).
+> **Documentación:** la **fuente de verdad del estado actual** es
+> [`docs/PROYECTO.md`](docs/PROYECTO.md) (contexto, objetivos, roles,
+> funcionalidades y arquitectura); este README cubre uso y desarrollo. El
+> `docs/documento-funcional-v3.1.md` es **histórico** (modelo anterior de 2
+> roles / 4 estados). Antes de tocar RLS, permisos, Edge Functions de auth o el
+> despliegue, leer [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md) (invariantes que no
+> se deben romper).
 
 ## Dos modos de ejecución
 
@@ -34,9 +39,10 @@ En modo Local es un selector "entrar como…" con los usuarios del seed (2 admin
 
 ```bash
 npm install
-npm run dev      # servidor de desarrollo (Vite)
-npm run build    # typecheck + build de producción
-npm run preview  # sirve el build
+npm run dev        # servidor de desarrollo (Vite)
+npm run typecheck  # solo chequeo de tipos (tsc -b --noEmit)
+npm run build      # typecheck + build de producción
+npm run preview    # sirve el build
 ```
 
 Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
@@ -214,6 +220,22 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   consultor con el permiso "invitar clientes" también puede invitar a los
   clientes de sus proyectos. Ver DEPLOY.md para el proveedor de correo y las
   Edge Functions.
+- **Administración → Proyectos** (hermano de Usuarios): módulo dueño de la
+  relación usuario↔proyecto (miembros, 🔑) y del ciclo de vida — **archivar**
+  (lo saca de la barra, Resumen y Mis Tareas conservándolo) y **eliminar en
+  cascada** (solo sobre archivados), ambas con el permiso
+  `archivarEliminarProyectos` verificado en la base. _Administrar ≠ ser
+  miembro_: el admin ve y gestiona todos los proyectos aunque su barra solo
+  muestre los suyos. Unirse/salir se hace desde el **modal de Miembros**.
+- **Notificaciones in-app:** tres eventos sobre tus tareas — te asignaron,
+  replanificaron o comentaron (nunca por acciones propias) —, **generadas por
+  triggers en la base**. Entrada en la barra con contador naranja, panel
+  emergente que marca leído **al cerrarlo**, y clic que **navega a la tarea con
+  un realce** (contorno que no tapa el color de categoría). Con la barra
+  contraída, una **campana fija** abre el mismo panel.
+- **Baja de usuarios:** eliminar = desactivar + invisible (sin borrado físico,
+  para no huérfanar el historial); dar de alta el mismo correo **reactiva** la
+  fila y recupera sus accesos.
 
 **CRUD (Fase 1) — con interacción inline (Bloque 2)**
 - Proyectos: crear / editar (nombre, descripción, color, estado) / eliminar. Multi-proyecto.
@@ -311,11 +333,17 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   dependía de una función que consulta la propia tabla con el snapshot previo
   al insert; se reescriben las políticas con expresión directa.
 - `supabase/migrations/20260707000005_comentarios.sql` — tabla `comentario`
-  (hilo acumulable por tarea, append-only; comentan admins, leen todos los
-  que ven la tarea). Migra el texto legado de `tarea.comentarios`.
+  (hilo acumulable por tarea, append-only; leen todos los que ven la tarea).
+  Migra el texto legado de `tarea.comentarios`. _(La 12 amplía el comentar a
+  todos los miembros, no solo admins.)_
 - `supabase/migrations/20260707000006_estados_y_fechas.sql` — fechas opcionales
   (la tarea nace sin fecha; la primera fija `fecha_original` sin historial) y
   anclaje de toda fecha al día hábil más cercano, ambos como triggers.
+- `…_000007_estados_v2.sql` a `…_000011_desplanificar_deshace.sql` — modelo de
+  estados v2 (replan solo si la fecha vencía; se **permiten** fines de semana,
+  reemplaza el anclaje de la 6), permisos por cliente (jsonb + RLS), tabla de
+  invitaciones (token 7 días), estándar de planificación por clics y RPC
+  `desplanificar_tarea` (deshace la última replanificación).
 - `supabase/migrations/20260707000012_roles_y_permisos.sql` — **reestructuración
   de roles**: rol `consultor` y fin del límite de 2 admins; dueño de proyecto
   (`creado_por`, con backfill al admin creador); `acceso_cliente_proyecto` →
@@ -337,13 +365,26 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   fijo (L1), `acceso_select` acotada + vista `usuario_visible` que enmascara
   email/permisos (M2), y `revoke execute` de funciones internas sin romper la
   RLS (L2/L3). **Aplicar con `docs/runbook-seguridad.md`.**
+- `supabase/migrations/20260707000016_mejoras_desktop.sql` — proyecto
+  activo/archivado con gate por permiso; `usuario.eliminado` + vista
+  `usuario_visible` que lo filtra + RPC `crear_o_reactivar_usuario`; tabla
+  `notificacion` + RLS por dueño + triggers que la generan (asignación /
+  replanificación / comentario, nunca por acción propia).
+- `supabase/migrations/20260707000017_delete_solo_archivado.sql` — endurece
+  `proyecto_delete`: solo se elimina un proyecto **archivado** (la regla
+  "archivar primero" pasa de la UI a la base).
+
+> La lista **completa y ordenada** de migraciones (1→17), lista para pegar en el
+> SQL Editor, está en [`DEPLOY.md`](DEPLOY.md) (Paso 2).
 
 Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
-mismo email que registraste en el Módulo de Usuarios). Al primer login se vinculan.
-**Importante (seguridad, migración 14):** el enlace auth↔usuario ahora exige una
+mismo email que registraste en el Módulo de Usuarios).
+**Importante (seguridad, migración 14):** el enlace auth↔usuario exige una
 invitación **usada**; el flujo normal es invitar desde el Módulo de Usuarios y que
 la persona active su cuenta por el enlace del correo. Para el **primer admin** de
-una instalación nueva (sin invitación), enlazar su `auth_id` manualmente por SQL.
+una instalación nueva (sin invitación) hay que enlazar su `auth_id` manualmente
+por SQL — el procedimiento exacto (bootstrap) está en [`DEPLOY.md`](DEPLOY.md)
+Paso 3.
 
 ## Estructura
 
@@ -365,18 +406,26 @@ src/
     apply.ts             Aplicar mutaciones al estado local (con cascada)
     index.ts             Selección de adapter
     seed.ts              Datos semilla + HOY simulado
+    vistaCongelada.ts    "Foto" de filas visibles + orden (P1)
+    filtros.ts / orden.ts  Filtrado y orden multinivel
+    permisos.ts          makeCan + dueño/invitado (espejo de la RLS)
   components/
-    Sidebar, Header, TableView, GanttView, Marca, Legend, HoverCard,
-    TaskDetail, Modal, TextPromptModal, ProyectoModal, TareaModal,
-    LoginPage, UsersView, UsuarioModal, TaskPanel, MiPanelView, ResumenView
+    Sidebar, Header, TableView, GanttView, MisTareasView, ResumenView,
+    TaskPanel, TaskDetail, FiltrosBar, FechaEditable, RespPicker,
+    AdminProyectosView, ProyectoModal, MiembrosModal, UsersView,
+    UsuarioModal, PermisosModal, PermisosProyectoModal, Notificaciones,
+    LoginPage, AceptarInvitacion, Modal, TextPromptModal, …
 supabase/
-  migrations/
-    …_init.sql           Esquema + trigger de historial + RPC
-    …_fase2_auth.sql     Auth, límite 2 admins y RLS por rol
-    …_fase3_archivo.sql  Campo archivada (archivo de canceladas)
+  migrations/            17 migraciones (1→17). Lista ordenada en DEPLOY.md.
+  functions/             Edge Functions (Deno): invitar-usuario, aceptar-invitacion
   seed.sql               Datos de arranque (opcional)
+scripts/
+  validar-rls.mjs        Compuerta de RLS (rol por rol contra la API)
 docs/
-  documento-funcional-v3.1.md
+  PROYECTO.md            Fuente de verdad del estado actual
+  SEGURIDAD.md           Invariantes de seguridad (leer antes de tocar RLS/auth)
+  runbook-seguridad.md / auditoria-seguridad.md
+  documento-funcional-v3.1.md  (histórico)
 ```
 
 ## Roadmap (sección 9)

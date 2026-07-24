@@ -17,7 +17,11 @@ export function AceptarInvitacion({ token, onListo }: Props) {
   const [ok, setOk] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
 
-  const valido = password.length >= 8 && password === confirmar
+  // Misma política que la Edge Function `aceptar-invitacion` (REGLA_PASSWORD):
+  // mínimo 10 caracteres y mezcla de letras y números. Validar aquí evita que
+  // el usuario pase el gate del cliente y reciba un error del servidor.
+  const passwordFuerte = password.length >= 10 && /[a-zA-Z]/.test(password) && /[0-9]/.test(password)
+  const valido = passwordFuerte && password === confirmar
 
   async function activar(e: React.FormEvent) {
     e.preventDefault()
@@ -68,7 +72,7 @@ export function AceptarInvitacion({ token, onListo }: Props) {
           <form onSubmit={activar}>
             <p className="login__hint">Define tu contraseña para activar la cuenta.</p>
             <label className="campo">
-              <span>Contraseña (mínimo 8 caracteres)</span>
+              <span>Contraseña (mínimo 10 caracteres, con letras y números)</span>
               <input
                 type="password"
                 autoFocus
@@ -86,6 +90,9 @@ export function AceptarInvitacion({ token, onListo }: Props) {
                 onChange={(e) => setConfirmar(e.target.value)}
               />
             </label>
+            {password && !passwordFuerte && (
+              <div className="login__error">La contraseña debe tener al menos 10 caracteres e incluir letras y números.</div>
+            )}
             {password && confirmar && password !== confirmar && (
               <div className="login__error">Las contraseñas no coinciden.</div>
             )}

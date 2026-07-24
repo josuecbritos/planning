@@ -1,3 +1,14 @@
+> ⚠️ **Documento histórico / parcialmente superado.** Esta especificación
+> refleja el modelo de una etapa anterior (roles admin/cliente con "exactamente
+> 2 admins", 4 categorías de estado sin "morado", tabla `acceso_cliente_proyecto`,
+> responsable limitado a los 2 admins). El producto evolucionó después: **tres
+> roles (admin/consultor/cliente) con principio dueño vs invitado**, **5
+> categorías de estado** (se añadió *atrasada replanificada* = morado) y
+> `acceso_proyecto`. La **fuente de verdad del estado actual es
+> [`PROYECTO.md`](./PROYECTO.md)**; usa este documento solo como referencia
+> histórica y trazabilidad de decisiones. Ver `PROYECTO.md` §3 (roles) y §4
+> (modelo de estados).
+
 # DOCUMENTO FUNCIONAL — VERSIÓN 3.1
 
 ## Herramienta de Planificación de Proyectos

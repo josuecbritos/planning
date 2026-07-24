@@ -58,11 +58,12 @@
 }
 
 /*
- * Modo oscuro (punto 4): se activa a mano (boton en el pie de la sidebar,
- * no sigue al sistema operativo) y se recuerda por usuario. Los colores de
- * gestion conservan su identidad: mismo tono por estado, con el ajuste
- * minimo de luminosidad para que las FILAS COMPLETAS de color sigan
- * legibles sobre fondo oscuro sin volverse dominantes.
+ * Modo oscuro (punto 4): sigue `prefers-color-scheme` del sistema por
+ * defecto y admite override manual (boton en el pie de la sidebar) que se
+ * recuerda por usuario. Los colores de gestion conservan su identidad:
+ * mismo tono por estado, con el ajuste minimo de luminosidad para que las
+ * FILAS COMPLETAS de color sigan legibles sobre fondo oscuro sin volverse
+ * dominantes.
  */
 [data-tema='oscuro'] {
   --texto: #e7e7ea;

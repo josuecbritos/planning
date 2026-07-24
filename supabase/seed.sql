@@ -5,9 +5,12 @@
 -- proyecto.creado_por.
 -- =====================================================================
 
+-- Igual que src/data/seed.ts (modo Local): 2 admins, 1 consultor con proyecto
+-- propio (para ejercitar el principio dueño vs invitado) y 1 cliente invitado.
 insert into usuario (id, nombre, iniciales, email, rol) values
   ('11111111-1111-1111-1111-111111111111', 'Daniela Vera', 'DV', 'dv@consultora.cl', 'admin'),
   ('22222222-2222-2222-2222-222222222222', 'Josue Britos', 'JB', 'jb@consultora.cl', 'admin'),
+  ('33333333-3333-3333-3333-333333333333', 'Carla Soto', 'CS', 'cs@consultora.cl', 'consultor'),
   ('55555555-5555-5555-5555-555555555555', 'Cliente Arauco', 'CA', 'contacto@arauco.cl', 'cliente')
 on conflict (id) do nothing;
 
@@ -15,7 +18,11 @@ on conflict (id) do nothing;
 insert into proyecto (id, nombre, descripcion, color, estado, creado_por) values
   ('aaaaaaaa-0000-0000-0000-000000000001', 'Plan PGP Arauco',
    'Implementacion del Plan de Gestion de Procesos — cliente Arauco.',
-   '#2e7d32', 'activo', '22222222-2222-2222-2222-222222222222')
+   '#2e7d32', 'activo', '22222222-2222-2222-2222-222222222222'),
+  -- Proyecto propio del consultor: es su dueño, sin ser admin (dueño vs invitado).
+  ('aaaaaaaa-0000-0000-0000-000000000002', 'Diagnostico Pyme Andina',
+   'Diagnostico de procesos para una pyme del sur.',
+   '#6a1b9a', 'activo', '33333333-3333-3333-3333-333333333333')
 on conflict (id) do nothing;
 
 -- El cliente de demo esta invitado al proyecto (su acceso nace con el
@@ -54,3 +61,17 @@ select replanificar_tarea(
   '2024-10-29',
   '22222222-2222-2222-2222-222222222222'
 );
+
+-- Proyecto propio del consultor (dueño CS): frente, sub frente y tareas.
+insert into frente (id, proyecto_id, nombre, orden) values
+  ('bbbbbbbb-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000002', 'Diagnostico', 1)
+on conflict (id) do nothing;
+
+insert into sub_frente (id, frente_id, nombre, orden) values
+  ('cccccccc-0000-0000-0000-000000000006', 'bbbbbbbb-0000-0000-0000-000000000003', 'Entrevistas iniciales', 1)
+on conflict (id) do nothing;
+
+insert into tarea (sub_frente_id, titulo, responsable_id, fecha_original, fecha_objetivo, hecha, fecha_real, orden) values
+  ('cccccccc-0000-0000-0000-000000000006', 'Entrevista con gerencia',        '33333333-3333-3333-3333-333333333333', '2024-10-28', '2024-10-28', true,  '2024-10-28', 0),
+  ('cccccccc-0000-0000-0000-000000000006', 'Levantamiento de procesos clave','33333333-3333-3333-3333-333333333333', '2024-11-05', '2024-11-05', false, null,          1),
+  ('cccccccc-0000-0000-0000-000000000006', 'Informe de diagnostico',         '33333333-3333-3333-3333-333333333333', '2024-11-14', '2024-11-14', false, null,          2);
