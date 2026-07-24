@@ -827,14 +827,22 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    La celda ya es `sticky` (posicionada), así que ancla el globo sin
    necesidad de `position: relative` — ponerlo rompería la columna congelada.
    Al pasar el mouse sube su z-index para que el globo no quede por debajo de
-   la columna de Frente, que es su hermana sticky y se pinta después. */
-.gantt td.fija--proy[data-tip]:hover { z-index: 130; }
+   la columna de Frente, que es su hermana sticky y se pinta después.
+   #193: el salto es MÍNIMO (5) y queda por DEBAJO del encabezado (30/40). Con
+   un valor alto, esta celda —que abarca todo su frente con rowSpan— se pintaba
+   sobre el encabezado congelado y parecía "salirse" tapando lo de arriba. */
+.gantt td.fija--proy[data-tip]:hover { z-index: 5; }
 .gantt td.fija--proy[data-tip]:hover::after {
   content: attr(data-tip);
   position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%);
   background: #1a1a1b; color: #fff; font-size: 11px; font-weight: 600;
   padding: 3px 9px; border-radius: 5px; white-space: nowrap;
-  z-index: 130; pointer-events: none;
+  z-index: 1; pointer-events: none;
+  /* #193: el globo cae sobre la columna de Frente, que también es oscura, y
+     sin separación se leía como si fuera el nombre del frente. El borde claro
+     y la sombra lo despegan del fondo: se ve flotando, no incrustado. */
+  border: 1px solid rgba(255,255,255,.28);
+  box-shadow: 0 3px 12px rgba(0,0,0,.45);
 }
 .gantt td.fija--proy .proy-rotulo {
   position: absolute; inset: 0;
@@ -852,11 +860,14 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .03em;
 }
 
+/* Capas de la grilla (#193): el encabezado congelado va en una banda MUY por
+   encima de las celdas del cuerpo (2, y 5 la de proyecto al pasar el mouse),
+   para que ninguna celda alta con rowSpan lo tape al desplazarse bajo él. */
 .gantt thead th {
-  position: sticky; top: 0; z-index: 3; background: var(--superficie-2); text-align: center;
+  position: sticky; top: 0; z-index: 30; background: var(--superficie-2); text-align: center;
   font-size: 11px; color: var(--gris-texto); font-weight: 700; padding: 4px 2px;
 }
-.gantt thead .fija { z-index: 4; }
+.gantt thead .fija { z-index: 40; }
 .gantt thead tr.semana th { border-bottom: 1px solid var(--gris-borde); }
 /* P2: las DOS bandas del encabezado quedan fijas al scroll vertical — la de
    rango/período arriba (top:0) y la de días justo debajo (top = alto de la
