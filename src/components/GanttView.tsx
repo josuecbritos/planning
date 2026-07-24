@@ -543,13 +543,20 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     }
   }, [filas, dias, soloHabiles, modo])
 
+  // #162: "sin frentes" se decide por la EXISTENCIA de frentes, no por si hay
+  // filas que renderizar. Un frente recién creado sin sub frentes ni tareas no
+  // produce filas, pero el proyecto ya no está "sin frentes": debe mostrar su
+  // estructura (fila de frente vacío), no el mensaje de bienvenida.
+  const sinFrentes =
+    state.frentes.filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
+      .length === 0
   if (filas.length === 0) {
     return (
       <div className="gantt-wrap">
-        {hayFiltroTareas ? (
-          'Ninguna tarea coincide con el filtro activo.'
-        ) : (
+        {sinFrentes ? (
           <EmptyFrentes proyectoId={proyectoId} puedeCrear={can.crearFrentes} actions={actions} />
+        ) : (
+          'Ninguna tarea coincide con el filtro activo.'
         )}
       </div>
     )

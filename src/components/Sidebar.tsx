@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { AppState, Proyecto, Usuario } from '../types'
 import type { Actions, FrenteSel, Pantalla, SidebarModo, Tema } from '../App'
 import { puedeEditarProyecto, puedeEliminarProyecto, type Can } from '../lib/permisos'
@@ -79,6 +79,21 @@ export function Sidebar({
   actions,
 }: Props) {
   const [modal, setModal] = useState<ModalState>(null)
+  // #178: menú ⋯ del proyecto abierto (id) o null. Se cierra al hacer clic
+  // fuera o al elegir una opción.
+  const [menuProyecto, setMenuProyecto] = useState<string | null>(null)
+  useEffect(() => {
+    if (!menuProyecto) return
+    const fuera = (e: MouseEvent) => {
+      const t = e.target as HTMLElement
+      if (!t.closest('.nav-proyecto__menu') && !t.closest('.nav-proyecto__menu-btn')) setMenuProyecto(null)
+    }
+    const id = setTimeout(() => document.addEventListener('mousedown', fuera), 0)
+    return () => {
+      clearTimeout(id)
+      document.removeEventListener('mousedown', fuera)
+    }
+  }, [menuProyecto])
 
   const frentes = state.frentes
     .filter((f) => f.proyectoId === proyectoActivoId)
@@ -157,44 +172,55 @@ export function Sidebar({
           const activo = p.id === proyectoActivoId && pantalla === 'proyectos'
           return (
             <div key={p.id} className={`nav-proyecto${activo ? ' nav-proyecto--activo' : ''}`}>
-              <button className="nav-proyecto__title" onClick={() => onSelectProyecto(p.id)}>
-                <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
-                <span className="nav-proyecto__nombre">{p.nombre}</span>
-                <span className="nav-frente__count">{tareasEnProyecto(p.id)}</span>
-              </button>
+              {/* #178: "Todos los frentes" es el default — clic en el nombre
+                  abre esa vista directamente. Editar/Archivar viven en el ⋯. */}
+              <div className="nav-proyecto__fila">
+                <button className="nav-proyecto__title" onClick={() => onSelectProyecto(p.id)}>
+                  <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
+                  <span className="nav-proyecto__nombre">{p.nombre}</span>
+                  <span className="nav-frente__count">{tareasEnProyecto(p.id)}</span>
+                </button>
+                {puedeEditarProyecto(state, usuario, p.id) && (
+                  <button
+                    className="nav-proyecto__menu-btn"
+                    aria-label={`Opciones de ${p.nombre}`}
+                    aria-expanded={menuProyecto === p.id}
+                    onClick={() => setMenuProyecto((m) => (m === p.id ? null : p.id))}
+                  >
+                    ⋯
+                  </button>
+                )}
+              </div>
+
+              {menuProyecto === p.id && (
+                <div className="nav-proyecto__menu">
+                  <button
+                    className="nav-proyecto__menu-op"
+                    onClick={() => {
+                      setModal({ tipo: 'proyecto-editar', id: p.id })
+                      setMenuProyecto(null)
+                    }}
+                  >
+                    Editar proyecto
+                  </button>
+                  {puedeEliminarProyecto(state, usuario, p.id) && (
+                    <button
+                      className="nav-proyecto__menu-op"
+                      onClick={() => {
+                        setMenuProyecto(null)
+                        if (confirm(`¿Archivar "${p.nombre}"? Saldrá de la barra lateral, de Resumen y de Mis Tareas. Queda en Administración → Proyectos.`)) {
+                          actions.updateProyecto(p.id, { estado: 'archivado' })
+                        }
+                      }}
+                    >
+                      Archivar
+                    </button>
+                  )}
+                </div>
+              )}
 
               {activo && (
                 <div className="nav-frentes">
-                  {/* #133: el menú de la barra es Editar · Archivar (Eliminar
-                      se movió a Administración → Proyectos, solo sobre
-                      archivados). Editar: admin o dueño (control total).
-                      Archivar exige además archivarEliminarProyectos. */}
-                  {puedeEditarProyecto(state, usuario, p.id) && (
-                    <div className="nav-proyecto__acciones">
-                      <button className="link-btn" onClick={() => setModal({ tipo: 'proyecto-editar', id: p.id })}>Editar proyecto</button>
-                      {puedeEliminarProyecto(state, usuario, p.id) && (
-                        <button
-                          className="link-btn"
-                          onClick={() => {
-                            if (confirm(`¿Archivar "${p.nombre}"? Saldrá de la barra lateral, de Resumen y de Mis Tareas. Queda en Administración → Proyectos.`)) {
-                              actions.updateProyecto(p.id, { estado: 'archivado' })
-                            }
-                          }}
-                        >
-                          Archivar
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  <button
-                    className={`nav-frente${frenteSel === 'todos' ? ' nav-frente--activo' : ''}`}
-                    onClick={() => onSelectFrente('todos')}
-                  >
-                    <span>Todos los frentes</span>
-                    <span className="nav-frente__count">{tareasEnProyecto(p.id)}</span>
-                  </button>
-
                   {frentes.map((f) => (
                     <div key={f.id} className={`nav-frente-row${frenteSel === f.id ? ' nav-frente-row--activo' : ''}`}>
                       <button className="nav-frente nav-frente--flex" onClick={() => onSelectFrente(f.id)}>

@@ -312,6 +312,18 @@ export default function App() {
   const proyectosMiembro = useMemo(() => {
     if (!state || !sesion) return []
     const ids = new Set(state.accesos.filter((a) => a.usuarioId === sesion.id).map((a) => a.proyectoId))
+    // #171: además, proyectos donde soy responsable de alguna tarea activa. Un
+    // admin es candidato a responsable en cualquier proyecto, así que puede
+    // recibir una asignación sin tener un `acceso`; ese proyecto igual debe
+    // aparecer en su barra y ser navegable desde la notificación.
+    const frenteProy = new Map(state.frentes.map((f) => [f.id, f.proyectoId]))
+    const subProy = new Map(state.subFrentes.map((sf) => [sf.id, frenteProy.get(sf.frenteId)]))
+    for (const t of state.tareas) {
+      if (t.responsableId === sesion.id && !t.archivada) {
+        const pid = subProy.get(t.subFrenteId)
+        if (pid) ids.add(pid)
+      }
+    }
     return state.proyectos.filter((p) => p.duenoId === sesion.id || ids.has(p.id))
   }, [state, sesion])
 
@@ -529,6 +541,9 @@ export default function App() {
     (f: Filtro) => {
       // Cambiar el filtro recalcula la foto (no es una "edición" de datos).
       setVistaStale(false)
+      // #173: cambiar el filtro suelta la tarea insertada por una notificación,
+      // para que la foto vuelva a ser consistente con el filtro (no persiste).
+      setTareaResaltada(null)
       setVistasProyecto((prev) => {
         if (!proyectoActivoId) return prev
         const cur = prev[proyectoActivoId] ?? VISTA_VACIA
@@ -540,6 +555,7 @@ export default function App() {
   const setOrden = useCallback(
     (o: OrdenMulti) => {
       setVistaStale(false)
+      setTareaResaltada(null) // #173
       setVistasProyecto((prev) => {
         if (!proyectoActivoId) return prev
         const cur = prev[proyectoActivoId] ?? VISTA_VACIA
@@ -740,7 +756,16 @@ export default function App() {
               aria-label="Notificaciones"
               onClick={abrirNotificaciones}
             >
-              🔔
+              {/* #174: campana de trazo, coherente con la iconografía Andotek. */}
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M6 9.5a6 6 0 0 1 12 0c0 3.6.9 5.2 1.8 6.2.4.4.1 1.1-.5 1.1H4.7c-.6 0-.9-.7-.5-1.1C5.1 14.7 6 13.1 6 9.5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <path d="M9.7 19.5a2.4 2.4 0 0 0 4.6 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
               {noLeidas > 0 && <span className="sidebar-mini__badge">{noLeidas}</span>}
             </button>
             {proyectosVisibles.map((p) => (
@@ -769,7 +794,7 @@ export default function App() {
           noLeidas={noLeidas}
           notifAbierto={notifAbierto}
           onNotificaciones={abrirNotificaciones}
-          nProyectosAdmin={proyectosAdmin.length}
+          nProyectosAdmin={proyectosAdmin.filter((p) => p.estado !== 'archivado').length}
           puedeCrearProyecto={puedeCrearProyectos(sesion)}
           can={can}
           usuario={sesion}

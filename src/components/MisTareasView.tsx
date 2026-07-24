@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Proyecto, Tarea, Usuario } from '../types'
 import type { Actions } from '../App'
 import { makeCan, type Can } from '../lib/permisos'
@@ -121,8 +121,24 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
   // visibles): si no tengo tareas en un proyecto, no cuenta.
   const nProyectos = useMemo(() => new Set(misFilas.map((f) => f.proyecto.id)).size, [misFilas])
 
+  // #163: mide la barra de filtros (sticky) y publica --filtros-h para que el
+  // thead de la tabla se congele JUSTO debajo, sin taparse — igual que en la
+  // vista de proyecto.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const bar = wrap.querySelector<HTMLElement>('.filtros-bar')
+    if (!bar) return
+    const update = () => wrap.style.setProperty('--filtros-h', `${bar.offsetHeight}px`)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(bar)
+    return () => ro.disconnect()
+  }, [])
+
   return (
-    <div className="usuarios-wrap">
+    <div className="usuarios-wrap" ref={wrapRef}>
       <div className="usuarios-cabecera">
         <div>
           <h2>Mis Tareas</h2>

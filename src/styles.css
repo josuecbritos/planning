@@ -974,10 +974,31 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   background: none; border: none; color: #d4d4d8; padding: 8px 10px; border-radius: 6px; text-align: left;
 }
 .nav-proyecto__title:hover { background: #27272a; }
-.nav-proyecto--activo > .nav-proyecto__title { color: #fff; font-weight: 600; }
+.nav-proyecto--activo > .nav-proyecto__fila > .nav-proyecto__title { color: #fff; font-weight: 600; }
 .nav-proyecto__nombre { flex: 1; }
 .nav-proyecto__dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .nav-proyecto__acciones { display: flex; gap: 10px; padding: 2px 12px 8px 30px; }
+
+/* #178: nombre del proyecto + menú ⋯. El ⋯ aparece al pasar el cursor o
+   cuando el proyecto está activo. */
+.nav-proyecto__fila { display: flex; align-items: center; }
+.nav-proyecto__fila .nav-proyecto__title { flex: 1; min-width: 0; }
+.nav-proyecto__menu-btn {
+  flex: none; border: none; background: none; color: #8e8e96; cursor: pointer;
+  font-size: 18px; line-height: 1; padding: 4px 8px; border-radius: 6px; visibility: hidden;
+}
+.nav-proyecto:hover .nav-proyecto__menu-btn,
+.nav-proyecto--activo .nav-proyecto__menu-btn { visibility: visible; }
+.nav-proyecto__menu-btn:hover { color: #fff; background: #27272a; }
+.nav-proyecto__menu {
+  display: flex; flex-direction: column; margin: 2px 8px 6px 30px;
+  background: #27272a; border: 1px solid #3f3f46; border-radius: 8px; overflow: hidden;
+}
+.nav-proyecto__menu-op {
+  border: none; background: none; color: #d4d4d8; text-align: left;
+  font: inherit; font-size: 13px; padding: 8px 12px; cursor: pointer;
+}
+.nav-proyecto__menu-op:hover { background: #333338; color: #fff; }
 
 .nav-frentes { padding-bottom: 6px; }
 .nav-frente-row { display: flex; align-items: center; }
@@ -1080,7 +1101,9 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 /* ---------- Modulo de Usuarios ---------- */
 
-.usuarios-wrap { padding: 24px; overflow: auto; }
+/* #163: contenedor de scroll propio (como .content), para que la barra de
+   filtros sticky de Mis Tareas se apile correctamente sobre la tabla. */
+.usuarios-wrap { flex: 1; min-height: 0; padding: 24px; overflow: auto; }
 .usuarios-cabecera { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
 .usuarios-cabecera h2 { margin: 0 0 4px; font-size: 18px; }
 .usuarios-sub { margin: 0; font-size: 12.5px; color: var(--gris-texto); }
@@ -1435,16 +1458,16 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 }
 .nav-frente--activo .nav-frente__count--alerta { background: var(--naranja); color: #fff; }
 
-/* #142/#161: chevron de colapso, a la derecha del título. Más grande y con
-   aire de control (fondo redondeado al pasar el cursor) para que se lea como
-   una flecha, no como un adorno. */
+/* #142/#161/#176: chevron de colapso, a la derecha del título. Grande y con
+   área de clic cómoda (≈28–32px) para que se lea y se pulse como un control. */
 .colapso-btn {
-  border: none; background: var(--superficie-3); color: var(--gris-texto); cursor: pointer;
-  font-size: 15px; line-height: 1; padding: 3px 8px; border-radius: 6px;
+  border: 1px solid var(--gris-linea); background: var(--superficie-3); color: var(--gris-texto); cursor: pointer;
+  font-size: 18px; line-height: 1; border-radius: 7px;
+  min-width: 30px; height: 28px; padding: 0 6px;
   display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
 }
-.colapso-btn:hover { color: var(--texto); background: var(--velo-fuerte); }
-.frente-cabecera .colapso-btn { font-size: 17px; padding: 4px 10px; }
+.colapso-btn:hover { color: var(--texto); background: var(--velo-fuerte); border-color: var(--gris-borde); }
+.frente-cabecera .colapso-btn { font-size: 22px; min-width: 34px; height: 32px; }
 
 /* #157: fila resaltada al llegar desde una notificación. Realce EVIDENTE que
    se desvanece en ~3 s (arranca con un destello dorado + barra lateral). */
@@ -1467,11 +1490,10 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   font-size: 12.5px; color: var(--gris-texto); cursor: pointer;
 }
 
-/* #135: columna de proyectos de solo lectura (ancho y alto fijos, chips que
-   caben + "+N" con popover). */
-.col-proy { width: 260px; max-width: 260px; }
-.usuarios-tabla td.col-proy { height: 46px; }
-.proy-col { display: flex; align-items: center; gap: 6px; overflow: hidden; }
+/* #154/#170: columna de proyectos = solo un número, angosta como "Miembros".
+   Homologada con Proyectos: filas delgadas (sin alto fijo grande). */
+.col-proy { width: 92px; max-width: 92px; }
+.proy-col { display: flex; align-items: center; gap: 6px; overflow: visible; }
 .asignacion--ro { max-width: 118px; }
 .asignacion__nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .proy-mas { position: relative; flex: none; }
@@ -1534,10 +1556,28 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 .icon-btn:disabled { opacity: .35; cursor: default; }
 .icon-btn:disabled:hover { background: none; color: var(--gris-texto); }
 
-/* #147: chip MIEMBRO, mismo trato que DUEÑO pero color propio para
-   distinguirlos (un dueño también es miembro). */
+/* #147/#165: chip MIEMBRO, mismo trato que DUEÑO pero color propio. */
 .chip-miembro { background: #3f6a8a; color: #fff; }
 [data-tema='oscuro'] .chip-miembro { background: #2f5578; }
+
+/* #166: columna Acciones de ancho fijo, para que mostrar/ocultar archivados
+   (o desactivados, #170) no mueva la geometría de la tabla. */
+.usuarios-tabla .col-acc { width: 148px; white-space: nowrap; }
+
+/* #175: el menú de Vistas no recorta los tooltips data-tip (overflow visible);
+   así el globo aparece completo y con la misma inmediatez que el resto. La
+   lista de vistas es corta, no necesita scroll. */
+.filtro-menu--derecha { overflow: visible; }
+
+/* #177: encabezado de frente / sub frente plegado — conserva su borde inferior
+   para verse como un bloque cerrado, no "abierto" contra el fondo. */
+.frente-cabecera--colapsado {
+  border-bottom: 1px solid var(--gris-borde); padding-bottom: 8px; margin-bottom: 8px;
+}
+.subfrente__titulo--colapsado { border-bottom: 1px solid var(--gris-borde); border-radius: 8px; }
+
+/* #169: acciones del encabezado del módulo (filtro + botón crear). */
+.usuarios-cabecera__acciones { display: flex; align-items: center; gap: 16px; }
 
 /* #154: la celda de proyectos es un número clickeable centrado. */
 .proy-num { min-width: 34px; text-align: center; }

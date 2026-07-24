@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { AppState, Proyecto, Usuario } from '../types'
 import type { Actions } from '../App'
-import { esDuenoDe, puedeEditarProyecto, puedeEliminarProyecto } from '../lib/permisos'
+import { esDuenoDe, puedeCrearProyectos, puedeEditarProyecto, puedeEliminarProyecto } from '../lib/permisos'
 import { ProyectoModal } from './ProyectoModal'
 import { MiembrosModal } from './MiembrosModal'
 
@@ -22,6 +22,7 @@ interface Props {
 }
 
 type ModalState =
+  | { tipo: 'nuevo' }
   | { tipo: 'editar'; proyecto: Proyecto }
   | { tipo: 'miembros'; proyecto: Proyecto }
   | null
@@ -37,14 +38,17 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
     .slice()
     .sort((a, b) => a.nombre.localeCompare(b.nombre))
 
-  // #151: el conteo incluye al dueño (que no tiene fila en acceso_proyecto).
+  // #167: el conteo son SOLO usuarios activos (accesos de activos + dueño si
+  // está activo). Los desactivados/eliminados no cuentan ni aparecen en el
+  // modal de Miembros.
+  const activos = new Set(state.usuarios.filter((u) => u.activo).map((u) => u.id))
   const nMiembros = (p: Proyecto) =>
-    state.accesos.filter((a) => a.proyectoId === p.id).length + (p.duenoId ? 1 : 0)
+    state.accesos.filter((a) => a.proyectoId === p.id && activos.has(a.usuarioId)).length +
+    (p.duenoId && activos.has(p.duenoId) ? 1 : 0)
 
-  // #147: ¿la sesión es miembro (dueño o con acceso)? Marca el chip y decide
-  // unirse/salirse.
-  const esMiembro = (p: Proyecto) =>
-    esDuenoDe(state, sesion, p.id) ||
+  // Relación de la sesión con un proyecto (#165, pills excluyentes).
+  const soyDueno = (p: Proyecto) => esDuenoDe(state, sesion, p.id)
+  const soyMiembro = (p: Proyecto) =>
     state.accesos.some((a) => a.usuarioId === sesion.id && a.proyectoId === p.id)
 
   async function archivar(p: Proyecto) {
@@ -66,19 +70,22 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
     }
   }
 
-  function unirseSalirse(p: Proyecto) {
-    if (esMiembro(p)) actions.quitarAcceso(sesion.id, p.id)
-    else actions.asignarAcceso(sesion.id, p.id)
-  }
-
   return (
     <div className="usuarios-wrap">
       <div className="usuarios-cabecera">
         <h2>Proyectos</h2>
-        <label className="proy-filtro">
-          <input type="checkbox" checked={verArchivados} onChange={(e) => setVerArchivados(e.target.checked)} />
-          Ver archivados
-        </label>
+        <div className="usuarios-cabecera__acciones">
+          <label className="proy-filtro">
+            <input type="checkbox" checked={verArchivados} onChange={(e) => setVerArchivados(e.target.checked)} />
+            Ver archivados
+          </label>
+          {/* #169: botón de crear, homologado con "+ Usuario". */}
+          {puedeCrearProyectos(sesion) && (
+            <button className="btn btn--primary" onClick={() => setModal({ tipo: 'nuevo' })}>
+              + Proyecto
+            </button>
+          )}
+        </div>
       </div>
 
       {lista.length === 0 ? (
@@ -100,16 +107,18 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
               const puedeEditar = puedeEditarProyecto(state, sesion, p.id)
               const puedeArchivarEliminar = puedeEliminarProyecto(state, sesion, p.id)
               const archivado = p.estado === 'archivado'
-              const miembro = esMiembro(p)
-              const soyDueno = esDuenoDe(state, sesion, p.id)
               return (
                 <tr key={p.id} className={archivado ? 'usuario-inactivo' : ''}>
                   <td>
                     <span className="usuario-nombre">
                       <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
                       {p.nombre}
-                      {/* #147: chip MIEMBRO, mismo trato visual que DUEÑO. */}
-                      {miembro && <span className="chip-dueno chip-miembro">Miembro</span>}
+                      {/* #165: DUEÑO / MIEMBRO excluyentes, o nada. */}
+                      {soyDueno(p) ? (
+                        <span className="chip-dueno">Dueño</span>
+                      ) : soyMiembro(p) ? (
+                        <span className="chip-dueno chip-miembro">Miembro</span>
+                      ) : null}
                     </span>
                   </td>
                   <td>{dueno ? dueno.nombre : <span className="usuarios-sin">—</span>}</td>
@@ -119,50 +128,20 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
                       {archivado ? 'Archivado' : 'Activo'}
                     </span>
                   </td>
+                  {/* #166: en archivado solo aparecen 📦 y 🗑 (los demás no se
+                      renderizan, no se atenúan). La columna tiene ancho fijo
+                      (CSS) para que mostrar archivados no mueva la geometría. */}
                   <td className="col-acc">
-                    {/* #150: sobre un proyecto archivado solo tienen sentido
-                        desarchivar y eliminar; editar/miembros/unirse quedan
-                        deshabilitados (atenuados). #148: tooltips con data-tip. */}
-                    {puedeEditar && (
-                      <button
-                        className="icon-btn"
-                        data-tip="Editar proyecto"
-                        disabled={archivado}
-                        onClick={() => setModal({ tipo: 'editar', proyecto: p })}
-                      >
-                        ✎
-                      </button>
+                    {!archivado && puedeEditar && (
+                      <button className="icon-btn" data-tip="Editar proyecto" onClick={() => setModal({ tipo: 'editar', proyecto: p })}>✎</button>
                     )}
-                    {(esAdmin || soyDueno) && (
-                      <button
-                        className="icon-btn"
-                        data-tip="Miembros"
-                        disabled={archivado}
-                        onClick={() => setModal({ tipo: 'miembros', proyecto: p })}
-                      >
-                        👥
-                      </button>
+                    {!archivado && (esAdmin || soyDueno(p)) && (
+                      <button className="icon-btn" data-tip="Miembros" onClick={() => setModal({ tipo: 'miembros', proyecto: p })}>👥</button>
                     )}
-                    {/* #147: unirse/salirse (afecta la barra lateral). El dueño
-                        siempre es miembro y no puede salirse. */}
-                    <button
-                      className="icon-btn"
-                      data-tip={soyDueno ? 'El dueño siempre es miembro' : miembro ? 'Salir del proyecto' : 'Unirme al proyecto'}
-                      disabled={archivado || soyDueno}
-                      onClick={() => unirseSalirse(p)}
-                    >
-                      {miembro ? '🚪' : '➕'}
-                    </button>
                     {puedeArchivarEliminar && (
-                      <button
-                        className="icon-btn"
-                        data-tip={archivado ? 'Desarchivar' : 'Archivar'}
-                        onClick={() => archivar(p)}
-                      >
-                        📦
-                      </button>
+                      <button className="icon-btn" data-tip={archivado ? 'Desarchivar' : 'Archivar'} onClick={() => archivar(p)}>📦</button>
                     )}
-                    {puedeArchivarEliminar && archivado && (
+                    {archivado && puedeArchivarEliminar && (
                       <button className="icon-btn" data-tip="Eliminar (definitivo)" onClick={() => eliminar(p)}>🗑</button>
                     )}
                   </td>
@@ -173,6 +152,9 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
         </table>
       )}
 
+      {modal?.tipo === 'nuevo' && (
+        <ProyectoModal onSubmit={(d) => actions.createProyecto(d)} onClose={() => setModal(null)} />
+      )}
       {modal?.tipo === 'editar' && (
         <ProyectoModal
           proyecto={modal.proyecto}
