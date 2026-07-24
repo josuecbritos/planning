@@ -65,8 +65,14 @@ orden** el contenido de:
     activo/archivado con gate por permiso (#133); `usuario.eliminado` +
     `usuario_visible` lo filtra + RPC `crear_o_reactivar_usuario` (#136); tabla
     `notificacion` + RLS por dueño + triggers que la generan (#137)
+17. `supabase/migrations/20260707000017_delete_solo_archivado.sql` — endurece
+    `proyecto_delete`: solo se puede eliminar un proyecto **archivado** (la
+    restricción "archivar primero" ahora vive en la base, no solo en la UI)
 
-*(Alternativa con CLI: `supabase link --project-ref TU_REF && supabase db push`.)*
+*(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
+o `brew install supabase/tap/supabase`— y luego
+`supabase link --project-ref TU_REF && supabase db push`. Todo el esquema puede
+aplicarse también desde el SQL Editor del panel, sin CLI.)*
 
 ## Paso 3 — Crear los usuarios iniciales
 
@@ -76,18 +82,39 @@ poniendo los **emails reales** que usarán para entrar. Luego ejecuta el seed en
 el SQL Editor (o `supabase db reset` con CLI, que aplica migraciones + seed).
 
 > Si prefieres partir sin datos de ejemplo, ejecuta solo los `insert into usuario`
-> y `acceso_cliente_proyecto` del seed y omite proyecto/frentes/tareas.
+> y `acceso_proyecto` del seed y omite proyecto/frentes/tareas.
 > Si ya ejecutaste el seed con los emails placeholder, corrígelos con:
 > `update usuario set email = 'tu@email.real' where email = 'jb@consultora.cl';`
 
 Después, en el panel → **Authentication → Users → Add user → Create new user**:
 
-- Crea una cuenta por cada usuario, con el **mismo email** que quedó en la tabla
-  `usuario` y una contraseña.
+- Crea una cuenta por cada admin inicial, con el **mismo email** que quedó en la
+  tabla `usuario` y una contraseña.
 - Marca **Auto Confirm User** para no depender del correo de confirmación.
 
-Al primer inicio de sesión, el trigger `vincular_usuario_auth` enlaza
-automáticamente la cuenta de Auth con la fila de `usuario` (por email).
+**Enlazar el primer admin (bootstrap).** Desde la migración 14, el trigger
+`vincular_usuario_auth` solo enlaza una cuenta de Auth con su fila de `usuario`
+si existe una **invitación consumida** (endurecimiento de seguridad: nadie entra
+sin haber sido invitado). Los admins iniciales del seed **no** tienen invitación,
+así que hay que enlazarlos **a mano una sola vez**. En el **SQL Editor**, después
+de crear sus cuentas de Auth, ejecuta:
+
+```sql
+-- Bootstrap: enlaza los admins iniciales (sin invitación previa) con su cuenta
+-- de Auth por email. Solo para el arranque; el resto de usuarios entra por el
+-- flujo de invitación (Módulo de Usuarios → ✉).
+update usuario u
+set auth_id = a.id
+from auth.users a
+where a.email = u.email
+  and u.auth_id is null
+  and u.rol = 'admin';
+```
+
+Verifica que quedaron enlazados: `select email, auth_id from usuario where rol = 'admin';`
+(los `auth_id` no deben ser nulos). A partir de aquí esos admins pueden entrar, y
+los demás usuarios se dan de alta **por invitación** desde el Módulo de Usuarios
+(su enlace auth↔usuario se resuelve solo al aceptar la invitación).
 
 ## Paso 4 — Cerrar el registro público (importante)
 
@@ -159,7 +186,8 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
 1. **Cuenta en [Resend](https://resend.com)** (capa gratuita: 100 correos/día):
    crea una API key y verifica tu dominio remitente (o usa `onboarding@resend.dev`
    para pruebas).
-2. **Desplegar las funciones** (con la CLI de Supabase):
+2. **Desplegar las funciones** (con la CLI de Supabase; instálala con
+   `npm i -g supabase` si aún no la tienes):
    ```bash
    supabase functions deploy invitar-usuario
    supabase functions deploy aceptar-invitacion --no-verify-jwt
@@ -171,6 +199,9 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
      EMAIL_FROM="Andotek Planning <planning@tudominio.cl>" \
      SITE_URL=https://planning-andotek.vercel.app
    ```
+   > `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` los usa el código de las
+   > funciones, pero **Supabase los inyecta automáticamente** en el entorno de
+   > las Edge Functions: no hace falta configurarlos a mano.
 4. Desde el Módulo de Usuarios, el botón ✉ envía (o reenvía) la invitación a
    cualquier usuario activo que aún no tenga cuenta.
 

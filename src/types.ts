@@ -128,7 +128,8 @@ export interface Tarea {
   /**
    * Fecha vigente. La tarea NACE SIN FECHA; la primera fecha asignada fija
    * tambien fechaOriginal (sin historial). Los cambios posteriores generan
-   * una Replanificacion. Nunca cae en fin de semana.
+   * una Replanificacion. Se permiten fechas de fin de semana (el anclaje a
+   * dia habil se retiro en la migracion 7 / estados v2).
    */
   fechaObjetivo?: ISODate
   /** Compromiso inicial: la PRIMERA fecha asignada. Inmutable desde entonces. */

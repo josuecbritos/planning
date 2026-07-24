@@ -43,7 +43,8 @@ export type FrenteSel = string | 'todos'
 export type Pantalla = 'proyectos' | 'usuarios' | 'mipanel' | 'resumen' | 'admin-proyectos' | 'notificaciones'
 /** Modos de la barra lateral (punto 6): fija (default) o escondida. */
 export type SidebarModo = 'fija' | 'escondida'
-/** Tema de la interfaz (punto 4): manual, no sigue al sistema operativo. */
+/** Tema de la interfaz (punto 4): sigue `prefers-color-scheme` del sistema por
+ * defecto, con override manual persistente por usuario. */
 export type Tema = 'claro' | 'oscuro'
 
 /** Acciones expuestas a los componentes. Todas persisten via Repo. */
