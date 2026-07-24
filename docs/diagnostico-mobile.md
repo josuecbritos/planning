@@ -129,8 +129,8 @@ media query**. Es la misma causa raíz en dos lugares.
 
 ### C3.a — Panel de notificaciones: inutilizable
 
-CSS: `position: fixed; top: 60px; **left: 240px**; width: 360px; max-width: 92vw`.
-Ese `left: 240px` es el ancho del sidebar **de desktop**, escrito a mano.
+CSS: `position: fixed; top: 60px; left: 240px; width: 360px; max-width: 92vw`.
+Ese **`left: 240px` es el ancho del sidebar de desktop**, escrito a mano.
 
 | Métrica (390×844) | Valor |
 | --- | --- |
