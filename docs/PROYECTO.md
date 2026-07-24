@@ -110,6 +110,9 @@ son solo usuarios **activos** (#167). "Ver archivados" **suma** los archivados;
 sobre un proyecto archivado solo aparecen desarchivar y eliminar (#166). El
 módulo de **Usuarios** está homologado con este: filas delgadas, mismos iconos y
 un checkbox **"Ver desactivados"** que por defecto muestra solo activos (#170).
+Ambas tablas comparten la **fila delgada** de Proyectos: es Usuarios el que
+adelgaza su contenido (avatar, chips y número de proyectos), no Proyectos el que
+engorda (#185).
 
 En la barra lateral, hacer clic en un proyecto abre directamente **todos sus
 frentes**; editar y archivar viven en un menú **⋯** junto al nombre (#178).
@@ -118,11 +121,14 @@ frentes**; editar y archivar viven en un menú **⋯** junto al nombre (#178).
 replanificaron o comentaron (nunca por acciones propias). Entrada en la barra
 con contador naranja si hay sin leer; el panel emergente muestra las últimas,
 marca todo como leído **al cerrarlo** (#156, para no perder de vista lo nuevo
-mientras se lee), y el clic navega a la tarea (la **resalta con un realce que se
-desvanece** y abre su detalle; si un filtro la excluye, permanece visible hasta
-navegar o "Actualizar vista", #157/#158). Con la barra contraída, una **campana
-fija** con el contador abre el mismo panel (#159). Las genera la base, no el
-cliente.
+mientras se lee), y el clic navega a la tarea (la **resalta** y abre su detalle;
+si un filtro la excluye, permanece visible hasta navegar o "Actualizar vista",
+#157/#158). El realce **no usa el fondo de la fila** —chocaba con el color de
+categoría (verde/ámbar/rojo/morado), justo las que llegan por notificación—:
+atenúa el resto de las filas y dibuja un **contorno naranja** alrededor de la
+tarea, legible sobre cualquier categoría y en ambos temas (#186). Con la barra
+contraída, una **campana fija** con el contador abre el mismo panel (#159). Las
+genera la base, no el cliente.
 
 **Baja de usuarios (#136):** eliminar = desactivar + invisible (sin borrado
 físico, para no huérfanar el historial). Dar de alta el mismo correo reactiva la
