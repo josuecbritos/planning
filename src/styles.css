@@ -990,8 +990,14 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .nav-proyecto:hover .nav-proyecto__menu-btn,
 .nav-proyecto--activo .nav-proyecto__menu-btn { visibility: visible; }
 .nav-proyecto__menu-btn:hover { color: #fff; background: #27272a; }
+/* #184: popover flotante (portal fijo, a la derecha del ⋯), sobre el
+   contenido — no ocupa lugar dentro del sidebar. */
+.nav-proyecto__menu--portal {
+  z-index: 2600; min-width: 168px;
+  box-shadow: 0 12px 32px rgba(10, 10, 12, .45);
+}
 .nav-proyecto__menu {
-  display: flex; flex-direction: column; margin: 2px 8px 6px 30px;
+  display: flex; flex-direction: column;
   background: #27272a; border: 1px solid #3f3f46; border-radius: 8px; overflow: hidden;
 }
 .nav-proyecto__menu-op {
@@ -1103,13 +1109,39 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 /* #163: contenedor de scroll propio (como .content), para que la barra de
    filtros sticky de Mis Tareas se apile correctamente sobre la tabla. */
-.usuarios-wrap { flex: 1; min-height: 0; padding: 24px; overflow: auto; }
-.usuarios-cabecera { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+/* #163/#180: contenedor de scroll propio SIN padding superior. La barra de
+   filtros sticky (top:0) queda flush con el tope del scroll — con padding-top
+   se quedaba 24px más abajo y las filas asomaban por ese hueco, por encima de
+   la barra. El aire superior lo pone el encabezado. */
+.usuarios-wrap { flex: 1; min-height: 0; padding: 0 24px 24px; overflow: auto; }
+.usuarios-cabecera { display: flex; justify-content: space-between; align-items: flex-start; padding-top: 24px; margin-bottom: 18px; }
 .usuarios-cabecera h2 { margin: 0 0 4px; font-size: 18px; }
 .usuarios-sub { margin: 0; font-size: 12.5px; color: var(--gris-texto); }
-.usuarios-tabla td { vertical-align: middle; }
+/* #181: ancho de columnas fijo (table-layout) → mostrar/ocultar archivados o
+   desactivados NO mueve ninguna columna. Las columnas con nombre/email
+   truncan con elipsis; la de proyectos y la de acciones no recortan (llevan
+   popover / iconos). */
+.usuarios-tabla { table-layout: fixed; }
+.usuarios-tabla td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usuarios-tabla td.col-proy, .usuarios-tabla td.col-acc { overflow: visible; }
+.col-estado-adm { width: 112px; }
+.col-mini { width: 92px; }
+.col-rol { width: 116px; }
+.col-dueno { width: 160px; }
+.col-email { width: 230px; }
+/* #183: misma altura de fila en ambos módulos de Administración; iconos
+   monocromos (grayscale) para un solo lenguaje visual. */
+.usuarios-tabla td { vertical-align: middle; height: 40px; }
+.usuarios-tabla .resp-badge { width: 24px; height: 24px; }
+.usuarios-tabla .col-acc .icon-btn { filter: grayscale(1); }
 .usuario-nombre { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; }
-.usuario-inactivo { opacity: .55; }
+/* #181: una fila archivada/desactivada se ve atenuada por COLOR, no por
+   opacity — así los iconos de acción (📦/🗑, ↺/🗑) quedan plenos y operables
+   (opacity en la fila arrastraría también a los iconos). */
+.usuario-inactivo > td { color: var(--gris-texto); }
+.usuario-inactivo .usuario-nombre { color: var(--gris-texto); font-weight: 500; }
+.usuario-inactivo .col-acc .icon-btn { color: var(--gris-texto); }
+.usuario-inactivo .col-acc .icon-btn:hover { color: var(--texto); background: var(--velo-fuerte); }
 .chip-yo {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
   background: var(--gris-linea); color: var(--gris-texto); border-radius: 5px; padding: 2px 6px;
@@ -1306,7 +1338,9 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .resumen-card__head { display: flex; align-items: center; gap: 9px; }
 .resumen-card__nombre { font-weight: 700; font-size: 14.5px; flex: 1; }
 .resumen-card__desc { margin: 0; font-size: 12.5px; color: var(--gris-texto); }
-.chip-estado { font-size: 10.5px; font-weight: 700; border-radius: 5px; padding: 2px 8px; text-transform: uppercase; letter-spacing: .03em; }
+/* #181: ancho fijo dimensionado para "ARCHIVADO" → mostrar/ocultar archivados
+   no ensancha la columna Estado ni mueve la tabla. */
+.chip-estado { display: inline-block; box-sizing: border-box; min-width: 78px; text-align: center; font-size: 10.5px; font-weight: 700; border-radius: 5px; padding: 2px 8px; text-transform: uppercase; letter-spacing: .03em; }
 .chip-estado--activo { background: var(--verde-suave); color: var(--verde-check); }
 .chip-estado--archivado { background: var(--gris-linea); color: var(--gris-texto); }
 
@@ -1493,7 +1527,7 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 /* #154/#170: columna de proyectos = solo un número, angosta como "Miembros".
    Homologada con Proyectos: filas delgadas (sin alto fijo grande). */
 .col-proy { width: 92px; max-width: 92px; }
-.proy-col { display: flex; align-items: center; gap: 6px; overflow: visible; }
+.proy-col { position: relative; display: flex; align-items: center; gap: 6px; overflow: visible; }
 .asignacion--ro { max-width: 118px; }
 .asignacion__nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .proy-mas { position: relative; flex: none; }
@@ -1579,8 +1613,13 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 /* #169: acciones del encabezado del módulo (filtro + botón crear). */
 .usuarios-cabecera__acciones { display: flex; align-items: center; gap: 16px; }
 
-/* #154: la celda de proyectos es un número clickeable centrado. */
-.proy-num { min-width: 34px; text-align: center; }
+/* #154/#183: número PLANO (sin círculo), como "Miembros" en Proyectos, pero
+   clickeable (abre el popover). */
+.proy-num {
+  border: none; background: none; color: var(--texto); font: inherit; font-weight: 600;
+  cursor: pointer; padding: 2px 4px; border-radius: 4px;
+}
+.proy-num:hover { text-decoration: underline; color: var(--primario); background: none; }
 
 /* #159: campana fija en la barra contraída (mismo lugar que Notificaciones en
    la barra desplegada: primera, bajo el logo), con el contador naranja. */
@@ -1708,7 +1747,8 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .comentarios-chip { font-size: 9px; display: inline-block; vertical-align: middle; margin-left: 4px; }
 
   /* ---------- 8.2 Mis Tareas: cinco columnas, ruta completa ---------- */
-  .usuarios-wrap { padding: 12px; }
+  .usuarios-wrap { padding: 0 12px 12px; }
+  .usuarios-cabecera { padding-top: 12px; }
   .mistareas .col-proyecto { display: none; }
   .ruta-proy { display: inline; }
   .mistareas .col-ruta { width: 84px; }

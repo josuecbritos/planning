@@ -95,9 +95,9 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
           <thead>
             <tr>
               <th>Proyecto</th>
-              <th>Dueño</th>
-              <th>Miembros</th>
-              <th>Estado</th>
+              <th className="col-dueno">Dueño</th>
+              <th className="col-mini">Miembros</th>
+              <th className="col-estado-adm">Estado</th>
               <th className="col-acc">Acciones</th>
             </tr>
           </thead>
