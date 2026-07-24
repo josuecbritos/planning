@@ -7,12 +7,16 @@ import { MiembrosModal } from './MiembrosModal'
 
 // Administración → Proyectos (#132). Reparto: este módulo es dueño de la
 // relación usuario↔proyecto (miembros, 🔑) y del ciclo de vida del proyecto
-// (editar, archivar #133, eliminar #134). Trabaja sobre los proyectos de los
-// que el usuario es miembro (misma visibilidad de siempre).
+// (editar, archivar #133, eliminar #134).
+//
+// #146: administrar ≠ ser miembro. El admin ve y administra TODOS los
+// proyectos (sea o no miembro); su barra lateral y Resumen/Mis Tareas siguen
+// mostrando solo donde es miembro. El consultor ve los suyos (dueño + asignados).
 
 interface Props {
   state: AppState
-  proyectos: Proyecto[] // proyectos miembro (incluye archivados)
+  /** Proyectos administrables: admin = todos; consultor = dueño + asignados. */
+  proyectos: Proyecto[]
   sesion: Usuario
   actions: Actions
 }
@@ -24,15 +28,24 @@ type ModalState =
 
 export function AdminProyectosView({ state, proyectos, sesion, actions }: Props) {
   const [modal, setModal] = useState<ModalState>(null)
+  // #149: la casilla SUMA los archivados a la lista, no reemplaza.
   const [verArchivados, setVerArchivados] = useState(false)
 
   const esAdmin = sesion.rol === 'admin'
   const lista = proyectos
-    .filter((p) => (verArchivados ? p.estado === 'archivado' : p.estado !== 'archivado'))
+    .filter((p) => verArchivados || p.estado !== 'archivado')
     .slice()
     .sort((a, b) => a.nombre.localeCompare(b.nombre))
 
-  const nMiembros = (p: Proyecto) => state.accesos.filter((a) => a.proyectoId === p.id).length
+  // #151: el conteo incluye al dueño (que no tiene fila en acceso_proyecto).
+  const nMiembros = (p: Proyecto) =>
+    state.accesos.filter((a) => a.proyectoId === p.id).length + (p.duenoId ? 1 : 0)
+
+  // #147: ¿la sesión es miembro (dueño o con acceso)? Marca el chip y decide
+  // unirse/salirse.
+  const esMiembro = (p: Proyecto) =>
+    esDuenoDe(state, sesion, p.id) ||
+    state.accesos.some((a) => a.usuarioId === sesion.id && a.proyectoId === p.id)
 
   async function archivar(p: Proyecto) {
     const archivar = p.estado !== 'archivado'
@@ -53,6 +66,11 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
     }
   }
 
+  function unirseSalirse(p: Proyecto) {
+    if (esMiembro(p)) actions.quitarAcceso(sesion.id, p.id)
+    else actions.asignarAcceso(sesion.id, p.id)
+  }
+
   return (
     <div className="usuarios-wrap">
       <div className="usuarios-cabecera">
@@ -64,7 +82,7 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
       </div>
 
       {lista.length === 0 ? (
-        <p className="vacio-inline">{verArchivados ? 'No hay proyectos archivados.' : 'No hay proyectos activos.'}</p>
+        <p className="vacio-inline">No hay proyectos.</p>
       ) : (
         <table className="tareas usuarios-tabla">
           <thead>
@@ -73,7 +91,7 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
               <th>Dueño</th>
               <th>Miembros</th>
               <th>Estado</th>
-              <th className="col-acc"></th>
+              <th className="col-acc">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -82,12 +100,16 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
               const puedeEditar = puedeEditarProyecto(state, sesion, p.id)
               const puedeArchivarEliminar = puedeEliminarProyecto(state, sesion, p.id)
               const archivado = p.estado === 'archivado'
+              const miembro = esMiembro(p)
+              const soyDueno = esDuenoDe(state, sesion, p.id)
               return (
                 <tr key={p.id} className={archivado ? 'usuario-inactivo' : ''}>
                   <td>
                     <span className="usuario-nombre">
                       <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
                       {p.nombre}
+                      {/* #147: chip MIEMBRO, mismo trato visual que DUEÑO. */}
+                      {miembro && <span className="chip-dueno chip-miembro">Miembro</span>}
                     </span>
                   </td>
                   <td>{dueno ? dueno.nombre : <span className="usuarios-sin">—</span>}</td>
@@ -98,23 +120,50 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
                     </span>
                   </td>
                   <td className="col-acc">
+                    {/* #150: sobre un proyecto archivado solo tienen sentido
+                        desarchivar y eliminar; editar/miembros/unirse quedan
+                        deshabilitados (atenuados). #148: tooltips con data-tip. */}
                     {puedeEditar && (
-                      <button className="icon-btn" title="Editar" onClick={() => setModal({ tipo: 'editar', proyecto: p })}>✎</button>
+                      <button
+                        className="icon-btn"
+                        data-tip="Editar proyecto"
+                        disabled={archivado}
+                        onClick={() => setModal({ tipo: 'editar', proyecto: p })}
+                      >
+                        ✎
+                      </button>
                     )}
-                    {(esAdmin || esDuenoDe(state, sesion, p.id)) && (
-                      <button className="icon-btn" title="Miembros" onClick={() => setModal({ tipo: 'miembros', proyecto: p })}>👥</button>
+                    {(esAdmin || soyDueno) && (
+                      <button
+                        className="icon-btn"
+                        data-tip="Miembros"
+                        disabled={archivado}
+                        onClick={() => setModal({ tipo: 'miembros', proyecto: p })}
+                      >
+                        👥
+                      </button>
                     )}
+                    {/* #147: unirse/salirse (afecta la barra lateral). El dueño
+                        siempre es miembro y no puede salirse. */}
+                    <button
+                      className="icon-btn"
+                      data-tip={soyDueno ? 'El dueño siempre es miembro' : miembro ? 'Salir del proyecto' : 'Unirme al proyecto'}
+                      disabled={archivado || soyDueno}
+                      onClick={() => unirseSalirse(p)}
+                    >
+                      {miembro ? '🚪' : '➕'}
+                    </button>
                     {puedeArchivarEliminar && (
                       <button
                         className="icon-btn"
-                        title={archivado ? 'Desarchivar' : 'Archivar'}
+                        data-tip={archivado ? 'Desarchivar' : 'Archivar'}
                         onClick={() => archivar(p)}
                       >
                         📦
                       </button>
                     )}
                     {puedeArchivarEliminar && archivado && (
-                      <button className="icon-btn" title="Eliminar (definitivo)" onClick={() => eliminar(p)}>🗑</button>
+                      <button className="icon-btn" data-tip="Eliminar (definitivo)" onClick={() => eliminar(p)}>🗑</button>
                     )}
                   </td>
                 </tr>

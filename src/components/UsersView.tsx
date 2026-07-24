@@ -269,7 +269,14 @@ function UsuarioFila({
           <button
             className="icon-btn"
             title={usuario.activo ? 'Desactivar' : 'Reactivar'}
-            onClick={() => actions.updateUsuario(usuario.id, { activo: !usuario.activo })}
+            onClick={() => {
+              // #155: desactivar deja a alguien fuera de la app; confirmar
+              // (igual que eliminar). Reactivar también confirma.
+              const msg = usuario.activo
+                ? `¿Desactivar a "${usuario.nombre}"? No podrá entrar a la aplicación hasta reactivarlo.`
+                : `¿Reactivar a "${usuario.nombre}"? Volverá a tener acceso.`
+              if (confirm(msg)) actions.updateUsuario(usuario.id, { activo: !usuario.activo })
+            }}
           >
             {usuario.activo ? '⏻' : '↺'}
           </button>
@@ -298,9 +305,9 @@ function UsuarioFila({
   )
 }
 
-// #135: celda de proyectos de solo lectura. Muestra los primeros chips y, si
-// hay más, un "+N" que abre un popover con la lista completa y el enlace a la
-// gestión (Administración → Proyectos).
+// #154: celda de proyectos = SOLO el número, clickeable, que abre un popover
+// con la lista completa en lectura (mismo patrón que "Miembros" en la tabla de
+// Proyectos). Sin chips truncados, sin chip DUEÑO en la celda, sin "+N".
 function ProyectosCell({
   items,
   onIrAProyectos,
@@ -310,7 +317,6 @@ function ProyectosCell({
 }) {
   const [abierto, setAbierto] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const MAX_VISIBLES = 2
 
   useEffect(() => {
     if (!abierto) return
@@ -324,35 +330,32 @@ function ProyectosCell({
     }
   }, [abierto])
 
-  if (items.length === 0) return <span className="usuarios-sin">Sin proyectos</span>
-
-  const visibles = items.slice(0, MAX_VISIBLES)
-  const resto = items.slice(MAX_VISIBLES)
-
-  const chip = ({ p, dueno }: { p: Proyecto; dueno: boolean }) => (
-    <span key={p.id} className="asignacion asignacion--ro" title={p.nombre}>
-      <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
-      <span className="asignacion__nombre">{p.nombre}</span>
-      {dueno && <span className="chip-dueno">Dueño</span>}
-    </span>
-  )
+  if (items.length === 0) return <span className="usuarios-sin">0</span>
 
   return (
     <div className="proy-col" ref={ref}>
-      {visibles.map(chip)}
-      {resto.length > 0 && (
-        <div className="proy-mas">
-          <button className="chip-mas" onClick={() => setAbierto((v) => !v)} aria-expanded={abierto}>
-            +{resto.length}
+      <button
+        className="chip-mas proy-num"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        title="Ver proyectos"
+      >
+        {items.length}
+      </button>
+      {abierto && (
+        <div className="proy-pop" role="dialog">
+          <div className="proy-pop__lista">
+            {items.map(({ p, dueno }) => (
+              <span key={p.id} className="asignacion asignacion--ro" title={p.nombre}>
+                <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
+                <span className="asignacion__nombre">{p.nombre}</span>
+                {dueno && <span className="chip-dueno">Dueño</span>}
+              </span>
+            ))}
+          </div>
+          <button className="link-btn" onClick={onIrAProyectos}>
+            Gestionar en Proyectos →
           </button>
-          {abierto && (
-            <div className="proy-pop" role="dialog">
-              <div className="proy-pop__lista">{items.map(chip)}</div>
-              <button className="link-btn" onClick={onIrAProyectos}>
-                Gestionar en Proyectos →
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>

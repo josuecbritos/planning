@@ -29,6 +29,8 @@ interface Props {
   onNotificaciones: () => void
   /** "+" de proyectos: admin o consultor con permiso crearProyectos. */
   puedeCrearProyecto: boolean
+  /** #153: cuántos proyectos ve el usuario en Administración → Proyectos. */
+  nProyectosAdmin: number
   can: Can
   usuario: Usuario
   /** Punto 6: modo actual de la barra (fija / escondida) y su alternador. */
@@ -63,6 +65,7 @@ export function Sidebar({
   notifAbierto,
   onNotificaciones,
   puedeCrearProyecto,
+  nProyectosAdmin,
   can,
   usuario,
   sidebarModo,
@@ -248,6 +251,8 @@ export function Sidebar({
               onClick={() => onSelectPantalla('admin-proyectos')}
             >
               <span>Proyectos</span>
+              {/* #153: contador con el mismo patrón que Usuarios. */}
+              <span className="nav-frente__count">{nProyectosAdmin}</span>
             </button>
           </div>
         </>

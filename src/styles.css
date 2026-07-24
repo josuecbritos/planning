@@ -1435,19 +1435,30 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 }
 .nav-frente--activo .nav-frente__count--alerta { background: var(--naranja); color: #fff; }
 
-/* #142: chevron de colapso de frentes y sub frentes. */
+/* #142/#161: chevron de colapso, a la derecha del título. Más grande y con
+   aire de control (fondo redondeado al pasar el cursor) para que se lea como
+   una flecha, no como un adorno. */
 .colapso-btn {
-  border: none; background: none; color: var(--gris-texto); cursor: pointer;
-  font-size: 11px; line-height: 1; padding: 0 2px; border-radius: 4px;
+  border: none; background: var(--superficie-3); color: var(--gris-texto); cursor: pointer;
+  font-size: 15px; line-height: 1; padding: 3px 8px; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
 }
 .colapso-btn:hover { color: var(--texto); background: var(--velo-fuerte); }
-.frente-cabecera .colapso-btn { font-size: 13px; }
+.frente-cabecera .colapso-btn { font-size: 17px; padding: 4px 10px; }
 
-/* #137: fila resaltada al llegar desde una notificación (realce que se apaga). */
-.fila--resaltada { animation: resaltar-fila 2.4s ease-out; }
+/* #157: fila resaltada al llegar desde una notificación. Realce EVIDENTE que
+   se desvanece en ~3 s (arranca con un destello dorado + barra lateral). */
+.fila--resaltada { animation: resaltar-fila 3s ease-out; }
 @keyframes resaltar-fila {
-  0%, 30% { background: var(--ambar-suave); box-shadow: inset 3px 0 0 var(--ambar); }
-  100% { background: transparent; box-shadow: inset 3px 0 0 transparent; }
+  0%   { background: #ffd34d; box-shadow: inset 5px 0 0 var(--naranja); }
+  20%  { background: #ffe491; box-shadow: inset 5px 0 0 var(--naranja); }
+  100% { background: transparent; box-shadow: inset 5px 0 0 transparent; }
+}
+[data-tema='oscuro'] .fila--resaltada { animation: resaltar-fila-osc 3s ease-out; }
+@keyframes resaltar-fila-osc {
+  0%   { background: #6b5410; box-shadow: inset 5px 0 0 var(--naranja); }
+  20%  { background: #4a3a12; box-shadow: inset 5px 0 0 var(--naranja); }
+  100% { background: transparent; box-shadow: inset 5px 0 0 transparent; }
 }
 
 /* #132: filtro "ver archivados" en Administración → Proyectos. */
@@ -1514,6 +1525,37 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   border: 1px solid var(--gris-linea); border-radius: 10px; overflow: hidden; background: var(--superficie);
 }
 .notif-historial .notif-item:last-child { border-bottom: none; }
+
+/* ==========================================================================
+   Correcciones desktop (#146–#161).
+   ========================================================================== */
+
+/* #148/#150: iconos de acción deshabilitados = atenuados y sin respuesta. */
+.icon-btn:disabled { opacity: .35; cursor: default; }
+.icon-btn:disabled:hover { background: none; color: var(--gris-texto); }
+
+/* #147: chip MIEMBRO, mismo trato que DUEÑO pero color propio para
+   distinguirlos (un dueño también es miembro). */
+.chip-miembro { background: #3f6a8a; color: #fff; }
+[data-tema='oscuro'] .chip-miembro { background: #2f5578; }
+
+/* #154: la celda de proyectos es un número clickeable centrado. */
+.proy-num { min-width: 34px; text-align: center; }
+
+/* #159: campana fija en la barra contraída (mismo lugar que Notificaciones en
+   la barra desplegada: primera, bajo el logo), con el contador naranja. */
+.sidebar-mini__campana {
+  position: relative; width: 34px; height: 34px; border-radius: 9px;
+  border: 1px solid transparent; background: none; color: #d4d4d8;
+  font-size: 17px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.sidebar-mini__campana:hover { background: #27272a; }
+.sidebar-mini__campana--activo { background: #27272a; border-color: #3f3f46; }
+.sidebar-mini__badge {
+  position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px;
+  padding: 0 4px; border-radius: 999px; background: var(--naranja); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
+}
 
 @media (max-width: 768px) {
   /* ---------- 3. Sidebar superpuesta (no ocupa ancho fijo) ---------- */
