@@ -334,7 +334,7 @@ export function FiltrosBar({
 
       {activo && (
         <button className="link-btn filtros-bar__limpiar" onClick={() => onCambiar({})}>
-          Limpiar
+          Limpiar filtros
         </button>
       )}
 
@@ -438,7 +438,12 @@ export function FiltrosBar({
               className="icon-btn"
               data-tip="Eliminar"
               aria-label={`Eliminar ${g.nombre}`}
-              onClick={() => persistir(guardados.filter((x) => x.id !== g.id))}
+              onClick={() => {
+                // #141: confirmar antes de borrar una vista guardada.
+                if (confirm(`¿Eliminar la vista guardada "${g.nombre}"?`)) {
+                  persistir(guardados.filter((x) => x.id !== g.id))
+                }
+              }}
             >
               🗑
             </button>

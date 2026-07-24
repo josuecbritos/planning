@@ -63,6 +63,10 @@ export interface Repo {
   /** Nombre corto del backend activo, para mostrar en la UI. */
   readonly modo: 'memoria' | 'supabase'
 
+  /** Fija el actor de la sesión. En Supabase es no-op (sale del JWT); en modo
+   *  Local lo usa para atribuir acciones y generar notificaciones (#137). */
+  setActor(id: string | null): void
+
   loadState(): Promise<AppState>
 
   createProyecto(input: NuevoProyecto): Promise<Proyecto>
@@ -103,8 +107,13 @@ export interface Repo {
 
   // -- Modulo de Usuarios (7.1) --
 
+  /** Crea el usuario; si el correo ya existe (aunque esté eliminado, #136),
+   *  reactiva la fila en vez de fallar por el unique. Sus accesos vuelven. */
   createUsuario(input: NuevoUsuario): Promise<Usuario>
   updateUsuario(id: string, patch: PatchUsuario): Promise<Usuario>
+  /** #136: eliminar = desactivar + invisible. No hay hard delete: la fila y su
+   *  historial quedan intactos; reactivable dando de alta el mismo correo. */
+  eliminarUsuario(id: string): Promise<void>
   /** Asigna un proyecto a un usuario (cliente o consultor). El acceso nace
    *  con los permisos por DEFECTO del rol del usuario (4). */
   asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso>
@@ -118,4 +127,8 @@ export interface Repo {
 
   /** Agrega un comentario al hilo de la tarea (N5, append-only). */
   addComentario(tareaId: string, texto: string, autorId?: string): Promise<Comentario>
+
+  /** #137: marca como leídas TODAS las notificaciones del usuario actual.
+   *  Devuelve los ids afectados (para reflejarlo en el estado local). */
+  marcarNotificacionesLeidas(usuarioId: string): Promise<string[]>
 }

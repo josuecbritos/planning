@@ -76,7 +76,11 @@ completo con creación y edición **inline** (sin formularios).
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
 - **Mis Tareas:** las tareas donde el usuario es responsable, en todos sus
   proyectos, vencidas primero.
-- **Resumen:** indicadores por proyecto (avance, contadores por estado).
+- **Resumen:** indicadores por proyecto (avance, total y desglose de las cinco
+  categorías).
+
+En la Tabla, frentes y sub frentes se **colapsan** con un chevron (▸/▾) para
+enfocar; el colapso es momentáneo (no se guarda).
 
 **Modelo de estados (derivado, no editable a mano):** cada tarea cae en una de
 cinco categorías excluyentes — Hecha (verde), Pendiente (sin color), Pendiente
@@ -89,6 +93,22 @@ replanificación (↻ ×N) y deja rastro; mover una fecha futura es planificaci�
 
 **Colaboración:** comentarios acumulables por tarea (append-only; todos los
 miembros comentan siempre). Panel lateral de detalle con la línea de tiempo.
+
+**Administración → Proyectos (#132):** módulo de admin, hermano de Usuarios.
+Dueño de la relación usuario↔proyecto (miembros, 🔑) y del ciclo de vida:
+**archivar** (#133) saca el proyecto de la barra, Resumen y Mis Tareas pero lo
+conserva; **eliminar en cascada** (#134) solo sobre archivados. Ambas acciones
+exigen el permiso `archivarEliminarProyectos`, verificado en la base.
+
+**Notificaciones in-app (#137):** tres eventos sobre tus tareas — te asignaron,
+replanificaron o comentaron (nunca por acciones propias). Entrada en la barra
+con contador naranja si hay sin leer; el panel emergente muestra las últimas y
+marca todo como leído; el clic navega a la tarea (la resalta y abre su detalle).
+Las generan triggers de la base, no el cliente.
+
+**Baja de usuarios (#136):** eliminar = desactivar + invisible (sin borrado
+físico, para no huérfanar el historial). Dar de alta el mismo correo reactiva la
+fila y recupera sus accesos.
 
 **Miembros:** el dueño ve quién está asignado (no sus permisos) e invita/config.
 según sus permisos.

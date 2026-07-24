@@ -36,15 +36,39 @@ interface Props {
   actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
+  /** #137: tarea a resaltar al llegar desde una notificación (scroll + realce). */
+  resaltarTareaId?: string | null
+  /** #137: se llama cuando el realce ya se mostró (para bajar el estado). */
+  onResaltado?: () => void
 }
 
-export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, snapshotNonce, onStale, actions, onAbrirTarea }: Props) {
+export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, snapshotNonce, onStale, actions, onAbrirTarea, resaltarTareaId, onResaltado }: Props) {
   const filtrando = !filtroVacio(filtro)
   // P1: la vista se congela cuando hay filtro y/u orden activo.
   const activo = filtrando || orden.length > 0
   const frentes = state.frentes
     .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
     .sort((a, b) => a.orden - b.orden)
+
+  // #142: colapso momentáneo (no persistente) de frentes y sub frentes. En
+  // vista "Todos" colapsan ambos niveles; en una vista de un solo frente solo
+  // colapsan los sub frentes. El encabezado se mantiene: solo se ocultan el
+  // chevron y las tareas debajo.
+  const [frentesCol, setFrentesCol] = useState<Set<string>>(new Set())
+  const [subsCol, setSubsCol] = useState<Set<string>>(new Set())
+  const frenteColapsable = frenteSel === 'todos'
+  const toggleFrente = (id: string) =>
+    setFrentesCol((prev) => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  const toggleSub = (id: string) =>
+    setSubsCol((prev) => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
 
   // Candidatos a responsable: admins, el dueño y quienes tienen acceso.
   const candidatos = state.usuarios.filter(
@@ -81,7 +105,34 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
 
   const firma = JSON.stringify([proyectoId, frenteSel, filtro, orden, snapshotNonce])
   const { congelada, visibleIds, indice, stale } = useVistaCongelada(frescoIds, existentesIds, activo, firma)
-  useEffect(() => onStale(stale), [stale, onStale])
+
+  // #137: ¿la tarea a resaltar queda FUERA de la vista actual (por filtro o por
+  // la foto congelada)? Si es del proyecto pero no se muestra, se fuerza su
+  // aparición y se marca la vista como desactualizada ("Actualizar vista").
+  const resaltadaExcluida = useMemo(() => {
+    if (!resaltarTareaId) return false
+    const t = state.tareas.find((x) => x.id === resaltarTareaId)
+    if (!t || t.archivada) return false
+    const sf = state.subFrentes.find((x) => x.id === t.subFrenteId)
+    const fr = sf && state.frentes.find((x) => x.id === sf.frenteId)
+    if (!fr || fr.proyectoId !== proyectoId) return false
+    const enVista = congelada ? visibleIds.has(t.id) : !filtrando || pasaFiltroCompleto(state, t, filtro, hoy)
+    return !enVista
+  }, [resaltarTareaId, state, proyectoId, congelada, visibleIds, filtrando, filtro, hoy])
+  const forzarId = resaltadaExcluida ? resaltarTareaId ?? null : null
+
+  useEffect(() => onStale(stale || resaltadaExcluida), [stale, resaltadaExcluida, onStale])
+
+  // #137: al llegar desde una notificación, asegura que el frente y el sub
+  // frente de la tarea estén expandidos para poder verla.
+  useEffect(() => {
+    if (!resaltarTareaId) return
+    const t = state.tareas.find((x) => x.id === resaltarTareaId)
+    const sf = t && state.subFrentes.find((x) => x.id === t.subFrenteId)
+    const fr = sf && state.frentes.find((x) => x.id === sf.frenteId)
+    if (sf) setSubsCol((prev) => (prev.has(sf.id) ? new Set([...prev].filter((x) => x !== sf.id)) : prev))
+    if (fr) setFrentesCol((prev) => (prev.has(fr.id) ? new Set([...prev].filter((x) => x !== fr.id)) : prev))
+  }, [resaltarTareaId, state])
 
   return (
     <div className="tabla-wrap">
@@ -99,6 +150,14 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           congelada={congelada}
           visibleIds={visibleIds}
           indice={indice}
+          forzarId={forzarId}
+          resaltarTareaId={resaltarTareaId}
+          onResaltado={onResaltado}
+          colapsado={frentesCol.has(f.id)}
+          colapsable={frenteColapsable}
+          onToggleColapso={() => toggleFrente(f.id)}
+          subsCol={subsCol}
+          onToggleSub={toggleSub}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
         />
@@ -122,6 +181,14 @@ function FrentePagina({
   congelada,
   visibleIds,
   indice,
+  forzarId,
+  resaltarTareaId,
+  onResaltado,
+  colapsado,
+  colapsable,
+  onToggleColapso,
+  subsCol,
+  onToggleSub,
   actions,
   onAbrirTarea,
 }: {
@@ -136,6 +203,14 @@ function FrentePagina({
   congelada: boolean
   visibleIds: Set<string>
   indice: Map<string, number>
+  forzarId: string | null
+  resaltarTareaId?: string | null
+  onResaltado?: () => void
+  colapsado: boolean
+  colapsable: boolean
+  onToggleColapso: () => void
+  subsCol: Set<string>
+  onToggleSub: (id: string) => void
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -145,41 +220,64 @@ function FrentePagina({
 
   // Con filtro activo, los contenedores sin coincidencias se omiten. La foto
   // congelada manda: un sub muestra las tareas de su foto (aunque una edición
-  // las haya sacado del filtro); se omite solo si su foto quedó vacía.
+  // las haya sacado del filtro); se omite solo si su foto quedó vacía. #137: el
+  // sub que contiene la tarea forzada nunca se omite.
   const coincidencias = (subId: string) =>
-    congelada
+    (forzarId && state.tareas.some((t) => t.subFrenteId === subId && t.id === forzarId)) ||
+    (congelada
       ? state.tareas.some((t) => t.subFrenteId === subId && visibleIds.has(t.id))
       : state.tareas.some(
           (t) => t.subFrenteId === subId && !t.archivada && pasaFiltroCompleto(state, t, filtro, hoy),
-        )
+        ))
   const subsVisibles = filtrando ? subs.filter((sf) => coincidencias(sf.id)) : subs
   if (filtrando && subsVisibles.length === 0) return null
 
   return (
     <section>
+      {/* #142: en vista "Todos" el frente colapsa; su encabezado no cambia,
+          solo se antepone el chevron y se ocultan los sub frentes. */}
       <div className="frente-cabecera">
+        {colapsable && (
+          <button
+            className="colapso-btn"
+            aria-expanded={!colapsado}
+            aria-label={colapsado ? `Expandir ${frente.nombre}` : `Colapsar ${frente.nombre}`}
+            onClick={onToggleColapso}
+          >
+            {colapsado ? '▸' : '▾'}
+          </button>
+        )}
         <h2 className="frente-titulo">{frente.nombre}</h2>
       </div>
-      {subsVisibles.map((sf) => (
-        <SubFrenteTabla
-          key={sf.id}
-          sub={sf}
-          state={state}
-          hoy={hoy}
-          candidatos={candidatos}
-          can={can}
-          filtro={filtro}
-          filtrando={filtrando}
-          orden={orden}
-          congelada={congelada}
-          visibleIds={visibleIds}
-          indice={indice}
-          actions={actions}
-          onAbrirTarea={onAbrirTarea}
-        />
-      ))}
-      {subs.length === 0 && <p className="vacio-inline">Sin sub frentes en este frente.</p>}
-      {can.crearSubFrentes && !filtrando && <NuevoSubFrenteInline frenteId={frente.id} actions={actions} />}
+      {!colapsado && (
+        <>
+          {subsVisibles.map((sf) => (
+            <SubFrenteTabla
+              key={sf.id}
+              sub={sf}
+              state={state}
+              hoy={hoy}
+              candidatos={candidatos}
+              can={can}
+              filtro={filtro}
+              filtrando={filtrando}
+              orden={orden}
+              congelada={congelada}
+              visibleIds={visibleIds}
+              indice={indice}
+              forzarId={forzarId}
+              resaltarTareaId={resaltarTareaId}
+              onResaltado={onResaltado}
+              colapsado={subsCol.has(sf.id)}
+              onToggleColapso={() => onToggleSub(sf.id)}
+              actions={actions}
+              onAbrirTarea={onAbrirTarea}
+            />
+          ))}
+          {subs.length === 0 && <p className="vacio-inline">Sin sub frentes en este frente.</p>}
+          {can.crearSubFrentes && !filtrando && <NuevoSubFrenteInline frenteId={frente.id} actions={actions} />}
+        </>
+      )}
     </section>
   )
 }
@@ -244,6 +342,11 @@ function SubFrenteTabla({
   congelada,
   visibleIds,
   indice,
+  forzarId,
+  resaltarTareaId,
+  onResaltado,
+  colapsado,
+  onToggleColapso,
   actions,
   onAbrirTarea,
 }: {
@@ -258,6 +361,11 @@ function SubFrenteTabla({
   congelada: boolean
   visibleIds: Set<string>
   indice: Map<string, number>
+  forzarId: string | null
+  resaltarTareaId?: string | null
+  onResaltado?: () => void
+  colapsado: boolean
+  onToggleColapso: () => void
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -267,7 +375,7 @@ function SubFrenteTabla({
   // P1: con la vista congelada, se muestran EXACTAMENTE las tareas de la foto
   // (membresía + orden congelados): editar una tarea no la saca ni la reordena.
   // Sin congelar (vista live), se filtra y ordena en vivo.
-  const tareas = congelada
+  let tareas = congelada
     ? todas
         .filter((t) => visibleIds.has(t.id))
         .sort((a, b) => (indice.get(a.id) ?? 0) - (indice.get(b.id) ?? 0))
@@ -276,12 +384,28 @@ function SubFrenteTabla({
         orden,
         (t, campo) => valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
       )
+  // #137: la tarea forzada (excluida por el filtro/foto) se inserta igual para
+  // poder resaltarla; el aviso "Actualizar vista" ya está activo.
+  if (forzarId && !tareas.some((t) => t.id === forzarId)) {
+    const extra = todas.find((t) => t.id === forzarId)
+    if (extra) tareas = [...tareas, extra]
+  }
   const archivadas = filtrando ? [] : todas.filter((t) => t.archivada)
 
   return (
     <div className="subfrente">
+      {/* #142: chevron para colapsar el sub frente; su fila-título no cambia,
+          solo se antepone el chevron y se oculta la tabla de tareas. */}
       <div className="subfrente__titulo">
         <span>
+          <button
+            className="colapso-btn"
+            aria-expanded={!colapsado}
+            aria-label={colapsado ? `Expandir ${sub.nombre}` : `Colapsar ${sub.nombre}`}
+            onClick={onToggleColapso}
+          >
+            {colapsado ? '▸' : '▾'}
+          </button>{' '}
           {can.editarEstructura ? (
             <InlineText
               valor={sub.nombre}
@@ -304,6 +428,7 @@ function SubFrenteTabla({
           </span>
         )}
       </div>
+      {!colapsado && (
       <table className="tareas">
         <thead>
           <tr>
@@ -331,6 +456,8 @@ function SubFrenteTabla({
               hoy={hoy}
               candidatos={candidatos}
               can={can}
+              resaltar={t.id === resaltarTareaId}
+              onResaltado={onResaltado}
               actions={actions}
               onAbrirTarea={onAbrirTarea}
             />
@@ -340,8 +467,9 @@ function SubFrenteTabla({
           )}
         </tbody>
       </table>
+      )}
 
-      {archivadas.length > 0 && (
+      {!colapsado && archivadas.length > 0 && (
         <details className="archivadas">
           <summary>
             {archivadas.length} tarea{archivadas.length === 1 ? '' : 's'} archivada{archivadas.length === 1 ? '' : 's'}
@@ -487,6 +615,8 @@ function TareaFila({
   hoy,
   candidatos,
   can,
+  resaltar,
+  onResaltado,
   actions,
   onAbrirTarea,
 }: {
@@ -495,6 +625,8 @@ function TareaFila({
   hoy: string
   candidatos: Usuario[]
   can: Can
+  resaltar?: boolean
+  onResaltado?: () => void
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -506,8 +638,18 @@ function TareaFila({
 
   const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
 
+  // #137: al resaltar (llegada desde una notificación), centra la fila y deja
+  // el realce ~2.5 s; luego avisa para que el estado se baje.
+  const filaRef = useRef<HTMLTableRowElement>(null)
+  useEffect(() => {
+    if (!resaltar) return
+    filaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const id = setTimeout(() => onResaltado?.(), 2500)
+    return () => clearTimeout(id)
+  }, [resaltar, onResaltado])
+
   return (
-    <tr className={color !== 'ninguno' ? `fila--${color}` : undefined}>
+    <tr ref={filaRef} className={`${color !== 'ninguno' ? `fila--${color}` : ''}${resaltar ? ' fila--resaltada' : ''}`.trim() || undefined}>
       <td className="col-check">
         <CheckHecha
           hecha={tarea.hecha}

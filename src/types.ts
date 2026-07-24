@@ -8,7 +8,8 @@
  *  - cliente: solo los proyectos donde lo invitan.
  */
 export type Rol = 'admin' | 'consultor' | 'cliente'
-export type EstadoProyecto = 'activo' | 'pausado' | 'cerrado'
+/** #133: el proyecto está activo o archivado (archivar lo saca de las vistas). */
+export type EstadoProyecto = 'activo' | 'archivado'
 
 /** Fecha ISO corta, ej. '2024-10-30'. */
 export type ISODate = string
@@ -56,6 +57,12 @@ export interface Usuario {
   authId?: string
   /** Permisos de nivel proyecto (solo rol consultor; 3.1). */
   permisosProyecto?: PermisosProyecto
+  /**
+   * #136: tercer nivel de baja = desactivado + invisible. Un eliminado no
+   * entra ni aparece en la UI (la vista usuario_visible lo filtra); su fila e
+   * historial quedan intactos. Reactivable dando de alta el mismo correo.
+   */
+  eliminado?: boolean
 }
 
 /**
@@ -152,6 +159,25 @@ export interface Comentario {
   timestamp: string
 }
 
+/**
+ * Notificación in-app (#137). La generan triggers de la base para tres
+ * eventos sobre tareas donde eres responsable: te asignaron, replanificaron o
+ * comentaron. Apunta a una tarea (el clic navega a ella). El texto se arma en
+ * el front a partir del tipo + la tarea + el autor.
+ */
+export type TipoNotificacion = 'asignacion' | 'replan' | 'comentario'
+export interface Notificacion {
+  id: string
+  usuarioId: string // destinatario
+  tipo: TipoNotificacion
+  tareaId: string
+  autorId?: string
+  /** Datos del evento (p.ej. { fecha } para replan). */
+  dato?: { fecha?: ISODate }
+  leida: boolean
+  creada: string
+}
+
 /** Estado global de la aplicacion. */
 export interface AppState {
   usuarios: Usuario[]
@@ -162,6 +188,7 @@ export interface AppState {
   historial: Replanificacion[]
   accesos: Acceso[]
   comentarios: Comentario[]
+  notificaciones: Notificacion[]
 }
 
 // ---- Estados derivados ----

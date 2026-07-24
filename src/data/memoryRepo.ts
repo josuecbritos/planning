@@ -1,4 +1,4 @@
-import type { Acceso, AppState, Comentario, Frente, PermisosTareas, Proyecto, Replanificacion, SubFrente, Tarea, Usuario } from '../types'
+import type { Acceso, AppState, Comentario, Frente, PermisosTareas, Proyecto, Replanificacion, SubFrente, TipoNotificacion, Tarea, Usuario } from '../types'
 import { hoyISO } from '../lib/dates'
 import { DEFAULT_PERMISOS_PROYECTO, defaultPermisosTareas } from '../lib/permisos'
 import { initialState, proyectoConsultor } from './seed'
@@ -99,6 +99,8 @@ function migrarRoles(s: AppState) {
       u.permisosProyecto = { ...DEFAULT_PERMISOS_PROYECTO }
     }
   }
+  // #137: estados previos no traen la lista de notificaciones.
+  if (!Array.isArray(s.notificaciones)) s.notificaciones = []
   // Consultor de demo + su proyecto propio (para ejercitar dueño vs invitado).
   if (!s.usuarios.some((u) => u.rol === 'consultor')) {
     const demo = initialState.usuarios.find((u) => u.id === 'u-consultor')
@@ -121,9 +123,30 @@ function migrarRoles(s: AppState) {
 export class MemoryRepo implements Repo {
   readonly modo = 'memoria' as const
   private state: AppState
+  /** Actor de la sesión (#137): atribuye acciones y genera notificaciones. */
+  private actorId: string | null = null
 
   constructor() {
     this.state = load()
+  }
+
+  setActor(id: string | null): void {
+    this.actorId = id
+  }
+
+  /** #137: crea una notificación si hay destinatario y no es el propio actor. */
+  private notificar(dest: string | undefined, tipo: TipoNotificacion, tareaId: string, dato?: { fecha?: string }) {
+    if (!dest || !this.actorId || dest === this.actorId) return
+    this.state.notificaciones.unshift({
+      id: uid(),
+      usuarioId: dest,
+      tipo,
+      tareaId,
+      autorId: this.actorId,
+      dato,
+      leida: false,
+      creada: new Date().toISOString(),
+    })
   }
 
   private persist() {
@@ -246,15 +269,22 @@ export class MemoryRepo implements Repo {
       orden: input.orden ?? this.siguienteOrden(hermanos),
     }
     this.state.tareas.push(t)
+    // #137: te asignaron una tarea al crearla con responsable.
+    this.notificar(t.responsableId, 'asignacion', t.id)
     this.persist()
     return clone(t)
   }
   async updateTarea(id: string, patch: PatchTarea): Promise<Tarea> {
     const t = this.state.tareas.find((x) => x.id === id)
     if (!t) throw new Error('Tarea no encontrada')
+    const respPrevio = t.responsableId
     Object.assign(t, patch)
     // Coherencia: si se desmarca hecha, se limpia fecha_real.
     if (patch.hecha === false) t.fechaReal = undefined
+    // #137: te asignaron una tarea (cambió el responsable).
+    if ('responsableId' in patch && t.responsableId !== respPrevio) {
+      this.notificar(t.responsableId, 'asignacion', t.id)
+    }
     this.persist()
     return clone(t)
   }
@@ -270,13 +300,25 @@ export class MemoryRepo implements Repo {
 
   async createUsuario(input: NuevoUsuario): Promise<Usuario> {
     const email = input.email.trim().toLowerCase()
-    if (this.state.usuarios.some((u) => u.email.toLowerCase() === email)) {
-      throw new Error('Ya existe un usuario con ese email')
+    const iniciales = (input.iniciales ?? input.nombre.split(/\s+/).map((p) => p[0]).join('').slice(0, 2)).toUpperCase()
+    // #136: si el correo ya existe, se REACTIVA la fila (aunque esté eliminada);
+    // sus accesos quedan intactos. No se crea una fila nueva ni se toca el correo.
+    const existente = this.state.usuarios.find((u) => u.email.toLowerCase() === email)
+    if (existente) {
+      if (!existente.eliminado && existente.activo) {
+        throw new Error('Ya existe un usuario activo con ese email')
+      }
+      existente.eliminado = false
+      existente.activo = true
+      existente.nombre = input.nombre
+      existente.iniciales = iniciales
+      this.persist()
+      return clone(existente)
     }
     const u: Usuario = {
       id: uid(),
       nombre: input.nombre,
-      iniciales: (input.iniciales ?? input.nombre.split(/\s+/).map((p) => p[0]).join('').slice(0, 2)).toUpperCase(),
+      iniciales,
       email,
       rol: input.rol,
       activo: true,
@@ -294,6 +336,15 @@ export class MemoryRepo implements Repo {
     Object.assign(u, patch)
     this.persist()
     return clone(u)
+  }
+
+  async eliminarUsuario(id: string): Promise<void> {
+    // #136: desactivar + invisible. La fila y sus accesos quedan intactos.
+    const u = this.state.usuarios.find((x) => x.id === id)
+    if (!u) throw new Error('Usuario no encontrado')
+    u.activo = false
+    u.eliminado = true
+    this.persist()
   }
 
   async asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso> {
@@ -336,7 +387,8 @@ export class MemoryRepo implements Repo {
   }
 
   async addComentario(tareaId: string, texto: string, autorId?: string): Promise<Comentario> {
-    if (!this.state.tareas.some((t) => t.id === tareaId)) throw new Error('Tarea no encontrada')
+    const tarea = this.state.tareas.find((t) => t.id === tareaId)
+    if (!tarea) throw new Error('Tarea no encontrada')
     const c: Comentario = {
       id: uid(),
       tareaId,
@@ -345,6 +397,8 @@ export class MemoryRepo implements Repo {
       timestamp: new Date().toISOString(),
     }
     this.state.comentarios.push(c)
+    // #137: comentaron una tarea tuya.
+    this.notificar(tarea.responsableId, 'comentario', tareaId)
     this.persist()
     return clone(c)
   }
@@ -407,6 +461,8 @@ export class MemoryRepo implements Repo {
         })
         t.fechaObjetivo = nueva
         // fecha_original queda congelada desde la primera replanificacion.
+        // #137: replanificaron una tarea tuya.
+        this.notificar(t.responsableId, 'replan', id, { fecha: nueva })
       }
       this.persist()
     }
@@ -414,5 +470,17 @@ export class MemoryRepo implements Repo {
       tarea: clone(t),
       historial: clone(this.state.historial.filter((h) => h.tareaId === id)),
     }
+  }
+
+  async marcarNotificacionesLeidas(usuarioId: string): Promise<string[]> {
+    const ids: string[] = []
+    for (const n of this.state.notificaciones) {
+      if (n.usuarioId === usuarioId && !n.leida) {
+        n.leida = true
+        ids.push(n.id)
+      }
+    }
+    if (ids.length) this.persist()
+    return ids
   }
 }

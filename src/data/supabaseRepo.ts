@@ -4,6 +4,7 @@ import type {
   AppState,
   Comentario,
   Frente,
+  Notificacion,
   Proyecto,
   Replanificacion,
   SubFrente,
@@ -11,7 +12,6 @@ import type {
   Usuario,
 } from '../types'
 import { getClient } from './client'
-import { DEFAULT_PERMISOS_PROYECTO } from '../lib/permisos'
 import type {
   NuevaTarea,
   NuevoFrente,
@@ -83,6 +83,10 @@ const toReplan = (r: Row): Replanificacion => ({
   cambiadoPor: r.cambiado_por ?? '',
   timestamp: r.timestamp,
 })
+const toNotificacion = (r: Row): Notificacion => ({
+  id: r.id, usuarioId: r.usuario_id, tipo: r.tipo, tareaId: r.tarea_id,
+  autorId: r.autor_id ?? undefined, dato: r.dato ?? undefined, leida: r.leida, creada: r.creada,
+})
 
 export class SupabaseRepo implements Repo {
   readonly modo = 'supabase' as const
@@ -92,8 +96,11 @@ export class SupabaseRepo implements Repo {
     this.db = getClient()
   }
 
+  // El actor sale del JWT (usuario_actual_id en la base); no hace falta fijarlo.
+  setActor(): void {}
+
   async loadState(): Promise<AppState> {
-    const [u, p, f, sf, t, h, a, c] = await Promise.all([
+    const [u, p, f, sf, t, h, a, c, n] = await Promise.all([
       // Vista con email/permisos enmascarados (seguridad §3): la tabla base ya
       // no permite SELECT directo desde el cliente.
       this.db.from('usuario_visible').select('*').order('nombre'),
@@ -104,6 +111,8 @@ export class SupabaseRepo implements Repo {
       this.db.from('replanificacion').select('*').order('numero_cambio'),
       this.db.from('acceso_proyecto').select('*'),
       this.db.from('comentario').select('*').order('timestamp'),
+      // #137: RLS entrega solo las notificaciones del usuario actual.
+      this.db.from('notificacion').select('*').order('creada', { ascending: false }),
     ])
     return {
       usuarios: unwrap(u).map(toUsuario),
@@ -114,6 +123,7 @@ export class SupabaseRepo implements Repo {
       historial: unwrap(h).map(toReplan),
       accesos: unwrap(a).map(toAcceso),
       comentarios: unwrap(c).map(toComentario),
+      notificaciones: unwrap(n).map(toNotificacion),
     }
   }
 
@@ -264,21 +274,23 @@ export class SupabaseRepo implements Repo {
       input.iniciales ?? input.nombre.split(/\s+/).map((p) => p[0]).join('').slice(0, 2)
     ).toUpperCase()
     const email = input.email.trim().toLowerCase()
-    // La tabla base solo permite RETURNING de columnas no sensibles (§3). El
-    // email lo conocemos (lo insertamos) y permisos_proyecto lo pone el trigger
-    // con el default del rol; se reconstruye para el estado local.
+    // RPC (security definer): crea o REACTIVA si el correo ya existe —incluso
+    // eliminado, invisible para el cliente (#136)—; devuelve la fila completa.
     const row = unwrap(
       await this.db
-        .from('usuario')
-        .insert({ nombre: input.nombre, iniciales, email, rol: input.rol })
-        .select('id, nombre, iniciales, rol, activo, auth_id')
+        .rpc('crear_o_reactivar_usuario', {
+          p_nombre: input.nombre, p_iniciales: iniciales, p_email: email, p_rol: input.rol,
+        })
         .single(),
     )
-    return toUsuario({
-      ...row,
-      email,
-      permisos_proyecto: input.rol === 'consultor' ? DEFAULT_PERMISOS_PROYECTO : undefined,
-    })
+    return toUsuario(row)
+  }
+
+  async eliminarUsuario(id: string): Promise<void> {
+    // #136: desactivar + invisible (no hay hard delete). Admin-only por RLS.
+    unwrap(
+      await this.db.from('usuario').update({ activo: false, eliminado: true }).eq('id', id).select('id').single(),
+    )
   }
 
   async updateUsuario(id: string, patch: PatchUsuario): Promise<Usuario> {
@@ -343,6 +355,18 @@ export class SupabaseRepo implements Repo {
         .single(),
     )
     return toComentario(row)
+  }
+
+  async marcarNotificacionesLeidas(usuarioId: string): Promise<string[]> {
+    const rows = unwrap(
+      await this.db
+        .from('notificacion')
+        .update({ leida: true })
+        .eq('usuario_id', usuarioId)
+        .eq('leida', false)
+        .select('id'),
+    )
+    return rows.map((r: Row) => r.id)
   }
 
   private async nextOrden(tabla: string, fk: string, fkValue: string): Promise<number> {
