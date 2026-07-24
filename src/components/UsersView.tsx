@@ -1,12 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Proyecto, Usuario } from '../types'
 import type { Actions } from '../App'
-import {
-  puedeConfigurarClientesEn,
-  puedeInvitarClientesEn,
-} from '../lib/permisos'
+import { puedeInvitarClientesEn } from '../lib/permisos'
 import { UsuarioModal } from './UsuarioModal'
-import { PermisosModal } from './PermisosModal'
 import { PermisosProyectoModal } from './PermisosProyectoModal'
 import { supabaseConfigured, getClient } from '../data/client'
 
@@ -26,19 +22,21 @@ interface Props {
   state: AppState
   usuarioActual: Usuario
   actions: Actions
+  /** #135: el popup "+N" enlaza a Administración → Proyectos, donde vive la
+   *  gestión de la relación usuario↔proyecto. */
+  onIrAProyectos: () => void
 }
 
 type ModalState =
   | { tipo: 'nuevo' }
   | { tipo: 'editar'; usuario: Usuario }
-  | { tipo: 'permisos-acceso'; usuario: Usuario; proyecto: Proyecto }
   | { tipo: 'permisos-proyecto'; usuario: Usuario }
   | null
 
 const ROL_ORDEN: Record<Usuario['rol'], number> = { admin: 0, consultor: 1, cliente: 2 }
 const ROL_LABEL: Record<Usuario['rol'], string> = { admin: 'Admin', consultor: 'Consultor', cliente: 'Cliente' }
 
-export function UsersView({ state, usuarioActual, actions }: Props) {
+export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Props) {
   const [modal, setModal] = useState<ModalState>(null)
   const [invitandoId, setInvitandoId] = useState<string | null>(null)
   const [avisoInvitacion, setAvisoInvitacion] = useState<string | null>(null)
@@ -105,14 +103,7 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
   return (
     <div className="usuarios-wrap">
       <div className="usuarios-cabecera">
-        <div>
-          <h2>Usuarios</h2>
-          <p className="usuarios-sub">
-            {esAdminActor
-              ? 'Admins: todo · Consultores: sus proyectos + asignados · Clientes: solo invitados. Los permisos nacen con el default del rol.'
-              : 'Gente con acceso a tus proyectos. Puedes invitar y configurar a los clientes de tus proyectos; a los demás consultores los ves, no los editas.'}
-          </p>
-        </div>
+        <h2>Usuarios</h2>
         {puedeCrearUsuario && (
           <button className="btn btn--primary" onClick={() => setModal({ tipo: 'nuevo' })}>
             + {esAdminActor ? 'Usuario' : 'Cliente'}
@@ -149,8 +140,8 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
                 esYo={u.id === usuarioActual.id}
                 state={state}
                 actions={actions}
+                onIrAProyectos={onIrAProyectos}
                 onEditar={() => setModal({ tipo: 'editar', usuario: u })}
-                onPermisosAcceso={(proyecto) => setModal({ tipo: 'permisos-acceso', usuario: u, proyecto })}
                 onPermisosProyecto={() => setModal({ tipo: 'permisos-proyecto', usuario: u })}
                 onInvitar={() => invitar(u)}
                 invitando={invitandoId === u.id}
@@ -164,21 +155,6 @@ export function UsersView({ state, usuarioActual, actions }: Props) {
         <UsuarioModal
           soloCliente={!esAdminActor}
           onSubmit={(d) => actions.createUsuario(d)}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.tipo === 'permisos-acceso' && (
-        <PermisosModal
-          nombre={modal.usuario.nombre}
-          contexto={modal.proyecto.nombre}
-          permisos={
-            state.accesos.find(
-              (a) => a.usuarioId === modal.usuario.id && a.proyectoId === modal.proyecto.id,
-            )?.permisos ?? {}
-          }
-          onGuardar={(permisos) =>
-            actions.updateAccesoPermisos(modal.usuario.id, modal.proyecto.id, permisos)
-          }
           onClose={() => setModal(null)}
         />
       )}
@@ -210,8 +186,8 @@ function UsuarioFila({
   esYo,
   state,
   actions,
+  onIrAProyectos,
   onEditar,
-  onPermisosAcceso,
   onPermisosProyecto,
   onInvitar,
   invitando,
@@ -223,52 +199,37 @@ function UsuarioFila({
   esYo: boolean
   state: AppState
   actions: Actions
+  onIrAProyectos: () => void
   onEditar: () => void
-  onPermisosAcceso: (proyecto: Proyecto) => void
   onPermisosProyecto: () => void
   onInvitar: () => void
   invitando: boolean
 }) {
   const accesos = state.accesos.filter((a) => a.usuarioId === usuario.id)
   const targetEsCliente = usuario.rol === 'cliente'
-  const targetEsAdmin = usuario.rol === 'admin'
 
-  // Capacidades del ACTOR sobre este usuario, proyecto a proyecto.
-  //  - asignar/quitar: admin siempre; consultor solo a CLIENTES de sus
-  //    proyectos con permiso invitarClientes.
-  //  - configurar permisos (🔑): admin a cualquier no-admin; consultor solo a
-  //    CLIENTES con permiso configurarPermisosClientes. El admin no tiene
-  //    permisos por acceso que configurar (control total): sin 🔑.
-  const puedeAsignar = (p: Proyecto) =>
-    esAdminActor || (targetEsCliente && puedeInvitarClientesEn(state, actor, p.id))
-  const puedeConfig = (p: Proyecto) =>
-    !targetEsAdmin &&
-    (esAdminActor
-      ? usuario.rol !== 'admin'
-      : targetEsCliente && puedeConfigurarClientesEn(state, actor, p.id))
-
-  // Dueño de (solo el admin ve los proyectos propios de otros como referencia).
-  const propios = esAdminActor ? state.proyectos.filter((p) => p.duenoId === usuario.id) : []
-  // Asignados dentro del alcance del actor (admin: todos; consultor: los suyos).
+  // #135: la columna de proyectos es de SOLO LECTURA (dueño + asignados dentro
+  // del alcance del actor). Asignar/quitar/permisos vive en Administración →
+  // Proyectos (#132). Dueño primero, luego asignados; ambos como chips.
   const gestIds = new Set(gestionables.map((p) => p.id))
+  const propios = (esAdminActor ? state.proyectos.filter((p) => p.duenoId === usuario.id) : []).map(
+    (p) => ({ p, dueno: true }),
+  )
   const asignados = accesos
     .map((a) => state.proyectos.find((p) => p.id === a.proyectoId))
     .filter((p): p is Proyecto => Boolean(p) && gestIds.has(p!.id))
-  // Disponibles para asignar: dentro del alcance, no propios, no ya asignados,
-  // y que el actor pueda asignar.
-  const disponibles = gestionables.filter(
-    (p) =>
-      p.duenoId !== usuario.id &&
-      !accesos.some((a) => a.proyectoId === p.id) &&
-      puedeAsignar(p),
-  )
+    .map((p) => ({ p, dueno: false }))
+  const proyectosUsuario = [...propios, ...asignados]
 
   // Acciones de administración de la cuenta (editar datos, permisos de
-  // proyecto, activar/desactivar): SOLO el admin. El consultor no edita cuentas.
+  // proyecto, activar/desactivar, eliminar): SOLO el admin. El consultor no
+  // edita cuentas.
   const puedeAdministrarCuenta = esAdminActor
   // Invitación por correo: admin a cualquiera; consultor a los clientes que
-  // puede invitar (la Edge Function reconfirma la autorización).
-  const puedeInvitarCorreo = esAdminActor || (targetEsCliente && disponibles.length + asignados.length > 0)
+  // puede invitar en alguno de sus proyectos (la Edge Function reconfirma).
+  const puedeInvitarCorreo =
+    esAdminActor ||
+    (targetEsCliente && gestionables.some((p) => puedeInvitarClientesEn(state, actor, p.id)))
 
   return (
     <tr className={usuario.activo ? '' : 'usuario-inactivo'}>
@@ -284,57 +245,8 @@ function UsuarioFila({
         <span className={`chip-rol chip-rol--${usuario.rol}`}>{ROL_LABEL[usuario.rol]}</span>
       </td>
       <td>{usuario.activo ? 'Activo' : 'Inactivo'}</td>
-      <td>
-        <div className="asignaciones">
-          {propios.map((p) => (
-            <span key={p.id} className="asignacion asignacion--propia" title="Dueño: control total, sin permisos que configurar">
-              <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
-              {p.nombre}
-              <span className="chip-dueno">Dueño</span>
-            </span>
-          ))}
-          {asignados.map((p) => (
-            <span key={p.id} className="asignacion">
-              <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
-              {p.nombre}
-              {puedeConfig(p) && (
-                <button
-                  className="icon-btn"
-                  title={`Permisos en ${p.nombre}`}
-                  onClick={() => onPermisosAcceso(p)}
-                >
-                  🔑
-                </button>
-              )}
-              {puedeAsignar(p) && (
-                <button
-                  className="icon-btn"
-                  title={esYo ? 'Salir del proyecto' : 'Quitar acceso'}
-                  onClick={() => actions.quitarAcceso(usuario.id, p.id)}
-                >
-                  ✕
-                </button>
-              )}
-            </span>
-          ))}
-          {disponibles.length > 0 && (
-            <select
-              className="asignar-select"
-              value=""
-              onChange={(e) => {
-                if (e.target.value) actions.asignarAcceso(usuario.id, e.target.value)
-              }}
-            >
-              <option value="">{esYo ? '+ Unirme a proyecto…' : '+ Asignar proyecto…'}</option>
-              {disponibles.map((p) => (
-                <option key={p.id} value={p.id}>{p.nombre}</option>
-              ))}
-            </select>
-          )}
-          {propios.length === 0 && asignados.length === 0 && disponibles.length === 0 && (
-            <span className="usuarios-sin">Sin proyectos</span>
-          )}
-        </div>
+      <td className="col-proy">
+        <ProyectosCell items={proyectosUsuario} onIrAProyectos={onIrAProyectos} />
       </td>
       <td className="col-acc">
         {puedeAdministrarCuenta && (
@@ -362,7 +274,87 @@ function UsuarioFila({
             {usuario.activo ? '⏻' : '↺'}
           </button>
         )}
+        {/* #136: eliminar = desactivar + invisible (no hay borrado físico). */}
+        {puedeAdministrarCuenta && !esYo && (
+          <button
+            className="icon-btn"
+            title="Eliminar usuario"
+            onClick={() => {
+              if (
+                confirm(
+                  `¿Eliminar a "${usuario.nombre}"? Perderá el acceso y desaparecerá de la lista. ` +
+                    'Podrás recuperarlo dándole de alta con el mismo correo.',
+                )
+              ) {
+                actions.eliminarUsuario(usuario.id)
+              }
+            }}
+          >
+            🗑
+          </button>
+        )}
       </td>
     </tr>
+  )
+}
+
+// #135: celda de proyectos de solo lectura. Muestra los primeros chips y, si
+// hay más, un "+N" que abre un popover con la lista completa y el enlace a la
+// gestión (Administración → Proyectos).
+function ProyectosCell({
+  items,
+  onIrAProyectos,
+}: {
+  items: { p: Proyecto; dueno: boolean }[]
+  onIrAProyectos: () => void
+}) {
+  const [abierto, setAbierto] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const MAX_VISIBLES = 2
+
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false)
+    }
+    const id = setTimeout(() => document.addEventListener('mousedown', fuera), 0)
+    return () => {
+      clearTimeout(id)
+      document.removeEventListener('mousedown', fuera)
+    }
+  }, [abierto])
+
+  if (items.length === 0) return <span className="usuarios-sin">Sin proyectos</span>
+
+  const visibles = items.slice(0, MAX_VISIBLES)
+  const resto = items.slice(MAX_VISIBLES)
+
+  const chip = ({ p, dueno }: { p: Proyecto; dueno: boolean }) => (
+    <span key={p.id} className="asignacion asignacion--ro" title={p.nombre}>
+      <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
+      <span className="asignacion__nombre">{p.nombre}</span>
+      {dueno && <span className="chip-dueno">Dueño</span>}
+    </span>
+  )
+
+  return (
+    <div className="proy-col" ref={ref}>
+      {visibles.map(chip)}
+      {resto.length > 0 && (
+        <div className="proy-mas">
+          <button className="chip-mas" onClick={() => setAbierto((v) => !v)} aria-expanded={abierto}>
+            +{resto.length}
+          </button>
+          {abierto && (
+            <div className="proy-pop" role="dialog">
+              <div className="proy-pop__lista">{items.map(chip)}</div>
+              <button className="link-btn" onClick={onIrAProyectos}>
+                Gestionar en Proyectos →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

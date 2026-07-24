@@ -217,4 +217,11 @@ export const initialState: AppState = {
       timestamp: '2024-10-25T09:15:00Z',
     },
   ],
+  // Notificaciones de demo (#137) para la primera cuenta del picker (DV): dos
+  // sin leer (contador naranjo) y una leída, sobre una tarea suya en Arauco.
+  notificaciones: [
+    { id: 'n-1', usuarioId: 'u-dv', tipo: 'asignacion', tareaId: 't-1', autorId: 'u-jb', leida: false, creada: '2024-10-30T08:10:00Z' },
+    { id: 'n-2', usuarioId: 'u-dv', tipo: 'comentario', tareaId: 't-9', autorId: 'u-jb', leida: false, creada: '2024-10-29T16:40:00Z' },
+    { id: 'n-3', usuarioId: 'u-dv', tipo: 'replan', tareaId: 't-9', autorId: 'u-jb', dato: { fecha: '2024-10-29' }, leida: true, creada: '2024-10-28T11:05:00Z' },
+  ],
 }

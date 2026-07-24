@@ -16,12 +16,15 @@ export function ProyectoModal({ proyecto, onSubmit, onClose }: Props) {
   const [nombre, setNombre] = useState(proyecto?.nombre ?? '')
   const [descripcion, setDescripcion] = useState(proyecto?.descripcion ?? '')
   const [color, setColor] = useState(proyecto?.color ?? COLORES[0])
-  const [estado, setEstado] = useState<Proyecto['estado']>(proyecto?.estado ?? 'activo')
   const valido = nombre.trim().length > 0
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!valido) return
+    // #133: el estado (activo/archivado) ya no se edita aquí; se archiva/
+    // desarchiva desde el menú de la barra y Administración → Proyectos. Se
+    // conserva el estado actual (o "activo" al crear).
+    const estado: Proyecto['estado'] = proyecto?.estado ?? 'activo'
     onSubmit({ nombre: nombre.trim(), descripcion: descripcion.trim() || undefined, color, estado })
     onClose()
   }
@@ -52,14 +55,6 @@ export function ProyectoModal({ proyecto, onSubmit, onClose }: Props) {
             ))}
           </div>
         </div>
-        <label className="campo">
-          <span>Estado</span>
-          <select value={estado} onChange={(e) => setEstado(e.target.value as Proyecto['estado'])}>
-            <option value="activo">Activo</option>
-            <option value="pausado">Pausado</option>
-            <option value="cerrado">Cerrado</option>
-          </select>
-        </label>
         <div className="modal-acciones">
           <button type="button" className="btn" onClick={onClose}>Cancelar</button>
           <button type="submit" className="btn btn--primary" disabled={!valido}>

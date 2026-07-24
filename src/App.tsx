@@ -31,11 +31,16 @@ import { FiltrosBar } from './components/FiltrosBar'
 import { MisTareasView } from './components/MisTareasView'
 import { MiembrosModal } from './components/MiembrosModal'
 import { ResumenView } from './components/ResumenView'
+import { AdminProyectosView } from './components/AdminProyectosView'
+import { NotificacionesPanel, NotificacionesView } from './components/Notificaciones'
 import { AceptarInvitacion } from './components/AceptarInvitacion'
+import type { Notificacion } from './types'
 
 export type Vista = 'tabla' | 'gantt'
 export type FrenteSel = string | 'todos'
-export type Pantalla = 'proyectos' | 'usuarios' | 'mipanel' | 'resumen'
+// 'proyectos' = vista DENTRO de un proyecto. 'admin-proyectos' = módulo de
+// administración de proyectos (#132). 'notificaciones' = historial completo (#137).
+export type Pantalla = 'proyectos' | 'usuarios' | 'mipanel' | 'resumen' | 'admin-proyectos' | 'notificaciones'
 /** Modos de la barra lateral (punto 6): fija (default) o escondida. */
 export type SidebarModo = 'fija' | 'escondida'
 /** Tema de la interfaz (punto 4): manual, no sigue al sistema operativo. */
@@ -60,11 +65,15 @@ export interface Actions {
   cambiarFechaObjetivo: (tareaId: string, nueva: string | null) => Promise<void>
   createUsuario: (i: NuevoUsuario) => Promise<void>
   updateUsuario: (id: string, p: PatchUsuario) => Promise<void>
+  /** #136: eliminar = desactivar + invisible (no hard delete). */
+  eliminarUsuario: (id: string) => Promise<void>
   asignarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>
   quitarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>
   /** Configura el set de ocho DE UN ACCESO (usuario × proyecto). */
   updateAccesoPermisos: (usuarioId: string, proyectoId: string, permisos: PermisosTareas) => Promise<void>
   addComentario: (tareaId: string, texto: string) => Promise<void>
+  /** #137: marca todas las notificaciones del usuario actual como leídas. */
+  marcarNotificacionesLeidas: () => Promise<void>
 }
 
 /** Vista de un proyecto (punto 3/4): filtro y orden viven juntos y son
@@ -157,6 +166,10 @@ export default function App() {
   const [tareaDetalleId, setTareaDetalleId] = useState<string | null>(null)
   // Miembros del proyecto activo (roles punto 7): modal abierto/cerrado.
   const [miembrosAbierto, setMiembrosAbierto] = useState(false)
+  // #137: panel de notificaciones (anclado a la barra) y tarea a resaltar al
+  // navegar desde un aviso.
+  const [notifAbierto, setNotifAbierto] = useState(false)
+  const [tareaResaltada, setTareaResaltada] = useState<string | null>(null)
   // Contenedor con scroll de la vista de proyecto. Se mide el alto de la
   // barra de filtros (que es sticky, punto 2) para que el encabezado de la
   // tabla se congele JUSTO debajo, sin taparse ni superponerse.
@@ -174,6 +187,12 @@ export default function App() {
   useEffect(() => {
     auth.getUsuarioActual().then(setSesion).catch(() => setSesion(null))
   }, [auth])
+
+  // Fija el actor en el repo (#137): en modo Local atribuye acciones y genera
+  // notificaciones; en Supabase es no-op (el actor sale del JWT).
+  useEffect(() => {
+    repo.setActor(sesion?.id ?? null)
+  }, [repo, sesion])
 
   // Cargar la preferencia de sidebar del usuario al iniciar sesion.
   useEffect(() => {
@@ -287,11 +306,29 @@ export default function App() {
   // Usuarios. Su poder no cambia: sigue viendo y gestionando cualquier
   // proyecto desde ahí (donde la lista es completa), pero su barra lateral
   // solo muestra los proyectos donde es miembro.
-  const proyectosVisibles = useMemo(() => {
+  // Proyectos de los que ERES MIEMBRO (dueño o con acceso), en cualquier
+  // estado. El módulo Administración → Proyectos (#132) trabaja sobre esta
+  // lista (incluye archivados, con su propio filtro).
+  const proyectosMiembro = useMemo(() => {
     if (!state || !sesion) return []
     const ids = new Set(state.accesos.filter((a) => a.usuarioId === sesion.id).map((a) => a.proyectoId))
     return state.proyectos.filter((p) => p.duenoId === sesion.id || ids.has(p.id))
   }, [state, sesion])
+
+  // #133: los archivados salen de la barra lateral, Resumen y Mis Tareas.
+  const proyectosVisibles = useMemo(
+    () => proyectosMiembro.filter((p) => p.estado !== 'archivado'),
+    [proyectosMiembro],
+  )
+
+  // #137: mis notificaciones (más recientes primero) y cuántas sin leer.
+  const notifsMias = useMemo(() => {
+    if (!state || !sesion) return [] as Notificacion[]
+    return state.notificaciones
+      .filter((n) => n.usuarioId === sesion.id)
+      .sort((a, b) => (a.creada < b.creada ? 1 : -1))
+  }, [state, sesion])
+  const noLeidas = notifsMias.filter((n) => !n.leida).length
 
   // Seleccion inicial / correccion de proyecto activo.
   useEffect(() => {
@@ -398,6 +435,12 @@ export default function App() {
           const u = await repo.updateUsuario(id, p)
           return (s) => apply.upsertUsuario(s, u)
         }),
+      eliminarUsuario: (id) =>
+        run(async () => {
+          await repo.eliminarUsuario(id)
+          // #136: desaparece de la UI (la fila queda en la base, invisible).
+          return (s) => apply.removeUsuario(s, id)
+        }),
       asignarAcceso: (usuarioId, proyectoId) =>
         run(async () => {
           const a = await repo.asignarAcceso(usuarioId, proyectoId)
@@ -417,6 +460,11 @@ export default function App() {
         run(async () => {
           const c = await repo.addComentario(tareaId, texto, sesion?.id)
           return (s) => apply.addComentario(s, c)
+        }),
+      marcarNotificacionesLeidas: () =>
+        run(async () => {
+          const ids = sesion ? await repo.marcarNotificacionesLeidas(sesion.id) : []
+          return (s) => apply.marcarNotificacionesLeidas(s, ids)
         }),
     }),
     [repo, run, HOY, sesion],
@@ -501,6 +549,42 @@ export default function App() {
   }, [])
 
   const abrirDetalle = useCallback((tareaId: string) => setTareaDetalleId(tareaId), [])
+
+  // #137: abrir/cerrar el panel de notificaciones. Al abrirlo se marcan todas
+  // como leídas (y el contador naranja desaparece).
+  const abrirNotificaciones = useCallback(() => {
+    if (notifAbierto) {
+      setNotifAbierto(false)
+      return
+    }
+    setNotifAbierto(true)
+    if (noLeidas > 0) actions.marcarNotificacionesLeidas()
+  }, [notifAbierto, noLeidas, actions])
+
+  // #137: click en un aviso → ir a la Tabla del proyecto, resaltar la tarea y
+  // abrir su panel de detalle. Si el filtro la excluye, la Tabla la muestra
+  // igual y ofrece "Actualizar vista".
+  const abrirNotificacion = useCallback(
+    (n: Notificacion) => {
+      setNotifAbierto(false)
+      if (!state) return
+      const tarea = state.tareas.find((t) => t.id === n.tareaId)
+      if (!tarea) return
+      const sf = state.subFrentes.find((x) => x.id === tarea.subFrenteId)
+      const f = sf && state.frentes.find((x) => x.id === sf.frenteId)
+      if (f) {
+        setProyectoActivoId(f.proyectoId)
+        setFrenteSel('todos')
+        setVista('tabla')
+        setVistaStale(false)
+      }
+      setPantalla('proyectos')
+      setTareaDetalleId(n.tareaId)
+      setTareaResaltada(n.tareaId)
+      setMovilSidebar(false)
+    },
+    [state],
+  )
 
   // Punto 2: mide el alto de la barra de filtros (sticky) y lo publica en
   // --filtros-h para que el thead de la tabla se congele justo debajo.
@@ -651,6 +735,9 @@ export default function App() {
           pantalla={pantalla}
           puedeVerUsuarios={puedeVerUsuarios}
           conMisTareas={conMisTareas}
+          noLeidas={noLeidas}
+          notifAbierto={notifAbierto}
+          onNotificaciones={abrirNotificaciones}
           puedeCrearProyecto={puedeCrearProyectos(sesion)}
           can={can}
           usuario={sesion}
@@ -674,7 +761,12 @@ export default function App() {
         )}
 
         {pantalla === 'usuarios' && puedeVerUsuarios ? (
-          <UsersView state={state} usuarioActual={sesion} actions={actions} />
+          <UsersView
+            state={state}
+            usuarioActual={sesion}
+            actions={actions}
+            onIrAProyectos={() => onSelectPantalla('admin-proyectos')}
+          />
         ) : pantalla === 'mipanel' && conMisTareas ? (
           <MisTareasView
             state={state}
@@ -691,6 +783,10 @@ export default function App() {
             hoy={HOY}
             onAbrirProyecto={onSelectProyecto}
           />
+        ) : pantalla === 'admin-proyectos' && puedeVerUsuarios ? (
+          <AdminProyectosView state={state} proyectos={proyectosMiembro} sesion={sesion} actions={actions} />
+        ) : pantalla === 'notificaciones' ? (
+          <NotificacionesView state={state} notificaciones={notifsMias} onAbrir={abrirNotificacion} />
         ) : proyecto && contadores ? (
           <>
             <Header
@@ -730,6 +826,8 @@ export default function App() {
                   onStale={setVistaStale}
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
+                  resaltarTareaId={tareaResaltada}
+                  onResaltado={() => setTareaResaltada(null)}
                 />
               ) : (
                 <GanttView
@@ -783,6 +881,22 @@ export default function App() {
           sesion={sesion}
           actions={actions}
           onClose={() => setMiembrosAbierto(false)}
+        />
+      )}
+
+      {/* #137: panel emergente de notificaciones, anclado a la barra. No
+          cambia de pantalla; el click en un aviso navega a su tarea. */}
+      {notifAbierto && (
+        <NotificacionesPanel
+          state={state}
+          notificaciones={notifsMias}
+          onAbrir={abrirNotificacion}
+          onVerTodas={() => {
+            setNotifAbierto(false)
+            setPantalla('notificaciones')
+            setMovilSidebar(false)
+          }}
+          onClose={() => setNotifAbierto(false)}
         />
       )}
     </div>

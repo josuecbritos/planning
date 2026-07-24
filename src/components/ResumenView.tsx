@@ -11,22 +11,11 @@ interface Props {
   onAbrirProyecto: (id: string) => void
 }
 
-const ESTADO_PROYECTO: Record<Proyecto['estado'], string> = {
-  activo: 'Activo',
-  pausado: 'Pausado',
-  cerrado: 'Cerrado',
-}
-
 export function ResumenView({ state, proyectos, hoy, onAbrirProyecto }: Props) {
   return (
     <div className="usuarios-wrap">
       <div className="usuarios-cabecera">
-        <div>
-          <h2>Resumen de proyectos</h2>
-          <p className="usuarios-sub">
-            Rojo = atrasadas (exigen nueva fecha) · Ámbar = replanificadas en plazo · Punto = atrasada y replanificada.
-          </p>
-        </div>
+        <h2>Resumen de proyectos</h2>
       </div>
 
       <div className="resumen-grid">
@@ -58,16 +47,16 @@ function TarjetaProyecto({
 
   return (
     <button className="resumen-card" onClick={() => onAbrir(proyecto.id)}>
+      {/* #138: sin chip de estado. Cabecera solo con el punto y el nombre. */}
       <div className="resumen-card__head">
         <span className="nav-proyecto__dot" style={{ background: proyecto.color ?? '#607d8b' }} />
         <span className="resumen-card__nombre">{proyecto.nombre}</span>
-        <span className={`chip-estado chip-estado--${proyecto.estado}`}>
-          {ESTADO_PROYECTO[proyecto.estado]}
-        </span>
       </div>
 
       {proyecto.descripcion && <p className="resumen-card__desc">{proyecto.descripcion}</p>}
 
+      {/* #138: tres líneas — avance · total (mayor) · desglose de 5 categorías
+          (mismo tamaño). Atr. replanificadas en morado, lo más crítico. */}
       <div className="resumen-card__avance">
         <div className="barra">
           <div className="barra__relleno" style={{ width: `${avance}%` }} />
@@ -75,9 +64,11 @@ function TarjetaProyecto({
         <span className="resumen-card__pct">{avance}%</span>
       </div>
 
-      {/* Las 5 categorias excluyentes (suman el total), de menos a mas critica. */}
-      <div className="resumen-card__stats">
-        <span className="stat"><b>{c.total}</b> tareas</span>
+      <div className="resumen-card__total">
+        <b>{c.total}</b> tareas
+      </div>
+
+      <div className="resumen-card__desglose">
         <span className="stat stat--verde"><b>{c.hechas}</b> hechas</span>
         <span className="stat"><b>{c.pendientes}</b> pendientes</span>
         <span className={`stat${c.pendientesReplan > 0 ? ' stat--ambar' : ''}`}>
@@ -86,7 +77,7 @@ function TarjetaProyecto({
         <span className={`stat${c.atrasadas > 0 ? ' stat--rojo' : ''}`}>
           <b>{c.atrasadas}</b> atrasadas
         </span>
-        <span className={`stat${c.atrasadasReplan > 0 ? ' stat--rojo' : ''}`}>
+        <span className={`stat${c.atrasadasReplan > 0 ? ' stat--morado' : ''}`}>
           <b>{c.atrasadasReplan}</b> atr. replanificadas
         </span>
       </div>

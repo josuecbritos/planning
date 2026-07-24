@@ -117,6 +117,9 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
   )
 
   const atrasadas = misFilas.filter(({ tarea }) => esAtrasada(categoriaDe(state, tarea, hoy))).length
+  // #139: proyectos DISTINTOS realmente presentes en mis filas (no todos los
+  // visibles): si no tengo tareas en un proyecto, no cuenta.
+  const nProyectos = useMemo(() => new Set(misFilas.map((f) => f.proyecto.id)).size, [misFilas])
 
   return (
     <div className="usuarios-wrap">
@@ -124,7 +127,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
         <div>
           <h2>Mis Tareas</h2>
           <p className="usuarios-sub">
-            {misFilas.length} tareas a mi cargo en {proyectos.length} proyecto{proyectos.length === 1 ? '' : 's'}
+            {misFilas.length} tareas a mi cargo en {nProyectos} proyecto{nProyectos === 1 ? '' : 's'}
             {atrasadas > 0 && (
               <span className="mipanel-alerta"> · {atrasadas} atrasada{atrasadas === 1 ? '' : 's'} — asignar nueva fecha</span>
             )}

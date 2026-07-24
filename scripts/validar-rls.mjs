@@ -212,6 +212,30 @@ async function main() {
         await admin.from('acceso_proyecto').delete().eq('usuario_id', otroConsultor.id).eq('proyecto_id', mio.id)
       }
     }
+
+    // 5) #137 Notificaciones: cada quien ve SOLO las suyas (nunca USING(true))
+    //    y nadie puede fabricarlas (las generan triggers; sin policy de insert).
+    const { data: misNotifs } = await c.from('notificacion').select('usuario_id')
+    const notifsAjenas = (misNotifs ?? []).filter((n) => n.usuario_id !== yo.id)
+    marca(
+      notifsAjenas.length === 0,
+      rotulo,
+      'solo ve sus propias notificaciones',
+      notifsAjenas.length ? `VE ${notifsAjenas.length} ajenas` : `${misNotifs?.length ?? 0} propias`,
+    )
+    const { data: unaTareaVisible } = await c.from('tarea').select('id').limit(1)
+    if (unaTareaVisible?.length) {
+      marca(
+        bloqueado(
+          await c
+            .from('notificacion')
+            .insert({ usuario_id: yo.id, tipo: 'asignacion', tarea_id: unaTareaVisible[0].id })
+            .select(),
+        ),
+        rotulo, 'no puede insertar notificaciones (las generan triggers)',
+      )
+    }
+
     await c.auth.signOut()
   }
 

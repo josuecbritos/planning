@@ -21,6 +21,12 @@ interface Props {
   puedeVerUsuarios: boolean
   /** Mis Tareas: para el personal de la consultora (admins y consultores). */
   conMisTareas: boolean
+  /** #137: cuántas notificaciones sin leer (contador naranja si > 0). */
+  noLeidas: number
+  /** #137: ¿el panel emergente de notificaciones está abierto? */
+  notifAbierto: boolean
+  /** #137: abre/cierra el panel de notificaciones (no cambia de pantalla). */
+  onNotificaciones: () => void
   /** "+" de proyectos: admin o consultor con permiso crearProyectos. */
   puedeCrearProyecto: boolean
   can: Can
@@ -53,6 +59,9 @@ export function Sidebar({
   pantalla,
   puedeVerUsuarios,
   conMisTareas,
+  noLeidas,
+  notifAbierto,
+  onNotificaciones,
   puedeCrearProyecto,
   can,
   usuario,
@@ -104,6 +113,19 @@ export function Sidebar({
       </div>
 
       <div className="nav-proyectos nav-pantallas">
+        {/* #137: primera de las tres. Sin campana; el contador va en naranja
+            solo si hay avisos sin leer. Abre el panel emergente (no cambia de
+            pantalla); la vista completa "Notificaciones" se llega con "Ver
+            todas". */}
+        <button
+          className={`nav-frente nav-pantalla${
+            pantalla === 'notificaciones' || notifAbierto ? ' nav-frente--activo' : ''
+          }`}
+          onClick={onNotificaciones}
+        >
+          <span>Notificaciones</span>
+          {noLeidas > 0 && <span className="nav-frente__count nav-frente__count--alerta">{noLeidas}</span>}
+        </button>
         <button
           className={`nav-frente nav-pantalla${pantalla === 'resumen' ? ' nav-frente--activo' : ''}`}
           onClick={() => onSelectPantalla('resumen')}
@@ -140,19 +162,23 @@ export function Sidebar({
 
               {activo && (
                 <div className="nav-frentes">
-                  {/* Editar: admin o dueño (control total, 2). Eliminar exige
-                      ademas el permiso archivarEliminarProyectos (3.1). */}
+                  {/* #133: el menú de la barra es Editar · Archivar (Eliminar
+                      se movió a Administración → Proyectos, solo sobre
+                      archivados). Editar: admin o dueño (control total).
+                      Archivar exige además archivarEliminarProyectos. */}
                   {puedeEditarProyecto(state, usuario, p.id) && (
                     <div className="nav-proyecto__acciones">
                       <button className="link-btn" onClick={() => setModal({ tipo: 'proyecto-editar', id: p.id })}>Editar proyecto</button>
                       {puedeEliminarProyecto(state, usuario, p.id) && (
                         <button
-                          className="link-btn link-btn--danger"
+                          className="link-btn"
                           onClick={() => {
-                            if (confirm(`¿Eliminar el proyecto "${p.nombre}" y todo su contenido?`)) actions.deleteProyecto(p.id)
+                            if (confirm(`¿Archivar "${p.nombre}"? Saldrá de la barra lateral, de Resumen y de Mis Tareas. Queda en Administración → Proyectos.`)) {
+                              actions.updateProyecto(p.id, { estado: 'archivado' })
+                            }
                           }}
                         >
-                          Eliminar
+                          Archivar
                         </button>
                       )}
                     </div>
@@ -213,6 +239,15 @@ export function Sidebar({
             >
               <span>Usuarios</span>
               {usuario.rol === 'admin' && <span className="nav-frente__count">{state.usuarios.length}</span>}
+            </button>
+            {/* #132: Proyectos — hermano de Usuarios. Dueño de la relación
+                usuario↔proyecto y del ciclo de vida (archivar/eliminar). */}
+            <button
+              className={`nav-frente${pantalla === 'admin-proyectos' ? ' nav-frente--activo' : ''}`}
+              style={{ paddingLeft: 12 }}
+              onClick={() => onSelectPantalla('admin-proyectos')}
+            >
+              <span>Proyectos</span>
             </button>
           </div>
         </>

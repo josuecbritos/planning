@@ -38,6 +38,19 @@ export function upsertUsuario(s: AppState, u: Usuario): AppState {
   return { ...s, usuarios: upsert(s.usuarios, u) }
 }
 
+/** #136: eliminar = sacar de la UI. La fila sigue en la base; localmente se
+ *  quita del estado (queda invisible en el módulo y en todos los selectores). */
+export function removeUsuario(s: AppState, usuarioId: string): AppState {
+  return { ...s, usuarios: s.usuarios.filter((u) => u.id !== usuarioId) }
+}
+
+/** #137: marca como leídas las notificaciones con los ids dados. */
+export function marcarNotificacionesLeidas(s: AppState, ids: string[]): AppState {
+  if (ids.length === 0) return s
+  const set = new Set(ids)
+  return { ...s, notificaciones: s.notificaciones.map((n) => (set.has(n.id) ? { ...n, leida: true } : n)) }
+}
+
 export function addAcceso(s: AppState, a: Acceso): AppState {
   const existe = s.accesos.some(
     (x) => x.usuarioId === a.usuarioId && x.proyectoId === a.proyectoId,

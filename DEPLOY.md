@@ -51,6 +51,20 @@ orden** el contenido de:
     `desplanificar_tarea`: borrar la marca de una tarea replanificada deshace la
     última replanificación (vuelve a la fecha anterior y elimina ese registro
     del historial); sin historial, deja la tarea sin planificar
+12. `supabase/migrations/20260707000012_roles_y_permisos.sql` — rol consultor,
+    dueño de proyecto, accesos con set de permisos por proyecto; RLS reescrita
+    (admin / consultor dueño / invitado / cliente)
+13. `supabase/migrations/20260707000013_fix_replan_fecha_origen.sql` — la
+    replanificación solo cuenta si la fecha movida vence hoy o ya venció
+14. `supabase/migrations/20260707000014_seguridad_auth_y_historial.sql` — enlace
+    auth↔usuario solo con invitación usada; autor del historial desde la sesión
+15. `supabase/migrations/20260707000015_seguridad_exposicion_y_execute.sql` —
+    vista `usuario_visible` (enmascara `email`/`permisos_proyecto`); `EXECUTE`
+    acotado (predicados conservan `authenticated`, triggers no)
+16. `supabase/migrations/20260707000016_mejoras_desktop.sql` — proyecto
+    activo/archivado con gate por permiso (#133); `usuario.eliminado` +
+    `usuario_visible` lo filtra + RPC `crear_o_reactivar_usuario` (#136); tabla
+    `notificacion` + RLS por dueño + triggers que la generan (#137)
 
 *(Alternativa con CLI: `supabase link --project-ref TU_REF && supabase db push`.)*
 

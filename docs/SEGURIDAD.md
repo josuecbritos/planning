@@ -72,10 +72,14 @@ reintroduce un hallazgo de la auditoría.
 2. **Enlace auth↔usuario solo con invitación usada.** No debilitar
    `vincular_usuario_auth` para que enlace solo por email.
 3. **La tabla `usuario` no se lee directo desde el cliente.** Usar la vista
-   **`usuario_visible`** (enmascara `email` y `permisos_proyecto` para no-admin).
-   Todo código de front, script o herramienta que necesite la lista de usuarios
-   debe leer la vista, no la tabla. La app (`supabaseRepo`, `supabaseAuth`) y la
-   compuerta (`perfilDe` y la consulta base del admin) ya usan la vista.
+   **`usuario_visible`** (enmascara `email` y `permisos_proyecto` para no-admin,
+   y **filtra los `eliminado`**, #136). Todo código de front, script o
+   herramienta que necesite la lista de usuarios debe leer la vista, no la tabla.
+   La app (`supabaseRepo`, `supabaseAuth`) y la compuerta (`perfilDe` y la
+   consulta base del admin) ya usan la vista. El alta que reactiva a un
+   `eliminado` (por correo, invisible para el cliente) va por el RPC
+   `crear_o_reactivar_usuario` (SECURITY DEFINER que replica la autorización de
+   `usuario_insert`); no relajar esa autorización interna.
 4. **El autor del historial de replanificación se deriva de la sesión**
    (`usuario_actual_id()`), nunca de un parámetro enviado por el cliente.
 5. **Predicados de la RLS conservan `EXECUTE` para `authenticated`.** Funciones
@@ -95,11 +99,23 @@ reintroduce un hallazgo de la auditoría.
 9. **Headers de `vercel.json`:** no quitarlos. Si se agrega un origen externo
    (p. ej. otro API), ajustar la CSP para permitirlo — la CSP debe seguir
    permitiendo `*.supabase.co` y las fuentes usadas.
-10. **RLS habilitada en las 9 tablas con datos** (`usuario`, `proyecto`,
+10. **RLS habilitada en las 10 tablas con datos** (`usuario`, `proyecto`,
     `frente`, `sub_frente`, `tarea`, `replanificacion`, `acceso_proyecto`,
-    `comentario`, `invitacion`). Nunca una política `USING (true)`.
+    `comentario`, `invitacion`, `notificacion`). Nunca una política `USING (true)`.
 11. **Migraciones aditivas:** los cambios de base van como **archivos nuevos** en
     `supabase/migrations/`; no editar migraciones ya aplicadas.
+12. **Notificaciones privadas (#137).** `notificacion` scopea a su dueño:
+    `select`/`update` con `using (usuario_id = usuario_actual_id())` — nunca
+    `USING (true)`. **Sin política de insert/delete**: las generan triggers
+    (`notif_asignacion`, `registrar_replanificacion`, `notif_comentario`,
+    SECURITY DEFINER con `search_path` fijo y sin `EXECUTE` para
+    anon/authenticated, invariante 6) y se borran en cascada con la tarea. El
+    autor sale de la sesión (`usuario_actual_id()` / `app.actor`), nunca del
+    cliente. La compuerta verifica ambas cosas.
+13. **Archivar/eliminar proyectos exige permiso en la base (#133/#134).** El
+    trigger `validar_estado_proyecto` bloquea el cambio de `estado` salvo
+    `es_admin()` o `permiso_proyecto('archivarEliminarProyectos')`; no basta con
+    ocultar el botón en la UI.
 
 ---
 
