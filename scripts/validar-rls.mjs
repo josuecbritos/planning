@@ -184,16 +184,23 @@ async function main() {
       if (puedeCrear) {
         marca(!res.error, rotulo, 'consultor con permiso crea proyecto propio', res.error?.message ?? '')
         if (!res.error) {
-          const borr = await c.from('proyecto').delete().eq('id', res.data.id).select()
+          const id = res.data.id
           const puedeBorrar = (yo.permisos_proyecto ?? {}).archivarEliminarProyectos === true
-          marca(
-            puedeBorrar ? !bloqueado(borr) : bloqueado(borr),
-            rotulo,
-            puedeBorrar ? 'y puede eliminar su proyecto' : 'sin permiso, no elimina ni lo suyo',
-          )
-          if (bloqueado(borr)) {
-            await admin.from('proyecto').delete().eq('id', res.data.id) // limpieza
+          // Migración 17: un proyecto ACTIVO no se elimina, ni con permiso; hay
+          // que archivarlo primero (la regla "archivar antes de borrar" vive en
+          // la base, no solo en la UI).
+          const borrActivo = await c.from('proyecto').delete().eq('id', id).select()
+          marca(bloqueado(borrActivo), rotulo, 'no elimina un proyecto activo (debe archivarse primero)')
+          if (puedeBorrar) {
+            // Con permiso: archiva su propio proyecto y recién entonces lo elimina.
+            const arch = await c.from('proyecto').update({ estado: 'archivado' }).eq('id', id).select()
+            marca(!bloqueado(arch), rotulo, 'archiva su propio proyecto', arch.error?.message ?? '')
+            const borrArch = await c.from('proyecto').delete().eq('id', id).select()
+            marca(!bloqueado(borrArch), rotulo, 'y elimina su proyecto ya archivado', borrArch.error?.message ?? '')
+          } else {
+            marca(bloqueado(borrActivo), rotulo, 'sin permiso, no elimina ni lo suyo')
           }
+          await admin.from('proyecto').delete().eq('id', id) // limpieza (por si algo quedó)
         }
       } else {
         marca(bloqueado(res), rotulo, 'consultor sin permiso no crea proyectos')

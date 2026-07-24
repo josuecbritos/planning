@@ -69,7 +69,7 @@ Como **último paso**, correr la compuerta y no dar por terminado hasta que pase
 
 - Workflow de GitHub Actions **"Validar RLS (compuerta)"** (o `node
   scripts/validar-rls.mjs` con las credenciales). La compuerta ya lee la vista
-  `usuario_visible` en `perfilDe`. Debe pasar **34/34**.
+  `usuario_visible` en `perfilDe`. Debe pasar **en verde (todas las pruebas OK)**.
 - Verificación manual recomendada de §3 (opcional): autenticado como un
   **cliente**, consultar por API `usuario_visible` y `acceso_proyecto` y
   confirmar que **no** aparecen el correo ni los permisos de otros miembros.
