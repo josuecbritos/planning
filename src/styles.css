@@ -793,11 +793,41 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    declarados (120/150/240/60): overflow-wrap anywhere evita que una palabra
    larga ensanche la columna y desplace el anclaje (break-word no reduce el
    ancho minimo intrinseco dentro de una tabla). */
+/* #190: los anclajes se desplazan por el ancho de la columna de proyecto, que
+   solo existe en el Gantt de Mis Tareas (`.gantt--conproy`). En el Gantt de
+   proyecto la variable vale 0 y la geometría queda EXACTAMENTE como estaba. */
+.gantt { --gantt-proy-w: 0px; }
+.gantt--conproy { --gantt-proy-w: 28px; }
 .gantt .fija { position: sticky; background: var(--superficie); z-index: 2; overflow-wrap: anywhere; }
-.gantt .fija--frente { left: 0; width: 120px; min-width: 120px; max-width: 120px; }
-.gantt .fija--sf { left: 120px; width: 150px; min-width: 150px; max-width: 150px; }
-.gantt .fija--tarea { left: 270px; width: 240px; min-width: 240px; max-width: 240px; }
-.gantt .fija--resp { left: 510px; width: 60px; min-width: 60px; max-width: 60px; box-shadow: 2px 0 4px rgba(0,0,0,.08); }
+.gantt .fija--proy {
+  left: 0;
+  width: var(--gantt-proy-w); min-width: var(--gantt-proy-w); max-width: var(--gantt-proy-w);
+  padding: 0;
+}
+.gantt .fija--frente { left: var(--gantt-proy-w); width: 120px; min-width: 120px; max-width: 120px; }
+.gantt .fija--sf { left: calc(var(--gantt-proy-w) + 120px); width: 150px; min-width: 150px; max-width: 150px; }
+.gantt .fija--tarea { left: calc(var(--gantt-proy-w) + 270px); width: 240px; min-width: 240px; max-width: 240px; }
+.gantt .fija--resp { left: calc(var(--gantt-proy-w) + 510px); width: 60px; min-width: 60px; max-width: 60px; box-shadow: 2px 0 4px rgba(0,0,0,.08); }
+
+/* #190: rótulo del proyecto — vertical, leyéndose HACIA ARRIBA, centrado en
+   el bloque del frente. El envoltorio absoluto le da alto definido, que es lo
+   que permite truncar con "…" cuando el nombre no cabe (el nombre completo
+   queda en el tooltip del td). */
+.gantt td.fija--proy .proy-rotulo {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  overflow: hidden; padding: 4px 0;
+}
+/* El texto va en un hijo con `max-height: 100%` (en escritura vertical, el
+   alto ES el tamaño en línea): así queda CENTRADO cuando cabe y se trunca
+   con "…" por el extremo cuando no. Centrar y truncar a la vez no funciona
+   en el mismo elemento (el recorte pasa por los dos lados). */
+.gantt td.fija--proy .proy-rotulo__txt {
+  max-height: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .03em;
+}
 
 .gantt thead th {
   position: sticky; top: 0; z-index: 3; background: var(--superficie-2); text-align: center;
@@ -1783,10 +1813,11 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .gantt-toolbar { margin: 10px 12px 0; }
   .gantt-wrap { padding: 8px 12px 20px; }
   .gantt-scroll { -webkit-overflow-scrolling: touch; max-height: calc(100dvh - 220px); }
-  .gantt .fija--frente { left: 0; width: 76px; min-width: 76px; max-width: 76px; }
-  .gantt .fija--sf { left: 76px; width: 96px; min-width: 96px; max-width: 96px; }
-  .gantt .fija--tarea { left: 172px; width: 140px; min-width: 140px; max-width: 140px; }
-  .gantt .fija--resp { left: 312px; width: 40px; min-width: 40px; max-width: 40px; }
+  .gantt--conproy { --gantt-proy-w: 22px; }
+  .gantt .fija--frente { left: var(--gantt-proy-w); width: 76px; min-width: 76px; max-width: 76px; }
+  .gantt .fija--sf { left: calc(var(--gantt-proy-w) + 76px); width: 96px; min-width: 96px; max-width: 96px; }
+  .gantt .fija--tarea { left: calc(var(--gantt-proy-w) + 172px); width: 140px; min-width: 140px; max-width: 140px; }
+  .gantt .fija--resp { left: calc(var(--gantt-proy-w) + 312px); width: 40px; min-width: 40px; max-width: 40px; }
   .gantt td.fija--tarea { font-size: 11px; padding: 3px 6px; }
   .gantt td.fija--frente, .gantt td.fija--sf { font-size: 10.5px; padding: 6px 6px; }
 }

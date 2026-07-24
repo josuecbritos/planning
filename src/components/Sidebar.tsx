@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AppState, Proyecto, Usuario } from '../types'
 import type { Actions, FrenteSel, Pantalla, SidebarModo, Tema } from '../App'
-import { puedeEditarProyecto, puedeEliminarProyecto, type Can } from '../lib/permisos'
+import { makeCan, puedeEditarProyecto, puedeEliminarProyecto, type Can } from '../lib/permisos'
 import { TextPromptModal } from './TextPromptModal'
 import { ProyectoModal } from './ProyectoModal'
 import { Wordmark } from './Wordmark'
@@ -50,9 +50,34 @@ interface Props {
 type ModalState =
   | { tipo: 'proyecto-nuevo' }
   | { tipo: 'proyecto-editar'; id: string }
-  | { tipo: 'frente-nuevo' }
+  // #189: "Agregar frente" vive en el menú ⋯ de CADA proyecto (no solo el
+  // activo), así que el modal lleva su proyecto.
+  | { tipo: 'frente-nuevo'; proyectoId: string }
   | { tipo: 'frente-editar'; id: string; nombre: string }
   | null
+
+/** #187: chevron doble — comunica plegar/desplegar (no "fijar"). Mismo trazo
+ *  que el resto de la iconografía de la barra (la campana es la referencia). */
+function IconoPlegar({ plegar }: { plegar: boolean }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      style={plegar ? undefined : { transform: 'rotate(180deg)' }}
+    >
+      <path
+        d="m11 6-6 6 6 6M18 6l-6 6 6 6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 
 export function Sidebar({
   state,
@@ -111,15 +136,13 @@ export function Sidebar({
     .filter((f) => f.proyectoId === proyectoActivoId)
     .sort((a, b) => a.orden - b.orden)
 
-  function tareasEnFrente(frenteId: string): number {
-    const subIds = new Set(state.subFrentes.filter((sf) => sf.frenteId === frenteId).map((sf) => sf.id))
-    return state.tareas.filter((t) => subIds.has(t.subFrenteId) && !t.archivada).length
-  }
-  function tareasEnProyecto(proyectoId: string): number {
-    const frenteIds = new Set(state.frentes.filter((f) => f.proyectoId === proyectoId).map((f) => f.id))
-    const subIds = new Set(state.subFrentes.filter((sf) => frenteIds.has(sf.frenteId)).map((sf) => sf.id))
-    return state.tareas.filter((t) => subIds.has(t.subFrenteId) && !t.archivada).length
-  }
+  // #188: los proyectos y los frentes ya no muestran contador de tareas (era
+  // ruido: no se usa para navegar). Los contadores de Administración
+  // (Usuarios / Proyectos) SÍ se conservan — cuentan activos.
+
+  // #189: ¿puede agregar frentes EN ESE proyecto? El ⋯ es por proyecto (no
+  // solo el activo), así que el permiso se resuelve por proyecto.
+  const puedeCrearFrentesEn = (proyectoId: string) => makeCan(state, usuario, proyectoId).crearFrentes
 
   const proyectoEnEdicion =
     modal?.tipo === 'proyecto-editar' ? proyectos.find((p) => p.id === modal.id) : undefined
@@ -138,7 +161,7 @@ export function Sidebar({
           aria-label={sidebarModo === 'fija' ? 'Esconder barra lateral' : 'Fijar barra lateral'}
           onClick={onToggleSidebar}
         >
-          {sidebarModo === 'fija' ? '«' : '📌'}
+          <IconoPlegar plegar={sidebarModo === 'fija'} />
         </button>
       </div>
 
@@ -190,9 +213,10 @@ export function Sidebar({
                 <button className="nav-proyecto__title" onClick={() => onSelectProyecto(p.id)}>
                   <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
                   <span className="nav-proyecto__nombre">{p.nombre}</span>
-                  <span className="nav-frente__count">{tareasEnProyecto(p.id)}</span>
                 </button>
-                {puedeEditarProyecto(state, usuario, p.id) && (
+                {/* #189: el ⋯ aparece si hay AL MENOS una opción disponible
+                    (editar/archivar o agregar frente). */}
+                {(puedeEditarProyecto(state, usuario, p.id) || puedeCrearFrentesEn(p.id)) && (
                   <button
                     className="nav-proyecto__menu-btn"
                     aria-label={`Opciones de ${p.nombre}`}
@@ -218,7 +242,6 @@ export function Sidebar({
                     <div key={f.id} className={`nav-frente-row${frenteSel === f.id ? ' nav-frente-row--activo' : ''}`}>
                       <button className="nav-frente nav-frente--flex" onClick={() => onSelectFrente(f.id)}>
                         <span>{f.nombre}</span>
-                        <span className="nav-frente__count">{tareasEnFrente(f.id)}</span>
                       </button>
                       {can.editarEstructura && (
                         <span className="nav-frente__tools">
@@ -234,12 +257,8 @@ export function Sidebar({
                       )}
                     </div>
                   ))}
-
-                  {can.crearFrentes && (
-                    <button className="nav-frente nav-frente--add" onClick={() => setModal({ tipo: 'frente-nuevo' })}>
-                      + Frente
-                    </button>
-                  )}
+                  {/* #189: "+ Frente" salió de la lista — ahora vive en el ⋯
+                      del proyecto. La lista contiene solo frentes. */}
                 </div>
               )}
             </div>
@@ -315,15 +334,30 @@ export function Sidebar({
               style={{ position: 'fixed', top: menuPos.top, left: menuPos.left }}
               role="menu"
             >
-              <button
-                className="nav-proyecto__menu-op"
-                onClick={() => {
-                  setModal({ tipo: 'proyecto-editar', id: p.id })
-                  cerrarMenu()
-                }}
-              >
-                Editar proyecto
-              </button>
+              {puedeEditarProyecto(state, usuario, p.id) && (
+                <button
+                  className="nav-proyecto__menu-op"
+                  onClick={() => {
+                    setModal({ tipo: 'proyecto-editar', id: p.id })
+                    cerrarMenu()
+                  }}
+                >
+                  Editar proyecto
+                </button>
+              )}
+              {/* #189: creación de frentes, según el permiso en ESE proyecto.
+                  Abre el mismo flujo que la antigua opción "+ Frente". */}
+              {puedeCrearFrentesEn(p.id) && (
+                <button
+                  className="nav-proyecto__menu-op"
+                  onClick={() => {
+                    setModal({ tipo: 'frente-nuevo', proyectoId: p.id })
+                    cerrarMenu()
+                  }}
+                >
+                  Agregar frente
+                </button>
+              )}
               {puedeEliminarProyecto(state, usuario, p.id) && (
                 <button
                   className="nav-proyecto__menu-op"
@@ -355,12 +389,12 @@ export function Sidebar({
           onClose={() => setModal(null)}
         />
       )}
-      {modal?.tipo === 'frente-nuevo' && proyectoActivoId && (
+      {modal?.tipo === 'frente-nuevo' && (
         <TextPromptModal
           titulo="Nuevo frente"
           label="Nombre del frente"
           textoBoton="Crear"
-          onSubmit={(nombre) => actions.createFrente({ proyectoId: proyectoActivoId, nombre })}
+          onSubmit={(nombre) => actions.createFrente({ proyectoId: modal.proyectoId, nombre })}
           onClose={() => setModal(null)}
         />
       )}

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { AppState, Frente, ISODate, SubFrente, Tarea, TipoMarca, Usuario } from '../types'
+import type { AppState, Frente, ISODate, Proyecto, SubFrente, Tarea, TipoMarca, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import {
   addDays,
@@ -46,9 +46,24 @@ import { InlineText } from './InlineText'
  */
 type ModoHorizonte = 'hoy' | 'todo'
 
+/**
+ * #190 — Modo "Mis Tareas": la misma Gantt, pero sobre las tareas del usuario
+ * cruzando TODOS sus proyectos. Cambia solo el origen de las filas (y agrega
+ * la columna de proyecto a la izquierda); el formato de la grilla es idéntico.
+ * Es de lectura y replanificación: no ofrece crear ni eliminar nada.
+ */
+export interface GanttMisTareas {
+  usuarioId: string
+  /** Proyectos visibles: dan color/nombre de la columna y acotan las filas. */
+  proyectos: Proyecto[]
+  /** Permisos POR PROYECTO (dueño vs invitado): cada tarea usa los suyos. */
+  canDe: (proyectoId: string) => Can
+}
+
 interface Props {
   state: AppState
-  proyectoId: string
+  /** Proyecto de la vista. En modo Mis Tareas no aplica (las filas cruzan varios). */
+  proyectoId?: string
   frenteSel: FrenteSel
   hoy: string
   can: Can
@@ -68,6 +83,8 @@ interface Props {
   actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
+  /** #190: presente = Gantt de Mis Tareas (multi-proyecto, sin creación). */
+  misTareas?: GanttMisTareas
 }
 
 type FilaGantt =
@@ -145,7 +162,11 @@ function ventanaHoy(hoy: ISODate): { desde: ISODate; hasta: ISODate } {
   }
 }
 
-export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, onCambiarFiltro, snapshotNonce, onStale, actions, onAbrirTarea }: Props) {
+export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, onCambiarFiltro, snapshotNonce, onStale, actions, onAbrirTarea, misTareas }: Props) {
+  // #190: en modo Mis Tareas la grilla es de lectura y replanificación —
+  // ninguna afordancia de creación (una tarea creada aquí no sería del
+  // usuario hasta asignársela, así que aparecería y desaparecería sola).
+  const permiteCrear = !misTareas
   // Horizonte: por defecto "Alrededor de hoy"; no se persiste.
   const [modo, setModo] = useState<ModoHorizonte>('hoy')
   // §6.3.19: solo dias habiles (default) o semana completa de 7 dias.
@@ -161,14 +182,46 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     avisoTimer.current = window.setTimeout(() => setAviso(null), 2400)
   }
 
-  // Candidatos a responsable: admins, el dueño y quienes tienen acceso.
-  const candidatos = state.usuarios.filter(
-    (u) =>
-      u.activo &&
-      (u.rol === 'admin' ||
-        state.proyectos.some((p) => p.id === proyectoId && p.duenoId === u.id) ||
-        state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
+  // Candidatos a responsable: admins, el dueño y quienes tienen acceso. En
+  // Mis Tareas no se reasigna responsable (sacaría la tarea de la propia
+  // vista), así que la columna queda de solo lectura y no hay candidatos.
+  const candidatos = misTareas
+    ? []
+    : state.usuarios.filter(
+        (u) =>
+          u.activo &&
+          (u.rol === 'admin' ||
+            state.proyectos.some((p) => p.id === proyectoId && p.duenoId === u.id) ||
+            state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
+      )
+
+  // #190: origen de los frentes. En un proyecto, los suyos (o el seleccionado);
+  // en Mis Tareas, los de TODOS los proyectos visibles, ordenados por proyecto
+  // y luego por su orden dentro del proyecto.
+  const proyectosMT = useMemo(
+    () => new Map((misTareas?.proyectos ?? []).map((p) => [p.id, p])),
+    [misTareas],
   )
+  const frentesFuente = useMemo(() => {
+    if (misTareas) {
+      return state.frentes
+        .filter((f) => proyectosMT.has(f.proyectoId))
+        .sort((a, b) => {
+          const na = proyectosMT.get(a.proyectoId)!.nombre
+          const nb = proyectosMT.get(b.proyectoId)!.nombre
+          return na.localeCompare(nb) || a.orden - b.orden
+        })
+    }
+    return state.frentes
+      .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
+      .sort((a, b) => a.orden - b.orden)
+  }, [state.frentes, misTareas, proyectosMT, proyectoId, frenteSel])
+
+  // En Mis Tareas, la fila base son SOLO las tareas del usuario.
+  const esMia = (t: Tarea) => !misTareas || t.responsableId === misTareas.usuarioId
+  // Filtro de proyecto (solo existe en Mis Tareas, que cruza varios).
+  const filtraProyecto = !!(misTareas && filtro.proyectos && filtro.proyectos.length > 0)
+  const pasaProyecto = (f: Frente) => !filtraProyecto || filtro.proyectos!.includes(f.proyectoId)
 
   // Responsable/estado filtran las tareas mostradas en la grilla (la fecha
   // del filtro no: define el horizonte). EXCEPCION: "Sin fecha" — una tarea
@@ -176,9 +229,12 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   // horizonte; en su lugar FILTRA: quedan solo las tareas sin fecha (filas
   // sin marcas, planificables con un clic) y el horizonte no cambia. Con
   // filtro de tareas activo, los contenedores sin coincidencias se omiten.
-  const hayFiltroTareas = filtraTareas(filtro) || fechaFiltraGantt(filtro)
+  const hayFiltroTareas = filtraTareas(filtro) || fechaFiltraGantt(filtro) || filtraProyecto
   const pasaEnGantt = (t: Tarea) =>
     pasaFiltroTareas(state, t, filtro, hoy) && pasaFechaGantt(filtro, t, hoy)
+  // #190: en Mis Tareas nunca se dibujan contenedores vacíos ni filas de
+  // creación — la vista muestra solo frentes/sub frentes CON tareas propias.
+  const omitirVacios = hayFiltroTareas || !!misTareas
 
   // P1: vista congelada. Se congela con filtro y/u orden activo. `frescoIds`
   // recorre frentes→subs→tareas aplicando el filtro/orden actual; la foto se
@@ -187,18 +243,17 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   const { frescoIds, existentesIds } = useMemo(() => {
     const fresco: string[] = []
     const existentes: string[] = []
-    const frentesOrd = state.frentes
-      .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
-      .sort((a, b) => a.orden - b.orden)
-    for (const f of frentesOrd) {
+    for (const f of frentesFuente) {
       const subs = state.subFrentes.filter((sf) => sf.frenteId === f.id).sort((a, b) => a.orden - b.orden)
       for (const sf of subs) {
         const todas = state.tareas
-          .filter((t) => t.subFrenteId === sf.id && !t.archivada)
+          .filter((t) => t.subFrenteId === sf.id && !t.archivada && esMia(t))
           .sort((a, b) => a.orden - b.orden)
         for (const t of todas) existentes.push(t.id)
         const visibles = todas.filter(
-          (t) => !hayFiltroTareas || (pasaFiltroTareas(state, t, filtro, hoy) && pasaFechaGantt(filtro, t, hoy)),
+          (t) =>
+            !hayFiltroTareas ||
+            (pasaProyecto(f) && pasaFiltroTareas(state, t, filtro, hoy) && pasaFechaGantt(filtro, t, hoy)),
         )
         const ord = ordenarMulti(visibles, orden, (t, campo) =>
           valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
@@ -208,32 +263,35 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     }
     return { frescoIds: fresco, existentesIds: existentes }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, proyectoId, frenteSel, hayFiltroTareas, filtro, orden, hoy])
+  }, [state, frentesFuente, hayFiltroTareas, filtro, orden, hoy])
 
-  const firma = JSON.stringify([proyectoId, frenteSel, filtro, orden, snapshotNonce])
+  const firma = JSON.stringify([
+    misTareas ? `mt:${misTareas.usuarioId}` : proyectoId,
+    frenteSel,
+    filtro,
+    orden,
+    snapshotNonce,
+  ])
   const { congelada, visibleIds, indice, stale } = useVistaCongelada(frescoIds, existentesIds, activo, firma)
   useEffect(() => onStale(stale), [stale, onStale])
 
   // -- Filas (incluye contenedores vacios §6.4.26 e inputs inline §6.4.25) --
   const filas = useMemo<FilaGantt[]>(() => {
     const out: FilaGantt[] = []
-    const frentes = state.frentes
-      .filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
-      .sort((a, b) => a.orden - b.orden)
 
     let primera = true
-    for (const f of frentes) {
+    for (const f of frentesFuente) {
       const subs = state.subFrentes
         .filter((sf) => sf.frenteId === f.id)
         .sort((a, b) => a.orden - b.orden)
 
       const filasFrente: FilaGantt[] = []
       if (subs.length === 0) {
-        if (!hayFiltroTareas) filasFrente.push({ tipo: 'vacio-frente', frente: f, esPrimeraGlobal: false })
+        if (!omitirVacios) filasFrente.push({ tipo: 'vacio-frente', frente: f, esPrimeraGlobal: false })
       } else {
         for (const sf of subs) {
           const todasSub = state.tareas
-            .filter((t) => t.subFrenteId === sf.id && !t.archivada)
+            .filter((t) => t.subFrenteId === sf.id && !t.archivada && esMia(t))
             .sort((a, b) => a.orden - b.orden)
           // Punto 4: el orden reordena DENTRO del bloque de sub frente (no mezcla
           // entre bloques). P1: con la vista congelada se muestran EXACTAMENTE las
@@ -244,13 +302,13 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                 .filter((t) => visibleIds.has(t.id))
                 .sort((a, b) => (indice.get(a.id) ?? 0) - (indice.get(b.id) ?? 0))
             : ordenarMulti(
-                todasSub.filter((t) => !hayFiltroTareas || pasaEnGantt(t)),
+                todasSub.filter((t) => !hayFiltroTareas || (pasaProyecto(f) && pasaEnGantt(t))),
                 orden,
                 (t, campo) => valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
               )
           const filasSub: FilaGantt[] = []
           if (tareas.length === 0) {
-            if (hayFiltroTareas) continue
+            if (omitirVacios) continue
             filasSub.push({
               tipo: 'vacio-sub',
               frente: f,
@@ -318,7 +376,10 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         fila.esPrimeraGlobal = primera && i === 0
       })
       out.push(...filasFrente)
-      primera = false
+      // Solo cuenta como "ya hubo un frente" si aportó filas: con filtro (o en
+      // Mis Tareas) muchos frentes quedan vacíos y no deben consumir el turno
+      // de "primera fila global" (el separador superior).
+      if (filasFrente.length > 0) primera = false
       // Input de frente nuevo justo debajo del frente hermano.
       if (crearEn?.tipo === 'frente' && crearEn.despuesDe?.id === f.id) {
         out.push({ tipo: 'input-frente', esPrimeraGlobal: false })
@@ -328,7 +389,8 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
       out.push({ tipo: 'input-frente', esPrimeraGlobal: out.length === 0 })
     }
     return out
-  }, [state, proyectoId, frenteSel, crearEn, filtro, orden, hoy, hayFiltroTareas, congelada, visibleIds, indice])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, frentesFuente, omitirVacios, crearEn, filtro, orden, hoy, hayFiltroTareas, congelada, visibleIds, indice])
 
   const filasTarea = useMemo(
     () => filas.filter((f): f is Extract<FilaGantt, { tipo: 'tarea' }> => f.tipo === 'tarea'),
@@ -440,12 +502,17 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
       }))
       .filter((x): x is { usuario: Usuario; porDia: Map<ISODate, number> } => Boolean(x.usuario))
       .sort((a, b) => a.usuario.nombre.localeCompare(b.usuario.nombre))
+    // #190: en Mis Tareas hay una sola persona — al pie va UNA fila con el
+    // total diario del usuario (sin desglose por persona ni "Sin asignar").
+    if (misTareas) {
+      return { personas: [], sinAsignar: null, total: total.size > 0 ? total : null }
+    }
     return {
       personas,
       sinAsignar: porClave.get(SIN_ASIGNAR) ?? null,
       total: total.size > 0 ? total : null,
     }
-  }, [filasTarea, dias, state.usuarios])
+  }, [filasTarea, dias, state.usuarios, misTareas])
 
   // -- Creacion inline (§6.4.25/26) --
 
@@ -547,13 +614,19 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   // filas que renderizar. Un frente recién creado sin sub frentes ni tareas no
   // produce filas, pero el proyecto ya no está "sin frentes": debe mostrar su
   // estructura (fila de frente vacío), no el mensaje de bienvenida.
-  const sinFrentes =
-    state.frentes.filter((f) => f.proyectoId === proyectoId && (frenteSel === 'todos' || f.id === frenteSel))
-      .length === 0
+  const sinFrentes = frentesFuente.length === 0
   if (filas.length === 0) {
     return (
       <div className="gantt-wrap">
-        {sinFrentes ? (
+        {/* #190: en Mis Tareas no se ofrece crear frentes — el vacío es
+            "no tienes tareas", no "el proyecto no tiene estructura". */}
+        {misTareas ? (
+          hayFiltroTareas ? (
+            'Ninguna tarea coincide con el filtro activo.'
+          ) : (
+            'Sin tareas a tu cargo.'
+          )
+        ) : sinFrentes && proyectoId ? (
           <EmptyFrentes proyectoId={proyectoId} puedeCrear={can.crearFrentes} actions={actions} />
         ) : (
           'Ninguna tarea coincide con el filtro activo.'
@@ -563,7 +636,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   }
 
   const finOffsetSemana = soloHabiles ? 4 : 6
-  const hayCarga = carga.personas.length > 0 || carga.sinAsignar !== null
+  const hayCarga = carga.personas.length > 0 || carga.sinAsignar !== null || (!!misTareas && !!carga.total)
 
   return (
     <div>
@@ -600,7 +673,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                 Alrededor de hoy
               </button>
               <button className={modo === 'todo' ? 'activo' : ''} onClick={() => setModo('todo')} title="De la primera a la última tarea">
-                Todo el proyecto
+                {misTareas ? 'Todas mis tareas' : 'Todo el proyecto'}
               </button>
             </div>
           )}
@@ -610,9 +683,15 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         <div className="gantt-scroll" ref={scrollRef}>
           {/* 2.1: sin menu contextual del navegador sobre la grilla (el clic
               derecho es el gesto de marcar lista). */}
-          <table className="gantt" onContextMenu={(e) => e.preventDefault()}>
+          {/* #190: `gantt--conproy` activa la columna de proyecto y desplaza
+              los anclajes de las columnas congeladas (variable CSS). */}
+          <table
+            className={`gantt${misTareas ? ' gantt--conproy' : ''}`}
+            onContextMenu={(e) => e.preventDefault()}
+          >
             <thead>
               <tr className="semana">
+                {misTareas && <th className="fija fija--proy" rowSpan={2} aria-label="Proyecto" />}
                 <th className="fija fija--frente" rowSpan={2}>Frente</th>
                 <th className="fija fija--sf" rowSpan={2}>Sub Frente</th>
                 <th className="fija fija--tarea" rowSpan={2}>Tarea</th>
@@ -656,7 +735,20 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                   state={state}
                   hoy={hoy}
                   candidatos={candidatos}
-                  can={can}
+                  // #190: en Mis Tareas los permisos son los del proyecto de
+                  // ESA tarea (dueño vs invitado), no los de un proyecto activo.
+                  can={
+                    misTareas && fila.tipo !== 'input-frente'
+                      ? misTareas.canDe(fila.frente.proyectoId)
+                      : can
+                  }
+                  proyecto={
+                    misTareas && fila.tipo !== 'input-frente'
+                      ? proyectosMT.get(fila.frente.proyectoId)
+                      : undefined
+                  }
+                  conProyecto={!!misTareas}
+                  permiteCrear={permiteCrear}
                   actions={actions}
                   onAbrirTarea={onAbrirTarea}
                   abrirCrear={abrirCrear}
@@ -670,7 +762,10 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
               {/* §6.5 — Carga por persona + "Sin asignar" (puntos 3 y 4) */}
               {hayCarga && (
                 <tr className="carga-sep">
-                  <td className="fija fija--frente carga-sep__label">Carga por persona</td>
+                  {misTareas && <td className="fija fija--proy carga-vacia" />}
+                  <td className="fija fija--frente carga-sep__label">
+                    {misTareas ? 'Mi carga' : 'Carga por persona'}
+                  </td>
                   <td className="fija fija--sf carga-vacia" />
                   <td className="fija fija--tarea carga-vacia" />
                   <td className="fija fija--resp carga-vacia" />
@@ -692,7 +787,8 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                   atenuada
                 />
               )}
-              {/* Punto 4: total de tareas por dia (personas + sin asignar) */}
+              {/* Punto 4: total de tareas por dia (personas + sin asignar).
+                  #190: en Mis Tareas es la ÚNICA fila de carga. */}
               {carga.total && (
                 <FilaCarga
                   nombre="Total"
@@ -701,6 +797,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                   dias={dias}
                   hoy={hoy}
                   esTotal
+                  conProyecto={!!misTareas}
                 />
               )}
             </tbody>
@@ -728,6 +825,7 @@ function FilaCarga({
   hoy,
   atenuada,
   esTotal,
+  conProyecto,
 }: {
   nombre: string
   avatar: React.ReactNode
@@ -736,9 +834,12 @@ function FilaCarga({
   hoy: string
   atenuada?: boolean
   esTotal?: boolean
+  /** #190: hay columna de proyecto a la izquierda (Gantt de Mis Tareas). */
+  conProyecto?: boolean
 }) {
   return (
     <tr className={`carga-fila${atenuada ? ' carga-fila--sin' : ''}${esTotal ? ' carga-fila--total' : ''}`}>
+      {conProyecto && <td className="fija fija--proy carga-vacia" />}
       <td className="fija fija--frente carga-vacia" />
       <td className="fija fija--sf carga-vacia" />
       <td className="fija fija--tarea carga-fila__nombre">{nombre}</td>
@@ -799,6 +900,9 @@ function FilaGanttRow({
   hoy,
   candidatos,
   can,
+  proyecto,
+  conProyecto,
+  permiteCrear,
   actions,
   onAbrirTarea,
   abrirCrear,
@@ -813,6 +917,12 @@ function FilaGanttRow({
   hoy: string
   candidatos: Usuario[]
   can: Can
+  /** #190: proyecto de la fila (solo en Mis Tareas). */
+  proyecto?: Proyecto
+  /** #190: ¿se dibuja la columna de proyecto a la izquierda? */
+  conProyecto?: boolean
+  /** #190: en Mis Tareas no hay ninguna afordancia de creación. */
+  permiteCrear: boolean
   actions: Actions
   onAbrirTarea: (id: string) => void
   abrirCrear: (e: React.MouseEvent, crear: CrearEn) => void
@@ -827,12 +937,29 @@ function FilaGanttRow({
   // reposiciona para que quede centrado en la porcion VISIBLE del bloque
   // (punto 3), acompañando el scroll cuando el frente/sub es mas alto que
   // la pantalla y quedando centrado cuando cabe entero.
+  // #190: columna de proyecto — muy angosta, nombre ROTADO leyéndose hacia
+  // arriba y fondo del color del proyecto. Comparte el rowSpan del frente
+  // (se repite en cada frente). Si el nombre no cabe en el alto del bloque,
+  // se trunca con "…" y el nombre completo queda en el tooltip.
+  const celdaProyecto = (span: number) => (
+    <td
+      className="fija fija--proy"
+      rowSpan={span}
+      style={{ background: proyecto?.color ?? '#607d8b' }}
+      title={proyecto?.nombre}
+    >
+      <span className="proy-rotulo">
+        <span className="proy-rotulo__txt">{proyecto?.nombre ?? '—'}</span>
+      </span>
+    </td>
+  )
+
   const celdaFrente = (frente: Frente, span: number) => (
     <td className="fija fija--frente fija--rotula" rowSpan={span}>
       <span className="fija-nombre">
         <span className="con-mas">
           {frente.nombre}
-          {can.crearFrentes && (
+          {permiteCrear && can.crearFrentes && (
             <button
               className="mas-btn"
               data-tip="Agregar frente debajo"
@@ -854,7 +981,7 @@ function FilaGanttRow({
       <span className="fija-nombre">
         <span className="con-mas">
           {sub.nombre}
-          {can.crearSubFrentes && (
+          {permiteCrear && can.crearSubFrentes && (
             <button
               className="mas-btn"
               data-tip="Agregar sub frente debajo"
@@ -933,7 +1060,7 @@ function FilaGanttRow({
         <td className={`fija fija--sf gantt-vacio${creandoAca ? ' fija--input' : ''}`} colSpan={1}>
           {creandoAca ? (
             <CrearInput placeholder="Nuevo sub frente… (Enter crea)" onCrear={onCrear} onCerrar={onCerrarCrear} />
-          ) : can.crearSubFrentes ? (
+          ) : permiteCrear && can.crearSubFrentes ? (
             <button
               className="btn btn--ghost btn--sm"
               onClick={(e) => abrirCrear(e, { tipo: 'sub', contenedorId: fila.frente.id })}
@@ -960,7 +1087,7 @@ function FilaGanttRow({
         <td className={`fija fija--tarea gantt-vacio${creandoAca ? ' fija--input' : ''}`}>
           {creandoAca ? (
             <CrearInput placeholder="Nueva tarea… (Enter crea)" onCrear={onCrear} onCerrar={onCerrarCrear} />
-          ) : can.crearTareas ? (
+          ) : permiteCrear && can.crearTareas ? (
             <button
               className="btn btn--ghost btn--sm"
               onClick={(e) => abrirCrear(e, { tipo: 'tarea', contenedorId: fila.sub.id })}
@@ -1057,6 +1184,9 @@ function FilaGanttRow({
 
   return (
     <tr className={sep.trim()}>
+      {/* #190: la columna de proyecto solo existe en Mis Tareas, donde las
+          únicas filas posibles son de tarea (no hay vacíos ni inputs). */}
+      {conProyecto && fila.esInicioFrente && celdaProyecto(fila.spanFrente)}
       {fila.esInicioFrente && celdaFrente(fila.frente, fila.spanFrente)}
       {fila.esInicioSub && celdaSub(fila.frente, fila.sub, fila.spanSub)}
 
@@ -1091,7 +1221,7 @@ function FilaGanttRow({
             >
               ⓘ
             </button>
-            {can.crearTareas && (
+            {permiteCrear && can.crearTareas && (
               <button
                 className="mas-btn"
                 data-tip="Agregar tarea debajo"
@@ -1107,7 +1237,8 @@ function FilaGanttRow({
         </span>
       </td>
       <td className="fija fija--resp">
-        {can.asignarResponsable(tarea) ? (
+        {/* Sin candidatos (Mis Tareas) la columna es de solo lectura. */}
+        {candidatos.length > 0 && can.asignarResponsable(tarea) ? (
           <RespPicker
             usuarios={candidatos}
             value={tarea.responsableId}

@@ -844,6 +844,7 @@ export default function App() {
             hoy={HOY}
             actions={actions}
             onAbrirTarea={abrirDetalle}
+            esMovil={esMovil}
           />
         ) : pantalla === 'resumen' ? (
           <ResumenView
