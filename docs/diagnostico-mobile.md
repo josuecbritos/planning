@@ -16,14 +16,27 @@ resolvieron y aparecieron otros nuevos.
 
 ## 1. Resumen ejecutivo
 
-La **operación diaria en mobile está sana**: ver el plan, revisar las tareas
-propias, consultar el resumen y navegar funcionan bien y sin desbordes. Lo que
-está roto es la **administración**: configurar permisos es imposible desde el
-teléfono, y las dos tablas de administración muestran los datos sin la columna
-que dice **de quién** o **de qué proyecto** se trata.
+El **núcleo de la operación diaria está sano**: ver el plan, revisar las tareas
+propias, consultar el resumen y el drawer de navegación funcionan bien y sin
+desbordes.
 
-Son dos problemas críticos, ambos acotados y de arreglo aditivo (solo CSS
-mobile, sin tocar datos, permisos ni desktop).
+Hay **tres problemas críticos**:
+
+1. **C1 — Configurar permisos es imposible desde el teléfono:** el modal se sale
+   por arriba y por abajo y no tiene scroll, así que no se puede guardar ni cerrar.
+2. **C2 — Las tablas de administración no dicen de quién son los datos:** la
+   columna de identidad mide 0px, así que se ven los emails pero no los nombres.
+3. **C3 — Los dos flotantes del sidebar caen fuera de pantalla:** el panel de
+   notificaciones (se ve una franja de ~90px de él) y el menú ⋯ del proyecto.
+
+Los tres son acotados y de arreglo aditivo (CSS mobile, sin tocar datos,
+permisos ni desktop). **C3 es el más urgente en la práctica**: las notificaciones
+son de uso diario, mientras que C1 y C2 son de administración —cuya frecuencia
+real en móvil habría que confirmar (ver §9)—.
+
+Vale la pena notar un patrón: **C2 y C3 nacen de escribir medidas de desktop sin
+acotarlas por media query** (anchos de columna; `left: 240px`; `botón.right + 8`).
+No son descuidos de diseño mobile, sino desktop que se filtró.
 
 ---
 
@@ -43,7 +56,7 @@ Y sigue sano lo que ya estaba bien:
 | **Tabla del proyecto** | Bien | Encaja exacto en 390px. Columnas: Hecha 32 · Tarea 147 · Resp. 34 · Estado 62 · Fecha 64 · acciones 26. `Atraso` se colapsa a 0 **a propósito** en mobile |
 | **Mis Tareas** | Bien | Sin desborde |
 | **Resumen** | Bien | Sin desborde |
-| **Navegación** (drawer ☰ + velo + 🌙) | Bien | Patrón correcto |
+| **Navegación** (drawer ☰ + velo + 🌙) | Bien *el drawer* | Patrón correcto. **Pero lo que cuelga de él —panel de notificaciones y menú ⋯— está roto: ver §5** |
 | **Panel de detalle de tarea** | Bien | 359px de ancho, alto completo, `overflow-y: auto` → scrollea |
 | **Gantt** | Ausente a propósito | Incluida la nueva de Mis Tareas (#190), que también se oculta bien |
 
@@ -70,7 +83,7 @@ Problemas asociados, visibles en la misma pantalla:
 
 - Los controles segmentados **se salen del borde derecho de la tarjeta** (no del
   viewport, por eso una medición contra el ancho de pantalla no los detecta).
-- Los **botones flotantes ☰ y 🌙 tapan el texto** de ayuda del modal (ver C3).
+- Los **botones flotantes ☰ y 🌙 tapan el texto** de ayuda del modal (ver C4, §6).
 - Etiquetas quebradas en 2–3 líneas ("Marcar como hechas", "Archivar / eliminar").
 
 > Corresponde a los puntos P2 y P3 del diagnóstico de julio: **siguen abiertos**.
@@ -108,18 +121,71 @@ Afecta igual a la **vista acotada del consultor**, que usa la misma tabla.
 
 ---
 
-## 5. 🟡 Medio
+## 5. 🔴 C3 — Los dos elementos flotantes del sidebar caen fuera de pantalla
 
-**C3 — Botones flotantes por encima de los modales.** `☰` y `🌙` tienen
+Ambos son novedades recientes del sidebar (#137/#159 y #178/#184), se posicionan
+con **coordenadas absolutas pensadas para desktop** y **ninguno tiene regla en la
+media query**. Es la misma causa raíz en dos lugares.
+
+### C3.a — Panel de notificaciones: inutilizable
+
+CSS: `position: fixed; top: 60px; **left: 240px**; width: 360px; max-width: 92vw`.
+Ese `left: 240px` es el ancho del sidebar **de desktop**, escrito a mano.
+
+| Métrica (390×844) | Valor |
+| --- | --- |
+| Caja del panel | x = **240 … 599** |
+| Se sale por la derecha | **209px** (58% del panel) |
+| Primer ítem alcanzable con el dedo | **No** (`elementFromPoint` no lo devuelve) |
+| Botón "Ver todas" | borde derecho en 598 → **fuera de pantalla** |
+
+Y hay un agravante que solo se ve en la captura: como el panel se abre desde el
+drawer, **queda por detrás del drawer abierto** (que ocupa 0–300). Entre el
+drawer que lo tapa por la izquierda y el borde que lo corta por la derecha, del
+panel se ve una **franja de ~90px**: los textos aparecen mutilados por ambos
+lados ("osue Britos te a…").
+
+Es la vía principal a las notificaciones en mobile, y es de **uso diario**, no de
+administración.
+
+### C3.b — Menú ⋯ del proyecto: cortado, y ausente salvo en el proyecto activo
+
+El popover se ancla en JS con `left = botón.right + 8`.
+
+| Métrica (390×844) | Valor |
+| --- | --- |
+| Caja del menú | x = **288 … 456** (ancho 168) |
+| Se sale por la derecha | **66px** — el texto de las tres opciones queda cortado |
+| Opciones | Editar proyecto · Agregar frente · Archivar (las tres con el borde en 455) |
+
+**Segundo problema, de fondo:** la regla es
+`.nav-proyecto__menu-btn { visibility: hidden }`, y solo lo revelan
+`:hover` o `.nav-proyecto--activo`. **En una pantalla táctil no hay hover**, así
+que el ⋯ **solo existe en el proyecto activo**: para editar, archivar o agregar
+un frente a cualquier otro proyecto hay que abrirlo primero. Es una limitación
+funcional, no estética. *(El caso del proyecto activo está medido; el del no
+activo se deduce de la regla CSS, que es inequívoca.)*
+
+> **Por qué la primera pasada no los detectó.** El barrido de desbordes excluía
+> los elementos `position: fixed` —para no contar el drawer, que legítimamente
+> vive fuera de pantalla— y ambos son precisamente `position: fixed`. La lección
+> para futuras auditorías: los flotantes hay que medirlos **abiertos y uno por
+> uno**, no con un barrido general.
+
+---
+
+## 6. 🟡 Medio
+
+**C4 — Botones flotantes por encima de los modales.** `☰` y `🌙` tienen
 `z-index: 2200`, por encima del overlay de modales (`2000`): tapan contenido y
 permiten abrir el drawer sobre un formulario a medio llenar. Ya estaba en el
 diagnóstico de julio.
 
-**C4 — Áreas táctiles bajo lo recomendado (≥44px).** Medidos: ✕ de modal 25×22 ·
+**C5 — Áreas táctiles bajo lo recomendado (≥44px).** Medidos: ✕ de modal 25×22 ·
 segmentos de permisos 27px de alto · botones de modal 30px · `icon-btn` de las
 tablas ~21px. Afecta sobre todo a las pantallas de administración.
 
-## 6. 🔵 Menor
+## 7. 🔵 Menor
 
 - **Encabezado del proyecto**: título + 5 contadores + barra de filtros consumen
   bastante alto antes del contenido. Aceptable, compactable.
@@ -127,7 +193,7 @@ tablas ~21px. Afecta sobre todo a las pantallas de administración.
 
 ---
 
-## 7. Plan de mejoras propuesto
+## 8. Plan de mejoras propuesto
 
 **Principio:** aditivo, **solo dentro de `@media (max-width: 768px)`** — cero
 impacto en desktop, que está validado. Sin tocar datos, permisos ni RLS.
@@ -159,28 +225,47 @@ Dos caminos:
 En ambos casos conviene **acotar por media query las reglas de tabla**, para que
 un futuro ajuste de desktop no vuelva a romper mobile.
 
-### M3 — Áreas táctiles ≥44px *(resuelve C4)*
+### M3 — Flotantes del sidebar dentro de pantalla *(resuelve C3)*
+
+- **Panel de notificaciones:** en mobile, dejar de anclarlo al ancho del sidebar
+  de desktop. Lo natural es que ocupe el ancho útil de la pantalla (por ejemplo
+  `left: 8px; right: 8px; width: auto`) o que se presente como hoja inferior.
+  Debe quedar **por encima del drawer**, no detrás.
+- **Menú ⋯:** acotar la posición calculada al viewport (si `left + ancho` excede
+  la pantalla, anclar por la derecha), y **revelar el ⋯ sin depender de `:hover`**
+  en pantallas táctiles, para que sea alcanzable en cualquier proyecto y no solo
+  en el activo.
+
+Es el más urgente de los tres críticos: las notificaciones son de uso diario.
+
+### M4 — Áreas táctiles ≥44px *(resuelve C5)*
 
 En `icon-btn`, `modal-x`, segmentos de permisos y checkboxes. Barato y toca los
 mismos componentes que M1/M2.
 
-### M4 — Capas *(resuelve C3)*
+### M5 — Capas *(resuelve C4)*
 
 Bajar `☰`/`🌙` por debajo del overlay o, mejor, **ocultarlos mientras haya un
 modal o el panel de detalle abiertos**.
 
 ### Secuencia sugerida
 
-Un solo pedido con **M1 + M2 + M4**, con **M3** incluido por cercanía: es un
-bloque coherente —"administración usable en mobile"— y es donde está todo lo
-roto. El encabezado del proyecto (🔵) queda para un pedido menor posterior.
+Dos bloques, en este orden:
 
-**Qué no tocar:** tabla del proyecto, Mis Tareas, Resumen, navegación, panel de
-detalle y la ausencia deliberada de Gantt — ya iterados y funcionando.
+1. **Sidebar en mobile** — **M3** (+ la parte de capas de **M5**). Es chico,
+   toca lo de **uso diario** y desbloquea las notificaciones, que hoy son
+   inalcanzables. Va primero aunque sea el hallazgo más nuevo.
+2. **Administración usable en mobile** — **M1 + M2 + M4**. Bloque coherente y
+   más grande; su urgencia depende de la respuesta a §9.
+
+El encabezado del proyecto (🔵) queda para un pedido menor posterior.
+
+**Qué no tocar:** tabla del proyecto, Mis Tareas, Resumen, el drawer en sí,
+panel de detalle y la ausencia deliberada de Gantt — ya iterados y funcionando.
 
 ---
 
-## 8. Pregunta abierta
+## 9. Pregunta abierta
 
 El plan asume que **administrar desde el teléfono** (usuarios, permisos,
 proyectos) es un caso de uso real. Si en la práctica eso siempre se hace desde el
@@ -188,3 +273,6 @@ computador, **M2 baja de prioridad**: bastaría con que las tablas se vean digna
 y sin datos invisibles (opción b), sin llegar a tarjetas. M1 sigue siendo
 crítico en cualquier escenario, porque hoy un modal alto deja al usuario sin
 forma de guardar ni cerrar.
+
+**M3 no depende de esa respuesta:** las notificaciones son de uso diario para
+cualquier rol, así que se arregla igual.
