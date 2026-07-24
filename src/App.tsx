@@ -321,6 +321,15 @@ export default function App() {
     [proyectosMiembro],
   )
 
+  // #146: administrar ≠ ser miembro. El módulo Administración → Proyectos usa
+  // TODO lo que la RLS entrega: para el admin son todos los proyectos (sea o no
+  // miembro); para el consultor, los suyos (dueño + asignados). La barra lateral
+  // sigue con proyectosVisibles (solo donde es miembro).
+  const proyectosAdmin = useMemo(
+    () => (esAdmin ? state?.proyectos ?? [] : proyectosMiembro),
+    [esAdmin, state, proyectosMiembro],
+  )
+
   // #137: mis notificaciones (más recientes primero) y cuántas sin leer.
   const notifsMias = useMemo(() => {
     if (!state || !sesion) return [] as Notificacion[]
@@ -488,9 +497,12 @@ export default function App() {
   }, [auth])
 
   // P1: "Actualizar vista" recalcula la foto (nuevo snapshot) y baja el flag.
+  // #158: también suelta la tarea resaltada/forzada — al recalcular, si el
+  // filtro la excluye, deja de mostrarse.
   const actualizarVista = useCallback(() => {
     setSnapshotNonce((n) => n + 1)
     setVistaStale(false)
+    setTareaResaltada(null)
   }, [])
 
   // Cambiar de vista/proyecto recalcula la foto naturalmente (no cuenta como
@@ -507,6 +519,7 @@ export default function App() {
     // Punto 3: NO se limpia el filtro/orden — cada proyecto conserva el suyo.
     setVistaStale(false)
     setMovilSidebar(false)
+    setTareaResaltada(null) // #158: navegar suelta el resaltado
   }, [])
 
   // Vista (filtro + orden) del proyecto activo; setters que solo tocan la
@@ -540,33 +553,39 @@ export default function App() {
     setFrenteSel(f)
     setVistaStale(false)
     setMovilSidebar(false)
+    setTareaResaltada(null) // #158
   }, [])
 
   const onSelectPantalla = useCallback((p: Pantalla) => {
     setPantalla(p)
     setTareaDetalleId(null)
     setMovilSidebar(false)
+    setTareaResaltada(null) // #158
   }, [])
 
   const abrirDetalle = useCallback((tareaId: string) => setTareaDetalleId(tareaId), [])
 
-  // #137: abrir/cerrar el panel de notificaciones. Al abrirlo se marcan todas
-  // como leídas (y el contador naranja desaparece).
-  const abrirNotificaciones = useCallback(() => {
-    if (notifAbierto) {
-      setNotifAbierto(false)
-      return
-    }
-    setNotifAbierto(true)
+  // #156: cerrar el panel marca todo como leído (y el contador desaparece).
+  // Mientras está abierto, lo no leído conserva su estilo destacado.
+  const cerrarNotificaciones = useCallback(() => {
+    setNotifAbierto(false)
     if (noLeidas > 0) actions.marcarNotificacionesLeidas()
-  }, [notifAbierto, noLeidas, actions])
+  }, [noLeidas, actions])
+
+  // #137/#156: abrir/cerrar el panel. Al ABRIR ya no se marca nada; se marca al
+  // cerrar (arriba).
+  const abrirNotificaciones = useCallback(() => {
+    if (notifAbierto) cerrarNotificaciones()
+    else setNotifAbierto(true)
+  }, [notifAbierto, cerrarNotificaciones])
 
   // #137: click en un aviso → ir a la Tabla del proyecto, resaltar la tarea y
   // abrir su panel de detalle. Si el filtro la excluye, la Tabla la muestra
-  // igual y ofrece "Actualizar vista".
+  // igual (y queda "Actualizar vista"); #158: la tarea forzada PERMANECE hasta
+  // que el usuario navegue o actualice la vista, no se cae sola.
   const abrirNotificacion = useCallback(
     (n: Notificacion) => {
-      setNotifAbierto(false)
+      cerrarNotificaciones()
       if (!state) return
       const tarea = state.tareas.find((t) => t.id === n.tareaId)
       if (!tarea) return
@@ -583,7 +602,7 @@ export default function App() {
       setTareaResaltada(n.tareaId)
       setMovilSidebar(false)
     },
-    [state],
+    [state, cerrarNotificaciones],
   )
 
   // Punto 2: mide el alto de la barra de filtros (sticky) y lo publica en
@@ -712,6 +731,18 @@ export default function App() {
             >
               »
             </button>
+            {/* #159: campana fija en la barra contraída — misma posición que
+                "Notificaciones" en la barra desplegada (primera, bajo el logo),
+                con el contador naranja de no leídas. */}
+            <button
+              className={`sidebar-mini__campana${notifAbierto ? ' sidebar-mini__campana--activo' : ''}`}
+              title="Notificaciones"
+              aria-label="Notificaciones"
+              onClick={abrirNotificaciones}
+            >
+              🔔
+              {noLeidas > 0 && <span className="sidebar-mini__badge">{noLeidas}</span>}
+            </button>
             {proyectosVisibles.map((p) => (
               <button
                 key={p.id}
@@ -738,6 +769,7 @@ export default function App() {
           noLeidas={noLeidas}
           notifAbierto={notifAbierto}
           onNotificaciones={abrirNotificaciones}
+          nProyectosAdmin={proyectosAdmin.length}
           puedeCrearProyecto={puedeCrearProyectos(sesion)}
           can={can}
           usuario={sesion}
@@ -784,7 +816,7 @@ export default function App() {
             onAbrirProyecto={onSelectProyecto}
           />
         ) : pantalla === 'admin-proyectos' && puedeVerUsuarios ? (
-          <AdminProyectosView state={state} proyectos={proyectosMiembro} sesion={sesion} actions={actions} />
+          <AdminProyectosView state={state} proyectos={proyectosAdmin} sesion={sesion} actions={actions} />
         ) : pantalla === 'notificaciones' ? (
           <NotificacionesView state={state} notificaciones={notifsMias} onAbrir={abrirNotificacion} />
         ) : proyecto && contadores ? (
@@ -827,7 +859,6 @@ export default function App() {
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                   resaltarTareaId={tareaResaltada}
-                  onResaltado={() => setTareaResaltada(null)}
                 />
               ) : (
                 <GanttView
@@ -892,11 +923,11 @@ export default function App() {
           notificaciones={notifsMias}
           onAbrir={abrirNotificacion}
           onVerTodas={() => {
-            setNotifAbierto(false)
+            cerrarNotificaciones()
             setPantalla('notificaciones')
             setMovilSidebar(false)
           }}
-          onClose={() => setNotifAbierto(false)}
+          onClose={cerrarNotificaciones}
         />
       )}
     </div>

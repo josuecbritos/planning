@@ -417,9 +417,12 @@ export function FiltrosBar({
             >
               {g.nombre}
             </button>
+            {/* #160: dentro del menú con overflow, el globo data-tip se recorta
+                sin importar la dirección. Se usa `title` nativo (el navegador
+                lo dibuja fuera del contenedor, nunca se corta). */}
             <button
               className="icon-btn"
-              data-tip="Actualizar con el filtro y orden actuales"
+              title="Actualizar con el filtro y orden actuales"
               aria-label={`Actualizar ${g.nombre}`}
               disabled={!activo && !ordenActivo}
               onClick={() => persistir(guardados.map((x) => (x.id === g.id ? { ...x, filtro, orden } : x)))}
@@ -428,7 +431,7 @@ export function FiltrosBar({
             </button>
             <button
               className="icon-btn"
-              data-tip="Renombrar"
+              title="Renombrar"
               aria-label={`Renombrar ${g.nombre}`}
               onClick={() => setModal({ tipo: 'renombrar', id: g.id, nombre: g.nombre })}
             >
@@ -436,7 +439,7 @@ export function FiltrosBar({
             </button>
             <button
               className="icon-btn"
-              data-tip="Eliminar"
+              title="Eliminar"
               aria-label={`Eliminar ${g.nombre}`}
               onClick={() => {
                 // #141: confirmar antes de borrar una vista guardada.

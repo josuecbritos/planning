@@ -99,12 +99,21 @@ Dueño de la relación usuario↔proyecto (miembros, 🔑) y del ciclo de vida:
 **archivar** (#133) saca el proyecto de la barra, Resumen y Mis Tareas pero lo
 conserva; **eliminar en cascada** (#134) solo sobre archivados. Ambas acciones
 exigen el permiso `archivarEliminarProyectos`, verificado en la base.
+_Administrar ≠ ser miembro_ (#146): el admin **ve y administra todos** los
+proyectos aunque no sea miembro; su barra lateral, Resumen y Mis Tareas siguen
+mostrando solo aquellos donde es miembro. Un chip **Miembro** y un botón de
+unirse/salirse (#147) permiten sumarse o salir de un proyecto desde el módulo.
+Sobre un proyecto archivado solo quedan activos desarchivar y eliminar (#150).
 
 **Notificaciones in-app (#137):** tres eventos sobre tus tareas — te asignaron,
 replanificaron o comentaron (nunca por acciones propias). Entrada en la barra
-con contador naranja si hay sin leer; el panel emergente muestra las últimas y
-marca todo como leído; el clic navega a la tarea (la resalta y abre su detalle).
-Las generan triggers de la base, no el cliente.
+con contador naranja si hay sin leer; el panel emergente muestra las últimas,
+marca todo como leído **al cerrarlo** (#156, para no perder de vista lo nuevo
+mientras se lee), y el clic navega a la tarea (la **resalta con un realce que se
+desvanece** y abre su detalle; si un filtro la excluye, permanece visible hasta
+navegar o "Actualizar vista", #157/#158). Con la barra contraída, una **campana
+fija** con el contador abre el mismo panel (#159). Las genera la base, no el
+cliente.
 
 **Baja de usuarios (#136):** eliminar = desactivar + invisible (sin borrado
 físico, para no huérfanar el historial). Dar de alta el mismo correo reactiva la

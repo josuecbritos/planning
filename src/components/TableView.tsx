@@ -38,11 +38,9 @@ interface Props {
   onAbrirTarea: (tareaId: string) => void
   /** #137: tarea a resaltar al llegar desde una notificación (scroll + realce). */
   resaltarTareaId?: string | null
-  /** #137: se llama cuando el realce ya se mostró (para bajar el estado). */
-  onResaltado?: () => void
 }
 
-export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, snapshotNonce, onStale, actions, onAbrirTarea, resaltarTareaId, onResaltado }: Props) {
+export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, snapshotNonce, onStale, actions, onAbrirTarea, resaltarTareaId }: Props) {
   const filtrando = !filtroVacio(filtro)
   // P1: la vista se congela cuando hay filtro y/u orden activo.
   const activo = filtrando || orden.length > 0
@@ -152,7 +150,6 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           indice={indice}
           forzarId={forzarId}
           resaltarTareaId={resaltarTareaId}
-          onResaltado={onResaltado}
           colapsado={frentesCol.has(f.id)}
           colapsable={frenteColapsable}
           onToggleColapso={() => toggleFrente(f.id)}
@@ -183,7 +180,6 @@ function FrentePagina({
   indice,
   forzarId,
   resaltarTareaId,
-  onResaltado,
   colapsado,
   colapsable,
   onToggleColapso,
@@ -205,7 +201,6 @@ function FrentePagina({
   indice: Map<string, number>
   forzarId: string | null
   resaltarTareaId?: string | null
-  onResaltado?: () => void
   colapsado: boolean
   colapsable: boolean
   onToggleColapso: () => void
@@ -234,9 +229,10 @@ function FrentePagina({
 
   return (
     <section>
-      {/* #142: en vista "Todos" el frente colapsa; su encabezado no cambia,
-          solo se antepone el chevron y se ocultan los sub frentes. */}
+      {/* #142/#161: en vista "Todos" el frente colapsa; el chevron va a la
+          DERECHA del título (más grande, se lee como control). */}
       <div className="frente-cabecera">
+        <h2 className="frente-titulo">{frente.nombre}</h2>
         {colapsable && (
           <button
             className="colapso-btn"
@@ -247,7 +243,6 @@ function FrentePagina({
             {colapsado ? '▸' : '▾'}
           </button>
         )}
-        <h2 className="frente-titulo">{frente.nombre}</h2>
       </div>
       {!colapsado && (
         <>
@@ -267,7 +262,6 @@ function FrentePagina({
               indice={indice}
               forzarId={forzarId}
               resaltarTareaId={resaltarTareaId}
-              onResaltado={onResaltado}
               colapsado={subsCol.has(sf.id)}
               onToggleColapso={() => onToggleSub(sf.id)}
               actions={actions}
@@ -344,7 +338,6 @@ function SubFrenteTabla({
   indice,
   forzarId,
   resaltarTareaId,
-  onResaltado,
   colapsado,
   onToggleColapso,
   actions,
@@ -363,7 +356,6 @@ function SubFrenteTabla({
   indice: Map<string, number>
   forzarId: string | null
   resaltarTareaId?: string | null
-  onResaltado?: () => void
   colapsado: boolean
   onToggleColapso: () => void
   actions: Actions
@@ -397,15 +389,9 @@ function SubFrenteTabla({
       {/* #142: chevron para colapsar el sub frente; su fila-título no cambia,
           solo se antepone el chevron y se oculta la tabla de tareas. */}
       <div className="subfrente__titulo">
+        {/* #161: el chevron va a la DERECHA del título (tras el conteo), más
+            grande y con aire de control. */}
         <span>
-          <button
-            className="colapso-btn"
-            aria-expanded={!colapsado}
-            aria-label={colapsado ? `Expandir ${sub.nombre}` : `Colapsar ${sub.nombre}`}
-            onClick={onToggleColapso}
-          >
-            {colapsado ? '▸' : '▾'}
-          </button>{' '}
           {can.editarEstructura ? (
             <InlineText
               valor={sub.nombre}
@@ -416,7 +402,15 @@ function SubFrenteTabla({
           ) : (
             sub.nombre
           )}{' '}
-          <span className="subfrente__count">· {tareas.length} tareas</span>
+          <span className="subfrente__count">· {tareas.length} tareas</span>{' '}
+          <button
+            className="colapso-btn"
+            aria-expanded={!colapsado}
+            aria-label={colapsado ? `Expandir ${sub.nombre}` : `Colapsar ${sub.nombre}`}
+            onClick={onToggleColapso}
+          >
+            {colapsado ? '▸' : '▾'}
+          </button>
         </span>
         {can.editarEstructura && (
           <span className="subfrente__tools">
@@ -457,7 +451,6 @@ function SubFrenteTabla({
               candidatos={candidatos}
               can={can}
               resaltar={t.id === resaltarTareaId}
-              onResaltado={onResaltado}
               actions={actions}
               onAbrirTarea={onAbrirTarea}
             />
@@ -616,7 +609,6 @@ function TareaFila({
   candidatos,
   can,
   resaltar,
-  onResaltado,
   actions,
   onAbrirTarea,
 }: {
@@ -626,7 +618,6 @@ function TareaFila({
   candidatos: Usuario[]
   can: Can
   resaltar?: boolean
-  onResaltado?: () => void
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -638,15 +629,14 @@ function TareaFila({
 
   const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
 
-  // #137: al resaltar (llegada desde una notificación), centra la fila y deja
-  // el realce ~2.5 s; luego avisa para que el estado se baje.
+  // #157/#158: al llegar desde una notificación se centra la fila. El realce lo
+  // hace una animación CSS de una sola pasada (se desvanece sola). NO se baja el
+  // estado por temporizador: la tarea forzada permanece hasta que el usuario
+  // navegue o pulse "Actualizar vista" (App suelta `tareaResaltada` ahí).
   const filaRef = useRef<HTMLTableRowElement>(null)
   useEffect(() => {
-    if (!resaltar) return
-    filaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    const id = setTimeout(() => onResaltado?.(), 2500)
-    return () => clearTimeout(id)
-  }, [resaltar, onResaltado])
+    if (resaltar) filaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [resaltar])
 
   return (
     <tr ref={filaRef} className={`${color !== 'ninguno' ? `fila--${color}` : ''}${resaltar ? ' fila--resaltada' : ''}`.trim() || undefined}>
