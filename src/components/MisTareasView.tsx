@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Proyecto, Tarea, Usuario } from '../types'
-import type { Actions } from '../App'
+import type { Actions, Vista } from '../App'
 import { makeCan, type Can } from '../lib/permisos'
 import { cmp, formatoFecha } from '../lib/dates'
 import {
@@ -16,6 +16,7 @@ import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { CAMPOS_MIS_TAREAS, ordenarMulti, valorOrden, type OrdenMulti } from '../lib/orden'
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import { FiltrosBar } from './FiltrosBar'
+import { GanttView } from './GanttView'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
 import { CheckHecha } from './CheckHecha'
@@ -35,6 +36,8 @@ interface Props {
   hoy: string
   actions: Actions
   onAbrirTarea: (tareaId: string) => void
+  /** P5: en mobile no hay Gantt (la grilla no funciona en pantalla angosta). */
+  esMovil: boolean
 }
 
 interface FilaMisTareas {
@@ -43,13 +46,24 @@ interface FilaMisTareas {
   ruta: string
 }
 
-export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrirTarea }: Props) {
+export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrirTarea, esMovil }: Props) {
   // Los permisos dependen del PROYECTO de cada tarea (dueño vs invitado):
   // se resuelve un Can por proyecto visible.
   const canPorProyecto = useMemo(
     () => new Map(proyectos.map((p) => [p.id, makeCan(state, usuario, p.id)])),
     [state, usuario, proyectos],
   )
+  const canDe = useCallback(
+    (proyectoId: string) => canPorProyecto.get(proyectoId) ?? makeCan(state, usuario, null),
+    [canPorProyecto, state, usuario],
+  )
+  // #190: conmutador Tabla/Gantt, igual al de un proyecto. El filtro y el
+  // orden son los MISMOS para ambas vistas (cambiar de vista no los pierde).
+  const [vista, setVista] = useState<Vista>('tabla')
+  // P5: en mobile no hay Gantt. Si se achica la ventana con la Gantt abierta,
+  // la vista vuelve a Tabla (el conmutador se oculta y no habría forma de
+  // salir de la grilla).
+  const vistaEfectiva: Vista = esMovil ? 'tabla' : vista
   const [filtro, setFiltro] = useState<Filtro>({})
   // Orden multinivel del menu "Ordenar" (punto 4). Momentaneo salvo que se
   // guarde como vista; el "orden base" aqui es el propio de Mis Tareas
@@ -57,6 +71,8 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
   const [orden, setOrden] = useState<OrdenMulti>([])
   // P1: nonce para re-snapshot de la vista congelada ("Actualizar vista").
   const [snapNonce, setSnapNonce] = useState(0)
+  // P1: la Gantt reporta su propia foto desactualizada (tiene su recorrido).
+  const [ganttStale, setGanttStale] = useState(false)
 
   // Todas mis tareas activas, de todos los proyectos visibles.
   const misFilas = useMemo<FilaMisTareas[]>(() => {
@@ -149,6 +165,18 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
             )}
           </p>
         </div>
+        {/* #190: mismo conmutador que dentro de un proyecto. En mobile no hay
+            Gantt (la grilla no funciona en pantalla angosta). */}
+        {!esMovil && (
+          <div className="toggle">
+            <button className={vista === 'tabla' ? 'activo' : ''} onClick={() => setVista('tabla')}>
+              Tabla
+            </button>
+            <button className={vista === 'gantt' ? 'activo' : ''} onClick={() => setVista('gantt')}>
+              Gantt
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filtros del sistema comun, con Proyecto en vez de Responsable.
@@ -162,10 +190,28 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
         orden={orden}
         onCambiarOrden={setOrden}
         camposOrden={CAMPOS_MIS_TAREAS}
-        stale={stale}
+        stale={vistaEfectiva === 'tabla' ? stale : ganttStale}
         onActualizarVista={() => setSnapNonce((n) => n + 1)}
       />
 
+      {/* #190: la Gantt de Mis Tareas — misma grilla, con la columna de
+          proyecto a la izquierda. Comparte filtro y orden con la tabla. */}
+      {vistaEfectiva === 'gantt' ? (
+        <GanttView
+          state={state}
+          frenteSel="todos"
+          hoy={hoy}
+          can={canDe('')}
+          filtro={filtro}
+          orden={orden}
+          onCambiarFiltro={setFiltro}
+          snapshotNonce={snapNonce}
+          onStale={setGanttStale}
+          actions={actions}
+          onAbrirTarea={onAbrirTarea}
+          misTareas={{ usuarioId: usuario.id, proyectos, canDe }}
+        />
+      ) : (
       <table className="tareas mistareas">
         <thead>
           <tr>
@@ -199,6 +245,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
           )}
         </tbody>
       </table>
+      )}
     </div>
   )
 }

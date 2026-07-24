@@ -75,7 +75,14 @@ completo con creación y edición **inline** (sin formularios).
 - **Gantt** (grilla tipo Excel): planificación por clics, horizonte configurable,
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
 - **Mis Tareas:** las tareas donde el usuario es responsable, en todos sus
-  proyectos, vencidas primero.
+  proyectos, vencidas primero. Tiene el mismo conmutador **Tabla / Gantt** que
+  un proyecto (#190): la Gantt muestra la **carga propia repartida en el
+  tiempo**, cruzando proyectos, con una columna extra y muy angosta a la
+  izquierda —nombre del proyecto **rotado** sobre su color— que se repite en
+  cada frente; si no cabe, se trunca y el nombre completo queda en el tooltip.
+  Es de **lectura y replanificación**: mover fechas, marcar hechas y abrir el
+  detalle, sin crear ni eliminar nada (una tarea creada ahí no sería del
+  usuario hasta asignársela). Al pie, una sola fila con su total diario.
 - **Resumen:** indicadores por proyecto (avance, total y desglose de las cinco
   categorías).
 
@@ -115,7 +122,12 @@ adelgaza su contenido (avatar, chips y número de proyectos), no Proyectos el qu
 engorda (#185).
 
 En la barra lateral, hacer clic en un proyecto abre directamente **todos sus
-frentes**; editar y archivar viven en un menú **⋯** junto al nombre (#178).
+frentes**; editar, **agregar frente** y archivar viven en un menú **⋯** junto al
+nombre (#178/#189) — la lista de frentes contiene **solo frentes**. Ni los
+proyectos ni los frentes muestran contador de tareas (#188): la lista se navega
+por color, nombre y jerarquía. Los contadores de **Administración** (usuarios y
+proyectos activos) sí se conservan. El control de plegar la barra es un
+**chevron doble**, no un pin: contrae, no ancla (#187).
 
 **Notificaciones in-app (#137):** tres eventos sobre tus tareas — te asignaron,
 replanificaron o comentaron (nunca por acciones propias). Entrada en la barra

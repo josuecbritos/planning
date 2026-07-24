@@ -305,6 +305,14 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   usa el sistema común de filtros (Fecha Objetivo / Estado / **Proyecto**) con
   guardados propios del contexto, separados de los de cada proyecto. En mobile,
   Proyecto se fusiona dentro de Ubicación (ruta completa) y sale Atraso.
+  Tiene además el **conmutador Tabla / Gantt** (#190): la misma grilla del
+  proyecto aplicada a las tareas propias, cruzando proyectos, con una **columna
+  extra muy angosta** a la izquierda —nombre del proyecto **rotado** sobre su
+  color, repetida en cada frente, truncada con "…" y nombre completo en el
+  tooltip cuando no cabe—. Es de **lectura y replanificación** (mover fechas,
+  marcar hechas, abrir el detalle): sin crear ni eliminar, y con una sola fila
+  de carga al pie (el total diario del usuario). El filtro y el orden se
+  comparten entre ambas vistas. En mobile no hay Gantt.
 - **Panel lateral de detalle** (backlog de 7.2): click sobre una tarea o una marca del
   Gantt abre un panel con el detalle completo, la línea de tiempo del historial y las
   acciones operativas (marcar hecha, replanificar, archivar) para admins. Se cierra
