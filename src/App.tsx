@@ -170,6 +170,10 @@ export default function App() {
   // navegar desde un aviso.
   const [notifAbierto, setNotifAbierto] = useState(false)
   const [tareaResaltada, setTareaResaltada] = useState<string | null>(null)
+  // #179: proyecto al que se llegó desde una notificación SIN ser miembro. Se
+  // muestra de forma transitoria (no entra a la barra lateral); se suelta al
+  // navegar a cualquier otra cosa.
+  const [peekProyectoId, setPeekProyectoId] = useState<string | null>(null)
   // Contenedor con scroll de la vista de proyecto. Se mide el alto de la
   // barra de filtros (que es sticky, punto 2) para que el encabezado de la
   // tabla se congele JUSTO debajo, sin taparse ni superponerse.
@@ -309,21 +313,15 @@ export default function App() {
   // Proyectos de los que ERES MIEMBRO (dueño o con acceso), en cualquier
   // estado. El módulo Administración → Proyectos (#132) trabaja sobre esta
   // lista (incluye archivados, con su propio filtro).
+  // #179: la barra lateral (y Resumen / Mis Tareas) muestran SOLO los proyectos
+  // de los que el usuario es MIEMBRO — dueño o con acceso — para todos los roles,
+  // admin incluido. El módulo Administración → Proyectos sí ve todos (proyectos-
+  // Admin). Ser responsable de una tarea NO alcanza para aparecer aquí (eso
+  // arrastraba proyectos ajenos a la barra). La navegación desde una notificación
+  // a un proyecto no-miembro se resuelve con `peekProyectoId` (abajo).
   const proyectosMiembro = useMemo(() => {
     if (!state || !sesion) return []
     const ids = new Set(state.accesos.filter((a) => a.usuarioId === sesion.id).map((a) => a.proyectoId))
-    // #171: además, proyectos donde soy responsable de alguna tarea activa. Un
-    // admin es candidato a responsable en cualquier proyecto, así que puede
-    // recibir una asignación sin tener un `acceso`; ese proyecto igual debe
-    // aparecer en su barra y ser navegable desde la notificación.
-    const frenteProy = new Map(state.frentes.map((f) => [f.id, f.proyectoId]))
-    const subProy = new Map(state.subFrentes.map((sf) => [sf.id, frenteProy.get(sf.frenteId)]))
-    for (const t of state.tareas) {
-      if (t.responsableId === sesion.id && !t.archivada) {
-        const pid = subProy.get(t.subFrenteId)
-        if (pid) ids.add(pid)
-      }
-    }
     return state.proyectos.filter((p) => p.duenoId === sesion.id || ids.has(p.id))
   }, [state, sesion])
 
@@ -355,10 +353,11 @@ export default function App() {
   useEffect(() => {
     if (!state || !sesion) return
     setProyectoActivoId((prev) => {
-      if (prev && proyectosVisibles.some((p) => p.id === prev)) return prev
+      // #179: no descartar el proyecto "peek" (llegado por notificación).
+      if (prev && (proyectosVisibles.some((p) => p.id === prev) || prev === peekProyectoId)) return prev
       return proyectosVisibles[0]?.id ?? null
     })
-  }, [state, sesion, proyectosVisibles])
+  }, [state, sesion, proyectosVisibles, peekProyectoId])
 
   const run = useCallback(async (fn: () => Promise<(s: AppState) => AppState>) => {
     try {
@@ -532,6 +531,7 @@ export default function App() {
     setVistaStale(false)
     setMovilSidebar(false)
     setTareaResaltada(null) // #158: navegar suelta el resaltado
+    setPeekProyectoId(null) // #179
   }, [])
 
   // Vista (filtro + orden) del proyecto activo; setters que solo tocan la
@@ -577,6 +577,7 @@ export default function App() {
     setTareaDetalleId(null)
     setMovilSidebar(false)
     setTareaResaltada(null) // #158
+    setPeekProyectoId(null) // #179
   }, [])
 
   const abrirDetalle = useCallback((tareaId: string) => setTareaDetalleId(tareaId), [])
@@ -609,6 +610,10 @@ export default function App() {
       const f = sf && state.frentes.find((x) => x.id === sf.frenteId)
       if (f) {
         setProyectoActivoId(f.proyectoId)
+        // #179: si el proyecto no es de los que soy miembro, se muestra en modo
+        // "peek" (transitorio), sin entrar a la barra lateral.
+        const esMiembro = proyectosVisibles.some((p) => p.id === f.proyectoId)
+        setPeekProyectoId(esMiembro ? null : f.proyectoId)
         setFrenteSel('todos')
         setVista('tabla')
         setVistaStale(false)
@@ -618,7 +623,7 @@ export default function App() {
       setTareaResaltada(n.tareaId)
       setMovilSidebar(false)
     },
-    [state, cerrarNotificaciones],
+    [state, cerrarNotificaciones, proyectosVisibles],
   )
 
   // Punto 2: mide el alto de la barra de filtros (sticky) y lo publica en
@@ -683,7 +688,13 @@ export default function App() {
     return <div className="cargando">Cargando datos…</div>
   }
 
-  const proyecto = proyectosVisibles.find((p) => p.id === proyectoActivoId) ?? null
+  // #179: normalmente el proyecto activo es uno del que soy miembro; si llegué
+  // por notificación a uno ajeno (peek), se muestra igual de forma transitoria.
+  const proyecto =
+    proyectosVisibles.find((p) => p.id === proyectoActivoId) ??
+    (proyectoActivoId && proyectoActivoId === peekProyectoId
+      ? state.proyectos.find((p) => p.id === proyectoActivoId) ?? null
+      : null)
   const tareaDetalle = tareaDetalleId ? state.tareas.find((t) => t.id === tareaDetalleId) ?? null : null
   // P5: en mobile la Gantt no existe; la vista efectiva se fuerza a Tabla.
   const vistaEfectiva: Vista = esMovil ? 'tabla' : vista

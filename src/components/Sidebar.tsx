@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { AppState, Proyecto, Usuario } from '../types'
 import type { Actions, FrenteSel, Pantalla, SidebarModo, Tema } from '../App'
 import { puedeEditarProyecto, puedeEliminarProyecto, type Can } from '../lib/permisos'
@@ -79,19 +80,30 @@ export function Sidebar({
   actions,
 }: Props) {
   const [modal, setModal] = useState<ModalState>(null)
-  // #178: menú ⋯ del proyecto abierto (id) o null. Se cierra al hacer clic
-  // fuera o al elegir una opción.
+  // #178/#184: menú ⋯ del proyecto abierto (id) o null, con su posición para
+  // renderizarlo como popover FUERA del sidebar (portal fijo, a la derecha).
+  // Se cierra al hacer clic fuera, al hacer scroll o al elegir una opción.
   const [menuProyecto, setMenuProyecto] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+  const cerrarMenu = () => {
+    setMenuProyecto(null)
+    setMenuPos(null)
+  }
   useEffect(() => {
     if (!menuProyecto) return
     const fuera = (e: MouseEvent) => {
       const t = e.target as HTMLElement
-      if (!t.closest('.nav-proyecto__menu') && !t.closest('.nav-proyecto__menu-btn')) setMenuProyecto(null)
+      if (!t.closest('.nav-proyecto__menu') && !t.closest('.nav-proyecto__menu-btn')) cerrarMenu()
     }
+    const onScroll = () => cerrarMenu()
     const id = setTimeout(() => document.addEventListener('mousedown', fuera), 0)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onScroll)
     return () => {
       clearTimeout(id)
       document.removeEventListener('mousedown', fuera)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onScroll)
     }
   }, [menuProyecto])
 
@@ -185,39 +197,20 @@ export function Sidebar({
                     className="nav-proyecto__menu-btn"
                     aria-label={`Opciones de ${p.nombre}`}
                     aria-expanded={menuProyecto === p.id}
-                    onClick={() => setMenuProyecto((m) => (m === p.id ? null : p.id))}
+                    onClick={(e) => {
+                      if (menuProyecto === p.id) {
+                        cerrarMenu()
+                        return
+                      }
+                      const r = e.currentTarget.getBoundingClientRect()
+                      setMenuPos({ top: r.top, left: r.right + 8 })
+                      setMenuProyecto(p.id)
+                    }}
                   >
                     ⋯
                   </button>
                 )}
               </div>
-
-              {menuProyecto === p.id && (
-                <div className="nav-proyecto__menu">
-                  <button
-                    className="nav-proyecto__menu-op"
-                    onClick={() => {
-                      setModal({ tipo: 'proyecto-editar', id: p.id })
-                      setMenuProyecto(null)
-                    }}
-                  >
-                    Editar proyecto
-                  </button>
-                  {puedeEliminarProyecto(state, usuario, p.id) && (
-                    <button
-                      className="nav-proyecto__menu-op"
-                      onClick={() => {
-                        setMenuProyecto(null)
-                        if (confirm(`¿Archivar "${p.nombre}"? Saldrá de la barra lateral, de Resumen y de Mis Tareas. Queda en Administración → Proyectos.`)) {
-                          actions.updateProyecto(p.id, { estado: 'archivado' })
-                        }
-                      }}
-                    >
-                      Archivar
-                    </button>
-                  )}
-                </div>
-              )}
 
               {activo && (
                 <div className="nav-frentes">
@@ -267,7 +260,10 @@ export function Sidebar({
               onClick={() => onSelectPantalla('usuarios')}
             >
               <span>Usuarios</span>
-              {usuario.rol === 'admin' && <span className="nav-frente__count">{state.usuarios.length}</span>}
+              {/* #182: cuenta solo activos (ni desactivados ni eliminados). */}
+              {usuario.rol === 'admin' && (
+                <span className="nav-frente__count">{state.usuarios.filter((u) => u.activo).length}</span>
+              )}
             </button>
             {/* #132: Proyectos — hermano de Usuarios. Dueño de la relación
                 usuario↔proyecto y del ciclo de vida (archivar/eliminar). */}
@@ -304,6 +300,47 @@ export function Sidebar({
           <button className="link-btn sesion__salir" onClick={onLogout}>Salir</button>
         </span>
       </div>
+
+      {/* #184: menú ⋯ del proyecto como popover FUERA del sidebar (portal
+          fijo, a la derecha del botón), sobre el contenido — no desplaza nada
+          dentro de la barra. */}
+      {menuProyecto &&
+        menuPos &&
+        (() => {
+          const p = proyectos.find((x) => x.id === menuProyecto)
+          if (!p) return null
+          return createPortal(
+            <div
+              className="nav-proyecto__menu nav-proyecto__menu--portal"
+              style={{ position: 'fixed', top: menuPos.top, left: menuPos.left }}
+              role="menu"
+            >
+              <button
+                className="nav-proyecto__menu-op"
+                onClick={() => {
+                  setModal({ tipo: 'proyecto-editar', id: p.id })
+                  cerrarMenu()
+                }}
+              >
+                Editar proyecto
+              </button>
+              {puedeEliminarProyecto(state, usuario, p.id) && (
+                <button
+                  className="nav-proyecto__menu-op"
+                  onClick={() => {
+                    cerrarMenu()
+                    if (confirm(`¿Archivar "${p.nombre}"? Saldrá de la barra lateral, de Resumen y de Mis Tareas. Queda en Administración → Proyectos.`)) {
+                      actions.updateProyecto(p.id, { estado: 'archivado' })
+                    }
+                  }}
+                >
+                  Archivar
+                </button>
+              )}
+            </div>,
+            document.body,
+          )
+        })()}
 
       {modal?.tipo === 'proyecto-nuevo' && (
         <ProyectoModal

@@ -99,10 +99,11 @@ Dueño de la relación usuario↔proyecto (miembros, 🔑) y del ciclo de vida:
 **archivar** (#133) saca el proyecto de la barra, Resumen y Mis Tareas pero lo
 conserva; **eliminar en cascada** (#134) solo sobre archivados. Ambas acciones
 exigen el permiso `archivarEliminarProyectos`, verificado en la base.
-_Administrar ≠ ser miembro_ (#146): el admin **ve y administra todos** los
-proyectos aunque no sea miembro; su barra lateral, Resumen y Mis Tareas siguen
-mostrando solo aquellos donde es miembro — o donde tiene una tarea asignada
-(#171). Cada fila marca la relación de la sesión con un pill excluyente
+_Administrar ≠ ser miembro_ (#146/#179): el admin **ve y administra todos** los
+proyectos aunque no sea miembro; su barra lateral, Resumen y Mis Tareas muestran
+**solo aquellos donde es miembro** (dueño o con acceso), para todos los roles.
+Al llegar desde una notificación a un proyecto ajeno, se abre la tarea de forma
+transitoria sin sumarlo a la barra. Cada fila marca la relación de la sesión con un pill excluyente
 **Dueño / Miembro** (#165); unirse o salir de un proyecto se hace desde el
 **modal de Miembros** (#164), donde uno se ve a sí mismo. El conteo de miembros
 son solo usuarios **activos** (#167). "Ver archivados" **suma** los archivados;

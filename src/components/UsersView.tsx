@@ -141,9 +141,9 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
           <thead>
             <tr>
               <th>Usuario</th>
-              <th>Email</th>
-              <th>Rol</th>
-              <th>Estado</th>
+              <th className="col-email">Email</th>
+              <th className="col-rol">Rol</th>
+              <th className="col-estado-adm">Estado</th>
               <th className="col-proy">Proyectos</th>
               <th className="col-acc">Acciones</th>
             </tr>
@@ -357,7 +357,7 @@ function ProyectosCell({
   return (
     <div className="proy-col" ref={ref}>
       <button
-        className="chip-mas proy-num"
+        className="proy-num"
         onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto}
         title="Ver proyectos"
