@@ -132,8 +132,24 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     if (fr) setFrentesCol((prev) => (prev.has(fr.id) ? new Set([...prev].filter((x) => x !== fr.id)) : prev))
   }, [resaltarTareaId, state])
 
+  // #186: realce temporal (≈3.5 s) al llegar desde una notificación. NO usa el
+  // fondo (chocaría con el color de categoría de la fila): atenúa el resto de
+  // las filas y contornea la fila objetivo. `realceId` es el id visible durante
+  // ese lapso; la inclusión forzada (forzarId) sigue viviendo de resaltarTareaId.
+  const [realceOn, setRealceOn] = useState(false)
+  useEffect(() => {
+    if (!resaltarTareaId) {
+      setRealceOn(false)
+      return
+    }
+    setRealceOn(true)
+    const id = window.setTimeout(() => setRealceOn(false), 3500)
+    return () => window.clearTimeout(id)
+  }, [resaltarTareaId])
+  const realceId = realceOn ? resaltarTareaId : null
+
   return (
-    <div className="tabla-wrap">
+    <div className={`tabla-wrap${realceOn ? ' tabla-wrap--realce' : ''}`}>
       {frentes.map((f) => (
         <FrentePagina
           key={f.id}
@@ -149,7 +165,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           visibleIds={visibleIds}
           indice={indice}
           forzarId={forzarId}
-          resaltarTareaId={resaltarTareaId}
+          realceId={realceId}
           colapsado={frentesCol.has(f.id)}
           colapsable={frenteColapsable}
           onToggleColapso={() => toggleFrente(f.id)}
@@ -179,7 +195,7 @@ function FrentePagina({
   visibleIds,
   indice,
   forzarId,
-  resaltarTareaId,
+  realceId,
   colapsado,
   colapsable,
   onToggleColapso,
@@ -200,7 +216,7 @@ function FrentePagina({
   visibleIds: Set<string>
   indice: Map<string, number>
   forzarId: string | null
-  resaltarTareaId?: string | null
+  realceId?: string | null
   colapsado: boolean
   colapsable: boolean
   onToggleColapso: () => void
@@ -262,7 +278,7 @@ function FrentePagina({
               visibleIds={visibleIds}
               indice={indice}
               forzarId={forzarId}
-              resaltarTareaId={resaltarTareaId}
+              realceId={realceId}
               colapsado={subsCol.has(sf.id)}
               onToggleColapso={() => onToggleSub(sf.id)}
               actions={actions}
@@ -338,7 +354,7 @@ function SubFrenteTabla({
   visibleIds,
   indice,
   forzarId,
-  resaltarTareaId,
+  realceId,
   colapsado,
   onToggleColapso,
   actions,
@@ -356,7 +372,7 @@ function SubFrenteTabla({
   visibleIds: Set<string>
   indice: Map<string, number>
   forzarId: string | null
-  resaltarTareaId?: string | null
+  realceId?: string | null
   colapsado: boolean
   onToggleColapso: () => void
   actions: Actions
@@ -452,7 +468,7 @@ function SubFrenteTabla({
               hoy={hoy}
               candidatos={candidatos}
               can={can}
-              resaltar={t.id === resaltarTareaId}
+              resaltar={t.id === realceId}
               actions={actions}
               onAbrirTarea={onAbrirTarea}
             />
@@ -631,26 +647,17 @@ function TareaFila({
 
   const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
 
-  // #157/#172: al llegar desde una notificación se centra la fila y luego se
-  // dispara el realce. El realce se aplica DESPUÉS del scroll (con la fila ya
-  // visible), porque si corre mientras la fila está fuera de pantalla, se
-  // desvanece antes de que el usuario la vea. La tarea forzada permanece hasta
-  // navegar o "Actualizar vista" (App suelta `tareaResaltada`); el realce es
-  // solo visual (una pasada, se apaga solo).
+  // #157/#186: al llegar desde una notificación se centra la fila. El realce es
+  // un CONTORNO (no cambia el fondo, así no choca con el color de categoría) y
+  // vive mientras `resaltar` está activo (~3.5 s, lo controla el padre). El
+  // resto de las filas se atenúa vía `.tabla-wrap--realce`.
   const filaRef = useRef<HTMLTableRowElement>(null)
-  const [pulso, setPulso] = useState(false)
   useEffect(() => {
-    if (!resaltar) {
-      setPulso(false)
-      return
-    }
-    filaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    const id = window.setTimeout(() => setPulso(true), 380)
-    return () => window.clearTimeout(id)
+    if (resaltar) filaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [resaltar])
 
   return (
-    <tr ref={filaRef} className={`${color !== 'ninguno' ? `fila--${color}` : ''}${pulso ? ' fila--resaltada' : ''}`.trim() || undefined}>
+    <tr ref={filaRef} className={`${color !== 'ninguno' ? `fila--${color}` : ''}${resaltar ? ' fila--resaltada' : ''}`.trim() || undefined}>
       <td className="col-check">
         <CheckHecha
           hecha={tarea.hecha}

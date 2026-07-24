@@ -1129,10 +1129,19 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .col-rol { width: 116px; }
 .col-dueno { width: 160px; }
 .col-email { width: 230px; }
-/* #183: misma altura de fila en ambos módulos de Administración; iconos
-   monocromos (grayscale) para un solo lenguaje visual. */
-.usuarios-tabla td { vertical-align: middle; height: 40px; }
-.usuarios-tabla .resp-badge { width: 24px; height: 24px; }
+/* #183/#185: filas DELGADAS en ambos módulos (la altura correcta de Proyectos,
+   no la de Usuarios). No se fuerza altura: se achica el contenido de Usuarios
+   (avatar y chip de rol) para que quepa en la misma fila delgada que Proyectos
+   — es Usuarios el que adelgaza, no Proyectos el que engorda. Iconos
+   monocromos (grayscale). El avatar (26px) y el chip de rol (padding 3px)
+   eran lo que forzaba el mayor alto; se reducen a la altura de la línea de
+   texto, igual que en Proyectos. */
+.usuarios-tabla td { vertical-align: middle; }
+.usuarios-tabla .resp-badge { width: 18px; height: 18px; font-size: 8px; }
+.usuarios-tabla .chip-rol { padding: 2px 8px; }
+/* El número de proyectos (col-proy) es lo más alto de la fila de Usuarios;
+   se le recorta el alto de línea para no engordar la fila. */
+.usuarios-tabla .proy-num { padding-top: 1px; padding-bottom: 1px; line-height: 1.2; }
 .usuarios-tabla .col-acc .icon-btn { filter: grayscale(1); }
 .usuario-nombre { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; }
 /* #181: una fila archivada/desactivada se ve atenuada por COLOR, no por
@@ -1503,19 +1512,35 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 .colapso-btn:hover { color: var(--texto); background: var(--velo-fuerte); border-color: var(--gris-borde); }
 .frente-cabecera .colapso-btn { font-size: 22px; min-width: 34px; height: 32px; }
 
-/* #157: fila resaltada al llegar desde una notificación. Realce EVIDENTE que
-   se desvanece en ~3 s (arranca con un destello dorado + barra lateral). */
-.fila--resaltada { animation: resaltar-fila 3s ease-out; }
-@keyframes resaltar-fila {
-  0%   { background: #ffd34d; box-shadow: inset 5px 0 0 var(--naranja); }
-  20%  { background: #ffe491; box-shadow: inset 5px 0 0 var(--naranja); }
-  100% { background: transparent; box-shadow: inset 5px 0 0 transparent; }
+/* #157/#186: fila resaltada al llegar desde una notificación. El resaltado NO
+   toca el fondo (competía con los colores de categoría: verde/ámbar/rojo/morado
+   y ninguno), sino que (a) atenúa el resto de las filas mientras dura y (b)
+   dibuja un contorno naranja EVIDENTE alrededor de la fila con un pulso. Así se
+   identifica de un vistazo sobre cualquier categoría y en ambos temas, y el
+   color de la categoría sigue legible. Dura ~3.5 s (lo controla el timer en JS,
+   que quita la clase; la atenuación depende de .tabla-wrap--realce). */
+.tabla-wrap--realce .subfrente tbody tr:not(.fila--resaltada) {
+  opacity: .32;
+  transition: opacity .25s ease;
+  animation: realce-atenuar 1.4s ease-in-out infinite;
 }
-[data-tema='oscuro'] .fila--resaltada { animation: resaltar-fila-osc 3s ease-out; }
-@keyframes resaltar-fila-osc {
-  0%   { background: #6b5410; box-shadow: inset 5px 0 0 var(--naranja); }
-  20%  { background: #4a3a12; box-shadow: inset 5px 0 0 var(--naranja); }
-  100% { background: transparent; box-shadow: inset 5px 0 0 transparent; }
+/* Pulsamos la ATENUACIÓN del resto (no la fila objetivo), para llamar la
+   atención sin tocar el fondo de la fila resaltada ni su color de categoría. */
+@keyframes realce-atenuar {
+  0%, 100% { opacity: .32; }
+  50%      { opacity: .5; }
+}
+.fila--resaltada { position: relative; z-index: 1; }
+/* Contorno continuo: línea arriba+abajo en todas las celdas, barra lateral en
+   la primera y la última para cerrar el rectángulo sobre cualquier fondo. */
+.fila--resaltada > td {
+  box-shadow: inset 0 2px 0 0 var(--naranja), inset 0 -2px 0 0 var(--naranja);
+}
+.fila--resaltada > td:first-child {
+  box-shadow: inset 0 2px 0 0 var(--naranja), inset 0 -2px 0 0 var(--naranja), inset 4px 0 0 0 var(--naranja);
+}
+.fila--resaltada > td:last-child {
+  box-shadow: inset 0 2px 0 0 var(--naranja), inset 0 -2px 0 0 var(--naranja), inset -4px 0 0 0 var(--naranja);
 }
 
 /* #132: filtro "ver archivados" en Administración → Proyectos. */
