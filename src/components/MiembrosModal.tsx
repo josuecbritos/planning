@@ -41,21 +41,18 @@ export function MiembrosModal({ state, proyecto, sesion, actions, onClose }: Pro
 
   const dueno = state.usuarios.find((u) => u.id === proyecto.duenoId)
   const accesos = state.accesos.filter((a) => a.proyectoId === proyecto.id)
+  // #167: solo miembros ACTIVOS (los desactivados no aparecen; los eliminados
+  // ya los oculta usuario_visible). Incluye al propio usuario si es miembro.
   const miembros = accesos
     .map((a) => state.usuarios.find((u) => u.id === a.usuarioId))
-    .filter((u): u is Usuario => Boolean(u))
+    .filter((u): u is Usuario => Boolean(u) && u!.activo)
     .sort((a, b) => (a.rol === b.rol ? a.nombre.localeCompare(b.nombre) : a.rol.localeCompare(b.rol)))
 
-  // Candidatos a agregar: el admin puede sumar a cualquiera (consultores e
-  // incluso otros admins como referencia no aplica: solo no-admins); el dueño
-  // consultor, SOLO clientes (punto 6).
+  // #164: el admin puede sumar a cualquiera, INCLUIDO él mismo (para unirse y
+  // que el proyecto aparezca en su barra). El consultor dueño, SOLO clientes.
   const yaDentro = new Set([proyecto.duenoId, ...accesos.map((a) => a.usuarioId)])
   const agregables = state.usuarios.filter(
-    (u) =>
-      u.activo &&
-      u.rol !== 'admin' &&
-      !yaDentro.has(u.id) &&
-      (esAdmin || u.rol === 'cliente'),
+    (u) => u.activo && !yaDentro.has(u.id) && (esAdmin || u.rol === 'cliente'),
   )
 
   // El acceso configurable: solo CLIENTES para el dueño; cualquiera para admin.
@@ -81,22 +78,28 @@ export function MiembrosModal({ state, proyecto, sesion, actions, onClose }: Pro
     <Modal titulo={`Miembros de ${proyecto.nombre}`} onClose={onClose} ancho>
       <div className="miembros">
         <ul className="miembros-lista">
-          {dueno && (
+          {/* #167: el dueño se muestra solo si está activo (coincide con el
+              conteo de la tabla). */}
+          {dueno && dueno.activo && (
             <li className="miembro">
               <Avatar usuario={dueno} />
               <span className="miembro__info">
-                <b>{dueno.nombre}</b>
+                <b>{dueno.nombre}{dueno.id === sesion.id && <span className="chip-yo">tú</span>}</b>
                 <small>{dueno.email}</small>
               </span>
               <span className={`chip-rol chip-rol--${dueno.rol}`}>{ROL_LABEL[dueno.rol]}</span>
               <span className="chip-dueno" title="Creador del proyecto: control total">Dueño</span>
             </li>
           )}
-          {miembros.map((u) => (
+          {/* #164: la lista incluye a uno mismo si es miembro; desde aquí uno
+              puede salirse (quitarse). El dueño no aparece aquí (no se quita). */}
+          {miembros.map((u) => {
+            const esYo = u.id === sesion.id
+            return (
             <li key={u.id} className="miembro">
               <Avatar usuario={u} />
               <span className="miembro__info">
-                <b>{u.nombre}</b>
+                <b>{u.nombre}{esYo && <span className="chip-yo">tú</span>}</b>
                 <small>{u.email}</small>
               </span>
               <span className={`chip-rol chip-rol--${u.rol}`}>{ROL_LABEL[u.rol]}</span>
@@ -114,12 +117,13 @@ export function MiembrosModal({ state, proyecto, sesion, actions, onClose }: Pro
                 {puedeQuitarA(u) && (
                   <button
                     className="icon-btn"
-                    data-tip="Quitar del proyecto"
-                    aria-label={`Quitar a ${u.nombre}`}
+                    data-tip={esYo ? 'Salir del proyecto' : 'Quitar del proyecto'}
+                    aria-label={esYo ? 'Salir del proyecto' : `Quitar a ${u.nombre}`}
                     onClick={() => {
-                      if (confirm(`¿Quitar a ${u.nombre} de ${proyecto.nombre}?`)) {
-                        actions.quitarAcceso(u.id, proyecto.id)
-                      }
+                      const msg = esYo
+                        ? `¿Salir de "${proyecto.nombre}"? Dejará de aparecer en tu barra lateral.`
+                        : `¿Quitar a ${u.nombre} de ${proyecto.nombre}?`
+                      if (confirm(msg)) actions.quitarAcceso(u.id, proyecto.id)
                     }}
                   >
                     ✕
@@ -127,7 +131,8 @@ export function MiembrosModal({ state, proyecto, sesion, actions, onClose }: Pro
                 )}
               </span>
             </li>
-          ))}
+            )
+          })}
           {miembros.length === 0 && (
             <li className="miembros-vacio">Nadie más tiene acceso a este proyecto.</li>
           )}

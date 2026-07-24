@@ -230,8 +230,9 @@ function FrentePagina({
   return (
     <section>
       {/* #142/#161: en vista "Todos" el frente colapsa; el chevron va a la
-          DERECHA del título (más grande, se lee como control). */}
-      <div className="frente-cabecera">
+          DERECHA del título (más grande, se lee como control). #177: al
+          plegarse conserva su borde inferior (se ve como bloque cerrado). */}
+      <div className={`frente-cabecera${colapsado ? ' frente-cabecera--colapsado' : ''}`}>
         <h2 className="frente-titulo">{frente.nombre}</h2>
         {colapsable && (
           <button
@@ -387,8 +388,9 @@ function SubFrenteTabla({
   return (
     <div className="subfrente">
       {/* #142: chevron para colapsar el sub frente; su fila-título no cambia,
-          solo se antepone el chevron y se oculta la tabla de tareas. */}
-      <div className="subfrente__titulo">
+          solo se antepone el chevron y se oculta la tabla de tareas. #177: al
+          plegarse conserva su borde inferior. */}
+      <div className={`subfrente__titulo${colapsado ? ' subfrente__titulo--colapsado' : ''}`}>
         {/* #161: el chevron va a la DERECHA del título (tras el conteo), más
             grande y con aire de control. */}
         <span>
@@ -629,17 +631,26 @@ function TareaFila({
 
   const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
 
-  // #157/#158: al llegar desde una notificación se centra la fila. El realce lo
-  // hace una animación CSS de una sola pasada (se desvanece sola). NO se baja el
-  // estado por temporizador: la tarea forzada permanece hasta que el usuario
-  // navegue o pulse "Actualizar vista" (App suelta `tareaResaltada` ahí).
+  // #157/#172: al llegar desde una notificación se centra la fila y luego se
+  // dispara el realce. El realce se aplica DESPUÉS del scroll (con la fila ya
+  // visible), porque si corre mientras la fila está fuera de pantalla, se
+  // desvanece antes de que el usuario la vea. La tarea forzada permanece hasta
+  // navegar o "Actualizar vista" (App suelta `tareaResaltada`); el realce es
+  // solo visual (una pasada, se apaga solo).
   const filaRef = useRef<HTMLTableRowElement>(null)
+  const [pulso, setPulso] = useState(false)
   useEffect(() => {
-    if (resaltar) filaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (!resaltar) {
+      setPulso(false)
+      return
+    }
+    filaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const id = window.setTimeout(() => setPulso(true), 380)
+    return () => window.clearTimeout(id)
   }, [resaltar])
 
   return (
-    <tr ref={filaRef} className={`${color !== 'ninguno' ? `fila--${color}` : ''}${resaltar ? ' fila--resaltada' : ''}`.trim() || undefined}>
+    <tr ref={filaRef} className={`${color !== 'ninguno' ? `fila--${color}` : ''}${pulso ? ' fila--resaltada' : ''}`.trim() || undefined}>
       <td className="col-check">
         <CheckHecha
           hecha={tarea.hecha}

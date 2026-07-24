@@ -40,6 +40,10 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
   const [modal, setModal] = useState<ModalState>(null)
   const [invitandoId, setInvitandoId] = useState<string | null>(null)
   const [avisoInvitacion, setAvisoInvitacion] = useState<string | null>(null)
+  // #170: por defecto solo activos; la casilla SUMA los desactivados (mismo
+  // patrón que "Ver archivados" de Proyectos). Los eliminados nunca aparecen
+  // (usuario_visible ya los oculta).
+  const [verDesactivados, setVerDesactivados] = useState(false)
 
   const esAdminActor = usuarioActual.rol === 'admin'
 
@@ -89,11 +93,13 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
           (conAcceso.has(u.id) || (u.rol === 'cliente' && !conAlgunAcceso.has(u.id))),
       )
     }
-    return [...lista].sort((a, b) => {
+    // #170: activos por defecto; con la casilla, se suman los desactivados.
+    const filtrada = verDesactivados ? lista : lista.filter((u) => u.activo)
+    return [...filtrada].sort((a, b) => {
       if (a.rol !== b.rol) return ROL_ORDEN[a.rol] - ROL_ORDEN[b.rol]
       return a.nombre.localeCompare(b.nombre)
     })
-  }, [state.usuarios, state.accesos, esAdminActor, gestionables, usuarioActual.id])
+  }, [state.usuarios, state.accesos, esAdminActor, gestionables, usuarioActual.id, verDesactivados])
 
   // El consultor solo puede crear usuarios si puede invitar clientes en algún
   // proyecto suyo (y solo como cliente).
@@ -104,11 +110,24 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
     <div className="usuarios-wrap">
       <div className="usuarios-cabecera">
         <h2>Usuarios</h2>
-        {puedeCrearUsuario && (
-          <button className="btn btn--primary" onClick={() => setModal({ tipo: 'nuevo' })}>
-            + {esAdminActor ? 'Usuario' : 'Cliente'}
-          </button>
-        )}
+        {/* #170: homologado con Proyectos — filtro + botón de crear. */}
+        <div className="usuarios-cabecera__acciones">
+          {esAdminActor && (
+            <label className="proy-filtro">
+              <input
+                type="checkbox"
+                checked={verDesactivados}
+                onChange={(e) => setVerDesactivados(e.target.checked)}
+              />
+              Ver desactivados
+            </label>
+          )}
+          {puedeCrearUsuario && (
+            <button className="btn btn--primary" onClick={() => setModal({ tipo: 'nuevo' })}>
+              + {esAdminActor ? 'Usuario' : 'Cliente'}
+            </button>
+          )}
+        </div>
       </div>
 
       {avisoInvitacion && <p className="usuarios-aviso">{avisoInvitacion}</p>}
@@ -125,8 +144,8 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
               <th>Email</th>
               <th>Rol</th>
               <th>Estado</th>
-              <th>Proyectos</th>
-              <th className="col-acc"></th>
+              <th className="col-proy">Proyectos</th>
+              <th className="col-acc">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -248,17 +267,20 @@ function UsuarioFila({
       <td className="col-proy">
         <ProyectosCell items={proyectosUsuario} onIrAProyectos={onIrAProyectos} />
       </td>
+      {/* #170: iconos homologados con Proyectos (data-tip). En una fila
+          desactivada solo tienen sentido reactivar (↺) y eliminar (🗑): los
+          demás no se renderizan. La columna tiene ancho fijo (CSS). */}
       <td className="col-acc">
-        {puedeAdministrarCuenta && (
-          <button className="icon-btn" title="Editar" onClick={onEditar}>✎</button>
+        {puedeAdministrarCuenta && usuario.activo && (
+          <button className="icon-btn" data-tip="Editar" onClick={onEditar}>✎</button>
         )}
-        {puedeAdministrarCuenta && usuario.rol === 'consultor' && (
-          <button className="icon-btn" title="Permisos de proyecto (3.1)" onClick={onPermisosProyecto}>🔧</button>
+        {puedeAdministrarCuenta && usuario.activo && usuario.rol === 'consultor' && (
+          <button className="icon-btn" data-tip="Permisos de proyecto" onClick={onPermisosProyecto}>🔧</button>
         )}
         {supabaseConfigured && !usuario.authId && usuario.activo && puedeInvitarCorreo && (
           <button
             className="icon-btn"
-            title={invitando ? 'Enviando…' : 'Enviar / reenviar invitación por correo'}
+            data-tip={invitando ? 'Enviando…' : 'Enviar / reenviar invitación'}
             disabled={invitando}
             onClick={onInvitar}
           >
@@ -268,7 +290,7 @@ function UsuarioFila({
         {puedeAdministrarCuenta && !esYo && (
           <button
             className="icon-btn"
-            title={usuario.activo ? 'Desactivar' : 'Reactivar'}
+            data-tip={usuario.activo ? 'Desactivar' : 'Reactivar'}
             onClick={() => {
               // #155: desactivar deja a alguien fuera de la app; confirmar
               // (igual que eliminar). Reactivar también confirma.
@@ -285,7 +307,7 @@ function UsuarioFila({
         {puedeAdministrarCuenta && !esYo && (
           <button
             className="icon-btn"
-            title="Eliminar usuario"
+            data-tip="Eliminar usuario"
             onClick={() => {
               if (
                 confirm(

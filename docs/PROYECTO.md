@@ -101,9 +101,17 @@ conserva; **eliminar en cascada** (#134) solo sobre archivados. Ambas acciones
 exigen el permiso `archivarEliminarProyectos`, verificado en la base.
 _Administrar ≠ ser miembro_ (#146): el admin **ve y administra todos** los
 proyectos aunque no sea miembro; su barra lateral, Resumen y Mis Tareas siguen
-mostrando solo aquellos donde es miembro. Un chip **Miembro** y un botón de
-unirse/salirse (#147) permiten sumarse o salir de un proyecto desde el módulo.
-Sobre un proyecto archivado solo quedan activos desarchivar y eliminar (#150).
+mostrando solo aquellos donde es miembro — o donde tiene una tarea asignada
+(#171). Cada fila marca la relación de la sesión con un pill excluyente
+**Dueño / Miembro** (#165); unirse o salir de un proyecto se hace desde el
+**modal de Miembros** (#164), donde uno se ve a sí mismo. El conteo de miembros
+son solo usuarios **activos** (#167). "Ver archivados" **suma** los archivados;
+sobre un proyecto archivado solo aparecen desarchivar y eliminar (#166). El
+módulo de **Usuarios** está homologado con este: filas delgadas, mismos iconos y
+un checkbox **"Ver desactivados"** que por defecto muestra solo activos (#170).
+
+En la barra lateral, hacer clic en un proyecto abre directamente **todos sus
+frentes**; editar y archivar viven en un menú **⋯** junto al nombre (#178).
 
 **Notificaciones in-app (#137):** tres eventos sobre tus tareas — te asignaron,
 replanificaron o comentaron (nunca por acciones propias). Entrada en la barra
