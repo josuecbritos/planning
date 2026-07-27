@@ -302,6 +302,16 @@ acepta el scroll horizontal**. Las tarjetas quedaron descartadas.
 | #201 | «Usuarios» sin contador | Contador ya no condicionado al rol; el número lo calcula `usuariosVisiblesPara` en `App`, la **misma regla** que arma la tabla | admin: contador 4 / tabla 4 · consultor: contador 0 / tabla 0 |
 | #203 | Iconos ▯ en Android | 10 iconos SVG de trazo en `components/Iconos.tsx` reemplazan ✎ 🔧 ✉ ⏻ ↺ 🗑 👥 📦 🔑 ⓘ | 6 SVG en la tabla, **0** botones con glifo de texto; idéntico en escritorio |
 
+**Corrección posterior en #194.** La primera pasada dejó las filas del set en
+una sola línea: el segmento es `flex: none` (no encoge), así que la etiqueta más
+larga —«Asignar responsable», con su descripción— lo empujaba fuera del borde
+derecho de la tarjeta. Detectado en un Android real, no en las mediciones. Las
+filas ahora se **apilan** en mobile (etiqueta arriba, segmento a ancho completo
+abajo con `flex: 1` por opción), con lo que el ancho del segmento deja de
+depender del largo de la etiqueta. Medido en 390×844 y en **360×740**: las 8
+filas apiladas, segmento 54→336 uniforme, **16 px de margen** contra el borde y
+cero scroll horizontal. En escritorio siguen en una línea, sin cambios.
+
 **Causa de #203.** Los glifos que se usaban (✎ U+270E, ⏻ U+23FB, ✉ U+2709,
 ↺ U+21BA) son símbolos de **presentación de texto**: no están en el set de emoji
 a color, así que si la fuente del sistema no los trae, Android dibuja el cuadro

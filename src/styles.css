@@ -1788,6 +1788,17 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
     padding-top: 10px; margin-bottom: 0;
     box-shadow: 0 -6px 12px -6px rgba(0,0,0,.18);
   }
+  /* #194: filas del set de permisos a DOS LÍNEAS — etiqueta arriba, segmento
+     a ancho completo abajo. En una sola línea el segmento es `flex: none` (no
+     encoge), así que la etiqueta más larga —"Asignar responsable", con su
+     descripción— lo empujaba fuera del borde derecho de la tarjeta. Apilando,
+     el ancho del segmento deja de depender del largo de la etiqueta. */
+  .permiso-item {
+    display: grid; grid-template-columns: 1fr; gap: 8px;
+    align-items: start;
+  }
+  .permiso-item .seg { display: flex; width: 100%; }
+  .permiso-item .seg__btn { flex: 1; padding: 8px 4px; text-align: center; }
 
   /* #198/#200: con un modal, el panel de detalle, el panel de notificaciones
      o el drawer abiertos, los botones flotantes se ocultan. Tapaban el
