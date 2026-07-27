@@ -1,7 +1,8 @@
 # Diagnóstico mobile — Andotek Planning
 
 **Fecha:** julio 2026 · **Base:** `main` tras el PR #41 (solicitudes #187–#193).
-**Alcance:** solo análisis; no se modificó código.
+**Alcance:** §1–§9 son el diagnóstico (análisis, sin cambios de código). **§10
+registra la resolución** de las solicitudes #194–#203, con lo medido después.
 
 **Método.** Build de producción servido en local, recorrido con Playwright en
 viewport **390×844** (`isMobile` + `hasTouch`, escala 2) por el rol admin, con
@@ -276,3 +277,64 @@ forma de guardar ni cerrar.
 
 **M3 no depende de esa respuesta:** las notificaciones son de uso diario para
 cualquier rol, así que se arregla igual.
+
+---
+
+## 10. Resolución — solicitudes #194–#203
+
+Implementado sobre este diagnóstico, con las reglas que fijó el pedido: **todo
+aditivo dentro de `@media (max-width: 768px)`**, las reglas de tabla de #181
+acotadas a `@media (min-width: 769px)`, y **sin cambios de estructura de base**.
+La pregunta abierta de §9 la respondió el pedido: administrar desde el teléfono
+**no** es el caso de uso principal, así que M2 se resolvió por la **opción (b)**
+—anchos acotados a escritorio + columna de identidad con ancho propio— y **se
+acepta el scroll horizontal**. Las tarjetas quedaron descartadas.
+
+| # | Hallazgo | Qué se hizo | Medido en 390×844 |
+| --- | --- | --- | --- |
+| #194 | C1 — modal 🔑 de 999 px sin ✕ ni Guardar alcanzables | `max-height: calc(100dvh - 24px)` + `overflow-y: auto` en `.modal-card`, cabecera y botonera **sticky**, overlay con `align-items: flex-start`; filas del set de permisos a dos líneas | tarjeta 820 px (viewport 844), contenido 997→818 con scroll propio; ✕ y **Guardar** dentro del viewport y clicables **antes y después** de scrollear al fondo |
+| #194 | No tocar los modales cortos | La regla es un techo, no una altura fija | «Miembros» 415 px sin scroll; «Nuevo usuario» y «Permisos de proyecto» 🔧 igual que antes |
+| #195 | C3.a — panel de notificaciones fuera de pantalla y detrás del drawer | Al tocar «Notificaciones» **se cierra el drawer** y el panel entra a **pantalla completa**, con ✕ propio (solo en mobile) | panel 0→390 × 844; drawer cerrado; ítem alcanzable por `elementFromPoint`; «Ver todas» dentro; ✕ visible y cierra |
+| #196 | C3.b — menú ⋯ cortado y solo en el proyecto activo | Posición acotada al viewport (`Math.min/Math.max` sobre `innerWidth`/`innerHeight`) y, en pantallas táctiles, el ⋯ **visible en todos los proyectos** | menú 202→370 de 390 (20 px de margen); ⋯ visible sin hover, también con rol consultor |
+| #197 | C2 — la columna de identidad se comía el resto | Anchos de #181 acotados a `min-width: 769px`; en mobile, identidad con ancho propio | Usuarios: 170/170/96/92/76/132 · Proyectos: 170/130/76/92/132; nombre y proyecto legibles |
+| #198 · #200 | Flotantes ☰/🌙 sobre el overlay y tapando el pie del drawer | Se **ocultan** mientras haya modal o panel abiertos (`body:has(…)`) | 0 flotantes visibles con el modal de Miembros, con el 🔑 y con el panel de notificaciones |
+| #199 | Áreas táctiles < 44 px | `::before` transparente de `max(44px, 100%)` sobre `.icon-btn` — **no** engorda la fila | 0 botones bajo 44 px; alto de fila **29 px, sin cambio** |
+| #201 | «Usuarios» sin contador | Contador ya no condicionado al rol; el número lo calcula `usuariosVisiblesPara` en `App`, la **misma regla** que arma la tabla | admin: contador 4 / tabla 4 · consultor: contador 0 / tabla 0 |
+| #203 | Iconos ▯ en Android | 10 iconos SVG de trazo en `components/Iconos.tsx` reemplazan ✎ 🔧 ✉ ⏻ ↺ 🗑 👥 📦 🔑 ⓘ | 6 SVG en la tabla, **0** botones con glifo de texto; idéntico en escritorio |
+
+**Causa de #203.** Los glifos que se usaban (✎ U+270E, ⏻ U+23FB, ✉ U+2709,
+↺ U+21BA) son símbolos de **presentación de texto**: no están en el set de emoji
+a color, así que si la fuente del sistema no los trae, Android dibuja el cuadro
+vacío. En escritorio se veían porque esas fuentes sí los cubren. El SVG no
+depende de ninguna fuente.
+
+**Sin regresiones en escritorio** (1440×900, medido): anchos de tabla intactos
+(449/230/116/112/92/148 y 635/160/92/112/148), modales centrados y sin
+`max-height`, ⋯ oculto sin hover, panel de notificaciones como popover de 360 px
+y sin ✕. El `::before` táctil no existe fuera de mobile (`content: none`).
+
+### #202 — proyectos `__prueba_rls_*`
+
+Dos partes, y solo una está hecha:
+
+- **(b) Hecho — la compuerta ya no deja basura.** `scripts/validar-rls.mjs`
+  limpia en un `finally`, así que arrastra los proyectos de prueba **aunque un
+  test falle**. La causa de la acumulación era propia: el cliente `admin` del
+  script es un admin **bajo RLS**, no `service_role`, y la migración 17 exige
+  `estado = 'archivado'` para poder borrar — el `delete` afectaba 0 filas **sin
+  devolver error**. Ahora archiva y después borra, y reporta lo que quede.
+- **(a) Pendiente — limpieza de producción.** Requiere credenciales de base que
+  no están en este entorno. Los SQL a ejecutar (listar → respaldar → borrar,
+  confirmando la lista antes) están en la solicitud; no se ejecutó nada.
+
+### Qué queda fuera
+
+- **Verificación en teléfono Android real** (#203): no es posible desde este
+  entorno. Lo medido es Chromium en viewport 390×844 con `hasTouch`, que
+  confirma que ya **no hay glifos de texto** — pero la confirmación visual en el
+  dispositivo la tiene que hacer una persona.
+- Por decisión del pedido: tarjetas para las tablas de administración, primera
+  columna fija con scroll horizontal y compactar el encabezado del proyecto.
+- El icono ⓘ de la tabla del proyecto y de la Gantt tiene el **mismo riesgo de
+  ▯** que los ya corregidos, pero **no se tocó**: el pedido prohíbe expresamente
+  modificar la tabla del proyecto. Queda anotado para un pedido futuro.

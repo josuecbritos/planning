@@ -6,7 +6,7 @@ import { makeAuth } from './auth'
 import { supabaseConfigured } from './data/client'
 import { hoyISO } from './lib/dates'
 import { contar } from './lib/derive'
-import { esDuenoDe, makeCan, puedeCrearProyectos } from './lib/permisos'
+import { esDuenoDe, makeCan, puedeCrearProyectos, usuariosVisiblesPara } from './lib/permisos'
 import type { Filtro } from './lib/filtros'
 import { CAMPOS_PROYECTO, type OrdenMulti } from './lib/orden'
 import * as apply from './data/apply'
@@ -594,7 +594,13 @@ export default function App() {
   // cerrar (arriba).
   const abrirNotificaciones = useCallback(() => {
     if (notifAbierto) cerrarNotificaciones()
-    else setNotifAbierto(true)
+    else {
+      // #195: en mobile el panel va a pantalla completa, así que el drawer se
+      // cierra al abrirlo — dos capas flotantes encimadas en 390px es peor
+      // que cerrar una.
+      setMovilSidebar(false)
+      setNotifAbierto(true)
+    }
   }, [notifAbierto, cerrarNotificaciones])
 
   // #137: click en un aviso → ir a la Tabla del proyecto, resaltar la tarea y
@@ -807,6 +813,9 @@ export default function App() {
           notifAbierto={notifAbierto}
           onNotificaciones={abrirNotificaciones}
           nProyectosAdmin={proyectosAdmin.filter((p) => p.estado !== 'archivado').length}
+          /* #201: el mismo criterio que la pantalla de Usuarios — activos y,
+             para el consultor, solo su gente. */
+          nUsuarios={usuariosVisiblesPara(state, sesion).filter((u) => u.activo).length}
           puedeCrearProyecto={puedeCrearProyectos(sesion)}
           can={can}
           usuario={sesion}

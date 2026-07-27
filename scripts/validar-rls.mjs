@@ -61,6 +61,34 @@ async function perfilDe(c) {
   return data?.find((u) => u.auth_id === yo.user.id)
 }
 
+/**
+ * #202: barrido GARANTIZADO de los proyectos de prueba.
+ *
+ * Los `__prueba_rls_*` se colaban a producción porque la limpieza vivía en el
+ * camino feliz y, desde la migración 17, un DELETE sobre un proyecto ACTIVO no
+ * borra nada: la política exige `estado = 'archivado'` y el cliente de esta
+ * compuerta es un admin normal (clave anónima), así que le aplica RLS. Como un
+ * DELETE que no afecta filas no es un error, fallaba en silencio.
+ *
+ * Aquí se archivan primero y se borran después, y se corre SIEMPRE —también si
+ * una prueba falla o revienta— desde un `finally`.
+ */
+async function limpiarProyectosDePrueba(admin) {
+  if (!admin) return
+  const { data: previos } = await admin.from('proyecto').select('id').like('nombre', '__prueba_rls_%')
+  if (!previos?.length) return
+  for (const p of previos) {
+    await admin.from('proyecto').update({ estado: 'archivado' }).eq('id', p.id)
+    await admin.from('proyecto').delete().eq('id', p.id)
+  }
+  const { data: quedan } = await admin.from('proyecto').select('id, nombre').like('nombre', '__prueba_rls_%')
+  const n = previos.length - (quedan?.length ?? 0)
+  console.log(`\nLimpieza: ${n} proyecto(s) de prueba eliminados.`)
+  if (quedan?.length) {
+    console.log(`⚠ QUEDAN ${quedan.length} sin borrar: ${quedan.map((x) => x.nombre).join(', ')}`)
+  }
+}
+
 async function main() {
   // ---------- línea base: admin ve todo ----------
   const adminEmail = process.env.RLS_ADMIN_EMAIL
@@ -75,6 +103,9 @@ async function main() {
     console.error('La cuenta RLS_ADMIN no es un admin activo.')
     process.exit(2)
   }
+  // #202: todo el cuerpo de pruebas va en try/finally para que el barrido de
+  // proyectos de prueba corra SIEMPRE, aunque una prueba falle o reviente.
+  try {
   const { data: todosProyectos } = await admin.from('proyecto').select('id, nombre, creado_por')
   // La tabla base `usuario` ya no permite SELECT directo (ni al admin, que es
   // rol `authenticated`); se lee por la vista enmascarada (seguridad §3).
@@ -200,11 +231,13 @@ async function main() {
           } else {
             marca(bloqueado(borrActivo), rotulo, 'sin permiso, no elimina ni lo suyo')
           }
-          await admin.from('proyecto').delete().eq('id', id) // limpieza (por si algo quedó)
+          // La limpieza no se hace aquí: desde la migración 17 un DELETE sobre
+          // un proyecto ACTIVO no borra nada (y no da error), así que se hacía
+          // en silencio a medias. La hace el barrido garantizado del final.
         }
       } else {
         marca(bloqueado(res), rotulo, 'consultor sin permiso no crea proyectos')
-        if (!res.error) await admin.from('proyecto').delete().eq('id', res.data.id)
+        // Igual que arriba: lo limpia el barrido garantizado del final.
       }
       // Un consultor no asigna consultores (solo el admin, punto 6).
       const otroConsultor = (todosUsuarios ?? []).find((u) => u.rol === 'consultor' && u.id !== yo.id)
@@ -244,6 +277,10 @@ async function main() {
     }
 
     await c.auth.signOut()
+  }
+
+  } finally {
+    await limpiarProyectosDePrueba(admin)
   }
 
   // ---------- resumen ----------

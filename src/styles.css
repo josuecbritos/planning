@@ -1003,7 +1003,12 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .icon-btn {
   border: none; background: none; color: var(--gris-texto); font-size: 13px;
   padding: 2px 5px; border-radius: 4px; line-height: 1;
+  /* #203: los iconos de acción son SVG; el inline-flex los centra y evita el
+     espacio extra bajo la línea base que deja un elemento en línea. */
+  display: inline-flex; align-items: center; justify-content: center;
+  vertical-align: middle;
 }
+.icon-btn svg { display: block; }
 .icon-btn:hover { background: var(--velo-fuerte); color: var(--texto); }
 
 /* Tooltip explicativo inmediato sobre los iconos de accion */
@@ -1189,11 +1194,18 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .usuarios-tabla { table-layout: fixed; }
 .usuarios-tabla td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .usuarios-tabla td.col-proy, .usuarios-tabla td.col-acc { overflow: visible; }
-.col-estado-adm { width: 112px; }
-.col-mini { width: 92px; }
-.col-rol { width: 116px; }
-.col-dueno { width: 160px; }
-.col-email { width: 230px; }
+/* #197: los anchos fijos son de ESCRITORIO y van acotados. Sin acotar, en
+   390px sumaban ~698px y `table-layout: fixed` dejaba la primera columna —la
+   que identifica la fila— en 0px. La regla de mobile vive en la media query;
+   aquí solo se declara lo de pantalla ancha, para que un ajuste futuro de
+   escritorio no vuelva a romper mobile sin que se note. */
+@media (min-width: 769px) {
+  .col-estado-adm { width: 112px; }
+  .col-mini { width: 92px; }
+  .col-rol { width: 116px; }
+  .col-dueno { width: 160px; }
+  .col-email { width: 230px; }
+}
 /* #183/#185: filas DELGADAS en ambos módulos (la altura correcta de Proyectos,
    no la de Usuarios). No se fuerza altura: se achica el contenido de Usuarios
    (avatar y chip de rol) para que quepa en la misma fila delgada que Proyectos
@@ -1615,8 +1627,9 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 }
 
 /* #154/#170: columna de proyectos = solo un número, angosta como "Miembros".
-   Homologada con Proyectos: filas delgadas (sin alto fijo grande). */
-.col-proy { width: 92px; max-width: 92px; }
+   Homologada con Proyectos: filas delgadas (sin alto fijo grande).
+   #197: acotada a escritorio. */
+@media (min-width: 769px) { .col-proy { width: 92px; max-width: 92px; } }
 .proy-col { position: relative; display: flex; align-items: center; gap: 6px; overflow: visible; }
 .asignacion--ro { max-width: 118px; }
 .asignacion__nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1644,6 +1657,10 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 .notif-panel__head {
   font-size: 13px; font-weight: 700; padding: 12px 16px; border-bottom: 1px solid var(--gris-linea);
 }
+/* #195: la ✕ del panel es de mobile (ahí ocupa la pantalla completa). En
+   escritorio sigue siendo un popover que se cierra al hacer clic fuera, y su
+   cabecera queda EXACTAMENTE como estaba. */
+.notif-panel__cerrar { display: none; }
 .notif-panel__lista { max-height: 60vh; overflow-y: auto; }
 .notif-panel__vertodas {
   border: none; border-top: 1px solid var(--gris-linea); background: none; color: var(--primario);
@@ -1685,8 +1702,10 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 [data-tema='oscuro'] .chip-miembro { background: #2f5578; }
 
 /* #166: columna Acciones de ancho fijo, para que mostrar/ocultar archivados
-   (o desactivados, #170) no mueva la geometría de la tabla. */
-.usuarios-tabla .col-acc { width: 148px; white-space: nowrap; }
+   (o desactivados, #170) no mueva la geometría de la tabla.
+   #197: acotada a escritorio — en mobile la fija la media query. */
+.usuarios-tabla .col-acc { white-space: nowrap; }
+@media (min-width: 769px) { .usuarios-tabla .col-acc { width: 148px; } }
 
 /* #175: el menú de Vistas no recorta los tooltips data-tip (overflow visible);
    así el globo aparece completo y con la misma inmediatez que el resto. La
@@ -1727,6 +1746,112 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 }
 
 @media (max-width: 768px) {
+  /* ================= #194–#203 · Mobile ================= */
+
+  /* #197: la columna de IDENTIDAD (la primera, sin clase de ancho) recupera
+     un ancho propio para que el nombre se lea sin arrastrar. El resto de las
+     columnas conserva medidas compactas y la tabla sigue teniendo scroll
+     horizontal —aceptado por el pedido— dentro de `.usuarios-wrap`. */
+  .usuarios-tabla { table-layout: fixed; width: auto; min-width: 100%; }
+  .usuarios-tabla th:first-child,
+  .usuarios-tabla td:first-child { width: 170px; min-width: 170px; max-width: 170px; }
+  .usuarios-tabla .col-email { width: 170px; }
+  .usuarios-tabla .col-rol { width: 96px; }
+  .usuarios-tabla .col-estado-adm { width: 92px; }
+  .usuarios-tabla .col-dueno { width: 130px; }
+  .usuarios-tabla .col-mini { width: 76px; }
+  .usuarios-tabla .col-proy { width: 76px; }
+  .usuarios-tabla .col-acc { width: 132px; }
+  /* El nombre puede truncar con elipsis, pero nunca desaparecer. */
+  .usuarios-tabla td:first-child { overflow: hidden; text-overflow: ellipsis; }
+
+  /* #194: cualquier modal cabe en pantalla y se opera entero. Sin esto, un
+     modal más alto que el viewport se centraba y dejaba la cabecera (con la
+     ✕) fuera por arriba y los botones por abajo, sin scroll: no se podía ni
+     guardar ni cerrar. */
+  .modal-overlay {
+    align-items: flex-start;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .modal-card {
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    width: 100%;
+  }
+  /* Cabecera y botonera siempre alcanzables mientras se scrollea el cuerpo. */
+  .modal-card__head, .modal-head, .miembros__head {
+    position: sticky; top: 0; z-index: 3; background: var(--superficie);
+  }
+  .modal-acciones {
+    position: sticky; bottom: 0; z-index: 3; background: var(--superficie);
+    padding-top: 10px; margin-bottom: 0;
+    box-shadow: 0 -6px 12px -6px rgba(0,0,0,.18);
+  }
+
+  /* #198/#200: con un modal, el panel de detalle, el panel de notificaciones
+     o el drawer abiertos, los botones flotantes se ocultan. Tapaban el
+     contenido del modal, el pie del drawer (nombre y rol de la sesión) y
+     permitían abrir el drawer sobre un formulario a medio llenar.
+     `:has()` evita cablear un estado global sólo para esto: los modales y el
+     panel son elementos reales en el árbol. El drawer se cierra tocando el
+     velo o eligiendo una opción, y su pie ya tiene su propio botón de tema y
+     el de salir, así que no se pierde ninguna acción. */
+  body:has(.modal-overlay) .movil-menu,
+  body:has(.modal-overlay) .movil-tema,
+  body:has(.panel-detalle) .movil-menu,
+  body:has(.panel-detalle) .movil-tema,
+  body:has(.notif-panel) .movil-menu,
+  body:has(.notif-panel) .movil-tema,
+  .app--movil-abierta .movil-menu,
+  .app--movil-abierta .movil-tema { display: none; }
+
+  /* #199: área tocable de 44×44 SIN engordar la fila. El glifo mantiene su
+     tamaño; el objetivo se extiende por fuera con un pseudo-elemento absoluto
+     que NO ocupa lugar en el flujo, así que la altura de fila no cambia.
+     Se usa `::before` porque `::after` ya es el globo de los tooltips. */
+  .icon-btn, .modal-x, .seg button, .nav-proyecto__menu-btn, .proy-num {
+    position: relative;
+  }
+  .icon-btn::before, .modal-x::before, .seg button::before,
+  .nav-proyecto__menu-btn::before, .proy-num::before {
+    content: ''; position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: max(44px, 100%); height: max(44px, 100%);
+  }
+  /* Los checkbox no admiten pseudo-elementos: se agrandan con el propio
+     control, que ya vive en una celda con alto suficiente. */
+  .usuarios-wrap input[type='checkbox'] { width: 22px; height: 22px; }
+
+  /* #195: el panel de notificaciones deja de anclarse al ancho del sidebar de
+     escritorio (`left: 240px`, que en 390px lo dejaba 209px fuera y por
+     detrás del drawer) y pasa a PANTALLA COMPLETA, como el panel de detalle
+     de tarea. El drawer se cierra al abrirlo (lo hace App), así que no hay
+     dos capas flotantes encimadas. */
+  .notif-panel {
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: auto; max-width: none;
+    border: none; border-radius: 0;
+    z-index: 2300;
+  }
+  .notif-panel__head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 15px; padding: 16px;
+  }
+  .notif-panel__lista { max-height: none; flex: 1; }
+  .notif-panel__vertodas { padding: 16px; font-size: 14px; }
+  .notif-panel__cerrar { display: inline-flex; }
+  .notif-item { padding: 14px 16px; }
+
+  /* #196: el popover del ⋯ nunca se sale por la derecha. La posición la
+     calcula App/Sidebar acotada al viewport; aquí se limita el ancho para que
+     quepa en cualquier caso. */
+  .nav-proyecto__menu--portal { max-width: calc(100vw - 16px); }
+  .nav-proyecto__menu-op { padding: 12px 14px; }
+  /* En táctil no hay hover: el ⋯ se muestra en TODOS los proyectos, no solo
+     en el activo, para poder editar/archivar/agregar frente sin abrirlos. */
+  .nav-proyecto__menu-btn { visibility: visible; }
+
   /* ---------- 3. Sidebar superpuesta (no ocupa ancho fijo) ---------- */
   .app, .app--sidebar-escondida { display: block; }
   .main { height: 100vh; height: 100dvh; }

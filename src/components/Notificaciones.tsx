@@ -90,7 +90,13 @@ export function NotificacionesPanel({ state, notificaciones, onAbrir, onVerTodas
 
   return (
     <div className="notif-panel" ref={ref} role="dialog" aria-label="Notificaciones">
-      <div className="notif-panel__head">Notificaciones</div>
+      {/* #195: en mobile el panel ocupa la pantalla completa, así que necesita
+          una ✕ propia; en escritorio es un popover y se cierra al hacer clic
+          fuera, pero tener la ✕ tampoco estorba. */}
+      <div className="notif-panel__head">
+        <span>Notificaciones</span>
+        <button className="modal-x notif-panel__cerrar" onClick={onClose} aria-label="Cerrar">✕</button>
+      </div>
       <div className="notif-panel__lista">
         {notificaciones.length === 0 ? (
           <p className="notif-vacio">No tienes notificaciones.</p>

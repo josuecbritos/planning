@@ -32,6 +32,8 @@ interface Props {
   puedeCrearProyecto: boolean
   /** #153: cuántos proyectos ve el usuario en Administración → Proyectos. */
   nProyectosAdmin: number
+  /** #201: usuarios activos VISIBLES para quien mira (el consultor ve los suyos). */
+  nUsuarios: number
   can: Can
   usuario: Usuario
   /** Punto 6: modo actual de la barra (fija / escondida) y su alternador. */
@@ -92,6 +94,7 @@ export function Sidebar({
   onNotificaciones,
   puedeCrearProyecto,
   nProyectosAdmin,
+  nUsuarios,
   can,
   usuario,
   sidebarModo,
@@ -226,8 +229,20 @@ export function Sidebar({
                         cerrarMenu()
                         return
                       }
+                      // #196: la posición se ACOTA al viewport. Antes era
+                      // siempre `r.right + 8`, que en una pantalla angosta
+                      // dejaba el menú 66px fuera y cortaba el texto de las
+                      // opciones. Si no cabe a la derecha, se ancla pegado al
+                      // borde; el alto también se limita para no salirse abajo.
                       const r = e.currentTarget.getBoundingClientRect()
-                      setMenuPos({ top: r.top, left: r.right + 8 })
+                      const ANCHO = 180
+                      const MARGEN = 8
+                      const left = Math.max(
+                        MARGEN,
+                        Math.min(r.right + MARGEN, window.innerWidth - ANCHO - MARGEN),
+                      )
+                      const top = Math.min(r.top, window.innerHeight - 150)
+                      setMenuPos({ top: Math.max(MARGEN, top), left })
                       setMenuProyecto(p.id)
                     }}
                   >
@@ -279,10 +294,14 @@ export function Sidebar({
               onClick={() => onSelectPantalla('usuarios')}
             >
               <span>Usuarios</span>
-              {/* #182: cuenta solo activos (ni desactivados ni eliminados). */}
-              {usuario.rol === 'admin' && (
-                <span className="nav-frente__count">{state.usuarios.filter((u) => u.activo).length}</span>
-              )}
+              {/* #182/#201: cuenta solo activos (ni desactivados ni eliminados).
+                  #201: ya no se condiciona al rol admin — el consultor también
+                  ve esta entrada (con su lista acotada) y quedaba sin contador
+                  mientras "Proyectos", que nunca estuvo condicionado, sí lo
+                  mostraba. Ambas entradas cuentan lo que su dueño puede ver:
+                  el número lo calcula App con usuariosVisiblesPara, la misma
+                  regla que arma la tabla. */}
+              <span className="nav-frente__count">{nUsuarios}</span>
             </button>
             {/* #132: Proyectos — hermano de Usuarios. Dueño de la relación
                 usuario↔proyecto y del ciclo de vida (archivar/eliminar). */}

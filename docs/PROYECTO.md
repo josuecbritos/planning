@@ -159,7 +159,9 @@ un solo uso, reenviable). La persona define su contraseña y entra.
 
 **Otros:** archivo de canceladas, tema claro/oscuro (sigue el sistema, con
 override manual persistente por usuario), diseño responsive (mobile prioriza
-Tabla y Mis Tareas).
+Tabla y Mis Tareas; los modales altos, el panel de notificaciones y el menú ⋯
+tienen tratamiento propio en pantalla angosta) e iconos de acción como SVG, no
+como glifos del sistema.
 
 ## 5. Arquitectura
 
@@ -196,5 +198,5 @@ Tabla y Mis Tareas).
 | `SEGURIDAD.md` | Invariantes de seguridad — leer antes de tocar RLS/auth/deploy. |
 | `auditoria-seguridad.md` | Informe de la auditoría (hallazgos por gravedad). |
 | `runbook-seguridad.md` | Pasos para aplicar las correcciones de seguridad. |
-| `diagnostico-mobile.md` | Estado de la vista mobile medido en 390×844 y plan de mejoras propuesto. |
+| `diagnostico-mobile.md` | Estado de la vista mobile medido en 390×844, plan de mejoras y su resolución (#194–#203). |
 | `DEPLOY.md` | Despliegue (Supabase, Vercel, Resend, Edge Functions). |

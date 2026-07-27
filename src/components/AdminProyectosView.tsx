@@ -4,6 +4,7 @@ import type { Actions } from '../App'
 import { esDuenoDe, puedeCrearProyectos, puedeEditarProyecto, puedeEliminarProyecto } from '../lib/permisos'
 import { ProyectoModal } from './ProyectoModal'
 import { MiembrosModal } from './MiembrosModal'
+import { IconoArchivar, IconoEditar, IconoMiembros, IconoPapelera } from './Iconos'
 
 // Administración → Proyectos (#132). Reparto: este módulo es dueño de la
 // relación usuario↔proyecto (miembros, 🔑) y del ciclo de vida del proyecto
@@ -133,16 +134,16 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
                       (CSS) para que mostrar archivados no mueva la geometría. */}
                   <td className="col-acc">
                     {!archivado && puedeEditar && (
-                      <button className="icon-btn" data-tip="Editar proyecto" onClick={() => setModal({ tipo: 'editar', proyecto: p })}>✎</button>
+                      <button className="icon-btn" data-tip="Editar proyecto" onClick={() => setModal({ tipo: 'editar', proyecto: p })}><IconoEditar /></button>
                     )}
                     {!archivado && (esAdmin || soyDueno(p)) && (
-                      <button className="icon-btn" data-tip="Miembros" onClick={() => setModal({ tipo: 'miembros', proyecto: p })}>👥</button>
+                      <button className="icon-btn" data-tip="Miembros" onClick={() => setModal({ tipo: 'miembros', proyecto: p })}><IconoMiembros /></button>
                     )}
                     {puedeArchivarEliminar && (
-                      <button className="icon-btn" data-tip={archivado ? 'Desarchivar' : 'Archivar'} onClick={() => archivar(p)}>📦</button>
+                      <button className="icon-btn" data-tip={archivado ? 'Desarchivar' : 'Archivar'} onClick={() => archivar(p)}><IconoArchivar /></button>
                     )}
                     {archivado && puedeArchivarEliminar && (
-                      <button className="icon-btn" data-tip="Eliminar (definitivo)" onClick={() => eliminar(p)}>🗑</button>
+                      <button className="icon-btn" data-tip="Eliminar (definitivo)" onClick={() => eliminar(p)}><IconoPapelera /></button>
                     )}
                   </td>
                 </tr>

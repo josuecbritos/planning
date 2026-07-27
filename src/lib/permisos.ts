@@ -105,6 +105,29 @@ export function puedeConfigurarClientesEn(state: AppState, usuario: Usuario | nu
   return esDuenoDe(state, usuario, proyectoId) && permisoProyecto(usuario, 'configurarPermisosClientes')
 }
 
+/** Usuarios que el actor VE en el módulo de Usuarios. Admin: todos. Consultor
+ *  (§4): solo la gente CON ACCESO a sus proyectos (clientes y otros
+ *  consultores) más los clientes recién creados aún sin asignar; nunca admins
+ *  ni ajenos. Vive aquí — y no dentro de UsersView — porque el contador del
+ *  sidebar (#201) tiene que contar exactamente la misma lista que la pantalla:
+ *  con la regla duplicada, el consultor veía "4" y una tabla con 1 fila. */
+export function usuariosVisiblesPara(state: AppState, actor: Usuario): Usuario[] {
+  if (actor.rol === 'admin') return state.usuarios
+  const gestIds = new Set(
+    state.proyectos.filter((p) => p.duenoId === actor.id).map((p) => p.id),
+  )
+  const conAcceso = new Set(
+    state.accesos.filter((a) => gestIds.has(a.proyectoId)).map((a) => a.usuarioId),
+  )
+  const conAlgunAcceso = new Set(state.accesos.map((a) => a.usuarioId))
+  return state.usuarios.filter(
+    (u) =>
+      u.rol !== 'admin' &&
+      u.id !== actor.id &&
+      (conAcceso.has(u.id) || (u.rol === 'cliente' && !conAlgunAcceso.has(u.id))),
+  )
+}
+
 // ---- Can: "¿puede el usuario actual hacer X (sobre esta tarea)?" ----
 
 export interface Can {

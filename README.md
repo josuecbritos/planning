@@ -105,6 +105,21 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 - **En mobile la Gantt no se ofrece** (la grilla no funciona en pantalla
   angosta): dentro de un proyecto solo queda la Tabla, sin toggle de vistas. Mis
   Tareas se abre desde el menú izquierdo. En desktop se mantienen Tabla y Gantt.
+- **Mobile — administración y flotantes (#194–#203):** todo aditivo dentro de
+  `@media (max-width: 768px)`; las reglas de ancho de tabla quedan acotadas a
+  `@media (min-width: 769px)` para que un ajuste de escritorio no rompa mobile.
+  Los **modales altos** tienen techo `calc(100dvh - 24px)` con scroll propio,
+  cabecera y botonera **sticky** (la ✕ y Guardar siempre alcanzables); los
+  cortos no cambian. El **panel de notificaciones** cierra el drawer y entra a
+  **pantalla completa** con ✕ propio. El menú **⋯** se acota al viewport y, en
+  pantallas táctiles, se muestra en **todos** los proyectos (en escritorio sigue
+  apareciendo con hover). Las tablas de administración dan **ancho propio a la
+  columna de identidad** y aceptan scroll horizontal. Los flotantes ☰/🌙 se
+  **ocultan** mientras haya un modal o el panel abiertos. Las áreas táctiles
+  llegan a **≥44 px** con un `::before` transparente, sin engordar las filas.
+  Los iconos de acción son **SVG de trazo** (`components/Iconos.tsx`), no
+  glifos: los símbolos de presentación de texto (✎ ⏻ ✉ ↺) salían como ▯ en
+  Android porque no están en el set de emoji a color.
 - **Gantt editable — estándar por clics (sin arrastre):** clic izquierdo en una
   celda vacía planifica la tarea ese día; clic izquierdo sobre una marca **futura**
   la borra — si la marca venía de una replanificación, borrarla **deshace ese
@@ -423,6 +438,7 @@ src/
     AdminProyectosView, ProyectoModal, MiembrosModal, UsersView,
     UsuarioModal, PermisosModal, PermisosProyectoModal, Notificaciones,
     LoginPage, AceptarInvitacion, Modal, TextPromptModal, …
+    Iconos.tsx           Iconos de acción como SVG de trazo (#203)
 supabase/
   migrations/            17 migraciones (1→17). Lista ordenada en DEPLOY.md.
   functions/             Edge Functions (Deno): invitar-usuario, aceptar-invitacion
