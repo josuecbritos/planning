@@ -5,6 +5,7 @@ import {
   puedeConfigurarClientesEn,
   puedeInvitarClientesEn,
 } from '../lib/permisos'
+import { IconoLlave } from './Iconos'
 import { Modal } from './Modal'
 import { Avatar } from './RespPicker'
 import { PermisosModal } from './PermisosModal'
@@ -111,7 +112,7 @@ export function MiembrosModal({ state, proyecto, sesion, actions, onClose }: Pro
                     aria-label={`Permisos de ${u.nombre}`}
                     onClick={() => setPermisosDe(u)}
                   >
-                    🔑
+                    <IconoLlave />
                   </button>
                 )}
                 {puedeQuitarA(u) && (
@@ -181,7 +182,7 @@ export function MiembrosModal({ state, proyecto, sesion, actions, onClose }: Pro
               </form>
             )}
             <p className="miembros-nota">
-              El acceso nace con los permisos por defecto del rol; ajustables con 🔑.
+              El acceso nace con los permisos por defecto del rol; ajustables con el botón de permisos.
             </p>
           </div>
         )}

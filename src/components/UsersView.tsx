@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Proyecto, Usuario } from '../types'
 import type { Actions } from '../App'
-import { puedeInvitarClientesEn } from '../lib/permisos'
+import { puedeInvitarClientesEn, usuariosVisiblesPara } from '../lib/permisos'
 import { UsuarioModal } from './UsuarioModal'
 import { PermisosProyectoModal } from './PermisosProyectoModal'
 import { supabaseConfigured, getClient } from '../data/client'
+import {
+  IconoCorreo,
+  IconoEditar,
+  IconoEncendido,
+  IconoLlaveInglesa,
+  IconoPapelera,
+  IconoReactivar,
+} from './Iconos'
 
 // Módulo de Usuarios (7.1, reestructurado por roles-y-permisos + pedido §3/§4).
 //
@@ -72,34 +80,17 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
     }
   }
 
-  // Usuarios visibles. Admin: todos. Consultor (§4): solo la gente CON ACCESO a
-  // sus proyectos (clientes y otros consultores); nunca admins ni ajenos.
+  // Usuarios visibles: la regla vive en permisos.ts (usuariosVisiblesPara) para
+  // que el contador del sidebar cuente exactamente esta misma lista (#201).
   const usuarios = useMemo(() => {
-    let lista = state.usuarios
-    if (!esAdminActor) {
-      const gestIds = new Set(gestionables.map((p) => p.id))
-      const conAcceso = new Set(
-        state.accesos.filter((a) => gestIds.has(a.proyectoId)).map((a) => a.usuarioId),
-      )
-      const conAlgunAcceso = new Set(state.accesos.map((a) => a.usuarioId))
-      lista = state.usuarios.filter(
-        (u) =>
-          u.rol !== 'admin' &&
-          u.id !== usuarioActual.id &&
-          // Gente con acceso a sus proyectos (clientes y consultores) +
-          // clientes recién creados aún sin asignar (para poder invitarlos).
-          // La RLS garantiza que un consultor solo tenga en su estado clientes
-          // suyos: los ajenos sin acceso compartido no le llegan.
-          (conAcceso.has(u.id) || (u.rol === 'cliente' && !conAlgunAcceso.has(u.id))),
-      )
-    }
+    const lista = usuariosVisiblesPara(state, usuarioActual)
     // #170: activos por defecto; con la casilla, se suman los desactivados.
     const filtrada = verDesactivados ? lista : lista.filter((u) => u.activo)
     return [...filtrada].sort((a, b) => {
       if (a.rol !== b.rol) return ROL_ORDEN[a.rol] - ROL_ORDEN[b.rol]
       return a.nombre.localeCompare(b.nombre)
     })
-  }, [state.usuarios, state.accesos, esAdminActor, gestionables, usuarioActual.id, verDesactivados])
+  }, [state, usuarioActual, verDesactivados])
 
   // El consultor solo puede crear usuarios si puede invitar clientes en algún
   // proyecto suyo (y solo como cliente).
@@ -272,10 +263,10 @@ function UsuarioFila({
           demás no se renderizan. La columna tiene ancho fijo (CSS). */}
       <td className="col-acc">
         {puedeAdministrarCuenta && usuario.activo && (
-          <button className="icon-btn" data-tip="Editar" onClick={onEditar}>✎</button>
+          <button className="icon-btn" data-tip="Editar" onClick={onEditar}><IconoEditar /></button>
         )}
         {puedeAdministrarCuenta && usuario.activo && usuario.rol === 'consultor' && (
-          <button className="icon-btn" data-tip="Permisos de proyecto" onClick={onPermisosProyecto}>🔧</button>
+          <button className="icon-btn" data-tip="Permisos de proyecto" onClick={onPermisosProyecto}><IconoLlaveInglesa /></button>
         )}
         {supabaseConfigured && !usuario.authId && usuario.activo && puedeInvitarCorreo && (
           <button
@@ -284,7 +275,7 @@ function UsuarioFila({
             disabled={invitando}
             onClick={onInvitar}
           >
-            ✉
+            <IconoCorreo />
           </button>
         )}
         {puedeAdministrarCuenta && !esYo && (
@@ -300,7 +291,7 @@ function UsuarioFila({
               if (confirm(msg)) actions.updateUsuario(usuario.id, { activo: !usuario.activo })
             }}
           >
-            {usuario.activo ? '⏻' : '↺'}
+            {usuario.activo ? <IconoEncendido /> : <IconoReactivar />}
           </button>
         )}
         {/* #136: eliminar = desactivar + invisible (no hay borrado físico). */}
@@ -319,7 +310,7 @@ function UsuarioFila({
               }
             }}
           >
-            🗑
+            <IconoPapelera />
           </button>
         )}
       </td>
