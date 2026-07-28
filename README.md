@@ -98,10 +98,11 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   **solo días hábiles** (default) y **semana completa (7 días)**, con aviso de
   tareas de fin de semana ocultas.
 - **Horizonte del Gantt:** *Alrededor de hoy* (default fijo: 2 semanas atrás +
-  actual + 2 adelante, no persistido) y *Todo el proyecto*. El horizonte dice
-  **qué días se ven** y es independiente del filtro, que dice **qué tareas se
-  ven** (#234). Para acotar la ventana a un tramo: se filtra por fecha y se elige
-  *Todo el proyecto*, que se ajusta a las tareas que quedaron.
+  actual + 2 adelante, no persistido) y *Todo el proyecto*. Para ver un rango
+  específico se usa el filtro de fechas, que **filtra las tareas y define el
+  horizonte** (#234): si el filtro deja las de esta semana, la ventana es esa
+  semana. Mientras hay filtro de fecha el selector de modo no se ofrece (en su
+  lugar, el aviso "Horizonte definido por el filtro de fecha").
   Al hacer scroll vertical, **ambas bandas del encabezado** (rango/período arriba
   + días abajo) quedan **fijas** como un único bloque sticky.
 - **En mobile la Gantt no se ofrece** (la grilla no funciona en pantalla
@@ -225,11 +226,11 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   además del Limpiar global. **El filtro filtra filas en las dos vistas, con la
   misma regla** (#234): los tres campos —fecha, responsable y estado— dejan
   exactamente las mismas tareas en la tabla y en la Gantt. Antes la fecha era la
-  excepción: en la Gantt no filtraba, se traducía al horizonte, así que con "Hoy"
-  puesto seguían apareciendo las tareas de otros días y las que no tienen fecha.
-  Filtrar y elegir qué días se ven son dos cosas distintas y ahora están
-  separadas: el horizonte tiene su propio selector, que ya no lo reemplaza ningún
-  aviso. En la tabla, los
+  excepción: en la Gantt no filtraba, **solo** se traducía al horizonte, así que
+  con "Hoy" puesto seguían apareciendo las tareas de otros días y las que no
+  tienen fecha. Ahora la fecha hace **las dos cosas a la vez**: filtra las tareas
+  y define la ventana de días, que es lo que corresponde —si quedan las de esta
+  semana, se muestra esa semana—. En la tabla, los
   filtros quedan **fijos arriba** al hacer scroll y los encabezados de columna se
   congelan justo debajo. Los desplegables de filtro se muestran **por encima del
   contenedor** (no se recortan aunque la tabla sea corta, p. ej. en Mis Tareas).
@@ -239,8 +240,11 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   fecha —incluida "Sin fecha"— y elegir otra la apaga a ella; nunca quedan dos
   encendidas. Sumarla a "Esta semana" anularía esa opción (todo lo de esta semana
   ya tiene fecha) y sumarla a "Sin fecha" equivaldría a no filtrar. Volver a
-  tocarla la desactiva. Filtra filas en las dos vistas, como el resto de las
-  opciones de fecha desde #234. Está en las vistas de proyecto y en
+  tocarla la desactiva. **Filtra filas en las dos vistas** (como el resto de las
+  opciones de fecha desde #234) pero **no define el horizonte**: no es una
+  ventana temporal, así que el selector "Alrededor de hoy" / "Todo el proyecto"
+  sigue disponible y no aparece el aviso "Horizonte definido por el filtro de
+  fecha". Está en las vistas de proyecto y en
   Mis Tareas, y se guarda como parte de una vista. El comportamiento de "Sin
   fecha" **no cambia** (sigue sumándose al resto); lo único nuevo entre ambas es
   que se apagan mutuamente.

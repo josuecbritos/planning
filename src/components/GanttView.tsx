@@ -14,7 +14,7 @@ import {
   inicioSemana,
 } from '../lib/dates'
 import { colorTarea, fechaVigente, marcasDe } from '../lib/derive'
-import { filtraTareas, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
+import { filtraTareas, pasaFiltroCompleto, rangoDeFecha, type Filtro } from '../lib/filtros'
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
 import { miembrosDeProyecto, responsableDeTarea, type Can } from '../lib/permisos'
@@ -41,9 +41,10 @@ import { InlineText } from './InlineText'
 
 /**
  * Modos del horizonte: qué DÍAS se ven. Siempre arranca en 'hoy'; no se
- * persiste. Es independiente del filtro, que decide qué TAREAS se ven (#234):
- * para acotar la ventana a un tramo, se filtra por fecha y se usa "Todo el
- * proyecto", que se ajusta a las filas que quedaron.
+ * persiste. El antiguo "Rango personalizado" se elimino: un rango especifico se
+ * pide con el filtro de fechas (rango fijo), que ademas de filtrar las tareas
+ * se traduce al horizonte (#234) — mientras hay filtro de fecha, el modo no se
+ * elige.
  */
 type ModoHorizonte = 'hoy' | 'todo'
 
@@ -69,7 +70,7 @@ interface Props {
   hoy: string
   can: Can
   /** Filtro activo (punto 3). Se aplica entero —fecha incluida— igual que en
-   *  la tabla: decide qué tareas se ven, no qué días (#234). */
+   *  la tabla; la parte de fecha además define el horizonte visible (#234). */
   filtro: Filtro
   /** Orden multinivel (punto 4): reordena las filas dentro de cada bloque de
    *  sub frente, sin mezclarlas entre bloques. */
@@ -219,10 +220,10 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   const pasaProyecto = (f: Frente) => !filtraProyecto || filtro.proyectos!.includes(f.proyectoId)
 
   // #234: el filtro se aplica ENTERO, igual que en la tabla — fecha incluida.
-  // Antes la fecha no filtraba filas aquí: se traducía al horizonte, así que
-  // con "Hoy" puesto seguían apareciendo tareas de otros días y tareas sin
-  // fecha. El horizonte (qué días se ven) es otra cosa y tiene su propio
-  // control. Con filtro activo, los contenedores sin coincidencias se omiten.
+  // Antes la fecha NO filtraba filas aquí: solo se traducía al horizonte, así
+  // que con "Hoy" puesto seguían apareciendo tareas de otros días y tareas sin
+  // fecha. Ahora hace las dos cosas: filtra las tareas Y define la ventana de
+  // días (más abajo). Con filtro activo, los contenedores vacíos se omiten.
   const hayFiltroTareas = filtraTareas(filtro) || filtraProyecto
   const pasaEnGantt = (t: Tarea) => pasaFiltroCompleto(state, t, filtro, hoy)
   // #190: en Mis Tareas nunca se dibujan contenedores vacíos ni filas de
@@ -389,13 +390,26 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   )
 
   // -- Rango de dias segun el modo de horizonte + toggle habiles/completa --
-  // #234: el horizonte lo decide SOLO su propio toggle. Antes lo secuestraba
-  // el filtro de fecha, que es otra pregunta ("qué tareas veo", no "qué días
-  // veo"). Como "Todo el proyecto" se calcula sobre las filas visibles, con un
-  // filtro puesto la ventana se ajusta sola a las tareas que quedaron.
+  // Punto 3.5 + #234: el filtro de fecha hace LAS DOS COSAS — filtra las tareas
+  // (arriba, igual que en la tabla) y define el horizonte, la ventana de días.
+  // Van juntas a propósito: si "Esta semana" deja solo las tareas de la semana,
+  // la ventana que corresponde es esa semana. Las relativas se recalculan
+  // contra hoy.
   const dias = useMemo<ISODate[]>(() => {
     let desde: ISODate
     let hasta: ISODate
+
+    // "En horizonte visible" NO fija el horizonte (el horizonte lo define el
+    // modo); al revés, el rango se DERIVA del horizonte (efecto más abajo).
+    const rangoFiltro =
+      filtro.fecha && filtro.fecha.tipo !== 'horizonte' ? rangoDeFecha(filtro.fecha, hoy) : null
+    if (rangoFiltro && (rangoFiltro.desde || rangoFiltro.hasta)) {
+      const v = ventanaHoy(hoy)
+      desde = rangoFiltro.desde ?? v.desde
+      hasta = rangoFiltro.hasta ?? v.hasta
+      if (cmp(desde, hasta) > 0) [desde, hasta] = [hasta, desde]
+      return soloHabiles ? diasHabiles(desde, hasta) : diasCalendario(desde, hasta)
+    }
 
     if (modo === 'todo' && filasTarea.length > 0) {
       const fechas: ISODate[] = [hoy]
@@ -418,7 +432,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     }
 
     return soloHabiles ? diasHabiles(desde, hasta) : diasCalendario(desde, hasta)
-  }, [filasTarea, state.historial, hoy, modo, soloHabiles])
+  }, [filasTarea, state.historial, hoy, modo, soloHabiles, filtro.fecha])
 
   // P4: con "En horizonte visible" activo, sincroniza el rango del filtro con
   // el horizonte visible actual (primer y último día). Así la tabla filtra por
@@ -642,24 +656,32 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
               Semana completa
             </button>
           </div>
-          {/* #234: el toggle está SIEMPRE disponible. El filtro de fecha ya no
-              lo reemplaza: filtra tareas y no toca los días que se ven. */}
-          <div className="toggle">
-            <button className={modo === 'hoy' ? 'activo' : ''} onClick={() => setModo('hoy')} title="2 semanas atrás + semana actual + 2 adelante, fijo">
-              Alrededor de hoy
-            </button>
-            <button
-              className={modo === 'todo' ? 'activo' : ''}
-              onClick={() => setModo('todo')}
-              title={
-                hayFiltroTareas
-                  ? 'De la primera a la última tarea de las que quedaron con el filtro'
-                  : 'De la primera a la última tarea'
-              }
-            >
-              {misTareas ? 'Todas mis tareas' : 'Todo el proyecto'}
-            </button>
-          </div>
+          {/* El filtro de fecha define el horizonte además de filtrar las
+              tareas (#234), así que mientras esté puesto el modo no se elige.
+              "En horizonte visible" es la excepción: NO fija el horizonte —al
+              revés, deriva su rango de él—, así que deja el toggle disponible. */}
+          {filtro.fecha && filtro.fecha.tipo !== 'horizonte' ? (
+            <span className="horizonte-filtro" title="Quita el filtro de fecha para volver a elegir el horizonte">
+              Horizonte definido por el filtro de fecha
+            </span>
+          ) : (
+            <div className="toggle">
+              <button className={modo === 'hoy' ? 'activo' : ''} onClick={() => setModo('hoy')} title="2 semanas atrás + semana actual + 2 adelante, fijo">
+                Alrededor de hoy
+              </button>
+              <button
+                className={modo === 'todo' ? 'activo' : ''}
+                onClick={() => setModo('todo')}
+                title={
+                  hayFiltroTareas
+                    ? 'De la primera a la última tarea de las que quedaron con el filtro'
+                    : 'De la primera a la última tarea'
+                }
+              >
+                {misTareas ? 'Todas mis tareas' : 'Todo el proyecto'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <div className="gantt-wrap">

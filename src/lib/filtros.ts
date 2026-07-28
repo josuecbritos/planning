@@ -8,11 +8,12 @@ import type { OrdenMulti } from './orden'
 // como "o"; entre campos, como "y". Las fechas relativas se recalculan
 // siempre contra `hoy`; la semana va de lunes a domingo (como la Gantt).
 //
-// #234 — El filtro decide QUÉ TAREAS se ven; el horizonte de la Gantt decide
-// QUÉ DÍAS se ven. Son cosas distintas y ninguna manda sobre la otra: el
-// filtro se aplica igual en las dos vistas y el horizonte tiene su propio
-// control. La única opción que cruza los dos conceptos es `horizonte`, y lo
-// hace en un solo sentido y a pedido: filtra por lo que la Gantt muestra.
+// #234 — El componente de fecha hace DOS cosas, no una: filtra las tareas
+// (igual en las dos vistas, con la misma función) y, en la Gantt, define el
+// horizonte visible. Antes solo hacía lo segundo, y por eso "Hoy" mostraba
+// tareas de cualquier día. Las dos van juntas: si el filtro deja las tareas de
+// esta semana, la ventana que corresponde es esa semana. La excepción es
+// `horizonte`, que va al revés: deriva su rango del horizonte, no lo define.
 
 export type FechaRelativa = 'hoy' | 'semana' | 'proxima' | 'mes'
 
@@ -80,9 +81,9 @@ export function filtroVacio(f: Filtro): boolean {
 }
 
 /**
- * true si el filtro restringe QUÉ TAREAS se ven. La fecha cuenta: filtra filas
- * en las dos vistas (#234). No incluye `proyectos`, que acota frentes y solo
- * existe en Mis Tareas.
+ * true si el filtro restringe QUÉ TAREAS se ven. La fecha cuenta: desde #234
+ * filtra filas también en la Gantt (antes solo movía el horizonte). No incluye
+ * `proyectos`, que acota frentes y solo existe en Mis Tareas.
  */
 export function filtraTareas(f: Filtro): boolean {
   return Boolean(
@@ -146,9 +147,9 @@ export function pasaFiltroTareas(state: AppState, t: Tarea, f: Filtro, hoy: ISOD
 /**
  * Filtro completo: fecha + responsable + estado. Lo usan LAS DOS vistas — la
  * tabla y la Gantt filtran las mismas filas con la misma regla (#234). La
- * Gantt tenía su propia versión en la que la fecha no filtraba, solo movía el
- * horizonte; eso confundía dos cosas distintas (qué tareas veo vs. qué días
- * veo) y dejaba pasar tareas sin fecha con "Hoy" puesto.
+ * Gantt tenía su propia versión en la que la fecha no filtraba —solo movía el
+ * horizonte—, y por eso dejaba pasar tareas de otros días y sin fecha con
+ * "Hoy" puesto. El horizonte lo sigue moviendo; lo que faltaba era filtrar.
  */
 export function pasaFiltroCompleto(state: AppState, t: Tarea, f: Filtro, hoy: ISODate): boolean {
   if (!pasaFiltroTareas(state, t, f, hoy)) return false
