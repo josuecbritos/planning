@@ -181,14 +181,14 @@ export function TaskPanel({ state, tarea, hoy, can, actions, sesionId, onClose }
               {can.archivarEliminar(tarea) && (
                 <button
                   className="btn"
-                  title="Cancelar la tarea: sale del plan y conserva su historial"
+                  title="Sale del plan y conserva su historial"
                   onClick={() => {
                     if (confirm(`¿Archivar la tarea "${tarea.titulo}"? Sale del plan y conserva su historial.`)) {
                       actions.updateTarea(tarea.id, { archivada: true })
                     }
                   }}
                 >
-                  Archivar (cancelar)
+                  Archivar tarea
                 </button>
               )}
             </>

@@ -484,7 +484,10 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   que pasó. Editar no genera notificaciones nuevas.
 - **Archivo de canceladas (6.3)**: archivar una tarea la saca del plan (vistas y
   contadores) conservando su historial; queda consultable por sub frente y puede
-  restaurarse. Distinto de eliminar (definitivo).
+  restaurarse. Distinto de eliminar (definitivo). En el panel de detalle el botón
+  dice **"Archivar tarea"**, a secas: antes decía "Archivar (cancelar)" y el
+  paréntesis se leía como si el botón cancelara la acción en curso, no la tarea.
+  Qué implica archivar lo explica el tooltip y lo confirma el diálogo.
 - **Resumen / indicadores por proyecto**: tarjetas con % de avance, barra de progreso y
   contadores (hechas, pendientes, por replanificar, replanificadas abiertas) de todos
   los proyectos visibles. Disponible también para clientes (con sus proyectos).
