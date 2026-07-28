@@ -37,6 +37,11 @@
   --primario-hover: #333336;
   --sobre-primario: #ffffff;
   --naranja: #f97316;
+  /* #232: acento del pie de la barra lateral. La barra es oscura en los DOS
+     temas, así que el valor es fijo a propósito, como el resto de sus colores.
+     Antes se pedía `--primario-claro`, que no existe: funcionaba de casualidad
+     por el valor de respaldo escrito al lado. Es el mismo color de siempre. */
+  --sidebar-acento: #9fd0a8;
   --estructura: #1a1a1b;
   --borde-input: #71717a;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -122,7 +127,21 @@ body {
   font-size: 14px;
 }
 
-button { font-family: inherit; cursor: pointer; }
+/* #230: los botones NO heredan el color del texto por defecto — sin `color`
+   propio, el navegador les pone su negro. En modo claro eso pasa desapercibido
+   (el fondo es claro) y en oscuro el texto desaparece, que es lo que ocurría en
+   el menú de responsable. La corrección va en la raíz, no en ese menú: cualquier
+   botón que se agregue mañana y se olvide de declarar color sigue el tema, como
+   el resto del texto.
+   Es un selector de elemento (especificidad mínima): los botones que ya
+   declaran su color —los de la barra lateral, los tooltips y la tarjeta
+   flotante de la Gantt, que son zonas oscuras en los dos temas— siguen
+   mandando y no cambian. Se auditaron todos los botones de la aplicación en
+   ambos temas: solo dependían del negro por defecto el disparador del selector
+   de responsable (cuyo avatar y flecha declaran su propio color) y las opciones
+   de su menú; ninguno estaba sobre un fondo claro fijo, así que heredar el
+   color del tema no rompe ninguno. */
+button { font-family: inherit; cursor: pointer; color: inherit; }
 
 /* ---------- Layout ---------- */
 
@@ -532,6 +551,13 @@ table.tareas .col-desv { text-align: center; }
 .comentario-nuevo textarea {
   font: inherit; font-size: 13px; border: 1px solid var(--gris-borde);
   border-radius: 7px; padding: 8px 10px; resize: vertical;
+  /* #231: sin fondo ni color propios, el campo usaba los del navegador —blanco
+     con letra negra—, así que en oscuro quedaba un recuadro blanco dentro del
+     panel. Toma los mismos que `.campo input, .campo textarea`, que es el
+     campo de referencia de la aplicación. Tamaño, forma y comportamiento no
+     cambian; en modo claro el resultado es el mismo de siempre porque ahí
+     --superficie es blanco y --texto es el color del cuerpo. */
+  color: var(--texto); background: var(--superficie);
 }
 .comentario-nuevo textarea:focus { outline: none; border-color: var(--verde); }
 .comentario-nuevo .btn { align-self: flex-end; }
@@ -1076,7 +1102,11 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .vacio-frentes .mudo { font-size: 13px; font-style: italic; }
 .vacio-frentes__form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .vacio-frentes__form input {
-  padding: 7px 10px; border: 1px solid var(--borde); border-radius: 8px;
+  /* #232: pedía `var(--borde)`, que no existe en ningún tema y no llevaba
+     valor de respaldo. Sin él la declaración entera se descarta y el campo se
+     quedaba sin el borde de la aplicación. Usa el mismo que el resto de los
+     campos (`.campo input`). */
+  padding: 7px 10px; border: 1px solid var(--borde-input); border-radius: 8px;
   background: var(--fondo); color: var(--texto); font: inherit; min-width: 220px;
 }
 
@@ -1515,9 +1545,9 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   border: none; background: none; font: inherit; color: inherit;
   cursor: pointer; text-align: left; padding: 0;
 }
-.sesion--boton:hover .sesion__info b { color: var(--primario-claro, #9fd0a8); }
+.sesion--boton:hover .sesion__info b { color: var(--sidebar-acento); }
 .sesion--boton:focus-visible { outline: 2px solid var(--primario); outline-offset: 2px; border-radius: 4px; }
-.sesion--activa .sesion__info b { color: var(--primario-claro, #9fd0a8); }
+.sesion--activa .sesion__info b { color: var(--sidebar-acento); }
 .sidebar__footer .sesion__salir { color: #8e8e96; }
 .sidebar__footer .sesion__salir:hover { color: #ff8a80; }
 

@@ -213,6 +213,16 @@ Tabla y Mis Tareas; los modales altos, el panel de notificaciones y el menú ⋯
 tienen tratamiento propio en pantalla angosta) e iconos de acción como SVG, no
 como glifos del sistema.
 
+**Regla de color del tema (#230–#232):** el color se declara siempre, nunca se
+hereda por accidente del navegador. Los `<button>` no heredan el color del texto
+—la regla base los pone en `inherit`— y todo campo de formulario fija su
+`color` y su `background` de tema. Las zonas que son **oscuras en los dos
+temas** —barra lateral, globos de tooltip, tarjeta flotante de la Gantt— usan
+colores fijos **a propósito** y no deben "corregirse" a variables de tema; para
+eso la barra lateral tiene su propia `--sidebar-acento`. Una variable
+inexistente invalida la declaración completa: `var()` sin respaldo no cae al
+valor por defecto del navegador, cae al inicial (un `border` así desaparece).
+
 ## 5. Arquitectura
 
 - **Frontend:** Vite + React 18 + TypeScript (estricto), single-page, sin router.
