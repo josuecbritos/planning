@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, PermisosTareas, Tarea, Usuario } from './types'
-import { HOY as HOY_SIM } from './data/seed'
-import { makeRepo } from './data'
+import { HOY_SIMULADO } from './data/hoy'
 import { makeAuth } from './auth'
 import { supabaseConfigured } from './data/client'
 import { hoyISO } from './lib/dates'
@@ -21,6 +20,7 @@ import type {
   PatchProyecto,
   PatchTarea,
   PatchUsuario,
+  Repo,
 } from './data/repo'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
@@ -155,10 +155,9 @@ function leerAnchoSidebar(usuarioId: string | null): number {
   }
 }
 
-export default function App() {
-  const repo = useMemo(() => makeRepo(), [])
+export default function App({ repo }: { repo: Repo }) {
   const auth = useMemo(() => makeAuth(repo), [repo])
-  const HOY = useMemo(() => (supabaseConfigured ? hoyISO() : HOY_SIM), [])
+  const HOY = useMemo(() => (supabaseConfigured ? hoyISO() : HOY_SIMULADO), [])
 
   // §8 / #205: enlaces por correo — invitación (#invitacion=TOKEN) y
   // recuperación (#recuperar=TOKEN). Tienen prioridad sobre todo: los dos

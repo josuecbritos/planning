@@ -81,7 +81,10 @@ export function RespPicker({ usuarios, value, onChange, ariaLabel, apagado, resp
     const r = triggerRef.current?.getBoundingClientRect()
     if (r) {
       const anchoMenu = 240
-      const altoEstimado = 46 * (usuarios.length + 1) + 12
+      // #241: el menú está acotado a 80vh y se desplaza; la estimación tiene
+      // que respetar ese tope o con muchos miembros se reposicionaría usando
+      // un alto que el menú nunca llega a tener.
+      const altoEstimado = Math.min(46 * (usuarios.length + 1) + 12, window.innerHeight * 0.8)
       let x = r.left
       let y = r.bottom + 4
       if (x + anchoMenu > window.innerWidth - 8) x = window.innerWidth - anchoMenu - 8

@@ -8,10 +8,13 @@ import type {
   Tarea,
   Usuario,
 } from '../types'
+import { HOY_SIMULADO } from './hoy'
 
 // "Hoy" simulado (seccion 8): fijo a mitad del plan para que convivan tareas
 // hechas, hechas tarde, vencidas y futuras. En la app real seria new Date().
-export const HOY: ISODate = '2024-10-30'
+// #240: el valor vive en `hoy.ts` para que la app pueda usarlo sin arrastrar
+// este archivo —y con el, todo el plan de ejemplo— al bundle de produccion.
+export const HOY: ISODate = HOY_SIMULADO
 
 // Datos semilla representativos del Plan PGP Arauco: 2 frentes, 5 sub frentes,
 // responsables DV/JB/FS/IC. (El Excel real tiene 93 tareas; aqui una muestra

@@ -12,6 +12,7 @@ import type {
   Usuario,
 } from '../types'
 import { getClient } from './client'
+import { derivarIniciales } from './repo'
 import type {
   NuevaTarea,
   NuevoFrente,
@@ -205,8 +206,9 @@ export class SupabaseRepo implements Repo {
           titulo: input.titulo,
           descripcion: input.descripcion ?? null,
           responsable_id: input.responsableId ?? null,
-          // El trigger normalizar_fechas_tarea ancla a dia habil y fija
-          // fecha_original con la primera fecha.
+          // El trigger normalizar_fechas_tarea fija fecha_original con la
+          // primera fecha. (#237: ya NO ancla a día hábil — eso se quitó en la
+          // migración 7; cualquier día es válido.)
           fecha_objetivo: input.fechaObjetivo ?? null,
           fecha_original: null,
           hecha: false,
@@ -272,9 +274,8 @@ export class SupabaseRepo implements Repo {
   // triggers de la BD (aplicar_default_consultor / aplicar_default_acceso).
 
   async createUsuario(input: NuevoUsuario): Promise<Usuario> {
-    const iniciales = (
-      input.iniciales ?? input.nombre.split(/\s+/).map((p) => p[0]).join('').slice(0, 2)
-    ).toUpperCase()
+    // #239: la derivación vive en `repo.ts`, compartida con el repo de memoria.
+    const iniciales = (input.iniciales ?? derivarIniciales(input.nombre)).toUpperCase()
     const email = input.email.trim().toLowerCase()
     // RPC (security definer): crea o REACTIVA si el correo ya existe —incluso
     // eliminado, invisible para el cliente (#136)—; devuelve la fila completa.

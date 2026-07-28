@@ -1,6 +1,7 @@
 import type { AppState, Tarea } from '../types'
 import { formatoFecha } from '../lib/dates'
 import { CATEGORIA_LABEL, categoriaDe, colorTarea, historialDe } from '../lib/derive'
+import { miembrosDeProyecto, responsableDeTarea } from '../lib/permisos'
 
 // Contenido del tooltip de una tarea (6.6). Se usa igual en Tabla y Gantt.
 // El estado en lenguaje llano sale de las 5 categorias; "hecha" es terminal
@@ -10,7 +11,17 @@ export function TaskDetail({ state, tarea, hoy }: { state: AppState; tarea: Tare
   const hist = historialDe(state, tarea.id)
   const cat = categoriaDe(state, tarea, hoy)
   const color = colorTarea(state, tarea, hoy)
-  const resp = state.usuarios.find((u) => u.id === tarea.responsableId)
+  // #242: por el mismo camino que la tabla, la Gantt y el panel. Antes buscaba
+  // el usuario a mano y omitía la línea si no lo encontraba, así que una tarea
+  // con responsable ya no disponible se veía SIN responsable acá y apagado en
+  // la fila. La regla #229 es que nunca se muestre como si no tuviera.
+  const sub = state.subFrentes.find((sf) => sf.id === tarea.subFrenteId)
+  const frente = state.frentes.find((f) => f.id === sub?.frenteId)
+  const resp = responsableDeTarea(
+    state,
+    tarea.responsableId,
+    miembrosDeProyecto(state, frente?.proyectoId ?? null),
+  )
 
   // Cadena de fechas por las que paso: original -> nueva1 -> ... -> vigente.
   const cadena: string[] = tarea.fechaOriginal ? [tarea.fechaOriginal] : []
@@ -23,11 +34,18 @@ export function TaskDetail({ state, tarea, hoy }: { state: AppState; tarea: Tare
         {CATEGORIA_LABEL[cat]}
       </span>
 
-      {resp && (
-        <div className="hovercard__row">
-          <span>Responsable</span>
-          <span>{resp.nombre} ({resp.iniciales})</span>
-        </div>
+      {resp.estado !== 'sin-asignar' && (
+        <>
+          <div className="hovercard__row">
+            <span>Responsable</span>
+            <span className={resp.apagado ? 'hovercard__apagado' : undefined}>
+              {resp.usuario ? `${resp.usuario.nombre} (${resp.usuario.iniciales})` : '?'}
+            </span>
+          </div>
+          {/* La tarjeta no recibe el mouse (`pointer-events: none`), así que el
+              motivo va como texto y no como tooltip. */}
+          {resp.motivo && <div className="hovercard__motivo">{resp.motivo}</div>}
+        </>
       )}
       <div className="hovercard__row">
         <span>Fecha comprometida original</span>

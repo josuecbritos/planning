@@ -3,6 +3,7 @@ import { hoyISO } from '../lib/dates'
 import { idsMencionados } from '../lib/menciones'
 import { DEFAULT_PERMISOS_PROYECTO, defaultPermisosTareas } from '../lib/permisos'
 import { initialState, proyectoConsultor } from './seed'
+import { derivarIniciales } from './repo'
 import type {
   NuevaTarea,
   NuevoFrente,
@@ -133,11 +134,6 @@ export class MemoryRepo implements Repo {
 
   setActor(id: string | null): void {
     this.actorId = id
-  }
-
-  /** #207: misma derivación que la base (función `derivar_iniciales`). */
-  private static derivarIniciales(nombre: string): string {
-    return nombre.trim().split(/\s+/).filter(Boolean).map((p) => p[0]).join('').slice(0, 2).toUpperCase()
   }
 
   /** #137: crea una notificación si hay destinatario y no es el propio actor. */
@@ -310,7 +306,7 @@ export class MemoryRepo implements Repo {
     const manual = Boolean(input.iniciales && input.iniciales.trim())
     const iniciales = manual
       ? input.iniciales!.trim().toUpperCase()
-      : MemoryRepo.derivarIniciales(input.nombre)
+      : derivarIniciales(input.nombre)
     // #136: si el correo ya existe, se REACTIVA la fila (aunque esté eliminada);
     // sus accesos quedan intactos. No se crea una fila nueva ni se toca el correo.
     const existente = this.state.usuarios.find((u) => u.email.toLowerCase() === email)
@@ -354,7 +350,7 @@ export class MemoryRepo implements Repo {
       u.iniciales = (patch.iniciales ?? '').trim().toUpperCase()
       if (patch.inicialesManual !== false) u.inicialesManual = true
     }
-    if (!u.inicialesManual) u.iniciales = MemoryRepo.derivarIniciales(u.nombre)
+    if (!u.inicialesManual) u.iniciales = derivarIniciales(u.nombre)
     this.persist()
     return clone(u)
   }

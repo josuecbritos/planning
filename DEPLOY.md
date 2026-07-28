@@ -6,13 +6,6 @@ Tiempo estimado: 30–45 minutos. Costo: $0 (capas gratuitas).
 
 ---
 
-## Paso 0 — Integrar la rama
-
-Todo el trabajo está en la rama `claude/markdown-idea-dev-3noisv`. Intégrala a
-`main` (por PR o merge directo). Los despliegues automáticos se cuelgan de `main`.
-
----
-
 ## Paso 1 — Crear el proyecto Supabase
 
 1. Entra a [supabase.com](https://supabase.com) → **New project**.
@@ -179,7 +172,15 @@ se necesita nada extra (la app es una sola página, sin rutas de servidor).
 - [ ] Entrar con los 2 admins desde la URL productiva.
 - [ ] Crear un usuario Cliente desde el Módulo de Usuarios y asignarle un proyecto.
 - [ ] Crear la cuenta Auth de ese cliente (panel, paso 3) y probar que al entrar
-      **solo ve su proyecto y en solo lectura**.
+      **solo ve el proyecto donde lo invitaste** — ningún otro, ni en la barra
+      lateral ni en Resumen ni en Mis Tareas.
+- [ ] Con esa misma cuenta, comprobar que **sí puede** hacer lo que le
+      corresponde por los permisos por defecto de un cliente (#236): **crear
+      tareas**, **cambiar la fecha** y **marcar hechas las tareas asignadas a
+      él**, y **asignar responsable**. Un cliente **no** es de solo lectura por
+      defecto: eso se configura por acceso, en el 🔑 del Módulo de Usuarios.
+      Lo que **no** puede es crear frentes ni sub frentes, ni administrar
+      usuarios o proyectos.
 - [ ] Cambiar una fecha objetivo y verificar que el historial aparece en el
       tooltip / panel de detalle (el trigger funciona).
 - [ ] Confirmar que el registro público está desactivado (paso 4).
@@ -236,5 +237,11 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
   siempre con el mismo email.
 - **Cambios de esquema futuros**: nuevos archivos en `supabase/migrations/`,
   aplicados por SQL Editor o `supabase db push`.
-- **Respaldo**: Supabase free incluye respaldos diarios (7 días). Para algo más,
-  Settings → Database → exportar dump.
+- **Respaldo**: ⚠️ **el plan gratuito de Supabase NO tiene respaldos
+  automáticos** — los respaldos diarios son de los planes Pro, Team y
+  Enterprise; en el gratuito la retención es de cero días (#234). La **única**
+  red que existe es el respaldo manual: `pg_dump` (o Settings → Database →
+  exportar dump) **antes de cada migración**. No es una recomendación: si algo
+  sale mal en una migración y no hiciste el dump, no hay desde dónde volver.
+  Es lo mismo que dicen el README, `docs/SEGURIDAD.md` §4 y
+  `docs/runbook-seguridad.md` §0.
