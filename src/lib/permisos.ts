@@ -180,3 +180,84 @@ export function makeCan(state: AppState | null, u: Usuario | null, proyectoId: s
       !!(p.editarFechas || p.marcarHechas || p.editarTareas || p.archivarEliminar || p.asignarResponsable),
   }
 }
+
+/**
+ * #228: candidatos a RESPONSABLE de una tarea = los miembros del proyecto, o
+ * sea el dueño y los usuarios activos con acceso. Sin excepción por rol.
+ *
+ * Antes se colaban además TODOS los admins activos, fueran o no miembros. La
+ * intención era cómoda, pero chocaba con la regla que gobierna el resto de la
+ * aplicación: barra lateral, Resumen y Mis Tareas muestran solo los proyectos
+ * donde la persona es miembro. Una tarea asignada a un admin no miembro no le
+ * aparecía por ningún lado — trabajo asignado que su responsable no ve.
+ *
+ * Es la ÚNICA fuente de esta lista: tabla, Gantt, panel de detalle, creación de
+ * tarea y el filtro de Responsable la usan toda, para que no puedan divergir.
+ */
+export function miembrosDeProyecto(state: AppState, proyectoId: string | null): Usuario[] {
+  if (!proyectoId) return []
+  const proyecto = state.proyectos.find((p) => p.id === proyectoId)
+  return state.usuarios.filter(
+    (u) =>
+      u.activo &&
+      !u.eliminado &&
+      (u.id === proyecto?.duenoId ||
+        state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
+  )
+}
+
+/**
+ * #229: cómo mostrar al responsable de una tarea. Una tarea CON responsable en
+ * la base nunca debe verse como si no tuviera: si esa persona ya no está entre
+ * los candidatos, se muestra igual, apagada y con el motivo.
+ *
+ * `desconocido` es el caso en que el cliente no tiene la fila del usuario. Pasa
+ * de verdad con Supabase: la lista sale de la vista `usuario_visible`, que
+ * excluye a los eliminados y, para quien no es admin, a quien ya no comparte
+ * ningún proyecto. En modo memoria no ocurre —el estado conserva a todos—, así
+ * que verificar solo ahí escondería este caso.
+ */
+export type EstadoResponsable = 'sin-asignar' | 'normal' | 'ex-miembro' | 'desactivado' | 'desconocido'
+
+export interface ResponsableVista {
+  /** El usuario, si el cliente dispone de su ficha. */
+  usuario?: Usuario
+  estado: EstadoResponsable
+  /** Se muestra apagado y con `motivo` en el tooltip. */
+  apagado: boolean
+  motivo?: string
+}
+
+export function responsableDeTarea(
+  state: AppState,
+  responsableId: string | undefined,
+  candidatos: Usuario[],
+): ResponsableVista {
+  if (!responsableId) return { estado: 'sin-asignar', apagado: false }
+
+  const candidato = candidatos.find((u) => u.id === responsableId)
+  if (candidato) return { usuario: candidato, estado: 'normal', apagado: false }
+
+  const conocido = state.usuarios.find((u) => u.id === responsableId)
+  if (!conocido) {
+    return {
+      estado: 'desconocido',
+      apagado: true,
+      motivo: 'Responsable ya no disponible: la persona fue eliminada o dejó de ser visible para ti',
+    }
+  }
+  if (!conocido.activo || conocido.eliminado) {
+    return {
+      usuario: conocido,
+      estado: 'desactivado',
+      apagado: true,
+      motivo: `${conocido.nombre} está desactivado en el sistema`,
+    }
+  }
+  return {
+    usuario: conocido,
+    estado: 'ex-miembro',
+    apagado: true,
+    motivo: `${conocido.nombre} ya no es miembro de este proyecto`,
+  }
+}

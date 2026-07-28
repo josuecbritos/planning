@@ -2205,3 +2205,27 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .gantt td.fija--tarea { font-size: 11px; padding: 3px 6px; }
   .gantt td.fija--frente, .gantt td.fija--sf { font-size: 10.5px; padding: 6px 6px; }
 }
+
+/* #229: responsable que ya no está entre los candidatos —dejó de ser miembro,
+   o fue desactivado/eliminado. La tarea lo sigue mostrando (con responsable en
+   la base nunca debe verse vacía), pero apagado: se distingue del responsable
+   normal y del "sin asignar", que es un círculo punteado. El motivo va en el
+   tooltip. Los responsables normales no cambian: estas reglas solo actúan con
+   la clase --apagado. */
+.avatar--apagado {
+  opacity: .45;
+  filter: grayscale(.85);
+  box-shadow: inset 0 0 0 1px var(--gris-borde);
+}
+/* Sin ficha del usuario en el cliente (eliminado, o ya no visible): marca
+   neutra en vez de un hueco. */
+.avatar--sinficha {
+  background: var(--superficie-3); color: var(--gris-texto);
+  border: 1.5px dashed var(--gris-borde);
+  filter: none; opacity: .7;
+}
+.resp-badge--apagado { opacity: .45; filter: grayscale(.85); }
+.resp-apagado { color: var(--gris-texto); font-style: italic; }
+/* En oscuro la opacidad sola no basta para separarlo del fondo: se compensa. */
+[data-tema='oscuro'] .avatar--apagado { opacity: .55; }
+[data-tema='oscuro'] .resp-badge--apagado { opacity: .55; }

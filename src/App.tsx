@@ -7,7 +7,7 @@ import { supabaseConfigured } from './data/client'
 import { hoyISO } from './lib/dates'
 import { mensajeError } from './lib/errores'
 import { contar } from './lib/derive'
-import { esDuenoDe, makeCan, puedeCrearProyectos, usuariosVisiblesPara } from './lib/permisos'
+import { esDuenoDe, makeCan, miembrosDeProyecto, puedeCrearProyectos, usuariosVisiblesPara } from './lib/permisos'
 import type { Filtro } from './lib/filtros'
 import { CAMPOS_PROYECTO, type OrdenMulti } from './lib/orden'
 import { escribirVistaActiva, estadoInicial } from './lib/vistas'
@@ -842,17 +842,9 @@ export default function App() {
   // P5: en mobile la Gantt no existe; la vista efectiva se fuerza a Tabla.
   const vistaEfectiva: Vista = esMovil ? 'tabla' : vista
 
-  // Candidatos a responsable del proyecto activo: admins, el dueño y los
-  // usuarios con acceso.
-  const candidatosFiltro = proyecto
-    ? state.usuarios.filter(
-        (u) =>
-          u.activo &&
-          (u.rol === 'admin' ||
-            u.id === proyecto.duenoId ||
-            state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyecto.id)),
-      )
-    : []
+  // #228: el filtro de Responsable ofrece los MIEMBROS del proyecto activo, la
+  // misma lista que los selectores de la tabla, la Gantt y el panel.
+  const candidatosFiltro = miembrosDeProyecto(state, proyecto?.id ?? null)
   // Miembros (7): el admin y el dueño pueden abrir la lista del proyecto.
   const puedeVerMiembros = !!proyecto && (esAdmin || esDuenoDe(state, sesion, proyecto.id))
   // Mis Tareas: para el personal de la consultora (admins y consultores).

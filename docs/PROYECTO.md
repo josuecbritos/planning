@@ -101,6 +101,17 @@ cinco categorías excluyentes — Hecha (verde), Pendiente (sin color), Pendient
 replanificada (ámbar), Atrasada (rojo), Atrasada replanificada (morado). El
 usuario solo marca "hecha"; el resto sale de la fecha y del historial.
 
+**Responsable = miembro del proyecto (#228/#229):** los candidatos a responsable
+de una tarea son el **dueño y los usuarios activos con acceso**, sin excepción
+por rol; los admins no miembros ya no entran. La regla vive en un único
+`miembrosDeProyecto` que usan la tabla, la Gantt, el panel de detalle, la
+creación de tareas y el filtro de Responsable. Es coherente con el resto: la
+membresía gobierna la visibilidad, así que asignar a un no miembro dejaba
+trabajo que su responsable no veía por ningún lado. Una tarea con responsable en
+la base **nunca se muestra vacía**: si esa persona ya no es candidata se ve
+**apagada**, con el motivo en el tooltip, y una **marca neutra «?»** cuando el
+cliente no dispone de su ficha. No cambia ningún dato existente ni la base.
+
 **Replanificación con historial:** mover una fecha que ya venció cuenta como
 replanificación (↻ ×N) y deja rastro; mover una fecha futura es planificación
 (sin rastro). La fecha original se conserva. Es el diferenciador del producto.
