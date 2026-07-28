@@ -398,3 +398,45 @@ ahora en el frame siguiente.
 - El icono ⓘ de la tabla del proyecto y de la Gantt tiene el **mismo riesgo de
   ▯** que los ya corregidos, pero **no se tocó**: el pedido prohíbe expresamente
   modificar la tabla del proyecto. Queda anotado para un pedido futuro.
+
+---
+
+## 12. Menú ⋯ de los frentes (#222) — mobile
+
+Ronda posterior (#222–#224). Solo #222 toca mobile; se registra aquí porque
+continúa la misma línea de trabajo de §10 y §11.
+
+**Qué pasaba.** Las acciones del frente eran dos iconos (✎ y 🗑) que aparecían
+al pasar el mouse. En escritorio le quitaban ancho al nombre al aparecer: un
+nombre medianamente largo se partía en dos líneas, la fila crecía de alto y la
+barra "saltaba" con el movimiento del mouse. En mobile, donde no hay hover,
+directamente no había forma de renombrar ni eliminar un frente desde la barra.
+
+**Qué se hizo.** Los frentes adoptan el patrón que los proyectos ya tenían desde
+#178/#184/#196: un botón **⋯** con dos opciones —"Renombrar frente" y "Eliminar
+frente"— desplegadas en un **portal fijo sobre `document.body`**, acotado al
+viewport. El botón se oculta con `visibility`, no con `display`: **reserva su
+lugar siempre**, así el ancho disponible para el nombre no cambia al pasar el
+mouse. El nombre pasa a una sola línea con elipsis y el completo en el tooltip.
+
+Tres detalles que costaron:
+
+- **El estado del menú es uno solo** para proyectos y frentes
+  (`{tipo: 'proyecto'|'frente', id}`). No hace falta coordinar dos estados para
+  que abrir uno cierre el otro: es la misma variable.
+- **La regla de visibilidad del ⋯ del proyecto era descendente**
+  (`.nav-proyecto--activo .nav-proyecto__menu-btn`). Como los frentes se
+  renderizan **dentro** del proyecto activo, esa regla habría dejado visibles
+  también los ⋯ de los frentes en escritorio, donde deben aparecer solo con
+  hover. Se acotó a su propia fila con el combinador hijo (`> .nav-proyecto__fila >`),
+  igual que ya se hacía con `.nav-proyecto__title`.
+- **El área tocable de 44 px** se consigue sumando `.nav-frente__menu-btn` a la
+  lista del `::before` absoluto de #199. Al no ocupar lugar en el flujo, el alto
+  de la fila no cambia: medido en 30 px con y sin el botón.
+
+| Criterio (teléfono) | Medido en 390×844, `hasTouch` |
+| --- | --- |
+| ⋯ visible en todos los frentes sin tocar nada | 2/2 frentes en `visibility: visible` |
+| Toque impreciso abre el menú del frente | tap a +8/+14 px del centro → abre "Renombrar frente" / "Eliminar frente" |
+| El menú no se corta por la derecha | x=202, ancho=168 → borde derecho en 370 de 390 |
+| El alto de la fila no crece | 30 px por fila; área tocable 44×44 sobre un botón visible de 34×26 |
