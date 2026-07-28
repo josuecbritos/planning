@@ -44,6 +44,12 @@
 -- Aditiva: no edita ninguna migración aplicada. Solo reemplaza una política
 -- por su versión con una condición más.
 --
+-- CUÁNDO APLICARLA: esta es la ÚNICA migración que va DESPUÉS de desplegar el
+-- front, no antes. El front nuevo funciona con la política vieja y con la nueva
+-- (la vista ya filtra eliminados desde la migración 16, así que la relectura da
+-- el mismo resultado); el front VIEJO se rompe con la política nueva, por el
+-- RETURNING que se explica arriba. Aplicarla después no deja ventana rota.
+--
 -- ANTES DE APLICAR: respaldo con `pg_dump` (el plan gratuito de Supabase no
 -- trae respaldos automáticos — DEPLOY.md §Mantenimiento).
 -- DESPUÉS DE APLICAR: correr la compuerta `scripts/validar-rls.mjs`, que trae

@@ -213,6 +213,11 @@ El proyecto se opera **desde el dashboard**, no con la CLI de Supabase:
   **Orden obligatorio:** aplicar las migraciones de base **antes** de mergear el
   frontend, porque el front nuevo depende de objetos de la base (p. ej.
   `usuario_visible`).
+  **Excepción, la migración 19 (#248):** va **después** del front. Ahí la
+  dependencia se invierte —el front nuevo aguanta las dos políticas, el viejo se
+  rompe con la nueva por el `RETURNING`—, así que aplicarla antes abriría la
+  ventana rota en vez de cerrarla. La regla general no cambia; se comprueba en
+  cada migración de qué lado está la dependencia.
 - **Respaldo previo:** `pg_dump` (Session pooler, contraseña sin corchetes) antes
   de cada cambio estructural. El plan gratuito no trae backups automáticos.
 

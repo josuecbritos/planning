@@ -71,11 +71,14 @@ orden** el contenido de:
 19. `supabase/migrations/20260707000019_usuario_eliminado_fuera_de_la_tabla.sql` —
     la política `usuario_select` suma `not eliminado`: la lectura directa de la
     tabla `usuario` deja de exponer lo que la vista `usuario_visible` oculta
-    (#248). **Va acompañada del front de esta misma entrega**: `eliminarUsuario`
-    ya no pide la fila de vuelta con `RETURNING` —Postgres aplica las políticas
-    de SELECT también a esas filas— y comprueba el efecto releyendo la vista.
-    Aplicar la migración con el front viejo dejaría el mensaje "no se pudo
-    eliminar" en un borrado que sí ocurrió.
+    (#248).
+    ⚠️ **ÚNICA EXCEPCIÓN al orden "migración antes que front": esta va
+    DESPUÉS.** El front nuevo (`eliminarUsuario` sin `RETURNING`, que comprueba
+    el borrado releyendo `usuario_visible`) funciona con la política vieja y con
+    la nueva; el front VIEJO se rompe con la política nueva —pediría de vuelta
+    una fila que la política ya no deja ver, y mostraría "no se pudo eliminar"
+    en un borrado que sí ocurrió—. Aplicarla después de que el front esté en
+    producción no deja ninguna ventana rota.
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
