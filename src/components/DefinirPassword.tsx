@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getClient, supabaseConfigured } from '../data/client'
 import { mensajeError } from '../lib/errores'
 import { REGLA_PASSWORD, passwordFuerte } from '../lib/password'
+import { CampoPassword } from './CampoPassword'
 
 // #204 — UNA sola pantalla para los dos flujos que definen una contraseña por
 // enlace: activar la invitación y restablecerla. Son el mismo flujo con
@@ -176,25 +177,20 @@ export function DefinirPassword({ flujo, token, onListo }: Props) {
           <form onSubmit={enviar}>
             <h3 className="login__titulo">{t.titulo}</h3>
             <p className="login__hint">{t.bajada}</p>
-            <label className="campo">
-              <span>Contraseña (mínimo 10 caracteres, con letras y números)</span>
-              <input
-                type="password"
-                autoFocus
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </label>
-            <label className="campo">
-              <span>Repite la contraseña</span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={confirmar}
-                onChange={(e) => setConfirmar(e.target.value)}
-              />
-            </label>
+            {/* #217: un ojo por campo, independientes entre sí. */}
+            <CampoPassword
+              etiqueta="Contraseña (mínimo 10 caracteres, con letras y números)"
+              autoFocus
+              autoComplete="new-password"
+              valor={password}
+              onCambiar={setPassword}
+            />
+            <CampoPassword
+              etiqueta="Repite la contraseña"
+              autoComplete="new-password"
+              valor={confirmar}
+              onCambiar={setConfirmar}
+            />
             {password && !fuerte && <div className="login__error">{REGLA_PASSWORD}</div>}
             {password && confirmar && password !== confirmar && (
               <div className="login__error">Las contraseñas no coinciden.</div>

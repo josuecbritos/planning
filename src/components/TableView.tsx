@@ -38,9 +38,14 @@ interface Props {
   onAbrirTarea: (tareaId: string) => void
   /** #137: tarea a resaltar al llegar desde una notificación (scroll + realce). */
   resaltarTareaId?: string | null
+  /** #219: sube en cada llegada desde una notificación. Entra en las
+   *  dependencias del realce para que tocar DOS VECES la misma notificación
+   *  —o tocarla estando ya en ese proyecto— vuelva a resaltar y a centrar la
+   *  fila. Sin él, React descarta la asignación del mismo id y no pasa nada. */
+  resaltarNonce?: number
 }
 
-export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, snapshotNonce, onStale, actions, onAbrirTarea, resaltarTareaId }: Props) {
+export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, snapshotNonce, onStale, actions, onAbrirTarea, resaltarTareaId, resaltarNonce = 0 }: Props) {
   const filtrando = !filtroVacio(filtro)
   // P1: la vista se congela cuando hay filtro y/u orden activo.
   const activo = filtrando || orden.length > 0
@@ -130,7 +135,8 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     const fr = sf && state.frentes.find((x) => x.id === sf.frenteId)
     if (sf) setSubsCol((prev) => (prev.has(sf.id) ? new Set([...prev].filter((x) => x !== sf.id)) : prev))
     if (fr) setFrentesCol((prev) => (prev.has(fr.id) ? new Set([...prev].filter((x) => x !== fr.id)) : prev))
-  }, [resaltarTareaId, state])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resaltarTareaId, resaltarNonce, state])
 
   // #186: realce temporal (≈3.5 s) al llegar desde una notificación. NO usa el
   // fondo (chocaría con el color de categoría de la fila): atenúa el resto de
@@ -145,7 +151,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     setRealceOn(true)
     const id = window.setTimeout(() => setRealceOn(false), 3500)
     return () => window.clearTimeout(id)
-  }, [resaltarTareaId])
+  }, [resaltarTareaId, resaltarNonce])
   const realceId = realceOn ? resaltarTareaId : null
 
   return (
@@ -655,6 +661,8 @@ function TareaFila({
   useEffect(() => {
     if (resaltar) filaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [resaltar])
+  // (`resaltar` pasa de false a true en cada llegada gracias al nonce de #219,
+  //  así que este efecto vuelve a centrar la fila también la segunda vez.)
 
   return (
     <tr ref={filaRef} className={`${color !== 'ninguno' ? `fila--${color}` : ''}${resaltar ? ' fila--resaltada' : ''}`.trim() || undefined}>

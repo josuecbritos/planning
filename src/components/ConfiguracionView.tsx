@@ -4,6 +4,7 @@ import type { Actions } from '../App'
 import type { AuthService } from '../auth/auth'
 import { mensajeError } from '../lib/errores'
 import { REGLA_PASSWORD, passwordFuerte } from '../lib/password'
+import { CampoPassword } from './CampoPassword'
 
 // #207 — Configuración de la propia cuenta. Se entra desde el pie de la barra
 // lateral, donde ya viven el nombre y el botón de salir.
@@ -42,7 +43,6 @@ export function ConfiguracionView({ usuario, actions, auth }: Props) {
   const [nueva, setNueva] = useState('')
   const [confirmar, setConfirmar] = useState('')
   const [cambiando, setCambiando] = useState(false)
-  const [verPass, setVerPass] = useState(false)
   const [avisoPass, setAvisoPass] = useState<{ ok: boolean; texto: string } | null>(null)
 
   // Las iniciales que se verían si nadie las hubiera escrito a mano.
@@ -147,43 +147,28 @@ export function ConfiguracionView({ usuario, actions, auth }: Props) {
         </form>
 
         <form className="config__bloque" onSubmit={guardarPassword}>
-          <div className="config__titulo">
-            <h3>Contraseña</h3>
-            {/* Un solo interruptor para los tres campos: escribir una
-                contraseña a ciegas y repetirla es donde se cometen los
-                errores que después parecen "no me acepta la clave". */}
-            <label className="config__ver">
-              <input type="checkbox" checked={verPass} onChange={(e) => setVerPass(e.target.checked)} />
-              Ver contraseñas
-            </label>
-          </div>
-          <label className="campo">
-            <span>Contraseña actual</span>
-            <input
-              type={verPass ? 'text' : 'password'}
-              autoComplete="current-password"
-              value={actual}
-              onChange={(e) => setActual(e.target.value)}
-            />
-          </label>
-          <label className="campo">
-            <span>Contraseña nueva (mínimo 10 caracteres, con letras y números)</span>
-            <input
-              type={verPass ? 'text' : 'password'}
-              autoComplete="new-password"
-              value={nueva}
-              onChange={(e) => setNueva(e.target.value)}
-            />
-          </label>
-          <label className="campo">
-            <span>Repite la nueva</span>
-            <input
-              type={verPass ? 'text' : 'password'}
-              autoComplete="new-password"
-              value={confirmar}
-              onChange={(e) => setConfirmar(e.target.value)}
-            />
-          </label>
+          <h3>Contraseña</h3>
+          {/* #217: el interruptor único que mostraba los tres a la vez se
+              reemplaza por un ojo dentro de cada campo, como en el resto de
+              la aplicación. */}
+          <CampoPassword
+            etiqueta="Contraseña actual"
+            autoComplete="current-password"
+            valor={actual}
+            onCambiar={setActual}
+          />
+          <CampoPassword
+            etiqueta="Contraseña nueva (mínimo 10 caracteres, con letras y números)"
+            autoComplete="new-password"
+            valor={nueva}
+            onCambiar={setNueva}
+          />
+          <CampoPassword
+            etiqueta="Repite la nueva"
+            autoComplete="new-password"
+            valor={confirmar}
+            onCambiar={setConfirmar}
+          />
           {nueva && !passwordFuerte(nueva) && <div className="config__error">{REGLA_PASSWORD}</div>}
           {nueva && confirmar && nueva !== confirmar && (
             <div className="config__error">Las contraseñas no coinciden.</div>

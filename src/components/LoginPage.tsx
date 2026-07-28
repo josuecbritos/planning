@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Usuario } from '../types'
 import { getClient, supabaseConfigured } from '../data/client'
 import { mensajeError } from '../lib/errores'
+import { CampoPassword } from './CampoPassword'
 import { Wordmark } from './Wordmark'
 
 // Pantalla de acceso. En Supabase: email + password. En modo Local: selector
@@ -131,15 +132,13 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </label>
-            <label className="campo">
-              <span>Contraseña</span>
-              <input
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </label>
+            {/* #217: cada campo de contraseña lleva su propio ojo. */}
+            <CampoPassword
+              etiqueta="Contraseña"
+              autoComplete="current-password"
+              valor={password}
+              onCambiar={setPassword}
+            />
             {error && <div className="login__error">{error}</div>}
             <button className="btn btn--primary login__submit" disabled={cargando || !email || !password}>
               {cargando ? 'Entrando…' : 'Entrar'}

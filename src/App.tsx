@@ -10,6 +10,7 @@ import { contar } from './lib/derive'
 import { esDuenoDe, makeCan, puedeCrearProyectos, usuariosVisiblesPara } from './lib/permisos'
 import type { Filtro } from './lib/filtros'
 import { CAMPOS_PROYECTO, type OrdenMulti } from './lib/orden'
+import { escribirVistaActiva, estadoInicial } from './lib/vistas'
 import * as apply from './data/apply'
 import type {
   NuevaTarea,
@@ -93,10 +94,12 @@ export interface Actions {
 interface VistaProyecto {
   filtro: Filtro
   orden: OrdenMulti
+  /** #215: vista guardada en la que se está, o null (filtro suelto). */
+  vistaActivaId: string | null
 }
 const FILTRO_VACIO: Filtro = {}
 const ORDEN_VACIO: OrdenMulti = []
-const VISTA_VACIA: VistaProyecto = { filtro: FILTRO_VACIO, orden: ORDEN_VACIO }
+const VISTA_VACIA: VistaProyecto = { filtro: FILTRO_VACIO, orden: ORDEN_VACIO, vistaActivaId: null }
 
 // --- Tema: sigue al sistema del dispositivo por defecto, con override manual ---
 // Si el usuario tocó el interruptor, esa elección (guardada en localStorage,
@@ -187,6 +190,12 @@ export default function App() {
   // navegar desde un aviso.
   const [notifAbierto, setNotifAbierto] = useState(false)
   const [tareaResaltada, setTareaResaltada] = useState<string | null>(null)
+  // #219: contador que sube en cada llegada desde una notificación. Sin él, si
+  // ya estás en el proyecto de la tarea, `setTareaResaltada` asigna el MISMO
+  // valor, React descarta la actualización y el efecto del realce no vuelve a
+  // correr: la notificación parecía no hacer nada. Con el contador, cada toque
+  // es un evento distinto aunque la tarea sea la misma.
+  const [resaltadoNonce, setResaltadoNonce] = useState(0)
   // #179: proyecto al que se llegó desde una notificación SIN ser miembro. Se
   // muestra de forma transitoria (no entra a la barra lateral); se suelta al
   // navegar a cualquier otra cosa.
@@ -565,9 +574,38 @@ export default function App() {
     setPeekProyectoId(null) // #179
   }, [])
 
+  // #215: la primera vez que se entra a un proyecto EN ESTA SESIÓN se restaura
+  // su vista guardada activa (si la hay). Después manda lo que haya en memoria:
+  // moverse entre proyectos sin recargar conserva incluso el filtro suelto, que
+  // es el comportamiento que el pedido decidió mantener. Lo que solo sobrevive
+  // a una recarga es la vista guardada.
+  useEffect(() => {
+    if (!proyectoActivoId || !sesion) return
+    setVistasProyecto((prev) => {
+      if (prev[proyectoActivoId]) return prev
+      const ini = estadoInicial(sesion.id, proyectoActivoId)
+      if (!ini.vistaActivaId) return prev
+      return { ...prev, [proyectoActivoId]: ini }
+    })
+  }, [proyectoActivoId, sesion])
+
   // Vista (filtro + orden) del proyecto activo; setters que solo tocan la
   // entrada de ESE proyecto (punto 3: no se contaminan entre proyectos).
   const vistaActiva = proyectoActivoId ? vistasProyecto[proyectoActivoId] ?? VISTA_VACIA : VISTA_VACIA
+
+  // #215: entrar o salir de una vista guardada. Se persiste el id, nunca el
+  // filtro: lo que no se guardó es temporal.
+  const setVistaGuardada = useCallback(
+    (id: string | null) => {
+      if (!proyectoActivoId || !sesion) return
+      escribirVistaActiva(sesion.id, proyectoActivoId, id)
+      setVistasProyecto((prev) => {
+        const cur = prev[proyectoActivoId] ?? VISTA_VACIA
+        return { ...prev, [proyectoActivoId]: { ...cur, vistaActivaId: id } }
+      })
+    },
+    [proyectoActivoId, sesion],
+  )
   const setFiltro = useCallback(
     (f: Filtro) => {
       // Cambiar el filtro recalcula la foto (no es una "edición" de datos).
@@ -663,6 +701,7 @@ export default function App() {
       // ahí el panel se ve al frente con el plan de fondo.
       if (!esMovil) setTareaDetalleId(n.tareaId)
       setTareaResaltada(n.tareaId)
+      setResaltadoNonce((k) => k + 1) // #219
       setMovilSidebar(false)
     },
     [state, cerrarNotificaciones, proyectosVisibles, esMovil],
@@ -928,6 +967,8 @@ export default function App() {
                 onCambiarOrden={setOrden}
                 camposOrden={CAMPOS_PROYECTO}
                 vistaGantt={vistaEfectiva === 'gantt'}
+                vistaActivaId={vistaActiva.vistaActivaId}
+                onVistaActiva={setVistaGuardada}
                 stale={vistaStale}
                 onActualizarVista={actualizarVista}
               />
@@ -945,6 +986,7 @@ export default function App() {
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                   resaltarTareaId={tareaResaltada}
+                  resaltarNonce={resaltadoNonce}
                 />
               ) : (
                 <GanttView

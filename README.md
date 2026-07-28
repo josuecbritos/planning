@@ -120,6 +120,20 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   Los iconos de acción son **SVG de trazo** (`components/Iconos.tsx`), no
   glifos: los símbolos de presentación de texto (✎ ⏻ ✉ ↺) salían como ▯ en
   Android porque no están en el set de emoji a color.
+- **Vistas guardadas persistentes (#215):** la regla es **lo que se guardó
+  explícitamente persiste; lo que no, es temporal**. Aplicar una vista desde el
+  desplegable **entra** en ella: el botón pasa a decir `Vistas · <nombre>` y la
+  vista queda marcada en la lista. Sobrevive a salir de la pantalla y a
+  **recargar** (se guarda en `localStorage`, por usuario y por pantalla — cada
+  proyecto por su lado, Mis Tareas por el suyo). Un filtro puesto **a mano** no
+  persiste. Estando en una vista, **cambiar o limpiar** filtro u orden deja
+  dentro de ella y la marca con un **asterisco**; el **💾** lo hace
+  desaparecer, y salir sin guardar descarta lo no guardado. Se sale de una
+  vista **deseleccionándola** en el desplegable (queda todo limpio); borrarla
+  con el 🗑 deja los filtros puestos pero ya como temporales. Ninguna acción de
+  filtro entra ni saca de una vista — eso pasa solo por el desplegable.
+  *No confundir con el botón* **↻ Actualizar vista**, que es el mecanismo
+  independiente de la foto congelada.
 - **Mobile — correcciones del teléfono real (#212–#214):** tocar una
   **notificación** navega y resalta la tarea pero **no abre el panel de
   detalle**, que en 390 px taparía justo el plan al que se acaba de llegar (en
@@ -131,6 +145,14 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   recorte. Y los iconos de acción se **separan** hasta que sus áreas de 44 px
   dejan de solaparse (centros a 46 px): el problema no era el tamaño sino la
   falta de espacio, y por eso tocar 👥 disparaba 📦.
+- **#216–#220 (correcciones):** la separación de iconos baja a **4 px** y su
+  área tocable **vuelve a coincidir con lo visible** — con 44 px invisibles,
+  cuatro iconos no caben en la columna de Usuarios (#216). Cada campo de
+  contraseña de la aplicación lleva su **propio ojo** (#217). El pie de la
+  barra lateral **no dibuja recuadro**: lo pulsable es el nombre (#218). Una
+  notificación **siempre** lleva a su tarea y la resalta, aunque ya estés en
+  ese proyecto o toques la misma dos veces (#219). El filtro de **Proyecto**
+  tiene "Seleccionar todos", como Responsable y Estado (#220).
 - **Gantt editable — estándar por clics (sin arrastre):** clic izquierdo en una
   celda vacía planifica la tarea ese día; clic izquierdo sobre una marca **futura**
   la borra — si la marca venía de una replanificación, borrarla **deshace ese
@@ -454,6 +476,7 @@ src/
     dates.ts             Días hábiles y formato
     derive.ts            Estados derivados, colores y marcas (sección 6)
     password.ts          Política de contraseña, compartida por los dos flujos (#204)
+    vistas.ts            Vista guardada activa y su persistencia (#215)
     errores.ts           Traducción de fallos de red a lenguaje humano (#210)
     menciones.ts         Menciones @ en comentarios: marcador por id (#208)
   auth/
@@ -477,7 +500,7 @@ src/
     AdminProyectosView, ProyectoModal, MiembrosModal, UsersView,
     UsuarioModal, PermisosModal, PermisosProyectoModal, Notificaciones,
     LoginPage, DefinirPassword, ConfiguracionView, NombreTocable,
-    Modal, TextPromptModal, …
+    CampoPassword, Modal, TextPromptModal, …
     Iconos.tsx           Iconos de acción como SVG de trazo (#203)
 supabase/
   migrations/            18 migraciones (1→18). Lista ordenada en DEPLOY.md.
