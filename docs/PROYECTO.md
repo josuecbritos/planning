@@ -100,8 +100,12 @@ usuario solo marca "hecha"; el resto sale de la fecha y del historial.
 replanificación (↻ ×N) y deja rastro; mover una fecha futura es planificación
 (sin rastro). La fecha original se conserva. Es el diferenciador del producto.
 
-**Colaboración:** comentarios acumulables por tarea (append-only; todos los
-miembros comentan siempre). Panel lateral de detalle con la línea de tiempo.
+**Colaboración:** comentarios acumulables por tarea; todos los miembros comentan
+siempre. Se puede etiquetar con `@` a gente **con acceso al proyecto** (la
+mención se guarda por id, así sobrevive a un cambio de nombre) y el **autor**
+puede editar lo suyo, con marca visible de editado. **No se borra** ninguno: el
+hilo acompaña al registro de replanificaciones. Panel lateral de detalle con la
+línea de tiempo.
 
 **Administración → Proyectos (#132):** módulo de admin, hermano de Usuarios.
 Dueño de la relación usuario↔proyecto (miembros, 🔑) y del ciclo de vida:
@@ -133,8 +137,10 @@ proyectos activos) sí se conservan. El control de plegar la barra es un
 se ve solo el del riel y, al desplegarse, solo el de la cabecera: nunca los dos
 a la vez (#191).
 
-**Notificaciones in-app (#137):** tres eventos sobre tus tareas — te asignaron,
-replanificaron o comentaron (nunca por acciones propias). Entrada en la barra
+**Notificaciones in-app (#137):** cuatro eventos — te asignaron, replanificaron
+o comentaron una tarea tuya, y (desde #208) alguien te **mencionó** en un
+comentario; nunca por acciones propias. Una sola notificación por persona y
+comentario: si al responsable lo mencionan, gana el texto de la mención. Entrada en la barra
 con contador naranja si hay sin leer; el panel emergente muestra las últimas,
 marca todo como leído **al cerrarlo** (#156, para no perder de vista lo nuevo
 mientras se lee), y el clic navega a la tarea (la **resalta** y abre su detalle;
@@ -156,6 +162,20 @@ según sus permisos.
 **Alta por invitación:** el admin (o un consultor con permiso, para clientes de
 sus proyectos) crea al usuario y le envía un correo con enlace (caduca a 7 días,
 un solo uso, reenviable). La persona define su contraseña y entra.
+
+**Recuperar contraseña:** desde el login, con un enlace propio de 1 hora y un
+solo uso que cierra todas las sesiones al usarse. Solo para usuarios activos con
+cuenta ya creada; no es una vía para crear cuentas (el registro público sigue
+apagado). Define la contraseña en la misma pantalla que la invitación.
+
+**Cuenta propia:** cada usuario cambia su nombre, sus iniciales y su contraseña
+desde el pie de la barra lateral. El correo, el rol y el estado los gestiona el
+admin — la barrera no es la interfaz sino un trigger en la base.
+
+**Comentarios:** hilo por tarea con menciones `@` acotadas a quienes tienen
+acceso al proyecto (una sola notificación por persona y comentario). El autor
+puede editar lo suyo, con marca de editado; nadie borra: el hilo acompaña al
+registro de replanificaciones.
 
 **Otros:** archivo de canceladas, tema claro/oscuro (sigue el sistema, con
 override manual persistente por usuario), diseño responsive (mobile prioriza

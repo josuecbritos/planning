@@ -43,6 +43,9 @@ function resolver(state: AppState, n: Notificacion): Resuelta {
   const T = <em>{titulo}</em>
   let texto: React.ReactNode
   if (n.tipo === 'asignacion') texto = <>{quien} te asignó {T}</>
+  // #208: si además eres el responsable, esta es la ÚNICA que recibes — el
+  // texto de la mención gana al de comentario por ser más específico.
+  else if (n.tipo === 'mencion') texto = <>{quien} te mencionó en {T}</>
   else if (n.tipo === 'comentario') texto = <>{quien} comentó en {T}</>
   else texto = <>{quien} replanificó {T}{n.dato?.fecha ? <> al {formatoFecha(n.dato.fecha)}</> : null}</>
   return { autor, proyectoNombre: proyecto?.nombre ?? '', texto }

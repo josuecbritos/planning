@@ -6,12 +6,23 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-// CORS acotado al origen de la app (punto 8). Fallback '*' si no hay SITE_URL.
-const ORIGEN = Deno.env.get('SITE_URL') ?? '*'
-const cors = {
-  'Access-Control-Allow-Origin': ORIGEN,
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Vary': 'Origin',
+// CORS por LISTA de orígenes permitidos (invariante 8: acotado, nunca '*').
+// `SITE_URL` es la app en producción. `SITE_URLS` es opcional y admite orígenes
+// extra separados por coma — sirve para las URL de preview de Vercel, que son
+// de otro dominio y sin esto reciben un bloqueo del navegador que la app
+// reporta como si fuera un problema de conexión.
+const PERMITIDOS = [
+  Deno.env.get('SITE_URL'),
+  ...(Deno.env.get('SITE_URLS') ?? '').split(',').map((o) => o.trim()),
+].filter((o): o is string => Boolean(o))
+
+function corsDe(req: Request): Record<string, string> {
+  const origen = req.headers.get('Origin') ?? ''
+  return {
+    'Access-Control-Allow-Origin': PERMITIDOS.includes(origen) ? origen : (PERMITIDOS[0] ?? '*'),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Vary': 'Origin',
+  }
 }
 
 // Rate limiting best-effort (punto 9): en memoria del contenedor (efimero),
@@ -36,6 +47,7 @@ function contrasenaValida(p: unknown): p is string {
 const REGLA_PASSWORD = 'La contraseña debe tener al menos 10 caracteres e incluir letras y números.'
 
 Deno.serve(async (req) => {
+  const cors = corsDe(req)
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
   const responder = (status: number, body: unknown) =>
@@ -48,9 +60,12 @@ Deno.serve(async (req) => {
   if (limitado(ip)) return responder(429, { error: 'Demasiados intentos. Espera un momento y reintenta.' })
 
   try {
-    const { token, password } = await req.json()
+    // `verificar` (#206): comprueba el token SIN consumirlo, para que la
+    // pantalla pueda explicar de entrada que el enlace venció o ya se usó, en
+    // vez de hacer escribir una contraseña que va a ser rechazada.
+    const { token, password, verificar } = await req.json()
     if (!token) return responder(400, { error: 'Falta el token de invitación' })
-    if (!contrasenaValida(password)) return responder(400, { error: REGLA_PASSWORD })
+    if (!verificar && !contrasenaValida(password)) return responder(400, { error: REGLA_PASSWORD })
 
     const admin = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -75,6 +90,10 @@ Deno.serve(async (req) => {
       .maybeSingle()
     if (!usuario || !usuario.activo) return responder(404, { error: 'Usuario no encontrado o inactivo' })
     if (usuario.auth_id) return responder(409, { error: 'La cuenta ya está activa: inicia sesión' })
+
+    // Hasta aquí llegan las comprobaciones que no modifican nada: si solo se
+    // pedía verificar, se responde sin consumir la invitación.
+    if (verificar) return responder(200, { ok: true, verificado: true })
 
     // Defensa de C1: marcar la invitación como USADA ANTES de crear la cuenta.
     // El trigger vincular_usuario_auth solo enlaza cuentas cuya invitación

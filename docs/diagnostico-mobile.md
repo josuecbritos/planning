@@ -325,24 +325,46 @@ y sin ✕. El `::before` táctil no existe fuera de mobile (`content: none`).
 
 ### #202 — proyectos `__prueba_rls_*`
 
-Dos partes, y solo una está hecha:
+Cerrado, en dos partes:
 
-- **(b) Hecho — la compuerta ya no deja basura.** `scripts/validar-rls.mjs`
-  limpia en un `finally`, así que arrastra los proyectos de prueba **aunque un
-  test falle**. La causa de la acumulación era propia: el cliente `admin` del
-  script es un admin **bajo RLS**, no `service_role`, y la migración 17 exige
+- **(b) La compuerta ya no deja basura.** `scripts/validar-rls.mjs` limpia en un
+  `finally`, así que arrastra los proyectos de prueba **aunque un test falle**.
+  La causa de la acumulación era propia: el cliente `admin` del script es un
+  admin **bajo RLS**, no `service_role`, y la migración 17 exige
   `estado = 'archivado'` para poder borrar — el `delete` afectaba 0 filas **sin
   devolver error**. Ahora archiva y después borra, y reporta lo que quede.
-- **(a) Pendiente — limpieza de producción.** Requiere credenciales de base que
-  no están en este entorno. Los SQL a ejecutar (listar → respaldar → borrar,
-  confirmando la lista antes) están en la solicitud; no se ejecutó nada.
+- **(a) Producción limpia.** Había 4 proyectos `__prueba_rls_<timestamp>`, todos
+  del 24-jul en dos pares separados por ~4 s: el patrón crear→borrar del ciclo
+  del consultor A. Se listaron, se confirmaron uno a uno y se borraron por id
+  explícito; el conteo posterior dio 0.
+
+**Cómo limpiar esto desde el SQL Editor** (por si vuelve a hacer falta). Listar
+primero — la columna de fecha es `fecha_creacion`, y la tabla de accesos se
+llama `acceso_proyecto` desde la migración 12:
+
+```sql
+select id, nombre, estado, fecha_creacion from proyecto
+where nombre like '__prueba_rls_%' order by fecha_creacion;
+```
+
+Y borrar **por id explícito**, tras revisar esa lista y con respaldo hecho. Nada
+de `update ... set estado = 'archivado'` antes: el trigger
+`trg_validar_estado_proyecto` (migración 16) exige permiso de admin para cambiar
+`estado`, y en el SQL Editor no hay sesión de usuario, así que falla con «Sin
+permiso para archivar o desarchivar proyectos». El `delete` directo no pasa por
+ese trigger, y la regla que exige archivar primero es una **política RLS**, que
+el editor no aplica. Esa asimetría —el script tiene que archivar, el editor no
+debe— es la que conviene recordar.
 
 ### Qué queda fuera
 
 - **Verificación en teléfono Android real** (#203): no es posible desde este
   entorno. Lo medido es Chromium en viewport 390×844 con `hasTouch`, que
-  confirma que ya **no hay glifos de texto** — pero la confirmación visual en el
-  dispositivo la tiene que hacer una persona.
+  confirma que ya **no hay glifos de texto**; la confirmación visual en el
+  dispositivo la hizo el usuario, y ahí apareció el desborde del segmento que
+  la medición no veía (la comprobación era contra el viewport, no contra el
+  borde de la tarjeta). Queda pendiente confirmar en el teléfono el apilado ya
+  corregido.
 - Por decisión del pedido: tarjetas para las tablas de administración, primera
   columna fija con scroll horizontal y compactar el encabezado del proyecto.
 - El icono ⓘ de la tabla del proyecto y de la Gantt tiene el **mismo riesgo de

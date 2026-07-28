@@ -1,9 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
-import type { AppState, Tarea } from '../types'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { AppState, Tarea, Usuario } from '../types'
 import type { Actions } from '../App'
 import type { Can } from '../lib/permisos'
 import { formatoFecha, formatoFechaHora } from '../lib/dates'
 import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, historialDe } from '../lib/derive'
+import {
+  aTextoEditable,
+  aTextoGuardable,
+  mencionEnCurso,
+  mencionablesEn,
+  partirComentario,
+  type MencionElegida,
+} from '../lib/menciones'
 import { FechaEditable } from './FechaEditable'
 
 // Panel lateral de detalle (7.2, era backlog en v3.1): click sobre una tarea
@@ -16,10 +24,13 @@ interface Props {
   hoy: string
   can: Can
   actions: Actions
+  /** #208/#209: quién mira — para no ofrecerse a uno mismo en el selector de
+   *  menciones y para saber qué comentarios puede editar. */
+  sesionId?: string
   onClose: () => void
 }
 
-export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
+export function TaskPanel({ state, tarea, hoy, can, actions, sesionId, onClose }: Props) {
   const asideRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -121,7 +132,13 @@ export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
       </div>
 
       {/* 3.3: TODOS los miembros pueden comentar, siempre (append-only). */}
-      <Comentarios state={state} tarea={tarea} puedeComentar actions={actions} />
+      <Comentarios
+        state={state}
+        tarea={tarea}
+        puedeComentar
+        sesionId={sesionId}
+        actions={actions}
+      />
 
       {can.algunoDeTareas && (
         <div className="panel-detalle__acciones">
@@ -175,31 +192,67 @@ export function TaskPanel({ state, tarea, hoy, can, actions, onClose }: Props) {
 }
 
 /**
- * N5: hilo de comentarios acumulables. Cada comentario suma al historial
- * (con autor y fecha); no se sobrescriben ni se borran. Comentan los admins;
- * el cliente lee el hilo completo.
+ * N5: hilo de comentarios acumulables. Cada comentario suma al historial (con
+ * autor y fecha) y NO se borra: el hilo acompaña al registro de
+ * replanificaciones y es el respaldo de por qué pasó lo que pasó.
+ *
+ * #208: se puede etiquetar con "@" a gente CON ACCESO al proyecto —etiquetar a
+ * quien no puede ver la tarea generaría un aviso hacia una puerta cerrada—. En
+ * el texto guardado la mención es un id, no un nombre, así que sobrevive a que
+ * la persona se cambie el nombre (#207).
+ *
+ * #209: el AUTOR puede editar lo suyo, sin límite de tiempo y con marca
+ * visible. Ni el admin ni el dueño del proyecto editan lo de otros, y nadie
+ * borra nada. Editar no genera notificaciones nuevas.
  */
 function Comentarios({
   state,
   tarea,
   puedeComentar,
+  sesionId,
   actions,
 }: {
   state: AppState
   tarea: Tarea
   puedeComentar: boolean
+  sesionId?: string
   actions: Actions
 }) {
   const [texto, setTexto] = useState('')
+  const [elegidas, setElegidas] = useState<MencionElegida[]>([])
+  const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [textoEdit, setTextoEdit] = useState('')
+  const [elegidasEdit, setElegidasEdit] = useState<MencionElegida[]>([])
+
   const hilo = state.comentarios
     .filter((c) => c.tareaId === tarea.id)
     .sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1))
 
+  const candidatos = useMemo(
+    () => mencionablesEn(state, tarea.id, sesionId),
+    [state, tarea.id, sesionId],
+  )
+
   function publicar() {
-    const limpio = texto.trim()
+    const limpio = aTextoGuardable(texto, elegidas).trim()
     if (!limpio) return
     actions.addComentario(tarea.id, limpio)
     setTexto('')
+    setElegidas([])
+  }
+
+  function abrirEdicion(id: string, textoGuardado: string) {
+    const { texto: editable, elegidas: recuperadas } = aTextoEditable(textoGuardado, state.usuarios)
+    setEditandoId(id)
+    setTextoEdit(editable)
+    setElegidasEdit(recuperadas)
+  }
+
+  function guardarEdicion() {
+    const limpio = aTextoGuardable(textoEdit, elegidasEdit).trim()
+    if (!limpio || !editandoId) return
+    actions.editComentario(editandoId, limpio)
+    setEditandoId(null)
   }
 
   return (
@@ -211,6 +264,7 @@ function Comentarios({
       <ul className="comentarios-hilo">
         {hilo.map((c) => {
           const autor = state.usuarios.find((u) => u.id === c.autorId)
+          const esMio = !!sesionId && c.autorId === sesionId
           return (
             <li key={c.id} className="comentario">
               <div className="comentario__meta">
@@ -223,28 +277,170 @@ function Comentarios({
                   <b>—</b>
                 )}
                 <span className="comentario__fecha">{formatoFechaHora(c.timestamp)}</span>
+                {c.editado && (
+                  <span className="comentario__editado" title={`Editado el ${formatoFechaHora(c.editado)}`}>
+                    editado
+                  </span>
+                )}
+                {esMio && editandoId !== c.id && (
+                  <button
+                    className="link-btn comentario__editar"
+                    onClick={() => abrirEdicion(c.id, c.texto)}
+                  >
+                    Editar
+                  </button>
+                )}
               </div>
-              <p className="comentario__texto">{c.texto}</p>
+              {editandoId === c.id ? (
+                <div className="comentario-nuevo">
+                  <CampoComentario
+                    valor={textoEdit}
+                    onCambiar={setTextoEdit}
+                    candidatos={candidatos}
+                    onElegir={(m) => setElegidasEdit((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]))}
+                    onEnviar={guardarEdicion}
+                    placeholder="Editar el comentario…"
+                  />
+                  <div className="comentario-acciones">
+                    <button className="btn btn--primary btn--sm" disabled={!textoEdit.trim()} onClick={guardarEdicion}>
+                      Guardar
+                    </button>
+                    <button className="btn btn--sm" onClick={() => setEditandoId(null)}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="comentario__texto">
+                  {partirComentario(c.texto).map((parte, i) =>
+                    parte.tipo === 'texto' ? (
+                      <span key={i}>{parte.valor}</span>
+                    ) : (
+                      <span key={i} className="mencion">
+                        @{state.usuarios.find((u) => u.id === parte.usuarioId)?.nombre ?? 'alguien'}
+                      </span>
+                    ),
+                  )}
+                </p>
+              )}
             </li>
           )
         })}
       </ul>
 
-      {puedeComentar && (
+      {puedeComentar && editandoId === null && (
         <div className="comentario-nuevo">
-          <textarea
-            rows={2}
-            placeholder="Agregar un comentario… (se suma al hilo, no reemplaza)"
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) publicar()
-            }}
+          <CampoComentario
+            valor={texto}
+            onCambiar={setTexto}
+            candidatos={candidatos}
+            onElegir={(m) => setElegidas((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]))}
+            onEnviar={publicar}
+            placeholder="Agregar un comentario… (@ para etiquetar a alguien)"
           />
           <button className="btn btn--primary btn--sm" disabled={!texto.trim()} onClick={publicar}>
             Comentar
           </button>
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * #208: campo de texto con selector de "@". En el editor se ve "@Nombre"; la
+ * conversión al marcador por id ocurre al publicar, con las personas que se
+ * eligieron aquí. Se eligen de la lista: escribir "@" y un nombre a mano NO
+ * crea una mención, y eso es deliberado — así una mención siempre apunta a
+ * alguien que existe y tiene acceso.
+ */
+function CampoComentario({
+  valor,
+  onCambiar,
+  candidatos,
+  onElegir,
+  onEnviar,
+  placeholder,
+}: {
+  valor: string
+  onCambiar: (v: string) => void
+  candidatos: Usuario[]
+  onElegir: (m: MencionElegida) => void
+  onEnviar: () => void
+  placeholder: string
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  const [busca, setBusca] = useState<{ desde: number; termino: string } | null>(null)
+
+  const sugeridos = busca
+    ? candidatos
+        .filter((u) => u.nombre.toLowerCase().includes(busca.termino.toLowerCase().trim()))
+        .slice(0, 6)
+    : []
+
+  function recalcular(v: string, cursor: number) {
+    setBusca(mencionEnCurso(v, cursor))
+  }
+
+  function elegir(u: Usuario) {
+    if (!busca) return
+    const antes = valor.slice(0, busca.desde)
+    const despues = valor.slice(busca.desde + 1 + busca.termino.length)
+    const insertado = `@${u.nombre} `
+    onCambiar(`${antes}${insertado}${despues}`)
+    onElegir({ id: u.id, nombre: u.nombre })
+    setBusca(null)
+    // Devolver el foco donde estaba, tras la mención recién puesta.
+    requestAnimationFrame(() => {
+      const el = ref.current
+      if (!el) return
+      const pos = antes.length + insertado.length
+      el.focus()
+      el.setSelectionRange(pos, pos)
+    })
+  }
+
+  return (
+    <div className="comentario-campo">
+      <textarea
+        ref={ref}
+        rows={2}
+        placeholder={placeholder}
+        value={valor}
+        onChange={(e) => {
+          onCambiar(e.target.value)
+          recalcular(e.target.value, e.target.selectionStart ?? e.target.value.length)
+        }}
+        onClick={(e) => recalcular(valor, e.currentTarget.selectionStart ?? 0)}
+        onBlur={() => {
+          // Sin retardo, el blur cierra la lista antes de que el clic llegue.
+          setTimeout(() => setBusca(null), 150)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && busca) {
+            e.stopPropagation() // no cerrar el panel de detalle: solo la lista
+            setBusca(null)
+            return
+          }
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) onEnviar()
+        }}
+      />
+      {busca && sugeridos.length > 0 && (
+        <ul className="mencion-lista">
+          {sugeridos.map((u) => (
+            <li key={u.id}>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => elegir(u)}>
+                <span className="resp-badge">{u.iniciales}</span>
+                <span>{u.nombre}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {busca && sugeridos.length === 0 && (
+        <ul className="mencion-lista">
+          <li className="mencion-lista__vacio">Nadie con acceso a este proyecto coincide.</li>
+        </ul>
       )}
     </div>
   )

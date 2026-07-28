@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react'
 import type { Usuario } from '../types'
+import { getClient, supabaseConfigured } from '../data/client'
+import { mensajeError } from '../lib/errores'
 import { Wordmark } from './Wordmark'
 
 // Pantalla de acceso. En Supabase: email + password. En modo Local: selector
 // de usuario ("entrar como…") para demostrar los roles sin backend.
+//
+// #205: desde aquí se pide el enlace de recuperación. La respuesta distingue
+// los casos en vez de dar el mensaje genérico de OWASP — decisión tomada en el
+// pedido: sin registro público, con usuarios creados por el admin y pocos, se
+// acepta la enumeración a cambio de que la persona entienda qué le pasa.
 
 interface Props {
   modo: 'memoria' | 'supabase'
@@ -17,6 +24,9 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
+  // #205: modo "olvidé mi contraseña" dentro de la misma tarjeta.
+  const [recuperando, setRecuperando] = useState(false)
+  const [avisoRec, setAvisoRec] = useState<{ ok: boolean; texto: string } | null>(null)
 
   useEffect(() => setError(null), [email, password])
 
@@ -26,7 +36,37 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
     try {
       await onLogin(mail, pass)
     } catch (e) {
-      setError(String((e as Error).message ?? e))
+      // #210: un "Failed to fetch" no le dice nada a nadie; los errores
+      // informativos (contraseña incorrecta, usuario desactivado) pasan tal cual.
+      setError(mensajeError(e))
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  async function pedirRecuperacion(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email.trim() || !supabaseConfigured) return
+    setCargando(true)
+    setAvisoRec(null)
+    try {
+      const { error } = await getClient().functions.invoke('recuperar-contrasena', {
+        body: { email: email.trim() },
+      })
+      if (error) {
+        let msg = error.message
+        try {
+          const ctx = await (error as { context?: Response }).context?.json()
+          if (ctx?.error) msg = ctx.error
+        } catch {
+          /* sin cuerpo JSON: queda el mensaje genérico */
+        }
+        setAvisoRec({ ok: false, texto: mensajeError(new Error(msg)) })
+        return
+      }
+      setAvisoRec({ ok: true, texto: 'Te enviamos las instrucciones a tu correo.' })
+    } catch (err) {
+      setAvisoRec({ ok: false, texto: mensajeError(err) })
     } finally {
       setCargando(false)
     }
@@ -40,7 +80,41 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
           <small>Herramienta de Planificación de Proyectos</small>
         </div>
 
-        {modo === 'supabase' ? (
+        {modo === 'supabase' && recuperando ? (
+          /* #205: pedir el enlace. Solo hace falta el correo. */
+          <form onSubmit={pedirRecuperacion}>
+            <p className="login__hint">
+              Escribe tu correo y te enviamos un enlace para elegir una contraseña nueva.
+              Dura 1 hora y sirve una sola vez.
+            </p>
+            <label className="campo">
+              <span>Email</span>
+              <input
+                type="email"
+                autoFocus
+                autoComplete="username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </label>
+            {avisoRec && (
+              <div className={avisoRec.ok ? 'login__aviso' : 'login__error'}>{avisoRec.texto}</div>
+            )}
+            <button className="btn btn--primary login__submit" disabled={cargando || !email}>
+              {cargando ? 'Enviando…' : 'Enviar instrucciones'}
+            </button>
+            <button
+              type="button"
+              className="link-btn login__link"
+              onClick={() => {
+                setRecuperando(false)
+                setAvisoRec(null)
+              }}
+            >
+              Volver a iniciar sesión
+            </button>
+          </form>
+        ) : modo === 'supabase' ? (
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -69,6 +143,16 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
             {error && <div className="login__error">{error}</div>}
             <button className="btn btn--primary login__submit" disabled={cargando || !email || !password}>
               {cargando ? 'Entrando…' : 'Entrar'}
+            </button>
+            <button
+              type="button"
+              className="link-btn login__link"
+              onClick={() => {
+                setRecuperando(true)
+                setError(null)
+              }}
+            >
+              ¿Olvidaste tu contraseña?
             </button>
           </form>
         ) : (

@@ -91,23 +91,34 @@ reintroduce un hallazgo de la auditoría.
    que consulta y revocar rompería la RLS. A lo sumo revocar a `anon`.
 6. **Funciones de trigger sin `EXECUTE` para `anon`/`authenticated`** (se disparan
    por trigger, no por RPC).
-7. **Política de contraseñas:** mínimo ≥10 con letras y números en
-   `aceptar-invitacion`. No bajarlo.
-8. **CORS acotado a `SITE_URL`** en las Edge Functions; **secretos solo
+7. **Política de contraseñas:** mínimo ≥10 con letras y números, aplicada en
+   **las dos** Edge Functions que fijan contraseña (`aceptar-invitacion` y
+   `recuperar-contrasena`). No bajarlo. El front comparte la regla en
+   `src/lib/password.ts`, pero esa es de conveniencia: la que manda es la del
+   servidor.
+8. **CORS por lista de orígenes** en las Edge Functions, nunca `'*'`: `SITE_URL`
+   más lo que traiga el secret opcional `SITE_URLS` (separado por comas). La
+   respuesta refleja el `Origin` **solo si está en la lista**; cualquier otro
+   recibe `SITE_URL` y el navegador lo bloquea. `SITE_URLS` existe para las URL
+   de preview de Vercel, que son otro dominio: sin ella, probar los flujos de
+   correo en un preview falla con un error que parece de conexión. No poner ahí
+   dominios que no sean de este proyecto. **Secretos solo
    server-side** (`RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, etc. nunca en el
    front; el front usa solo la `anon key`).
 9. **Headers de `vercel.json`:** no quitarlos. Si se agrega un origen externo
    (p. ej. otro API), ajustar la CSP para permitirlo — la CSP debe seguir
    permitiendo `*.supabase.co` y las fuentes usadas.
-10. **RLS habilitada en las 10 tablas con datos** (`usuario`, `proyecto`,
+10. **RLS habilitada en las 11 tablas con datos** (`usuario`, `proyecto`,
     `frente`, `sub_frente`, `tarea`, `replanificacion`, `acceso_proyecto`,
-    `comentario`, `invitacion`, `notificacion`). Nunca una política `USING (true)`.
+    `comentario`, `invitacion`, `notificacion`, `recuperacion`). Nunca una
+    política `USING (true)`.
 11. **Migraciones aditivas:** los cambios de base van como **archivos nuevos** en
     `supabase/migrations/`; no editar migraciones ya aplicadas.
 12. **Notificaciones privadas (#137).** `notificacion` scopea a su dueño:
     `select`/`update` con `using (usuario_id = usuario_actual_id())` — nunca
     `USING (true)`. **Sin política de insert/delete**: las generan triggers
-    (`notif_asignacion`, `registrar_replanificacion`, `notif_comentario`,
+    (`notif_asignacion`, `registrar_replanificacion`, `notif_comentario` —que
+    desde #208 cubre también las menciones—,
     SECURITY DEFINER con `search_path` fijo y sin `EXECUTE` para
     anon/authenticated, invariante 6) y se borran en cascada con la tarea. El
     autor sale de la sesión (`usuario_actual_id()` / `app.actor`), nunca del
@@ -116,6 +127,38 @@ reintroduce un hallazgo de la auditoría.
     trigger `validar_estado_proyecto` bloquea el cambio de `estado` salvo
     `es_admin()` o `permiso_proyecto('archivarEliminarProyectos')`; no basta con
     ocultar el botón en la UI.
+14. **Los tokens de recuperación viven en `recuperacion`, NUNCA en
+    `invitacion` (#205).** `invitacion.usada` significa "esta persona aceptó su
+    invitación" y de eso depende el invariante 2; mezclar ahí los tokens de
+    recuperación lo debilitaría sin que se note. `recuperacion` tiene RLS
+    habilitada y **cero políticas**: solo la Edge Function la toca, con
+    service_role. El flujo **no crea cuentas** — exige que `usuario.auth_id` ya
+    exista—, así que no reabre el registro público (invariante 1). El enlace
+    dura 1 hora, es de un solo uso y al consumirlo cierra todas las sesiones
+    de esa cuenta.
+15. **La auto-edición del perfil está acotada por un trigger, no por la UI
+    (#207).** `usuario_update` pasó de "solo admin" a "admin o mi propia fila";
+    lo que impide la escalada de privilegio es `validar_autoedicion_usuario`,
+    que para un no-admin rechaza cualquier cambio en `rol`, `permisos`,
+    `permisos_proyecto`, `activo`, `eliminado`, `email`, `auth_id` o `id`. Es
+    **SECURITY INVOKER a propósito**: mira `current_user` para distinguir una
+    petición del cliente (rol `authenticated`) de un UPDATE hecho dentro de una
+    función SECURITY DEFINER como `crear_o_reactivar_usuario`. No convertirlo en
+    DEFINER: perdería esa distinción y rompería el alta que reactiva usuarios.
+16. **Un comentario lo edita SOLO su autor, y nadie lo borra (#209).**
+    `comentario_update` usa `autor_id = usuario_actual_id()` **sin** la salida
+    de emergencia `es_admin()` que tiene el resto del modelo: el hilo acompaña
+    al registro de replanificaciones y es el respaldo de por qué pasó lo que
+    pasó. No hay política de delete. El trigger `validar_edicion_comentario`
+    congela `autor_id`, `tarea_id` y `timestamp`, y es quien pone la marca de
+    editado (nunca el cliente).
+17. **Los destinatarios de una mención se derivan del texto en la base
+    (#208).** `notif_comentario` extrae los `@[uuid]` del comentario, comprueba
+    con `usuario_tiene_acceso` que cada mencionado pueda ver el proyecto y solo
+    entonces notifica; el cliente nunca manda una lista de destinatarios (es el
+    invariante 4 aplicado a menciones). Menciones y responsable se resuelven en
+    **un solo trigger** para garantizar una notificación por persona: con dos
+    triggers la regla dependería del orden en que Postgres los dispara.
 
 ---
 

@@ -68,6 +68,13 @@ orden** el contenido de:
 17. `supabase/migrations/20260707000017_delete_solo_archivado.sql` — endurece
     `proyecto_delete`: solo se puede eliminar un proyecto **archivado** (la
     restricción "archivar primero" ahora vive en la base, no solo en la UI)
+18. `supabase/migrations/20260707000018_cuenta_y_comentarios.sql` — cuenta de
+    usuario y comentarios: tabla `recuperacion` para los enlaces de restablecer
+    contraseña (1 hora, un solo uso, RLS sin políticas), auto-edición del propio
+    nombre e iniciales acotada por trigger, `iniciales_manual` (las escritas a
+    mano se respetan; las derivadas siguen al nombre), edición del propio
+    comentario con marca de editado —sin borrado— y menciones `@` que notifican
+    sin duplicar la notificación de comentario
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
@@ -191,8 +198,10 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
    ```bash
    supabase functions deploy invitar-usuario
    supabase functions deploy aceptar-invitacion --no-verify-jwt
+   supabase functions deploy recuperar-contrasena --no-verify-jwt
    ```
-   (`aceptar-invitacion` la invoca el invitado sin sesión; valida el token.)
+   (`aceptar-invitacion` y `recuperar-contrasena` las invoca alguien **sin
+   sesión** —por eso `--no-verify-jwt`—; ambas validan su propio token.)
 3. **Secrets**:
    ```bash
    supabase secrets set RESEND_API_KEY=re_xxx \
@@ -202,8 +211,24 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
    > `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` los usa el código de las
    > funciones, pero **Supabase los inyecta automáticamente** en el entorno de
    > las Edge Functions: no hace falta configurarlos a mano.
+
+   **Para probar en un preview de Vercel** hace falta un secret más. Las
+   funciones responden con CORS acotado a `SITE_URL`, así que desde el dominio
+   del preview el navegador bloquea la respuesta y la app lo reporta como si
+   fuera un problema de conexión. Se agrega el origen del preview a la lista:
+   ```bash
+   supabase secrets set SITE_URLS="https://planning-git-<rama>-<cuenta>.vercel.app"
+   ```
+   Admite varios separados por coma. Es opcional: en producción no hace falta.
 4. Desde el Módulo de Usuarios, el botón ✉ envía (o reenvía) la invitación a
    cualquier usuario activo que aún no tenga cuenta.
+5. **Recuperar contraseña (#205).** Sale por el mismo Resend y la misma
+   `SITE_URL`, así que no hay secretos nuevos que configurar. El enlace es
+   `SITE_URL/#recuperar=<token>`, dura **1 hora** y sirve una vez; al usarlo se
+   cierran todas las sesiones abiertas de esa cuenta. Solo funciona para
+   usuarios **activos y con cuenta ya creada**: a un invitado que nunca aceptó,
+   a un desactivado o a un eliminado se les responde lo mismo y **no** se les
+   manda correo — su camino sigue siendo que el admin les reenvíe la invitación.
 
 ## Mantenimiento
 

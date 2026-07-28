@@ -57,7 +57,9 @@ export interface NuevoUsuario {
   email: string
   rol: Rol
 }
-export type PatchUsuario = Partial<Pick<Usuario, 'nombre' | 'iniciales' | 'activo' | 'rol' | 'permisosProyecto'>>
+export type PatchUsuario = Partial<
+  Pick<Usuario, 'nombre' | 'iniciales' | 'activo' | 'rol' | 'permisosProyecto' | 'inicialesManual'>
+>
 
 export interface Repo {
   /** Nombre corto del backend activo, para mostrar en la UI. */
@@ -127,6 +129,10 @@ export interface Repo {
 
   /** Agrega un comentario al hilo de la tarea (N5, append-only). */
   addComentario(tareaId: string, texto: string, autorId?: string): Promise<Comentario>
+  /** #209: edita el TEXTO del propio comentario. No hay borrado: el hilo sigue
+   *  siendo un registro. La base marca la hora de edición y comprueba que
+   *  quien edita sea el autor (RLS), no solo la interfaz. */
+  editComentario(id: string, texto: string): Promise<Comentario>
 
   /** #137: marca como leídas TODAS las notificaciones del usuario actual.
    *  Devuelve los ids afectados (para reflejarlo en el estado local). */

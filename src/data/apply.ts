@@ -82,6 +82,11 @@ export function addComentario(s: AppState, c: Comentario): AppState {
   return { ...s, comentarios: [...s.comentarios, c] }
 }
 
+/** #209: reemplaza un comentario editado, conservando su lugar en el hilo. */
+export function updateComentario(s: AppState, c: Comentario): AppState {
+  return { ...s, comentarios: s.comentarios.map((x) => (x.id === c.id ? c : x)) }
+}
+
 /** Reemplaza el historial de una tarea por la lista dada. */
 export function setHistorialTarea(s: AppState, tareaId: string, hist: Replanificacion[]): AppState {
   return {

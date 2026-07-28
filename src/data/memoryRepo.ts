@@ -1,5 +1,6 @@
 import type { Acceso, AppState, Comentario, Frente, PermisosTareas, Proyecto, Replanificacion, SubFrente, TipoNotificacion, Tarea, Usuario } from '../types'
 import { hoyISO } from '../lib/dates'
+import { idsMencionados } from '../lib/menciones'
 import { DEFAULT_PERMISOS_PROYECTO, defaultPermisosTareas } from '../lib/permisos'
 import { initialState, proyectoConsultor } from './seed'
 import type {
@@ -132,6 +133,11 @@ export class MemoryRepo implements Repo {
 
   setActor(id: string | null): void {
     this.actorId = id
+  }
+
+  /** #207: misma derivación que la base (función `derivar_iniciales`). */
+  private static derivarIniciales(nombre: string): string {
+    return nombre.trim().split(/\s+/).filter(Boolean).map((p) => p[0]).join('').slice(0, 2).toUpperCase()
   }
 
   /** #137: crea una notificación si hay destinatario y no es el propio actor. */
@@ -300,7 +306,11 @@ export class MemoryRepo implements Repo {
 
   async createUsuario(input: NuevoUsuario): Promise<Usuario> {
     const email = input.email.trim().toLowerCase()
-    const iniciales = (input.iniciales ?? input.nombre.split(/\s+/).map((p) => p[0]).join('').slice(0, 2)).toUpperCase()
+    // #207: manual = alguien las escribió. Si no, se derivan y seguirán al nombre.
+    const manual = Boolean(input.iniciales && input.iniciales.trim())
+    const iniciales = manual
+      ? input.iniciales!.trim().toUpperCase()
+      : MemoryRepo.derivarIniciales(input.nombre)
     // #136: si el correo ya existe, se REACTIVA la fila (aunque esté eliminada);
     // sus accesos quedan intactos. No se crea una fila nueva ni se toca el correo.
     const existente = this.state.usuarios.find((u) => u.email.toLowerCase() === email)
@@ -312,6 +322,7 @@ export class MemoryRepo implements Repo {
       existente.activo = true
       existente.nombre = input.nombre
       existente.iniciales = iniciales
+      existente.inicialesManual = manual
       this.persist()
       return clone(existente)
     }
@@ -319,6 +330,7 @@ export class MemoryRepo implements Repo {
       id: uid(),
       nombre: input.nombre,
       iniciales,
+      inicialesManual: manual,
       email,
       rol: input.rol,
       activo: true,
@@ -334,6 +346,15 @@ export class MemoryRepo implements Repo {
     const u = this.state.usuarios.find((x) => x.id === id)
     if (!u) throw new Error('Usuario no encontrado')
     Object.assign(u, patch)
+    // #207: espejo del trigger `sincronizar_iniciales`. Vacías = "no las fijé":
+    // se derivan y vuelven a seguir al nombre. Fijadas a mano, se respetan.
+    if ('iniciales' in patch && !(patch.iniciales ?? '').trim()) {
+      u.inicialesManual = false
+    } else if ('iniciales' in patch) {
+      u.iniciales = (patch.iniciales ?? '').trim().toUpperCase()
+      if (patch.inicialesManual !== false) u.inicialesManual = true
+    }
+    if (!u.inicialesManual) u.iniciales = MemoryRepo.derivarIniciales(u.nombre)
     this.persist()
     return clone(u)
   }
@@ -397,10 +418,50 @@ export class MemoryRepo implements Repo {
       timestamp: new Date().toISOString(),
     }
     this.state.comentarios.push(c)
-    // #137: comentaron una tarea tuya.
-    this.notificar(tarea.responsableId, 'comentario', tareaId)
+    // #208: espejo del trigger `notif_comentario`. Una sola notificación por
+    // persona y comentario: gana el texto de la mención, que es más específico.
+    const avisados = new Set<string>()
+    for (const idMencionado of idsMencionados(c.texto)) {
+      if (!this.puedeVerTarea(idMencionado, tareaId)) continue
+      this.notificar(idMencionado, 'mencion', tareaId)
+      avisados.add(idMencionado)
+    }
+    if (tarea.responsableId && !avisados.has(tarea.responsableId)) {
+      this.notificar(tarea.responsableId, 'comentario', tareaId)
+    }
     this.persist()
     return clone(c)
+  }
+
+  async editComentario(id: string, texto: string): Promise<Comentario> {
+    const c = this.state.comentarios.find((x) => x.id === id)
+    if (!c) throw new Error('Comentario no encontrado')
+    // #209: espejo de la RLS — solo el autor, y solo el texto. Editar NO
+    // genera notificaciones nuevas (por eso no se toca `notificar` aquí).
+    if (c.autorId !== this.actorId) throw new Error('Solo puedes editar tus propios comentarios')
+    const limpio = texto.trim()
+    if (limpio !== c.texto) {
+      c.texto = limpio
+      c.editado = new Date().toISOString()
+    }
+    this.persist()
+    return clone(c)
+  }
+
+  /** #208: ¿este usuario tiene acceso al proyecto de la tarea? Espejo de
+   *  `usuario_tiene_acceso`: sin acceso no hay notificación, porque llevaría a
+   *  una tarea que no puede abrir. */
+  private puedeVerTarea(usuarioId: string, tareaId: string): boolean {
+    const u = this.state.usuarios.find((x) => x.id === usuarioId)
+    if (!u || !u.activo || u.eliminado) return false
+    if (u.rol === 'admin') return true
+    const t = this.state.tareas.find((x) => x.id === tareaId)
+    const sf = t && this.state.subFrentes.find((x) => x.id === t.subFrenteId)
+    const f = sf && this.state.frentes.find((x) => x.id === sf.frenteId)
+    if (!f) return false
+    const p = this.state.proyectos.find((x) => x.id === f.proyectoId)
+    if (p?.duenoId === usuarioId) return true
+    return this.state.accesos.some((a) => a.usuarioId === usuarioId && a.proyectoId === f.proyectoId)
   }
 
   async cambiarFechaObjetivo(

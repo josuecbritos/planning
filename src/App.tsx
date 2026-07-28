@@ -5,6 +5,7 @@ import { makeRepo } from './data'
 import { makeAuth } from './auth'
 import { supabaseConfigured } from './data/client'
 import { hoyISO } from './lib/dates'
+import { mensajeError } from './lib/errores'
 import { contar } from './lib/derive'
 import { esDuenoDe, makeCan, puedeCrearProyectos, usuariosVisiblesPara } from './lib/permisos'
 import type { Filtro } from './lib/filtros'
@@ -33,14 +34,18 @@ import { MiembrosModal } from './components/MiembrosModal'
 import { ResumenView } from './components/ResumenView'
 import { AdminProyectosView } from './components/AdminProyectosView'
 import { NotificacionesPanel, NotificacionesView } from './components/Notificaciones'
-import { AceptarInvitacion } from './components/AceptarInvitacion'
+import { DefinirPassword, type FlujoPassword } from './components/DefinirPassword'
+import { ConfiguracionView } from './components/ConfiguracionView'
 import type { Notificacion } from './types'
 
 export type Vista = 'tabla' | 'gantt'
 export type FrenteSel = string | 'todos'
 // 'proyectos' = vista DENTRO de un proyecto. 'admin-proyectos' = módulo de
 // administración de proyectos (#132). 'notificaciones' = historial completo (#137).
-export type Pantalla = 'proyectos' | 'usuarios' | 'mipanel' | 'resumen' | 'admin-proyectos' | 'notificaciones'
+export type Pantalla =
+  | 'proyectos' | 'usuarios' | 'mipanel' | 'resumen' | 'admin-proyectos' | 'notificaciones'
+  // #207: configuración de la propia cuenta, desde el pie de la barra lateral.
+  | 'configuracion'
 /** Modos de la barra lateral (punto 6): fija (default) o escondida. */
 export type SidebarModo = 'fija' | 'escondida'
 /** Tema de la interfaz (punto 4): sigue `prefers-color-scheme` del sistema por
@@ -73,6 +78,12 @@ export interface Actions {
   /** Configura el set de ocho DE UN ACCESO (usuario × proyecto). */
   updateAccesoPermisos: (usuarioId: string, proyectoId: string, permisos: PermisosTareas) => Promise<void>
   addComentario: (tareaId: string, texto: string) => Promise<void>
+  /** #209: edita el texto del propio comentario (la RLS comprueba la autoría). */
+  editComentario: (id: string, texto: string) => Promise<void>
+  /** #207: cambios en MI propia ficha (nombre e iniciales). A diferencia del
+   *  resto, propaga el error en vez de mandarlo al aviso global: la pantalla
+   *  de Configuración necesita decir en el sitio si se guardó o no. */
+  actualizarPerfil: (patch: PatchUsuario) => Promise<void>
   /** #137: marca todas las notificaciones del usuario actual como leídas. */
   marcarNotificacionesLeidas: () => Promise<void>
 }
@@ -122,10 +133,15 @@ export default function App() {
   const auth = useMemo(() => makeAuth(repo), [repo])
   const HOY = useMemo(() => (supabaseConfigured ? hoyISO() : HOY_SIM), [])
 
-  // §8: enlace de invitacion (#invitacion=TOKEN) — tiene prioridad sobre todo.
-  const [tokenInvitacion, setTokenInvitacion] = useState<string | null>(() => {
-    const m = window.location.hash.match(/#invitacion=([\w-]+)/)
-    return m ? m[1] : null
+  // §8 / #205: enlaces por correo — invitación (#invitacion=TOKEN) y
+  // recuperación (#recuperar=TOKEN). Tienen prioridad sobre todo: los dos
+  // llevan a la MISMA pantalla, que solo cambia de texto (#204).
+  const [enlace, setEnlace] = useState<{ flujo: FlujoPassword; token: string } | null>(() => {
+    const inv = window.location.hash.match(/#invitacion=([\w-]+)/)
+    if (inv) return { flujo: 'invitacion', token: inv[1] }
+    const rec = window.location.hash.match(/#recuperar=([\w-]+)/)
+    if (rec) return { flujo: 'recuperacion', token: rec[1] }
+    return null
   })
 
   // undefined = comprobando sesion; null = sin sesion.
@@ -299,7 +315,8 @@ export default function App() {
         if (!vivo) return
         setState(s)
       })
-      .catch((e) => vivo && setError(String(e.message ?? e)))
+      // #210: un fallo de red se muestra entendible; el resto, tal cual.
+      .catch((e) => vivo && setError(mensajeError(e)))
     return () => {
       vivo = false
     }
@@ -365,7 +382,7 @@ export default function App() {
       const patch = await fn()
       setState((s) => (s ? patch(s) : s))
     } catch (e) {
-      setError(String((e as Error).message ?? e))
+      setError(mensajeError(e)) // #210
     }
   }, [])
 
@@ -482,6 +499,19 @@ export default function App() {
           const c = await repo.addComentario(tareaId, texto, sesion?.id)
           return (s) => apply.addComentario(s, c)
         }),
+      editComentario: (id, texto) =>
+        run(async () => {
+          const c = await repo.editComentario(id, texto)
+          return (s) => apply.updateComentario(s, c)
+        }),
+      actualizarPerfil: async (patch) => {
+        if (!sesion) return
+        const u = await repo.updateUsuario(sesion.id, patch)
+        setState((s) => (s ? apply.upsertUsuario(s, u) : s))
+        // La sesión es una copia aparte del estado: sin esto, el pie de la
+        // barra lateral seguiría mostrando el nombre viejo hasta recargar.
+        setSesion(u)
+      },
       marcarNotificacionesLeidas: () =>
         run(async () => {
           const ids = sesion ? await repo.marcarNotificacionesLeidas(sesion.id) : []
@@ -668,13 +698,14 @@ export default function App() {
 
   // -- Render --
 
-  if (tokenInvitacion) {
+  if (enlace) {
     return (
-      <AceptarInvitacion
-        token={tokenInvitacion}
+      <DefinirPassword
+        flujo={enlace.flujo}
+        token={enlace.token}
         onListo={() => {
           window.location.hash = ''
-          setTokenInvitacion(null)
+          setEnlace(null)
         }}
       />
     )
@@ -855,6 +886,9 @@ export default function App() {
             onAbrirTarea={abrirDetalle}
             esMovil={esMovil}
           />
+        ) : pantalla === 'configuracion' ? (
+          /* #207: la propia cuenta. No depende de rol: todos la tienen. */
+          <ConfiguracionView usuario={sesion} actions={actions} auth={auth} />
         ) : pantalla === 'resumen' ? (
           <ResumenView
             state={state}
@@ -946,6 +980,7 @@ export default function App() {
           hoy={HOY}
           can={can}
           actions={actions}
+          sesionId={sesion.id}
           onClose={() => setTareaDetalleId(null)}
         />
       )}

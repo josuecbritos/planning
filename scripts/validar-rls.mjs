@@ -276,6 +276,82 @@ async function main() {
       )
     }
 
+    // 6) #207 Perfil propio: se puede cambiar el nombre, y SOLO eso. La
+    //    política abrió el update a la propia fila; lo que impide la escalada
+    //    de privilegio es el trigger validar_autoedicion_usuario.
+    const nombreOriginal = yo.nombre
+    const cambioNombre = await c
+      .from('usuario')
+      .update({ nombre: `${nombreOriginal} ` })
+      .eq('id', yo.id)
+      .select('id')
+    marca(!bloqueado(cambioNombre), rotulo, 'puede cambiar su propio nombre', cambioNombre.error?.message ?? '')
+    await c.from('usuario').update({ nombre: nombreOriginal }).eq('id', yo.id)
+
+    if (rotulo !== 'admin') {
+      marca(
+        bloqueado(await c.from('usuario').update({ rol: 'admin' }).eq('id', yo.id).select('id')),
+        rotulo, 'NO puede ascenderse a admin',
+      )
+      // Se prueba con el correo y con la baja: `activo` no sirve como prueba
+      // porque el trigger solo se queja de lo que CAMBIA, y ya está en true.
+      marca(
+        bloqueado(await c.from('usuario').update({ email: `robo+${Date.now()}@x.cl` }).eq('id', yo.id).select('id')),
+        rotulo, 'NO puede cambiarse el correo',
+      )
+      marca(
+        bloqueado(await c.from('usuario').update({ activo: false }).eq('id', yo.id).select('id')),
+        rotulo, 'NO puede cambiarse el estado',
+      )
+      const ajeno = (todosUsuarios ?? []).find((u) => u.id !== yo.id)
+      if (ajeno) {
+        marca(
+          bloqueado(await c.from('usuario').update({ nombre: 'Hackeado' }).eq('id', ajeno.id).select('id')),
+          rotulo, 'NO puede editar la ficha de otro',
+        )
+      }
+    }
+
+    // 7) #209 Comentarios: el autor edita lo suyo; nadie edita lo ajeno (ni el
+    //    admin) y NADIE borra. Se comprueba contra la base, no contra la UI.
+    const { data: mioCom } = await c
+      .from('comentario')
+      .select('id, texto')
+      .eq('autor_id', yo.id)
+      .limit(1)
+    if (mioCom?.length) {
+      const edicion = await c
+        .from('comentario')
+        .update({ texto: mioCom[0].texto })
+        .eq('id', mioCom[0].id)
+        .select('id')
+      marca(!bloqueado(edicion), rotulo, 'edita su propio comentario', edicion.error?.message ?? '')
+    }
+    const { data: ajenoCom } = await c
+      .from('comentario')
+      .select('id')
+      .neq('autor_id', yo.id)
+      .not('autor_id', 'is', null)
+      .limit(1)
+    if (ajenoCom?.length) {
+      marca(
+        bloqueado(await c.from('comentario').update({ texto: 'Editado por otro' }).eq('id', ajenoCom[0].id).select('id')),
+        rotulo, 'NO puede editar el comentario de otro (tampoco el admin)',
+      )
+      marca(
+        bloqueado(await c.from('comentario').delete().eq('id', ajenoCom[0].id).select('id')),
+        rotulo, 'NO puede borrar comentarios (el hilo es un registro)',
+      )
+    }
+
+    // 8) #205 Los tokens de recuperación no se leen NI se escriben desde el
+    //    cliente: la tabla tiene RLS y cero políticas; solo la Edge Function
+    //    (service_role) la toca.
+    marca(
+      bloqueado(await c.from('recuperacion').select('token').limit(1)),
+      rotulo, 'no puede leer tokens de recuperación',
+    )
+
     await c.auth.signOut()
   }
 

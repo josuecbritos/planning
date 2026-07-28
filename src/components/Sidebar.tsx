@@ -319,13 +319,20 @@ export function Sidebar({
       )}
 
       <div className="sidebar__footer">
-        <span className="sesion" title={usuario.email}>
+        {/* #207: el pie ya mostraba quién eres; ahora es además la entrada a
+            tu configuración. Es donde la gente la busca, y no hace falta una
+            entrada más en la navegación. */}
+        <button
+          className={`sesion sesion--boton${pantalla === 'configuracion' ? ' sesion--activa' : ''}`}
+          title="Mi cuenta: nombre, iniciales y contraseña"
+          onClick={() => onSelectPantalla('configuracion')}
+        >
           <span className="resp-badge">{usuario.iniciales}</span>
           <span className="sesion__info">
             <b>{usuario.nombre}</b>
             <small>{usuario.rol === 'admin' ? 'Admin' : usuario.rol === 'consultor' ? 'Consultor' : 'Cliente'}</small>
           </span>
-        </span>
+        </button>
         <span className="sesion__acciones">
           <button
             className="sidebar__plegar sesion__tema"
