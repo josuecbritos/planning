@@ -364,6 +364,33 @@ table.tareas th {
      sub frente —que no lleva línea abajo— sigue apoyándose en ella. */
   border-top: 1px solid var(--gris-borde);
 }
+/* #227 (2ª pasada): con el encabezado CONGELADO y el zoom del sistema en 125%
+   (dpr 1.25), esa línea caía en una fracción de píxel de dispositivo (155 CSS
+   × 1.25 = 193.75) y la barra de filtros —que también es sticky, y cuya capa
+   se redondea hacia afuera— se comía la mitad de su tinta: la línea salía a
+   media tinta, "muy delgada o derechamente ausente". Se midió que NO depende
+   de cómo se dibuje: borde, sombra interior, degradado de fondo, contorno,
+   pseudo-elemento y hasta ponerla en la propia barra dan el mismo reparto; y
+   tampoco de dónde se congele (correr el encabezado al píxel entero abre un
+   hilo por el que asoma el contenido de atrás).
+   La salida es pintar LA MISMA línea dos veces sobre el mismo píxel: donde ya
+   sale sólida (dpr 1, 1.5, 2…) volver a pintar encima no cambia un solo píxel;
+   donde sale a media tinta, las coberturas se componen y sube a ~86%. El
+   pseudo-elemento se ancla al borde superior del th (`top: -1px` va contra la
+   caja de relleno, que empieza justo bajo el borde) y aporta dos pasadas más:
+   su fondo y su sombra interior. */
+table.tareas thead th::before {
+  content: ''; position: absolute; left: 0; right: -1px; top: -1px; height: 1px;
+  background: var(--gris-borde);
+  /* Varias sombras idénticas sobre el mismo rectángulo: cada pasada compone su
+     cobertura con la anterior (1-(1-a)^n). Con tinta plena son inocuas. */
+  box-shadow:
+    inset 0 0 0 1px var(--gris-borde),
+    inset 0 0 0 1px var(--gris-borde),
+    inset 0 0 0 1px var(--gris-borde),
+    inset 0 0 0 1px var(--gris-borde);
+  pointer-events: none;
+}
 
 /* Contenido centrado en Hecha, responsable y fechas.
    (Con el prefijo table.tareas: la regla generica th/td de arriba

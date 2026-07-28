@@ -579,3 +579,58 @@ En `main` la línea también aparece "ausente" **en reposo**: no es que no se ve
 —ahí la dibuja la tabla, 1px más arriba— sino que no está donde tiene que estar,
 que es en el encabezado. Eso es exactamente el bug, y la foto idéntica del
 bloque en reposo confirma que el resultado visual sin scroll no cambió.
+
+### #227, segunda pasada: la línea salía a media tinta con el zoom en 110% y 125%
+
+La primera corrección (mover el `border-top` de la tabla al `th`) puso la línea
+donde va, y se verificó a **dpr 1**. Con el zoom del sistema en 110% o 125% —lo
+habitual en portátiles Windows— seguía viéndose mal, y el reporte fue exacto:
+*"no sé si es muy delgada o si derechamente no está"*.
+
+**Qué pasaba.** Con el encabezado congelado, su borde superior cae en una
+fracción de píxel de dispositivo (155 CSS × 1.25 = 193.75) y comparte ese píxel
+con el borde inferior de la barra de filtros. La barra también es sticky y su
+capa se redondea hacia afuera, así que se comía cerca de la mitad de la tinta:
+la línea salía a ~50%, claramente más floja que la de reposo.
+
+**Lo que se descartó midiendo**, no razonando:
+
+| Se probó | Resultado a dpr 1.25 |
+| --- | --- |
+| Sombra interior, degradado de fondo, contorno, pseudo-elemento, `contain: paint`, capa propia | idénticos al borde: ~50% |
+| Poner la línea en la propia barra (`border-bottom`, `box-shadow`) | también se parte |
+| `thead` sticky en vez de `th` | la línea desaparece |
+| Correr el congelado al píxel entero (`--filtros-h` ajustado, con y sin la retícula de 1/64 px de Chromium) | abre un hilo por el que asoma el contenido de atrás — peor |
+| Estirar la barra unas milésimas para que su borde caiga en píxel entero | igual: Chromium trunca a 1/64 px |
+
+Dos mediciones acotaron el problema: el borde **inferior** del mismo `th` sticky
+sale sólido (o sea, la capa no se reescala), y en **reposo** el borde superior
+también sale sólido. Solo se lava el borde de arriba cuando está congelado, que
+es justo el que comparte píxel con la barra.
+
+**La salida.** Pintar la misma línea varias veces sobre el mismo píxel: un
+`::before` anclado al borde superior del `th` (`top: -1px`, contra la caja de
+relleno) que aporta su fondo más cuatro sombras interiores idénticas. Donde la
+línea ya sale sólida —dpr 1, 1.5, 1.75, 2— repintar encima **no cambia un solo
+píxel**; donde sale parcial, las coberturas se componen (`1-(1-a)^n`) y sube a
+tinta plena.
+
+| Zoom | Antes de la 2ª pasada | Después |
+| --- | --- | --- |
+| 100% | 0 | 0 |
+| 110% | 26 | **3 (claro) / 5 (oscuro)** |
+| 125% | 26 | **1 (claro) / 2 (oscuro)** |
+| 150% / 175% / 200% | 0 | 0 |
+| Teléfono 390×844 (dpr 2) | 0 | 0 |
+
+*(Desvío del color de la línea respecto del color de borde declarado; 0 = tinta
+plena, 26 ≈ mitad de la tinta.)*
+
+Verificado además: la foto del bloque en reposo sigue dando el **mismo SHA-256
+que `main`** (`a94c1be15b70cad4`); la línea está presente y **nunca doble** en
+las 21 posiciones de un recorrido de scroll, a dpr 1 y 1.25; el sub frente
+contraído no cambia; y contraer y expandir devuelve una foto idéntica.
+
+**La lección para la próxima verificación por píxeles:** medir a dpr 1 no basta.
+Los zooms no enteros (110%, 125%) mueven los bordes a fracciones de píxel de
+dispositivo y sacan a la luz problemas que a 100% no existen.
