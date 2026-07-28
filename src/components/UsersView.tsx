@@ -13,6 +13,7 @@ import {
   IconoPapelera,
   IconoReactivar,
 } from './Iconos'
+import { NombreTocable } from './NombreTocable'
 
 // Módulo de Usuarios (7.1, reestructurado por roles-y-permisos + pedido §3/§4).
 //
@@ -244,11 +245,13 @@ function UsuarioFila({
   return (
     <tr className={usuario.activo ? '' : 'usuario-inactivo'}>
       <td>
-        <span className="usuario-nombre">
-          <span className="resp-badge">{usuario.iniciales}</span>
-          {usuario.nombre}
-          {esYo && <span className="chip-yo">tú</span>}
-        </span>
+        {/* #213: nombre truncado; al tocarlo en mobile, el globo lo muestra
+            entero junto al chip "tú". */}
+        <NombreTocable
+          icono={<span className="resp-badge">{usuario.iniciales}</span>}
+          nombre={usuario.nombre}
+          pill={esYo ? <span className="chip-yo">tú</span> : undefined}
+        />
       </td>
       <td>{usuario.email}</td>
       <td>

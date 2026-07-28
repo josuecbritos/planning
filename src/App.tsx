@@ -656,11 +656,16 @@ export default function App() {
         setVistaStale(false)
       }
       setPantalla('proyectos')
-      setTareaDetalleId(n.tareaId)
+      // #212: en mobile NO se abre el panel de detalle. Mide 359px de los 390
+      // de pantalla, así que taparía justo el plan al que se acaba de navegar
+      // —que era el motivo de tocar la notificación—. Se navega, se resalta y
+      // el detalle queda a un toque de distancia. En escritorio no cambia:
+      // ahí el panel se ve al frente con el plan de fondo.
+      if (!esMovil) setTareaDetalleId(n.tareaId)
       setTareaResaltada(n.tareaId)
       setMovilSidebar(false)
     },
-    [state, cerrarNotificaciones, proyectosVisibles],
+    [state, cerrarNotificaciones, proyectosVisibles, esMovil],
   )
 
   // Punto 2: mide el alto de la barra de filtros (sticky) y lo publica en
