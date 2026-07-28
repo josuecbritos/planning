@@ -17,7 +17,7 @@ import { colorTarea, fechaVigente, marcasDe } from '../lib/derive'
 import { filtraTareas, pasaFiltroCompleto, rangoDeFecha, type Filtro } from '../lib/filtros'
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
-import { miembrosDeProyecto, responsableDeTarea, type Can } from '../lib/permisos'
+import { miembrosDeProyecto, puedeEditarFecha, responsableDeTarea, type Can } from '../lib/permisos'
 import { EmptyFrentes } from './EmptyFrentes'
 import { Marca } from './Marca'
 import { Avatar, RespPicker } from './RespPicker'
@@ -1128,7 +1128,8 @@ function FilaGanttRow({
   const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
 
   // -- Estandar de planificacion por clics (punto 2) --
-  const puedeEditar = can.editarFechas(tarea) && !tarea.hecha
+  // #245: la misma regla que las otras tres vistas, ahora compartida.
+  const puedeEditar = puedeEditarFecha(can, tarea)
   const sinFecha = !tarea.fechaObjetivo
   const vencidaOHoy = !!tarea.fechaObjetivo && tarea.fechaObjetivo <= hoy
 

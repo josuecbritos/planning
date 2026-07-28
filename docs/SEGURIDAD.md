@@ -55,6 +55,23 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
 - `invitar-usuario`: CORS acotado a `SITE_URL`. Verifica al invocador por JWT
   (admin, o consultor con `invitarClientes` para clientes de sus proyectos).
 
+**Migración 19 — `20260707000019_usuario_eliminado_fuera_de_la_tabla.sql` (#248)**
+- `usuario_select` suma `not eliminado`: la lectura directa de la tabla deja de
+  exponer lo que `usuario_visible` oculta. El grant de la migración 15 concede
+  columnas, no filas; las filas las decide la política, y esa no miraba
+  `eliminado`. Aplica a todos, admin incluido — igual que la vista desde #136.
+- Acompañada en el front: `eliminarUsuario` deja de usar `UPDATE ... RETURNING`
+  (Postgres aplica las políticas de SELECT también a las filas devueltas) y
+  comprueba el borrado releyendo `usuario_visible`.
+- La compuerta trae un caso nuevo: "la tabla `usuario` no expone más que la
+  vista", corrido para el admin y para cada rol.
+
+**Edge Functions — endurecimiento de #249 (redeploy manual de las tres)**
+- Sin orígenes configurados (`SITE_URL` / `SITE_URLS` vacíos) la función
+  **rechaza** con `503` en vez de caer en `'*'`.
+- Los errores internos se registran en el servidor y al cliente le llega un
+  mensaje genérico en español; los mensajes útiles del flujo no cambian.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.
@@ -75,6 +92,16 @@ reintroduce un hallazgo de la auditoría.
    **`usuario_visible`** (enmascara `email` y `permisos_proyecto` para no-admin,
    y **filtra los `eliminado`**, #136). Todo código de front, script o
    herramienta que necesite la lista de usuarios debe leer la vista, no la tabla.
+   **La tabla tampoco expone más que la vista** (#248, migración 19): la
+   migración 15 revocó el SELECT completo pero dejó un grant acotado a seis
+   columnas no sensibles —lo necesita el `RETURNING` de los INSERT—, y un GRANT
+   concede **columnas, no filas**; las filas las decide `usuario_select`, que no
+   miraba `eliminado`. Ahora sí (`not eliminado`, para todos, admin incluido).
+   Consecuencia a no olvidar: Postgres aplica las políticas de SELECT también a
+   las filas de un `RETURNING`, así que **ningún `UPDATE ... RETURNING` puede
+   pedir de vuelta la fila que acaba de marcar `eliminado`** — `eliminarUsuario`
+   comprueba el efecto releyendo `usuario_visible`. La compuerta trae un caso
+   nuevo que compara tabla contra vista, rol por rol.
    La app (`supabaseRepo`, `supabaseAuth`) y la compuerta (`perfilDe` y la
    consulta base del admin) ya usan la vista. El alta que reactiva a un
    `eliminado` (por correo, invisible para el cliente) va por el RPC
@@ -102,9 +129,14 @@ reintroduce un hallazgo de la auditoría.
    recibe `SITE_URL` y el navegador lo bloquea. `SITE_URLS` existe para las URL
    de preview de Vercel, que son otro dominio: sin ella, probar los flujos de
    correo en un preview falla con un error que parece de conexión. No poner ahí
-   dominios que no sean de este proyecto. **Secretos solo
-   server-side** (`RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, etc. nunca en el
-   front; el front usa solo la `anon key`).
+   dominios que no sean de este proyecto. **Si la lista queda vacía la función
+   RECHAZA la petición** (#249): responde `503` sin cabecera
+   `Access-Control-Allow-Origin` y deja constancia en los logs. Antes caía en un
+   `'*'` de emergencia — precisamente el caso en que la configuración falta es
+   cuando menos se puede confiar en quien llama. No reintroducir ese fallback.
+   **Secretos solo server-side** (`RESEND_API_KEY`,
+   `SUPABASE_SERVICE_ROLE_KEY`, etc. nunca en el front; el front usa solo la
+   `anon key`).
 9. **Headers de `vercel.json`:** no quitarlos. Si se agrega un origen externo
    (p. ej. otro API), ajustar la CSP para permitirlo — la CSP debe seguir
    permitiendo `*.supabase.co` y las fuentes usadas.
@@ -159,6 +191,15 @@ reintroduce un hallazgo de la auditoría.
     invariante 4 aplicado a menciones). Menciones y responsable se resuelven en
     **un solo trigger** para garantizar una notificación por persona: con dos
     triggers la regla dependería del orden en que Postgres los dispara.
+18. **Las Edge Functions no devuelven detalles internos (#249).** Un error de
+    Auth, la respuesta de Resend o una excepción se **registran en el servidor**
+    (`console.error` con el prefijo de la función; se leen en Edge Functions →
+    Logs) y al cliente le llega un mensaje genérico en español que dice qué
+    hacer. Lo que sí viaja son los mensajes que le sirven a quien mira la
+    pantalla —"Esta invitación ya fue usada", "El enlace expiró", "Sin permiso
+    para invitar"—: esos son parte del producto, no una fuga. La regla al
+    escribir un `return` de error nuevo: si el texto sale de un objeto de error
+    ajeno (`err.message`, el body de un fetch), va al log, no a la respuesta.
 
 ---
 
@@ -189,9 +230,16 @@ funciones de permisos.**
   cobertura completa).
 - Correr local: `node --env-file=.env scripts/validar-rls.mjs`. También corre por
   GitHub Actions (workflow **"Validar RLS (compuerta)"**, ya en Node 22).
-- Resultado esperado actual: **34/34, 0 fallas**.
+- Resultado esperado actual: **0 fallas** (34 comprobaciones + una por rol
+  disponible del caso nuevo de #248, así que el total sube según cuántas
+  credenciales `RLS_*` estén configuradas).
 - El script lee `usuario_visible` (invariante 3), tanto en `perfilDe` como en la
   consulta base del admin.
+- **Caso de #248**: `compararTablaContraVista` pide `usuario` (la tabla) y
+  `usuario_visible` (la vista) con la misma sesión y exige que la tabla no
+  devuelva ninguna fila que la vista no tenga. Si el grant acotado se revocara
+  del todo, la lectura falla y el caso se da por bueno igual: sin lectura
+  directa no hay nada que comparar.
 
 ---
 

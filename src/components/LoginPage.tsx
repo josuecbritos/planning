@@ -18,9 +18,14 @@ interface Props {
   /** En modo Local, usuarios activos entre los que se puede elegir. */
   usuariosDemo?: Usuario[]
   onLogin: (email: string, password?: string) => Promise<void>
+  /** #244: por qué se cerró la sesión sola (sesión inválida o cuenta dada de
+   *  baja). Se muestra al llegar, sin pedir nada. */
+  aviso?: string | null
+  /** Se llama al primer intento de entrar: el aviso ya cumplió su función. */
+  onAvisoVisto?: () => void
 }
 
-export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
+export function LoginPage({ modo, usuariosDemo = [], onLogin, aviso, onAvisoVisto }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +39,7 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
   async function entrar(mail: string, pass?: string) {
     setCargando(true)
     setError(null)
+    onAvisoVisto?.() // #244: el aviso de sesión caída se retira al reintentar
     try {
       await onLogin(mail, pass)
     } catch (e) {
@@ -80,6 +86,15 @@ export function LoginPage({ modo, usuariosDemo = [], onLogin }: Props) {
           <Wordmark />
           <small>Herramienta de Planificación de Proyectos</small>
         </div>
+
+        {/* #244: por qué la sesión se cerró sola. Va arriba de todo, antes de
+            los campos: es lo primero que hay que entender al llegar acá sin
+            haber pedido salir. */}
+        {aviso && (
+          <div className="login__aviso" role="status">
+            {aviso}
+          </div>
+        )}
 
         {modo === 'supabase' && recuperando ? (
           /* #205: pedir el enlace. Solo hace falta el correo. */

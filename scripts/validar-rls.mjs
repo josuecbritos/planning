@@ -73,6 +73,36 @@ async function perfilDe(c) {
  * Aquí se archivan primero y se borran después, y se corre SIEMPRE —también si
  * una prueba falla o revienta— desde un `finally`.
  */
+/**
+ * #248 — La tabla `usuario` no debe exponer nada que la vista `usuario_visible`
+ * no exponga. La única diferencia posible entre ambas era el filtro de
+ * eliminados; la migración 19 lo cierra en la política de SELECT.
+ *
+ * Se comparan por id, con las columnas que el grant permite. Si la tabla
+ * devolviera un id que la vista no tiene, esa persona está viendo a alguien
+ * eliminado y la compuerta debe caer.
+ */
+async function compararTablaContraVista(c, rotulo) {
+  const { data: enTabla, error } = await c.from('usuario').select('id, nombre')
+  if (error) {
+    // Sin grant de SELECT no hay nada que comparar: la tabla no expone nada,
+    // que es aún más restrictivo que lo pedido.
+    marca(true, rotulo, 'la tabla usuario no expone más que la vista', `sin lectura directa (${error.code})`)
+    return
+  }
+  const { data: enVista } = await c.from('usuario_visible').select('id')
+  const idsVista = new Set((enVista ?? []).map((u) => u.id))
+  const soloEnTabla = (enTabla ?? []).filter((u) => !idsVista.has(u.id))
+  marca(
+    soloEnTabla.length === 0,
+    rotulo,
+    'la tabla usuario no expone más que la vista (eliminados incluidos)',
+    soloEnTabla.length
+      ? `FUGA: ${soloEnTabla.length} fila(s) legibles en la tabla y ocultas en la vista`
+      : `${enTabla?.length ?? 0} filas, idénticas a la vista`,
+  )
+}
+
 async function limpiarProyectosDePrueba(admin) {
   if (!admin) return
   const { data: previos } = await admin.from('proyecto').select('id').like('nombre', '__prueba_rls_%')
@@ -114,6 +144,16 @@ async function main() {
   marca((todosProyectos?.length ?? 0) > 0, 'admin', 've todos los proyectos', `${todosProyectos?.length} proyectos`)
   marca((todosUsuarios?.length ?? 0) > 0, 'admin', 've todos los usuarios', `${todosUsuarios?.length} usuarios`)
 
+  // #248 — La TABLA `usuario` no puede devolver ninguna fila que la VISTA
+  // oculte. La tabla conserva un grant de seis columnas no sensibles (lo
+  // necesitan los RETURNING y pintar responsables), así que se puede consultar
+  // directo; lo que la migración 19 cierra es que por ahí salieran los
+  // ELIMINADOS, que la vista sí filtra. La comprobación es una diferencia de
+  // conjuntos: cualquier id que esté en la tabla y no en la vista es una fuga.
+  // Se corre para CADA rol, admin incluido — la vista oculta los eliminados a
+  // todos, y la política ahora también.
+  await compararTablaContraVista(admin, 'admin')
+
   // ---------- pruebas por rol no-admin ----------
   const casos = [
     ['consultor A', process.env.RLS_CONSULTOR_A_EMAIL, process.env.RLS_CONSULTOR_A_PASS],
@@ -147,6 +187,9 @@ async function main() {
       'solo ve proyectos propios o asignados',
       indebidos.length ? `VE INDEBIDAMENTE: ${indebidos.map((p) => p.nombre).join(', ')}` : `${visibles?.length ?? 0} visibles`,
     )
+
+    // 1b) #248: tampoco por la tabla base se cuela un usuario eliminado.
+    await compararTablaContraVista(c, rotulo)
 
     // 2) Sondas contra un proyecto OCULTO (si existe alguno).
     const oculto = (todosProyectos ?? []).find(

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Tarea, Usuario } from '../types'
 import type { Actions } from '../App'
-import { miembrosDeProyecto, responsableDeTarea, type Can } from '../lib/permisos'
+import { MOTIVO_FECHA_HECHA, miembrosDeProyecto, puedeEditarFecha, responsableDeTarea, type Can } from '../lib/permisos'
 import { formatoFecha, formatoFechaHora } from '../lib/dates'
 import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, historialDe } from '../lib/derive'
 import {
@@ -168,7 +168,10 @@ export function TaskPanel({ state, tarea, hoy, can, actions, sesionId, onClose }
                   Hecha
                 </label>
               )}
-              {can.editarFechas(tarea) && (
+              {/* #245: en una tarea hecha no se ofrece replanificar. La fecha
+                  vigente sigue arriba, en el detalle; lo que desaparece es el
+                  control, no el dato. */}
+              {puedeEditarFecha(can, tarea) ? (
                 <label className="panel-accion">
                   {tarea.fechaObjetivo ? 'Replanificar a' : 'Planificar para'}
                   <FechaEditable
@@ -177,6 +180,9 @@ export function TaskPanel({ state, tarea, hoy, can, actions, sesionId, onClose }
                     ariaLabel="Nueva fecha objetivo"
                   />
                 </label>
+              ) : (
+                tarea.hecha &&
+                can.editarFechas(tarea) && <p className="panel-nota">{MOTIVO_FECHA_HECHA}</p>
               )}
               {can.archivarEliminar(tarea) && (
                 <button

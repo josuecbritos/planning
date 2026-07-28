@@ -1346,6 +1346,13 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .login__usuario-info { display: flex; flex-direction: column; }
 .login__usuario-info small { color: var(--gris-texto); }
 .login__error { margin-top: 12px; color: var(--rojo); font-size: 13px; }
+/* #244: por qué se cerró la sesión sola. No es un error de lo que la persona
+   acaba de hacer —todavía no ha hecho nada—, así que se lee como aviso. */
+.login__aviso {
+  margin: 14px 0 0; padding: 10px 12px; font-size: 13px; line-height: 1.45;
+  color: var(--ambar-texto); background: var(--ambar-suave);
+  border: 1px solid var(--ambar); border-radius: 8px;
+}
 /* #204/#205/#206: título de la pantalla de contraseña, aviso de éxito al
    pedir el enlace, detalle técnico del enlace caducado y enlace secundario
    ("¿Olvidaste tu contraseña?" / "Volver a iniciar sesión"). */
@@ -1598,6 +1605,8 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   display: flex; flex-direction: column; gap: 12px;
 }
 .panel-accion { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; }
+/* #245: por qué no hay control de fecha en una tarea hecha. */
+.panel-nota { margin: 0; font-size: 12.5px; font-style: italic; color: var(--gris-texto); }
 
 /* ---------- Fase 3: archivadas ---------- */
 

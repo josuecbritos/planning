@@ -291,9 +291,17 @@ export class SupabaseRepo implements Repo {
 
   async eliminarUsuario(id: string): Promise<void> {
     // #136: desactivar + invisible (no hay hard delete). Admin-only por RLS.
-    unwrap(
-      await this.db.from('usuario').update({ activo: false, eliminado: true }).eq('id', id).select('id').single(),
-    )
+    //
+    // #248: sin `RETURNING`. Desde la migración 19 la política de SELECT
+    // excluye a los eliminados, y PostgreSQL aplica esas políticas a las filas
+    // que devuelve un RETURNING: pedir la fila de vuelta justo después de
+    // marcarla eliminada no devolvería nada. Como el update sin filas tampoco
+    // da error, el efecto se comprueba releyendo la vista: si sigue visible,
+    // no se eliminó (típicamente, sin permiso).
+    const { error } = await this.db.from('usuario').update({ activo: false, eliminado: true }).eq('id', id)
+    if (error) throw new Error(error.message)
+    const { data } = await this.db.from('usuario_visible').select('id').eq('id', id).maybeSingle()
+    if (data) throw new Error('No se pudo eliminar el usuario. Revisa que tengas permiso para hacerlo.')
   }
 
   async updateUsuario(id: string, patch: PatchUsuario): Promise<Usuario> {

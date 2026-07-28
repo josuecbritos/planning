@@ -22,24 +22,54 @@ const PERMITIDOS = [
   ...(Deno.env.get('SITE_URLS') ?? '').split(',').map((o) => o.trim()),
 ].filter((o): o is string => Boolean(o))
 
+// #249: si NO hay ningún origen configurado, la función no se abre a cualquiera
+// ('*'): rechaza la petición. Sin la lista no hay forma de saber quién es
+// legítimo, y un '*' de emergencia es peor que no responder.
+const CONFIGURADA = PERMITIDOS.length > 0
+
 function corsDe(req: Request): Record<string, string> {
   const origen = req.headers.get('Origin') ?? ''
-  return {
-    'Access-Control-Allow-Origin': PERMITIDOS.includes(origen) ? origen : (PERMITIDOS[0] ?? '*'),
+  const cabeceras: Record<string, string> = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Vary': 'Origin',
   }
+  // Si el origen está en la lista se le responde a él; si no, se responde con
+  // el primero permitido y el navegador bloquea por no coincidir. Sin lista no
+  // se emite la cabecera: nadie queda autorizado.
+  const permitido = PERMITIDOS.includes(origen) ? origen : PERMITIDOS[0]
+  if (permitido) cabeceras['Access-Control-Allow-Origin'] = permitido
+  return cabeceras
+}
+
+// #249: el detalle técnico va a los logs de la función (dashboard de Supabase →
+// Edge Functions → Logs) y al cliente le llega un mensaje en español que dice
+// qué hacer. Los mensajes legítimos —"ya tiene cuenta activa", "sin permiso"—
+// no pasan por aquí: esos SÍ le sirven a quien está mirando la pantalla.
+const ERROR_INTERNO =
+  'No pudimos completar la operación. Reintenta en un momento; si el problema sigue, avisa a tu administrador.'
+const ERROR_CORREO =
+  'No pudimos enviar el correo. Reintenta en un momento; si el problema sigue, avisa a tu administrador.'
+const ERROR_CONFIG = 'El servicio no está configurado. Avisa a tu administrador.'
+
+function registrar(etiqueta: string, detalle: unknown) {
+  console.error(`[invitar-usuario] ${etiqueta}:`, detalle instanceof Error ? detalle.message : detalle)
 }
 
 Deno.serve(async (req) => {
   const cors = corsDe(req)
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
   const responder = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), {
       status,
       headers: { ...cors, 'Content-Type': 'application/json' },
     })
+
+  if (!CONFIGURADA) {
+    registrar('configuración', 'falta SITE_URL (o SITE_URLS): sin orígenes permitidos se rechaza la petición')
+    return responder(503, { error: ERROR_CONFIG })
+  }
+
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
   try {
     const admin = createClient(
@@ -100,7 +130,10 @@ Deno.serve(async (req) => {
       )
       .select()
       .single()
-    if (errInv) return responder(500, { error: errInv.message })
+    if (errInv) {
+      registrar('upsert invitación', errInv)
+      return responder(500, { error: ERROR_INTERNO })
+    }
 
     // 4) Correo con el enlace.
     const enlace = `${Deno.env.get('SITE_URL')}/#invitacion=${inv.token}`
@@ -124,12 +157,13 @@ Deno.serve(async (req) => {
       }),
     })
     if (!correo.ok) {
-      const detalle = await correo.text()
-      return responder(502, { error: `Falló el envío del correo: ${detalle}` })
+      registrar('resend', `${correo.status} ${await correo.text()}`)
+      return responder(502, { error: ERROR_CORREO })
     }
 
     return responder(200, { ok: true, expira })
   } catch (e) {
-    return responder(500, { error: (e as Error).message })
+    registrar('excepción', e)
+    return responder(500, { error: ERROR_INTERNO })
   }
 })

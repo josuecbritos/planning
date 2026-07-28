@@ -3,7 +3,7 @@ import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../l
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
-import { miembrosDeProyecto, responsableDeTarea, type Can } from '../lib/permisos'
+import { MOTIVO_FECHA_HECHA, miembrosDeProyecto, puedeEditarFecha, responsableDeTarea, type Can } from '../lib/permisos'
 import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, nReplanificaciones, textoAtraso } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { formatoFecha } from '../lib/dates'
@@ -738,8 +738,13 @@ function TareaFila({
         <span className={`estado-chip estado-chip--${color}`}>{CATEGORIA_LABEL[cat]}</span>
       </td>
 
-      <td className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}>
-        {can.editarFechas(tarea) ? (
+      {/* #245: en una tarea hecha la fecha se muestra como texto, no como
+          control: no es un botón que falla, es una fecha cerrada. */}
+      <td
+        className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}
+        title={tarea.hecha && can.editarFechas(tarea) ? MOTIVO_FECHA_HECHA : undefined}
+      >
+        {puedeEditarFecha(can, tarea) ? (
           <FechaEditable
             valor={tarea.fechaObjetivo}
             onCambiar={(nueva) => actions.cambiarFechaObjetivo(tarea.id, nueva)}
