@@ -150,6 +150,27 @@ export interface Can {
 }
 
 /**
+ * #245: ¿se puede editar la fecha objetivo de esta tarea? Permiso Y estado:
+ * **la fecha de una tarea HECHA no se edita en ninguna vista**.
+ *
+ * "Hecha es terminal" es una definición del modelo, pero además replanificar
+ * una hecha permitiría borrar hacia atrás el atraso de una entrega tardía
+ * —mover la fecha objetivo al día en que se hizo y que el registro diga que se
+ * cumplió a tiempo—, vaciando el historial de replanificaciones, que es el
+ * diferenciador del producto. El caso legítimo (marqué hecha por error, o la
+ * fecha estaba mal) se resuelve desmarcando primero: el check es reversible.
+ *
+ * La Gantt ya lo hacía; la tabla, Mis Tareas y el panel lo escribían distinto.
+ * Vive acá para que las cuatro vistas no puedan volver a separarse.
+ */
+export function puedeEditarFecha(can: Can, t: Tarea): boolean {
+  return can.editarFechas(t) && !t.hecha
+}
+
+/** Explicación para quien SÍ podría editar la fecha si la tarea no estuviera hecha. */
+export const MOTIVO_FECHA_HECHA = 'La fecha de una tarea hecha no se edita. Desmárcala para corregirla.'
+
+/**
  * Construye el Can para el PROYECTO ACTIVO. Admin y dueño: todo. Invitado
  * (cliente o consultor asignado): según los permisos de su acceso.
  * `proyectoId` null (sin proyecto activo): solo el admin conserva permisos.

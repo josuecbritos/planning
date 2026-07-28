@@ -16,13 +16,35 @@ const PERMITIDOS = [
   ...(Deno.env.get('SITE_URLS') ?? '').split(',').map((o) => o.trim()),
 ].filter((o): o is string => Boolean(o))
 
+// #249: si NO hay ningún origen configurado, la función no se abre a cualquiera
+// ('*'): rechaza la petición. Sin la lista no hay forma de saber quién es
+// legítimo, y un '*' de emergencia es peor que no responder.
+const CONFIGURADA = PERMITIDOS.length > 0
+
 function corsDe(req: Request): Record<string, string> {
   const origen = req.headers.get('Origin') ?? ''
-  return {
-    'Access-Control-Allow-Origin': PERMITIDOS.includes(origen) ? origen : (PERMITIDOS[0] ?? '*'),
+  const cabeceras: Record<string, string> = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Vary': 'Origin',
   }
+  // Si el origen está en la lista se le responde a él; si no, se responde con
+  // el primero permitido y el navegador bloquea por no coincidir. Sin lista no
+  // se emite la cabecera: nadie queda autorizado.
+  const permitido = PERMITIDOS.includes(origen) ? origen : PERMITIDOS[0]
+  if (permitido) cabeceras['Access-Control-Allow-Origin'] = permitido
+  return cabeceras
+}
+
+// #249: el detalle técnico va a los logs de la función (dashboard de Supabase →
+// Edge Functions → Logs) y al cliente le llega un mensaje en español que dice
+// qué hacer. Los mensajes legítimos —"esta invitación ya fue usada", "el enlace
+// expiró"— no pasan por aquí: esos SÍ le sirven a quien está mirando.
+const ERROR_INTERNO =
+  'No pudimos completar la operación. Reintenta en un momento; si el problema sigue, avisa a tu administrador.'
+const ERROR_CONFIG = 'El servicio no está configurado. Avisa a tu administrador.'
+
+function registrar(etiqueta: string, detalle: unknown) {
+  console.error(`[aceptar-invitacion] ${etiqueta}:`, detalle instanceof Error ? detalle.message : detalle)
 }
 
 // Rate limiting best-effort (punto 9): en memoria del contenedor (efimero),
@@ -48,13 +70,19 @@ const REGLA_PASSWORD = 'La contraseña debe tener al menos 10 caracteres e inclu
 
 Deno.serve(async (req) => {
   const cors = corsDe(req)
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
   const responder = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), {
       status,
       headers: { ...cors, 'Content-Type': 'application/json' },
     })
+
+  if (!CONFIGURADA) {
+    registrar('configuración', 'falta SITE_URL (o SITE_URLS): sin orígenes permitidos se rechaza la petición')
+    return responder(503, { error: ERROR_CONFIG })
+  }
+
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'desconocida'
   if (limitado(ip)) return responder(429, { error: 'Demasiados intentos. Espera un momento y reintenta.' })
@@ -119,11 +147,13 @@ Deno.serve(async (req) => {
     if (errAuth) {
       // Revertir el reclamo para que el invitado pueda reintentar.
       await admin.from('invitacion').update({ usada: null }).eq('id', inv.id)
-      return responder(500, { error: errAuth.message })
+      registrar('createUser', errAuth)
+      return responder(500, { error: ERROR_INTERNO })
     }
 
     return responder(200, { ok: true, email: usuario.email })
   } catch (e) {
-    return responder(500, { error: (e as Error).message })
+    registrar('excepción', e)
+    return responder(500, { error: ERROR_INTERNO })
   }
 })

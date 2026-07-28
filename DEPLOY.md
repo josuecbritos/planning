@@ -68,6 +68,17 @@ orden** el contenido de:
     mano se respetan; las derivadas siguen al nombre), edición del propio
     comentario con marca de editado —sin borrado— y menciones `@` que notifican
     sin duplicar la notificación de comentario
+19. `supabase/migrations/20260707000019_usuario_eliminado_fuera_de_la_tabla.sql` —
+    la política `usuario_select` suma `not eliminado`: la lectura directa de la
+    tabla `usuario` deja de exponer lo que la vista `usuario_visible` oculta
+    (#248).
+    ⚠️ **ÚNICA EXCEPCIÓN al orden "migración antes que front": esta va
+    DESPUÉS.** El front nuevo (`eliminarUsuario` sin `RETURNING`, que comprueba
+    el borrado releyendo `usuario_visible`) funciona con la política vieja y con
+    la nueva; el front VIEJO se rompe con la política nueva —pediría de vuelta
+    una fila que la política ya no deja ver, y mostraría "no se pudo eliminar"
+    en un borrado que sí ocurrió—. Aplicarla después de que el front esté en
+    producción no deja ninguna ventana rota.
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
@@ -221,6 +232,13 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
    supabase secrets set SITE_URLS="https://planning-git-<rama>-<cuenta>.vercel.app"
    ```
    Admite varios separados por coma. Es opcional: en producción no hace falta.
+
+   > **Desde #249, `SITE_URL` (o `SITE_URLS`) es obligatorio.** Si no hay
+   > ningún origen configurado, las tres funciones **rechazan la petición** con
+   > `503` y "El servicio no está configurado" en vez de abrirse a cualquier
+   > origen con `'*'`. Si tras un despliegue las invitaciones o el recuperar
+   > contraseña dejan de funcionar con ese mensaje, el secret falta o quedó
+   > vacío: revísalo en Edge Functions → Secrets.
 4. Desde el Módulo de Usuarios, el botón ✉ envía (o reenvía) la invitación a
    cualquier usuario activo que aún no tenga cuenta.
 5. **Recuperar contraseña (#205).** Sale por el mismo Resend y la misma
@@ -230,6 +248,14 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
    usuarios **activos y con cuenta ya creada**: a un invitado que nunca aceptó,
    a un desactivado o a un eliminado se les responde lo mismo y **no** se les
    manda correo — su camino sigue siendo que el admin les reenvíe la invitación.
+6. **Errores de las funciones (#249).** Lo que llega al navegador es un mensaje
+   genérico en español —"No pudimos completar la operación…" / "No pudimos
+   enviar el correo…"— que dice qué hacer (reintentar, avisar al administrador).
+   El detalle técnico (error de Auth, respuesta de Resend, excepción) **queda en
+   el servidor**: dashboard de Supabase → **Edge Functions → la función → Logs**,
+   con el prefijo `[nombre-de-la-función]`. Ahí se diagnostica. Los mensajes que
+   sí le sirven a quien mira la pantalla —"Esta invitación ya fue usada", "El
+   enlace expiró", "El usuario ya tiene cuenta activa"— siguen llegando tal cual.
 
 ## Mantenimiento
 

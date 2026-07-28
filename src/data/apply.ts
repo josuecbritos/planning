@@ -103,6 +103,10 @@ export function removeTarea(s: AppState, tareaId: string): AppState {
     tareas: s.tareas.filter((t) => t.id !== tareaId),
     historial: s.historial.filter((h) => h.tareaId !== tareaId),
     comentarios: s.comentarios.filter((c) => c.tareaId !== tareaId),
+    // #246: las notificaciones de una tarea eliminada se van con ella. En la
+    // base ya lo hace el ON DELETE CASCADE; acá faltaba, así que quedaban
+    // apuntando a una tarea inexistente hasta recargar.
+    notificaciones: s.notificaciones.filter((n) => n.tareaId !== tareaId),
   }
 }
 
@@ -114,6 +118,7 @@ export function removeSubFrente(s: AppState, subFrenteId: string): AppState {
     tareas: s.tareas.filter((t) => t.subFrenteId !== subFrenteId),
     historial: s.historial.filter((h) => !tareaIds.has(h.tareaId)),
     comentarios: s.comentarios.filter((c) => !tareaIds.has(c.tareaId)),
+    notificaciones: s.notificaciones.filter((n) => !tareaIds.has(n.tareaId)), // #246
   }
 }
 
@@ -127,6 +132,7 @@ export function removeFrente(s: AppState, frenteId: string): AppState {
     tareas: s.tareas.filter((t) => !subIds.has(t.subFrenteId)),
     historial: s.historial.filter((h) => !tareaIds.has(h.tareaId)),
     comentarios: s.comentarios.filter((c) => !tareaIds.has(c.tareaId)),
+    notificaciones: s.notificaciones.filter((n) => !tareaIds.has(n.tareaId)), // #246
   }
 }
 
@@ -142,6 +148,7 @@ export function removeProyecto(s: AppState, proyectoId: string): AppState {
     tareas: s.tareas.filter((t) => !subIds.has(t.subFrenteId)),
     historial: s.historial.filter((h) => !tareaIds.has(h.tareaId)),
     comentarios: s.comentarios.filter((c) => !tareaIds.has(c.tareaId)),
+    notificaciones: s.notificaciones.filter((n) => !tareaIds.has(n.tareaId)), // #246
     accesos: s.accesos.filter((a) => a.proyectoId !== proyectoId),
   }
 }

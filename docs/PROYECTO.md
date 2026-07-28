@@ -64,6 +64,21 @@ del principio: hace todo en cualquier proyecto.
 **Los permisos se hacen cumplir en la base de datos** (RLS + triggers), no solo
 en la interfaz. Ver `SEGURIDAD.md`.
 
+**Los permisos son del proyecto de la tarea, no del que esté abierto (#243).**
+El panel de detalle se abre también desde Mis Tareas y desde una notificación,
+que cruzan proyectos: sus acciones se calculan con los permisos del proyecto **al
+que pertenece esa tarea**. Antes usaba los del proyecto activo de la barra, así
+que alguien con control total en A veía botones que no le corresponden al abrir
+una tarea de B — y al revés, quien tenía permisos en B no los veía.
+
+**Si la sesión deja de valer, se vuelve al login diciendo por qué (#244).** Dos
+casos, dos mensajes: sesión inválida ("Tu sesión ha expirado. Vuelve a
+ingresar.") y cuenta dada de baja ("Tu cuenta fue desactivada. Para volver a
+activarla ponte en contacto con tu administrador."). Se distinguen preguntando
+por el **estado** —hay sesión, existe el usuario, su perfil sigue activo—, nunca
+leyendo el texto del error. Si esa consulta falla no hay evidencia de nada: se
+muestra el error normal y **no se echa a nadie**.
+
 ## 4. Funcionalidades
 
 **Estructura de trabajo:** Proyecto → Frentes → Sub Frentes → Tareas. CRUD
@@ -110,6 +125,25 @@ enfocar; el colapso es momentáneo (no se guarda).
 cinco categorías excluyentes — Hecha (verde), Pendiente (sin color), Pendiente
 replanificada (ámbar), Atrasada (rojo), Atrasada replanificada (morado). El
 usuario solo marca "hecha"; el resto sale de la fecha y del historial.
+
+**La fecha de una tarea hecha no se edita (#245).** Vale en las **cuatro**
+vistas —tabla, Mis Tareas, Gantt y panel de detalle—: mover la fecha de algo ya
+cerrado reescribiría el registro de cuándo se comprometió, que es justamente el
+diferenciador del producto. La regla vive en un solo lugar
+(`puedeEditarFecha`), así que las cuatro no pueden volver a separarse. La fecha
+sigue **a la vista**, como texto: lo que desaparece es el control, no el dato, y
+quien podría editarla ve por qué ("La fecha de una tarea hecha no se edita.
+Desmárcala para corregirla."). El check **sigue siendo reversible**: el camino
+para corregir es desmarcar, cambiar la fecha y volver a marcar.
+
+**"Hoy" se recalcula solo (#247).** Antes se fijaba al abrir la aplicación, así
+que una pestaña que cruzaba la medianoche seguía calculando categorías, atrasos,
+la columna de HOY de la Gantt y la fecha de "marcar hecha" con el día anterior.
+Con sesiones que no expiran, tener la aplicación abierta varios días es un caso
+real. Se revisa cada minuto y **al volver a la pestaña** (foco o
+`visibilitychange`, el caso frecuente), y solo cambia el estado si el día
+efectivamente cambió: no provoca renders de más ni interrumpe lo que se esté
+haciendo. En modo Local la fecha es simulada y fija a propósito.
 
 **Responsable = miembro del proyecto (#228/#229):** los candidatos a responsable
 de una tarea son el **dueño y los usuarios activos con acceso**, sin excepción
@@ -190,7 +224,11 @@ categoría (verde/ámbar/rojo/morado), justo las que llegan por notificación—
 atenúa el resto de las filas y dibuja un **contorno naranja** alrededor de la
 tarea, legible sobre cualquier categoría y en ambos temas (#186). Con la barra
 contraída, una **campana fija** con el contador abre el mismo panel (#159). Las
-genera la base, no el cliente.
+genera la base, no el cliente. Si la tarea ya no existe —la borraron desde otra
+sesión— el clic avisa **"Esta tarea ya no existe."** y la notificación sale de
+la lista, en vez de no hacer nada (#246); borrar una tarea, un sub frente, un
+frente o un proyecto se lleva por delante sus notificaciones en los dos
+backends.
 
 **Baja de usuarios (#136):** eliminar = desactivar + invisible (sin borrado
 físico, para no huérfanar el historial). Dar de alta el mismo correo reactiva la
@@ -244,8 +282,12 @@ valor por defecto del navegador, cae al inicial (un `border` así desaparece).
     DEFINER, triggers de validación campo a campo, RPC).
 - **Auth:** Supabase Auth (email + contraseña); el admin crea el `usuario` con su
   email y, al activarse por el enlace de invitación, un trigger enlaza ambos.
-- **Edge Functions (Deno):** `invitar-usuario` y `aceptar-invitacion` (correo via
-  Resend). Secretos solo server-side.
+- **Edge Functions (Deno):** `invitar-usuario`, `aceptar-invitacion` y
+  `recuperar-contrasena` (correo via Resend). Secretos solo server-side. CORS
+  por lista de orígenes: si no hay ninguno configurado la función **rechaza** la
+  petición en vez de abrirse a cualquiera. Los errores internos se registran en
+  el servidor y al cliente le llega un mensaje genérico en español (#249). Se
+  despliegan a mano desde el dashboard (no hay CLI en este proyecto).
 - **Despliegue:** Vercel (frontend estático + `vercel.json` con headers de
   seguridad). Migraciones en `supabase/migrations/`, aplicadas desde el dashboard.
 
@@ -253,7 +295,10 @@ valor por defecto del navegador, cae al inicial (un `border` así desaparece).
 
 - **Estado:** desplegado, con roles/permisos y alta por correo; auditoría de
   seguridad cerrada y validada (compuerta 34/34). Listo para usuarios reales tras
-  el runbook de seguridad.
+  el runbook de seguridad. La auditoría de estado (#233) derivó en dos entregas
+  de correcciones: las simples (#234–#242, #251) y las complejas (#243–#249),
+  estas últimas con la **migración 19** —hay que aplicarla y volver a correr la
+  compuerta— y el **redeploy manual de las tres Edge Functions**.
 - **Pendientes no bloqueantes** (ver `SEGURIDAD.md` §6): features de plan Pro de
   Supabase (Leaked Password Protection, backups automáticos) y la actualización a
   Vite 8 (solo toolchain de desarrollo).

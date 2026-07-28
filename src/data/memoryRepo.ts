@@ -199,6 +199,7 @@ export class MemoryRepo implements Repo {
     this.state.tareas = this.state.tareas.filter((t) => !subIds.includes(t.subFrenteId))
     this.state.historial = this.state.historial.filter((h) => !tareaIds.includes(h.tareaId))
     this.state.comentarios = this.state.comentarios.filter((c) => !tareaIds.includes(c.tareaId))
+    this.state.notificaciones = this.state.notificaciones.filter((x) => !tareaIds.includes(x.tareaId)) // #246
     this.state.accesos = this.state.accesos.filter((a) => a.proyectoId !== id)
     this.persist()
   }
@@ -226,6 +227,7 @@ export class MemoryRepo implements Repo {
     this.state.tareas = this.state.tareas.filter((t) => !subIds.includes(t.subFrenteId))
     this.state.historial = this.state.historial.filter((h) => !tareaIds.includes(h.tareaId))
     this.state.comentarios = this.state.comentarios.filter((c) => !tareaIds.includes(c.tareaId))
+    this.state.notificaciones = this.state.notificaciones.filter((x) => !tareaIds.includes(x.tareaId)) // #246
     this.persist()
   }
 
@@ -250,6 +252,7 @@ export class MemoryRepo implements Repo {
     this.state.tareas = this.state.tareas.filter((t) => t.subFrenteId !== id)
     this.state.historial = this.state.historial.filter((h) => !tareaIds.includes(h.tareaId))
     this.state.comentarios = this.state.comentarios.filter((c) => !tareaIds.includes(c.tareaId))
+    this.state.notificaciones = this.state.notificaciones.filter((n) => !tareaIds.includes(n.tareaId)) // #246
     this.persist()
   }
 
@@ -294,6 +297,9 @@ export class MemoryRepo implements Repo {
     this.state.tareas = this.state.tareas.filter((t) => t.id !== id)
     this.state.historial = this.state.historial.filter((h) => h.tareaId !== id)
     this.state.comentarios = this.state.comentarios.filter((c) => c.tareaId !== id)
+    // #246: espejo del ON DELETE CASCADE de la base. Sin esto las
+    // notificaciones de la tarea quedaban para siempre en modo Local.
+    this.state.notificaciones = this.state.notificaciones.filter((n) => n.tareaId !== id)
     this.persist()
   }
 

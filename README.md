@@ -52,7 +52,7 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 ## Conectar Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com) (capa gratuita).
-2. Aplica el esquema **completo**, las 18 migraciones en orden:
+2. Aplica el esquema **completo**, las 19 migraciones en orden:
    ```bash
    supabase link --project-ref TU_REF
    supabase db push          # aplica supabase/migrations/ en orden
@@ -137,8 +137,14 @@ Edge Functions y sus secretos, despliegue en Vercel— es
   del comentario **en la base**, que resuelven mención y responsable en una sola
   notificación (#208); y **edición del propio comentario** con marca de editado,
   restringida al autor y sin borrado (#209).
+- `supabase/migrations/20260707000019_usuario_eliminado_fuera_de_la_tabla.sql` —
+  `usuario_select` suma `not eliminado`: la lectura directa de la tabla deja de
+  exponer lo que la vista `usuario_visible` oculta (#248). Va **junto con el
+  front de la misma entrega**: como Postgres aplica las políticas de SELECT
+  también a las filas de un `RETURNING`, `eliminarUsuario` dejó de pedir la fila
+  de vuelta y comprueba el borrado releyendo la vista.
 
-> La lista **completa y ordenada** de las 18 migraciones (1→18), lista para
+> La lista **completa y ordenada** de las 19 migraciones (1→19), lista para
 > pegar en el SQL Editor, está en [`DEPLOY.md`](DEPLOY.md) (Paso 2).
 
 Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
@@ -188,7 +194,7 @@ src/
     CampoPassword, Modal, TextPromptModal, …
     Iconos.tsx           Iconos de acción como SVG de trazo (#203)
 supabase/
-  migrations/            18 migraciones (1→18). Lista ordenada en DEPLOY.md.
+  migrations/            19 migraciones (1→19). Lista ordenada en DEPLOY.md.
   functions/             Edge Functions (Deno): invitar-usuario, aceptar-invitacion,
                          recuperar-contrasena
   seed.sql               Datos de arranque (opcional)

@@ -447,3 +447,59 @@ después por solicitudes posteriores.
   contadores (hechas, pendientes, por replanificar, replanificadas abiertas) de todos
   los proyectos visibles. Disponible también para clientes (con sus proyectos).
 
+
+## Auditoría de estado #233 — segunda entrega: hallazgos complejos (#243–#249)
+
+La auditoría de estado (informe en `docs/auditoria-seguridad.md` y el reporte
+#233) se resolvió en dos pedidos. El primero cubrió los hallazgos simples
+(#234–#242, #251) y sus efectos ya están descritos arriba. Este es el segundo:
+siete hallazgos que tocaban permisos, sesión, base de datos y Edge Functions.
+
+- **#243 — El panel de detalle usaba los permisos del proyecto equivocado.**
+  Calculaba sus acciones con el `can` del proyecto **activo** de la barra, pero
+  el panel se abre también desde Mis Tareas y desde una notificación, que cruzan
+  proyectos. Alguien con control total en A veía acciones que no le corresponden
+  al abrir una tarea de B, y quien tenía permisos en B no los veía. Ahora el
+  `can` se construye con el proyecto **de la tarea**, el mismo camino que ya
+  usaban las filas de Mis Tareas.
+- **#244 — Sesión inválida o cuenta desactivada: vuelta al login con el motivo.**
+  Antes la aplicación se quedaba mostrando errores sueltos. Ahora hay dos
+  mensajes fijos —"Tu sesión ha expirado. Vuelve a ingresar." y "Tu cuenta fue
+  desactivada. Para volver a activarla ponte en contacto con tu administrador."—
+  que se ven en el login al llegar y se retiran al reintentar. El caso se
+  distingue preguntando por el **estado** (hay sesión, existe el usuario, su
+  perfil sigue activo), **nunca** leyendo el texto de un error: si esa consulta
+  falla no hay evidencia de nada y no se echa a nadie. Se distingue además la
+  salida voluntaria de la involuntaria, para no mostrar un aviso a quien
+  simplemente cerró sesión.
+- **#245 — La fecha de una tarea hecha no se edita, en las cuatro vistas.** La
+  Gantt ya lo hacía; tabla, Mis Tareas y panel lo escribían distinto. La regla
+  vive ahora en un solo lugar (`puedeEditarFecha`). La fecha sigue a la vista
+  como texto —desaparece el control, no el dato— y quien podría editarla ve por
+  qué. El check sigue siendo reversible: desmarcar, corregir, volver a marcar.
+- **#246 — Notificación de una tarea que ya no existe.** El clic no hacía nada y
+  la notificación parecía rota. Ahora avisa "Esta tarea ya no existe." y la
+  retira de la lista. Además, borrar una tarea, un sub frente, un frente o un
+  proyecto se lleva por delante sus notificaciones en **los dos** backends (en
+  Supabase ya lo hacía la cascada; faltaba en el modo Local).
+- **#247 — "Hoy" se recalcula solo.** Se fijaba al abrir la aplicación: una
+  pestaña abierta al cruzar la medianoche seguía calculando categorías, atrasos,
+  la columna de HOY y la fecha de "marcar hecha" con el día anterior. Se revisa
+  cada minuto y al volver a la pestaña (foco / `visibilitychange`), y solo
+  cambia el estado si el día cambió.
+- **#248 — La lectura directa de `usuario` también excluye a los eliminados**
+  (migración 19). La migración 15 revocó el SELECT completo pero dejó un grant
+  de seis columnas no sensibles; un GRANT concede columnas, no filas, y la
+  política `usuario_select` no miraba `eliminado`. Ahora sí, para todos, admin
+  incluido. Como Postgres aplica las políticas de SELECT también a las filas de
+  un `RETURNING`, `eliminarUsuario` dejó de pedir la fila de vuelta y comprueba
+  el borrado releyendo `usuario_visible`. La compuerta de RLS trae un caso nuevo
+  que compara tabla contra vista, rol por rol.
+- **#249 — Edge Functions: CORS sin `'*'` y errores sin detalles internos.** Si
+  no hay ningún origen configurado (`SITE_URL` / `SITE_URLS`), las tres
+  funciones **rechazan** la petición con `503` en vez de abrirse a cualquiera —
+  el momento en que falta la configuración es justo cuando menos se puede
+  confiar en quien llama. Y el detalle técnico (error de Auth, respuesta de
+  Resend, excepción) se registra en el servidor; al cliente le llega un mensaje
+  genérico en español que dice qué hacer. Los mensajes útiles del flujo —"Esta
+  invitación ya fue usada", "El enlace expiró"— no cambian.

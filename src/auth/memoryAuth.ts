@@ -26,6 +26,18 @@ export class MemoryAuth implements AuthService {
 
   constructor(private repo: Repo) {}
 
+  /**
+   * #244: en modo Local no hay sesiones que expiren ni cuentas que un servidor
+   * pueda desactivar a media sesión. Nunca hay motivo para echar a nadie.
+   */
+  async diagnosticar(): Promise<null> {
+    return null
+  }
+
+  alPerderSesion(): () => void {
+    return () => {}
+  }
+
   async getUsuarioActual(): Promise<Usuario | null> {
     let email: string | null = null
     try {

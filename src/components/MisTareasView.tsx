@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Proyecto, Tarea, Usuario } from '../types'
 import type { Actions, Vista } from '../App'
-import { makeCan, type Can } from '../lib/permisos'
+import { MOTIVO_FECHA_HECHA, makeCan, puedeEditarFecha, type Can } from '../lib/permisos'
 import { cmp, formatoFecha } from '../lib/dates'
 import {
   CATEGORIA_LABEL,
@@ -347,8 +347,12 @@ function FilaTarea({
         <span className={`estado-chip estado-chip--${color}`}>{CATEGORIA_LABEL[cat]}</span>
       </td>
 
-      <td className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}>
-        {can.editarFechas(tarea) ? (
+      {/* #245: la fecha de una hecha no se edita en ninguna vista. */}
+      <td
+        className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}
+        title={tarea.hecha && can.editarFechas(tarea) ? MOTIVO_FECHA_HECHA : undefined}
+      >
+        {puedeEditarFecha(can, tarea) ? (
           <FechaEditable
             valor={tarea.fechaObjetivo}
             onCambiar={(nueva) => actions.cambiarFechaObjetivo(tarea.id, nueva)}
