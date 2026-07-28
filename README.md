@@ -125,8 +125,12 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   desplegable **entra** en ella: el botón pasa a decir `Vistas · <nombre>` y la
   vista queda marcada en la lista. Sobrevive a salir de la pantalla y a
   **recargar** (se guarda en `localStorage`, por usuario y por pantalla — cada
-  proyecto por su lado, Mis Tareas por el suyo). Un filtro puesto **a mano** no
-  persiste. Estando en una vista, **cambiar o limpiar** filtro u orden deja
+  proyecto por su lado, Mis Tareas por el suyo). **Salir de la pantalla
+  descarta todo lo que no se guardó**, y **cambiar de proyecto cuenta como
+  salir** (#221): un filtro puesto a mano no persiste, y los cambios sin
+  guardar sobre una vista se descartan —al volver aparece tal como está
+  guardada, sin asterisco—. Lo único que sobrevive es la vista guardada, y
+  solo con su contenido guardado. Estando en una vista, **cambiar o limpiar** filtro u orden deja
   dentro de ella y la marca con un **asterisco**; el **💾** lo hace
   desaparecer, y salir sin guardar descarta lo no guardado. Se sale de una
   vista **deseleccionándola** en el desplegable (queda todo limpio); borrarla

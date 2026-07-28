@@ -89,8 +89,10 @@ export interface Actions {
   marcarNotificacionesLeidas: () => Promise<void>
 }
 
-/** Vista de un proyecto (punto 3/4): filtro y orden viven juntos y son
- *  propios de cada proyecto. Referencias estables para el estado "vacio". */
+/** Vista de la pantalla de proyecto (punto 3/4): filtro, orden y la vista
+ *  guardada en la que se está, juntos. Se recarga al entrar a cada proyecto
+ *  (#221), así que no se contamina entre uno y otro. Referencias estables para
+ *  el estado "vacío". */
 interface VistaProyecto {
   filtro: Filtro
   orden: OrdenMulti
@@ -160,10 +162,11 @@ export default function App() {
   // Punto 6: modo de la sidebar. Primera preferencia persistente de la app
   // (por usuario, sobrevive a recargas y sesiones posteriores).
   const [sidebarModo, setSidebarModo] = useState<SidebarModo>('fija')
-  // Punto 3/4: filtro + orden POR PROYECTO. Cada proyecto conserva su propio
-  // estado (aplicar un filtro/orden en A no afecta a B); es momentaneo (vive
-  // en memoria) salvo que se guarde como vista. Mapa keyed por id de proyecto.
-  const [vistasProyecto, setVistasProyecto] = useState<Record<string, VistaProyecto>>({})
+  // Punto 3/4 + #215/#221: filtro + orden de la pantalla de proyecto. Es UNO
+  // solo, no un mapa por proyecto: al entrar a una pantalla se carga lo que
+  // corresponda y al salir no queda nada que recordar. Cambiar de proyecto es
+  // cambiar de pantalla.
+  const [vistaActiva, setVistaActiva] = useState<VistaProyecto>(VISTA_VACIA)
   // Tema claro/oscuro: por defecto sigue el modo del sistema; el interruptor
   // manual (persistente por usuario) actúa como override una vez usado.
   const [tema, setTema] = useState<Tema>(() => temaEfectivo(null))
@@ -567,72 +570,53 @@ export default function App() {
     setProyectoActivoId(id)
     setFrenteSel('todos')
     setPantalla('proyectos')
-    // Punto 3: NO se limpia el filtro/orden — cada proyecto conserva el suyo.
+    // #221: el filtro no se arrastra entre proyectos. Lo carga el efecto de
+    // entrada a la pantalla, que restaura la vista guardada o deja limpio.
     setVistaStale(false)
     setMovilSidebar(false)
     setTareaResaltada(null) // #158: navegar suelta el resaltado
     setPeekProyectoId(null) // #179
   }, [])
 
-  // #215: la primera vez que se entra a un proyecto EN ESTA SESIÓN se restaura
-  // su vista guardada activa (si la hay). Después manda lo que haya en memoria:
-  // moverse entre proyectos sin recargar conserva incluso el filtro suelto, que
-  // es el comportamiento que el pedido decidió mantener. Lo que solo sobrevive
-  // a una recarga es la vista guardada.
+  // #221: al ENTRAR a la pantalla de un proyecto se carga su vista guardada, y
+  // nada más. Salir descarta lo no guardado, y cambiar de proyecto es salir:
+  // cada proyecto es una pantalla distinta. La regla queda sin excepciones —
+  // lo que se guardó explícitamente persiste; lo demás se descarta—.
+  //
+  // (#215 había mantenido en memoria el filtro suelto de cada proyecto dentro
+  // de la sesión. Era una contradicción con la propia regla y se elimina.)
+  //
+  // Depende de `sesion?.id`, NO del objeto: la sesión se reemplaza al editar el
+  // propio perfil (#207) y eso no debe reiniciar el filtro que se esté usando.
+  const sesionId = sesion?.id
   useEffect(() => {
-    if (!proyectoActivoId || !sesion) return
-    setVistasProyecto((prev) => {
-      if (prev[proyectoActivoId]) return prev
-      const ini = estadoInicial(sesion.id, proyectoActivoId)
-      if (!ini.vistaActivaId) return prev
-      return { ...prev, [proyectoActivoId]: ini }
-    })
-  }, [proyectoActivoId, sesion])
-
-  // Vista (filtro + orden) del proyecto activo; setters que solo tocan la
-  // entrada de ESE proyecto (punto 3: no se contaminan entre proyectos).
-  const vistaActiva = proyectoActivoId ? vistasProyecto[proyectoActivoId] ?? VISTA_VACIA : VISTA_VACIA
+    if (!proyectoActivoId || !sesionId || pantalla !== 'proyectos') return
+    setVistaActiva(estadoInicial(sesionId, proyectoActivoId))
+  }, [proyectoActivoId, pantalla, sesionId])
 
   // #215: entrar o salir de una vista guardada. Se persiste el id, nunca el
   // filtro: lo que no se guardó es temporal.
   const setVistaGuardada = useCallback(
     (id: string | null) => {
-      if (!proyectoActivoId || !sesion) return
-      escribirVistaActiva(sesion.id, proyectoActivoId, id)
-      setVistasProyecto((prev) => {
-        const cur = prev[proyectoActivoId] ?? VISTA_VACIA
-        return { ...prev, [proyectoActivoId]: { ...cur, vistaActivaId: id } }
-      })
+      if (!proyectoActivoId || !sesionId) return
+      escribirVistaActiva(sesionId, proyectoActivoId, id)
+      setVistaActiva((cur) => ({ ...cur, vistaActivaId: id }))
     },
-    [proyectoActivoId, sesion],
+    [proyectoActivoId, sesionId],
   )
-  const setFiltro = useCallback(
-    (f: Filtro) => {
-      // Cambiar el filtro recalcula la foto (no es una "edición" de datos).
-      setVistaStale(false)
-      // #173: cambiar el filtro suelta la tarea insertada por una notificación,
-      // para que la foto vuelva a ser consistente con el filtro (no persiste).
-      setTareaResaltada(null)
-      setVistasProyecto((prev) => {
-        if (!proyectoActivoId) return prev
-        const cur = prev[proyectoActivoId] ?? VISTA_VACIA
-        return { ...prev, [proyectoActivoId]: { ...cur, filtro: f } }
-      })
-    },
-    [proyectoActivoId],
-  )
-  const setOrden = useCallback(
-    (o: OrdenMulti) => {
-      setVistaStale(false)
-      setTareaResaltada(null) // #173
-      setVistasProyecto((prev) => {
-        if (!proyectoActivoId) return prev
-        const cur = prev[proyectoActivoId] ?? VISTA_VACIA
-        return { ...prev, [proyectoActivoId]: { ...cur, orden: o } }
-      })
-    },
-    [proyectoActivoId],
-  )
+  const setFiltro = useCallback((f: Filtro) => {
+    // Cambiar el filtro recalcula la foto (no es una "edición" de datos).
+    setVistaStale(false)
+    // #173: cambiar el filtro suelta la tarea insertada por una notificación,
+    // para que la foto vuelva a ser consistente con el filtro (no persiste).
+    setTareaResaltada(null)
+    setVistaActiva((cur) => ({ ...cur, filtro: f }))
+  }, [])
+  const setOrden = useCallback((o: OrdenMulti) => {
+    setVistaStale(false)
+    setTareaResaltada(null) // #173
+    setVistaActiva((cur) => ({ ...cur, orden: o }))
+  }, [])
 
   const onSelectFrente = useCallback((f: FrenteSel) => {
     setFrenteSel(f)
