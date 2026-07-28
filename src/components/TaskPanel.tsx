@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Tarea, Usuario } from '../types'
 import type { Actions } from '../App'
-import type { Can } from '../lib/permisos'
+import { MOTIVO_FECHA_HECHA, miembrosDeProyecto, puedeEditarFecha, responsableDeTarea, type Can } from '../lib/permisos'
 import { formatoFecha, formatoFechaHora } from '../lib/dates'
 import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, historialDe } from '../lib/derive'
 import {
@@ -56,9 +56,15 @@ export function TaskPanel({ state, tarea, hoy, can, actions, sesionId, onClose }
   const color = colorTarea(state, tarea, hoy)
   const cat = categoriaDe(state, tarea, hoy)
   const hist = historialDe(state, tarea.id)
-  const resp = state.usuarios.find((u) => u.id === tarea.responsableId)
   const sub = state.subFrentes.find((sf) => sf.id === tarea.subFrenteId)
   const frente = state.frentes.find((f) => f.id === sub?.frenteId)
+  // #228/#229: la misma lista de miembros que la tabla y la Gantt, y el mismo
+  // trato para el responsable que ya no es candidato (se muestra apagado).
+  const resp = responsableDeTarea(
+    state,
+    tarea.responsableId,
+    miembrosDeProyecto(state, frente?.proyectoId ?? null),
+  )
 
   const cadena: string[] = tarea.fechaOriginal
     ? [tarea.fechaOriginal, ...hist.map((h) => h.fechaNueva)]
@@ -81,10 +87,17 @@ export function TaskPanel({ state, tarea, hoy, can, actions, sesionId, onClose }
       {tarea.descripcion && <p className="panel-detalle__desc">{tarea.descripcion}</p>}
 
       <dl className="panel-detalle__datos">
-        {resp && (
+        {resp.estado !== 'sin-asignar' && (
           <>
             <dt>Responsable</dt>
-            <dd><span className="resp-badge">{resp.iniciales}</span> {resp.nombre}</dd>
+            <dd title={resp.motivo}>
+              <span className={`resp-badge${resp.apagado ? ' resp-badge--apagado' : ''}`}>
+                {resp.usuario?.iniciales ?? '?'}
+              </span>{' '}
+              <span className={resp.apagado ? 'resp-apagado' : undefined}>
+                {resp.usuario?.nombre ?? 'Responsable ya no disponible'}
+              </span>
+            </dd>
           </>
         )}
         <dt>Fecha comprometida original</dt>
@@ -155,7 +168,10 @@ export function TaskPanel({ state, tarea, hoy, can, actions, sesionId, onClose }
                   Hecha
                 </label>
               )}
-              {can.editarFechas(tarea) && (
+              {/* #245: en una tarea hecha no se ofrece replanificar. La fecha
+                  vigente sigue arriba, en el detalle; lo que desaparece es el
+                  control, no el dato. */}
+              {puedeEditarFecha(can, tarea) ? (
                 <label className="panel-accion">
                   {tarea.fechaObjetivo ? 'Replanificar a' : 'Planificar para'}
                   <FechaEditable
@@ -164,18 +180,21 @@ export function TaskPanel({ state, tarea, hoy, can, actions, sesionId, onClose }
                     ariaLabel="Nueva fecha objetivo"
                   />
                 </label>
+              ) : (
+                tarea.hecha &&
+                can.editarFechas(tarea) && <p className="panel-nota">{MOTIVO_FECHA_HECHA}</p>
               )}
               {can.archivarEliminar(tarea) && (
                 <button
                   className="btn"
-                  title="Cancelar la tarea: sale del plan y conserva su historial"
+                  title="Sale del plan y conserva su historial"
                   onClick={() => {
                     if (confirm(`¿Archivar la tarea "${tarea.titulo}"? Sale del plan y conserva su historial.`)) {
                       actions.updateTarea(tarea.id, { archivada: true })
                     }
                   }}
                 >
-                  Archivar (cancelar)
+                  Archivar tarea
                 </button>
               )}
             </>

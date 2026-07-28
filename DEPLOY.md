@@ -6,13 +6,6 @@ Tiempo estimado: 30–45 minutos. Costo: $0 (capas gratuitas).
 
 ---
 
-## Paso 0 — Integrar la rama
-
-Todo el trabajo está en la rama `claude/markdown-idea-dev-3noisv`. Intégrala a
-`main` (por PR o merge directo). Los despliegues automáticos se cuelgan de `main`.
-
----
-
 ## Paso 1 — Crear el proyecto Supabase
 
 1. Entra a [supabase.com](https://supabase.com) → **New project**.
@@ -75,6 +68,17 @@ orden** el contenido de:
     mano se respetan; las derivadas siguen al nombre), edición del propio
     comentario con marca de editado —sin borrado— y menciones `@` que notifican
     sin duplicar la notificación de comentario
+19. `supabase/migrations/20260707000019_usuario_eliminado_fuera_de_la_tabla.sql` —
+    la política `usuario_select` suma `not eliminado`: la lectura directa de la
+    tabla `usuario` deja de exponer lo que la vista `usuario_visible` oculta
+    (#248).
+    ⚠️ **ÚNICA EXCEPCIÓN al orden "migración antes que front": esta va
+    DESPUÉS.** El front nuevo (`eliminarUsuario` sin `RETURNING`, que comprueba
+    el borrado releyendo `usuario_visible`) funciona con la política vieja y con
+    la nueva; el front VIEJO se rompe con la política nueva —pediría de vuelta
+    una fila que la política ya no deja ver, y mostraría "no se pudo eliminar"
+    en un borrado que sí ocurrió—. Aplicarla después de que el front esté en
+    producción no deja ninguna ventana rota.
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
@@ -179,7 +183,15 @@ se necesita nada extra (la app es una sola página, sin rutas de servidor).
 - [ ] Entrar con los 2 admins desde la URL productiva.
 - [ ] Crear un usuario Cliente desde el Módulo de Usuarios y asignarle un proyecto.
 - [ ] Crear la cuenta Auth de ese cliente (panel, paso 3) y probar que al entrar
-      **solo ve su proyecto y en solo lectura**.
+      **solo ve el proyecto donde lo invitaste** — ningún otro, ni en la barra
+      lateral ni en Resumen ni en Mis Tareas.
+- [ ] Con esa misma cuenta, comprobar que **sí puede** hacer lo que le
+      corresponde por los permisos por defecto de un cliente (#236): **crear
+      tareas**, **cambiar la fecha** y **marcar hechas las tareas asignadas a
+      él**, y **asignar responsable**. Un cliente **no** es de solo lectura por
+      defecto: eso se configura por acceso, en el 🔑 del Módulo de Usuarios.
+      Lo que **no** puede es crear frentes ni sub frentes, ni administrar
+      usuarios o proyectos.
 - [ ] Cambiar una fecha objetivo y verificar que el historial aparece en el
       tooltip / panel de detalle (el trigger funciona).
 - [ ] Confirmar que el registro público está desactivado (paso 4).
@@ -220,6 +232,13 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
    supabase secrets set SITE_URLS="https://planning-git-<rama>-<cuenta>.vercel.app"
    ```
    Admite varios separados por coma. Es opcional: en producción no hace falta.
+
+   > **Desde #249, `SITE_URL` (o `SITE_URLS`) es obligatorio.** Si no hay
+   > ningún origen configurado, las tres funciones **rechazan la petición** con
+   > `503` y "El servicio no está configurado" en vez de abrirse a cualquier
+   > origen con `'*'`. Si tras un despliegue las invitaciones o el recuperar
+   > contraseña dejan de funcionar con ese mensaje, el secret falta o quedó
+   > vacío: revísalo en Edge Functions → Secrets.
 4. Desde el Módulo de Usuarios, el botón ✉ envía (o reenvía) la invitación a
    cualquier usuario activo que aún no tenga cuenta.
 5. **Recuperar contraseña (#205).** Sale por el mismo Resend y la misma
@@ -229,6 +248,14 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
    usuarios **activos y con cuenta ya creada**: a un invitado que nunca aceptó,
    a un desactivado o a un eliminado se les responde lo mismo y **no** se les
    manda correo — su camino sigue siendo que el admin les reenvíe la invitación.
+6. **Errores de las funciones (#249).** Lo que llega al navegador es un mensaje
+   genérico en español —"No pudimos completar la operación…" / "No pudimos
+   enviar el correo…"— que dice qué hacer (reintentar, avisar al administrador).
+   El detalle técnico (error de Auth, respuesta de Resend, excepción) **queda en
+   el servidor**: dashboard de Supabase → **Edge Functions → la función → Logs**,
+   con el prefijo `[nombre-de-la-función]`. Ahí se diagnostica. Los mensajes que
+   sí le sirven a quien mira la pantalla —"Esta invitación ya fue usada", "El
+   enlace expiró", "El usuario ya tiene cuenta activa"— siguen llegando tal cual.
 
 ## Mantenimiento
 
@@ -236,5 +263,11 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
   siempre con el mismo email.
 - **Cambios de esquema futuros**: nuevos archivos en `supabase/migrations/`,
   aplicados por SQL Editor o `supabase db push`.
-- **Respaldo**: Supabase free incluye respaldos diarios (7 días). Para algo más,
-  Settings → Database → exportar dump.
+- **Respaldo**: ⚠️ **el plan gratuito de Supabase NO tiene respaldos
+  automáticos** — los respaldos diarios son de los planes Pro, Team y
+  Enterprise; en el gratuito la retención es de cero días (#234). La **única**
+  red que existe es el respaldo manual: `pg_dump` (o Settings → Database →
+  exportar dump) **antes de cada migración**. No es una recomendación: si algo
+  sale mal en una migración y no hiciste el dump, no hay desde dónde volver.
+  Es lo mismo que dicen el README, `docs/SEGURIDAD.md` §4 y
+  `docs/runbook-seguridad.md` §0.

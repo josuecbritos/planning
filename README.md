@@ -1,22 +1,24 @@
-# Planificador de Proyectos (Documento Funcional v3.1)
+# Andotek Planning
 
-Herramienta de planificación de proyectos con gestión interna y visibilidad
-controlada al cliente. Implementa las vistas **Tabla** (tipo Monday) y **Gantt**
-(grilla tipo Excel) con la lógica de estados derivados y colores de la sección 6
-del Documento Funcional, el **CRUD** completo sobre **Supabase** (Fase 1),
-**tres roles (Admin / Consultor / Cliente) con principio dueño vs invitado y
-acceso por proyecto** (Fase 2, Módulo 1), el **pulido de la Fase 3** (Mis
-Tareas, panel lateral de detalle, archivo de canceladas e indicadores por
-proyecto) y los módulos de escritorio posteriores: **Administración →
-Proyectos**, **Usuarios** con alta por invitación y **notificaciones in-app**.
+Herramienta de planificación de proyectos, **en producción**. Jerarquía
+Proyecto → Frente → Sub Frente → Tarea, con dos vistas del mismo plan —**Tabla**
+y **Gantt**—, un módulo **Mis Tareas** que cruza proyectos, y tres roles (Admin /
+Consultor / Cliente) con acceso por proyecto respaldado por RLS en la base.
+Su diferenciador es el **registro de replanificaciones**: mover una fecha ya
+vencida deja rastro, y ese rastro es el producto.
 
-> **Documentación:** la **fuente de verdad del estado actual** es
-> [`docs/PROYECTO.md`](docs/PROYECTO.md) (contexto, objetivos, roles,
-> funcionalidades y arquitectura); este README cubre uso y desarrollo. El
-> `docs/documento-funcional-v3.1.md` es **histórico** (modelo anterior de 2
-> roles / 4 estados). Antes de tocar RLS, permisos, Edge Functions de auth o el
-> despliegue, leer [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md) (invariantes que no
-> se deben romper).
+> **Este README cubre uso y desarrollo**: qué es, cómo levantarlo, cómo
+> desplegarlo y dónde vive cada cosa.
+>
+> - **Qué hace hoy y por qué** → [`docs/PROYECTO.md`](docs/PROYECTO.md) (fuente
+>   de verdad del estado actual).
+> - **Cómo se desplegó y cómo se opera** → [`DEPLOY.md`](DEPLOY.md).
+> - **Antes de tocar RLS, permisos, Edge Functions de auth o el despliegue** →
+>   [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md) (invariantes que no se rompen).
+> - **Historial de cambios**, solicitud por solicitud →
+>   [`CHANGELOG.md`](CHANGELOG.md).
+> - `docs/documento-funcional-v3.1.md` es **histórico** (modelo anterior de 2
+>   roles / 4 estados).
 
 ## Dos modos de ejecución
 
@@ -47,397 +49,28 @@ npm run preview    # sirve el build
 
 Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 
-## Conectar Supabase (Fase 1)
+## Conectar Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com) (capa gratuita).
-2. Aplica el esquema. Con la CLI de Supabase:
+2. Aplica el esquema **completo**, las 19 migraciones en orden:
    ```bash
    supabase link --project-ref TU_REF
-   supabase db push          # aplica supabase/migrations/
+   supabase db push          # aplica supabase/migrations/ en orden
    supabase db reset         # opcional: recrea + carga supabase/seed.sql
    ```
-   O bien, pega el contenido de `supabase/migrations/20260707000001_init.sql`
-   (y opcionalmente `supabase/seed.sql`) en el **SQL Editor** del panel de Supabase.
+   Sin la CLI, el orden exacto para pegar en el SQL Editor está en
+   [`DEPLOY.md`](DEPLOY.md) (Paso 2).
+
+   > **No hay atajo.** Aplicar solo la primera migración deja el esquema a
+   > medias **y con la RLS permisiva de la Fase 1**: la aplicación parece
+   > funcionar y la base queda abierta. Es todo o nada, y en orden (#235).
 3. Copia `.env.example` a `.env` y completa `VITE_SUPABASE_URL` y
    `VITE_SUPABASE_ANON_KEY` (Settings → API).
 4. `npm run dev`. El chip del encabezado debe decir **Supabase**.
 
-## Qué implementa
-
-**Vistas** (sección 4, 6, 7.2)
-- **Tabla tipo Monday:** navegación por Frente en el sidebar; cada Sub Frente es una
-  tabla. Columnas (en este orden): Hecha (checkbox), Tarea, Responsable, **Estado**
-  (pill de tamaño fijo con la categoría en texto — dos líneas si son dos palabras —
-  como refuerzo del color de fila), F. objetivo (editable → replanifica) y
-  F. original (referencia, siempre visible). La fecha de cierre no es columna: la
-  marca de una hecha vive en su **última fecha planificada** y el día real del
-  marcado queda solo como registro en el historial.
-- **Gantt en grilla:** columnas fijas congeladas, celdas combinadas reales, una columna
-  por día hábil, encabezado semana/día, columna de HOY, marcas de la sección 6.4 y
-  tooltips con historial (6.6).
-- **Modelo de 5 categorías excluyentes** (v2): el único estado manual es `hecha`;
-  el color pinta la **fila completa** con gravedad creciente — Hecha (verde ✓) ·
-  Pendiente (sin color) · Pendiente replanificada (ámbar) · Atrasada (rojo) ·
-  **Atrasada replanificada (morado, lo más crítico)**. "Hecha" es terminal. Los 5
-  contadores del encabezado suman el total y **cada uno lleva su cuadro de color**
-  (Pendientes = blanco con borde, "sin color"). Junto al nombre, **↻ ×N** muestra
-  las replanificaciones (solo tabla).
-- **Regla de replanificación (v2):** mover una fecha **futura** es planificación
-  (sin historial, y la fecha original acompaña); solo cuenta como replanificación
-  mover una fecha que **vence hoy o ya venció** — ahí la fecha original se congela
-  ("la última fecha comprometida antes de empezar a atrasarse").
-- **Columna "Atraso"** (tabla y Mis Tareas desktop): reemplaza a Fecha Original.
-  Muestra **"N días"** (hábiles) que la fecha vigente se corrió **hacia adelante**
-  respecto de la comprometida original, o **"—"** si no hay atraso — incluidos los
-  adelantos, que no interesan (un solo estado visual para "sin atraso"). Con el
-  encabezado "Atraso" la columna es autoexplicativa, sin signos. La columna vacía
-  es señal en sí misma. Font monoespaciado, como la fecha. La fecha original exacta
-  queda consultable en el panel de información. El menú de orden ordena por la
-  cantidad de días de atraso.
-- **Fechas en cualquier día**, incluidos sábado y domingo. La Gantt alterna entre
-  **solo días hábiles** (default) y **semana completa (7 días)**, con aviso de
-  tareas de fin de semana ocultas.
-- **Horizonte del Gantt:** *Alrededor de hoy* (default fijo: 2 semanas atrás +
-  actual + 2 adelante, no persistido) y *Todo el proyecto*. Para ver un rango
-  específico se usa el filtro de fechas con rango fijo, que define el horizonte.
-  Al hacer scroll vertical, **ambas bandas del encabezado** (rango/período arriba
-  + días abajo) quedan **fijas** como un único bloque sticky.
-- **En mobile la Gantt no se ofrece** (la grilla no funciona en pantalla
-  angosta): dentro de un proyecto solo queda la Tabla, sin toggle de vistas. Mis
-  Tareas se abre desde el menú izquierdo. En desktop se mantienen Tabla y Gantt.
-- **Mobile — administración y flotantes (#194–#203):** todo aditivo dentro de
-  `@media (max-width: 768px)`; las reglas de ancho de tabla quedan acotadas a
-  `@media (min-width: 769px)` para que un ajuste de escritorio no rompa mobile.
-  Los **modales altos** tienen techo `calc(100dvh - 24px)` con scroll propio,
-  cabecera y botonera **sticky** (la ✕ y Guardar siempre alcanzables); los
-  cortos no cambian. El **panel de notificaciones** cierra el drawer y entra a
-  **pantalla completa** con ✕ propio. El menú **⋯** se acota al viewport y, en
-  pantallas táctiles, se muestra en **todos** los proyectos y **todos los
-  frentes** (en escritorio sigue apareciendo con hover), con la misma área
-  tocable de ≥44 px sin aumentar el alto de la fila. En el frente, ese ⋯
-  **conserva su lugar en el teléfono** —está siempre visible y montarlo sobre el
-  texto lo taparía— mientras que en escritorio se monta sobre el extremo derecho
-  para no quitarle ancho al nombre (#225). Las tablas de administración dan **ancho propio a la
-  columna de identidad** y aceptan scroll horizontal. Los flotantes ☰/🌙 se
-  **ocultan** mientras haya un modal o el panel abiertos. Las áreas táctiles
-  llegan a **≥44 px** con un `::before` transparente, sin engordar las filas.
-  Los iconos de acción son **SVG de trazo** (`components/Iconos.tsx`), no
-  glifos: los símbolos de presentación de texto (✎ ⏻ ✉ ↺) salían como ▯ en
-  Android porque no están en el set de emoji a color.
-- **Vistas guardadas persistentes (#215):** la regla es **lo que se guardó
-  explícitamente persiste; lo que no, es temporal**. Aplicar una vista desde el
-  desplegable **entra** en ella: el botón pasa a decir `Vistas · <nombre>` y la
-  vista queda marcada en la lista. Sobrevive a salir de la pantalla y a
-  **recargar** (se guarda en `localStorage`, por usuario y por pantalla — cada
-  proyecto por su lado, Mis Tareas por el suyo). **Salir de la pantalla
-  descarta todo lo que no se guardó**, y **cambiar de proyecto cuenta como
-  salir** (#221): un filtro puesto a mano no persiste, y los cambios sin
-  guardar sobre una vista se descartan —al volver aparece tal como está
-  guardada, sin asterisco—. Lo único que sobrevive es la vista guardada, y
-  solo con su contenido guardado. Estando en una vista, **cambiar o limpiar** filtro u orden deja
-  dentro de ella y la marca con un **asterisco**; el **💾** lo hace
-  desaparecer, y salir sin guardar descarta lo no guardado. Se sale de una
-  vista **deseleccionándola** en el desplegable (queda todo limpio); borrarla
-  con el 🗑 deja los filtros puestos pero ya como temporales. Ninguna acción de
-  filtro entra ni saca de una vista — eso pasa solo por el desplegable.
-  *No confundir con el botón* **↻ Actualizar vista**, que es el mecanismo
-  independiente de la foto congelada.
-- **Mobile — correcciones del teléfono real (#212–#214):** tocar una
-  **notificación** navega y resalta la tarea pero **no abre el panel de
-  detalle**, que en 390 px taparía justo el plan al que se acaba de llegar (en
-  escritorio se abre como siempre). En las tablas de administración, el nombre
-  de la primera columna se **trunca** y **al tocarlo** un globo muestra el
-  nombre entero con su pill, envuelto en varias líneas si hace falta — en
-  táctil no hay hover, así que un "…" sin salida es ilegible para siempre; el
-  globo va en un portal con `position: fixed` para que ningún `overflow` lo
-  recorte. Y los iconos de acción se **separan** hasta que sus áreas de 44 px
-  dejan de solaparse (centros a 46 px): el problema no era el tamaño sino la
-  falta de espacio, y por eso tocar 👥 disparaba 📦.
-- **#216–#220 (correcciones):** la separación de iconos baja a **4 px** y su
-  área tocable **vuelve a coincidir con lo visible** — con 44 px invisibles,
-  cuatro iconos no caben en la columna de Usuarios (#216). Cada campo de
-  contraseña de la aplicación lleva su **propio ojo** (#217). El pie de la
-  barra lateral **no dibuja recuadro**: lo pulsable es el nombre (#218). Una
-  notificación **siempre** lleva a su tarea y la resalta, aunque ya estés en
-  ese proyecto o toques la misma dos veces (#219). El filtro de **Proyecto**
-  tiene "Seleccionar todos", como Responsable y Estado (#220).
-- **Gantt editable — estándar por clics (sin arrastre):** clic izquierdo en una
-  celda vacía planifica la tarea ese día; clic izquierdo sobre una marca **futura**
-  la borra — si la marca venía de una replanificación, borrarla **deshace ese
-  movimiento** (vuelve a la fecha anterior y elimina el registro del historial);
-  si no, la tarea queda "sin planificar". Una tarea que vence hoy o ya venció
-  **no se puede borrar** (mini-aviso: "No puedes eliminar tareas que ya pasaron") —
-  se marca lista o se replanifica con un clic en **cualquier día, pasado o futuro**
-  (sirve para registrar tareas que ya ocurrieron con su fecha real; cuenta como
-  replanificación); **clic derecho sobre la marca alterna lista / no lista**
-  (el menú contextual del navegador queda suprimido sobre la grilla). Cada celda
-  explica su gesto con un **tooltip contextual** (con retardo corto) según su
-  estado — planificar, quitar/deshacer, marcar lista o replanificar — en vez de
-  una leyenda permanente. La ✓ de una
-  lista queda en su última fecha planificada. "+" al pasar el mouse crea un hermano
-  justo debajo (frente/sub frente/tarea) **inline en la propia grilla**, igual que
-  los "+ agregar" de contenedores vacíos. Al pie, **filas de carga por persona**
-  (cada tarea cuenta una sola vez, en su fecha vigente, hecha o no; nombres
-  congelados al hacer scroll), una fila **"Sin asignar"** con las tareas sin
-  responsable por día y una fila **"Total"** con la suma de todas.
-- **Sidebar con dos modos:** fija (default) o **escondida** — se contrae a una
-  franja de íconos (uno por proyecto) siempre clicable; al pasar el mouse la barra
-  completa se despliega al lado y se repliega al salir. La preferencia se recuerda
-  por usuario entre sesiones.
-- **Ancho de la barra ajustable (#226):** se arrastra el **borde derecho**, que
-  al acercar el cursor muestra una línea y cambia a `col-resize`. Va entre
-  **244px** (el ancho de siempre; más angosta no aporta y para eso está el modo
-  escondido) y **400px**, y el arrastre se detiene en los topes. El cambio se ve
-  **en vivo** y el contenido se reacomoda con él; **doble clic** en el borde
-  devuelve el ancho por defecto. El ancho se recuerda **por usuario** con el
-  mismo mecanismo que el tema y el modo de la barra —`localStorage`, sin tocar
-  la base de datos— y la barra **escondida se despliega con ese mismo ancho**.
-  El valor vive en la variable CSS `--sidebar-w`, que leen la columna de la
-  grilla, la barra desplegada y el panel de notificaciones (anclado a su borde).
-  Solo en escritorio: en el teléfono la barra es un panel superpuesto de ancho
-  fijo y no hay nada que arrastrar.
-- **Menú "Ordenar"** (junto a Filtrar, en tabla y Gantt): la lista de campos
-  ordenables está **a la vista**, cada uno con controles **↑ ascendente / ↓
-  descendente**. Tocar una dirección **activa** ese campo como **prioridad 1**
-  (el último activado manda) y muestra su número; activar otro lo antepone y
-  renumera al resto. La dirección activa se **resalta**; volver a tocarla
-  desactiva el campo. Es **multinivel** (varios campos con prioridad, armada por
-  orden de activación). Campos: Responsable · Estado · Fecha Objetivo ·
-  **Atraso** (más **Proyecto** en Mis Tareas). Estado ordena por **gravedad**
-  (Hecha → Pendiente → Pendiente replanificada → Atrasada → Atrasada
-  replanificada), no alfabético. Ordena **dentro de cada sub frente** sin mezclar
-  tareas entre sub frentes (en la Gantt, reordena las filas del panel izquierdo
-  dentro de cada bloque). **"Limpiar orden"** vive fuera del menú, junto al botón.
-  Un orden sin guardar es **momentáneo**; sólo persiste si se guarda como parte de
-  una vista. No se ordena haciendo clic en el encabezado de columna.
-- **Filtros y orden guardables como "vista":** por Fecha Objetivo (relativas Hoy /
-  Esta semana / Próxima semana / Este mes — semana de lunes a domingo —, rango
-  fijo, **Con fecha** o **Sin fecha**), Responsable (incluye **Sin asignar**) y Estado, con
-  multi-selección ("o" dentro del campo, "y" entre campos). Responsable y Estado
-  incluyen **"Seleccionar todos"** (alterna a "Deseleccionar todos"). El **filtro y
-  el orden se guardan juntos** como una sola vista, con nombre, **privados por
-  usuario y por proyecto**; se aplican/actualizan/renombran/eliminan desde el
-  desplegable "Vistas". El **filtro y el orden son por proyecto**: aplicarlos en un
-  proyecto **no afecta** a otro; cada proyecto conserva su propio estado
-  (momentáneo hasta guardarlo como vista). Cada campo tiene su "Limpiar filtro"
-  además del Limpiar global. En la tabla filtran filas; en la Gantt, responsable y estado filtran
-  tareas y **la fecha define el horizonte visible** — con la excepción de **Sin
-  fecha**, que en la Gantt filtra (muestra solo las tareas sin fecha, como filas
-  sin marca, planificables ahí mismo) sin tocar el horizonte, y de **Con fecha**
-  (abajo). En la tabla, los
-  filtros quedan **fijos arriba** al hacer scroll y los encabezados de columna se
-  congelan justo debajo, **conservando su línea superior** al despegarse (#227:
-  esa línea es del `th`, no de la tabla; puesta en la tabla se quedaba atrás con
-  el scroll y el bloque se veía abierto por arriba). Los desplegables de filtro se muestran **por encima del
-  contenedor** (no se recortan aunque la tabla sea corta, p. ej. en Mis Tareas).
-- **"Con fecha"** (#223 — opción del filtro de Fecha, justo encima de "Sin
-  fecha"): muestra **solo las tareas que tienen Fecha Objetivo**, cualquiera sea.
-  Es **excluyente** dentro del campo: activarla apaga cualquier otra opción de
-  fecha —incluida "Sin fecha"— y elegir otra la apaga a ella; nunca quedan dos
-  encendidas. Sumarla a "Esta semana" anularía esa opción (todo lo de esta semana
-  ya tiene fecha) y sumarla a "Sin fecha" equivaldría a no filtrar. Volver a
-  tocarla la desactiva. **Filtra filas en las dos vistas** (en la Gantt también
-  esconde las tareas sin fecha) pero **no define el horizonte**: el selector
-  "Alrededor de hoy" / "Todo el proyecto" sigue disponible y no aparece el aviso
-  "Horizonte definido por el filtro de fecha". Está en las vistas de proyecto y en
-  Mis Tareas, y se guarda como parte de una vista. El comportamiento de "Sin
-  fecha" **no cambia** (sigue sumándose al resto); lo único nuevo entre ambas es
-  que se apagan mutuamente.
-- **"En horizonte visible (Gantt)"** (opción del filtro de Fecha): muestra las
-  tareas con Fecha Objetivo **dentro del horizonte actual** de la Gantt, más las
-  **sin fecha**. Solo se **activa desde la Gantt**; una vez activa **filtra ambas
-  vistas** (tabla y Gantt) usando ese mismo rango; se puede **desactivar desde
-  cualquier vista**. Es un modo de fecha excluyente y momentáneo (el rango es
-  siempre "lo que está visible ahora").
-- **Vista congelada ("foto"):** con un filtro y/u orden activo, el conjunto de
-  filas visibles y su orden quedan **congelados**: editar una tarea (planificar,
-  mover fecha, marcar hecha, renombrar, reasignar) **no la saca de la vista ni la
-  reordena**, aunque deje de calzar. Cuando la foto queda desactualizada aparece,
-  junto a "Vistas", un control discreto **"Actualizar vista"** que la recalcula (y
-  desaparece). Sin filtro ni orden, la vista es **live**. Aplica a tabla y Gantt.
-- **Modo oscuro:** por defecto **sigue el modo del sistema** del dispositivo
-  (`prefers-color-scheme`), en vivo — un teléfono en oscuro ve la app oscura sin
-  configurar nada. El botón 🌙/☀ es un **override manual** persistente por usuario:
-  una vez que eliges claro u oscuro, esa elección manda por sobre el sistema. El
-  botón vive al pie de la sidebar y, en mobile, también como **botón flotante
-  junto al ☰** (siempre alcanzable). Los cinco colores de estado conservan su
-  identidad con variantes ajustadas para fondo oscuro; el rastro de fechas
-  anteriores queda visible incluso en tareas hechas (memoria histórica de la
-  grilla; el color de fila y los contadores sí las tratan como Hecha).
-  Todo lo que se pinta **sobre un fondo destacado** usa la variable
-  `--sobre-primario` (blanco en claro, casi negro en oscuro), nunca `#fff` fijo:
-  con el color quemado, el contenido desaparecía al invertirse el fondo. Era el
-  caso del **número de prioridad y la flecha seleccionada del menú "Ordenar"**,
-  que quedaban blancos sobre un fondo casi blanco (#224); en modo claro el
-  resultado es idéntico al anterior, porque ahí la variable vale `#ffffff`.
-- **Roles y permisos (reestructuración):** tres roles — **Admin** (ve y
-  gestiona absolutamente todo; puede haber **varios admins**), **Consultor**
-  (los proyectos que **él creó** + los que el admin le asigne; no ve los de
-  otros consultores) y **Cliente** (solo los proyectos donde lo invitan).
-  **Principio rector — dueño vs invitado:** si creaste el proyecto tienes
-  **control total** dentro de él, sin configuración de permisos; si te
-  invitaron/asignaron, operas según los permisos configurados **en tu acceso**
-  (un invitado es un invitado, sea cliente o consultor). El admin queda fuera
-  del principio: control total en todo.
-- **Dos niveles de permisos:** (1) **Permisos de proyecto** del consultor
-  (crear proyectos, archivar/eliminar los suyos, invitar clientes, configurar
-  permisos de sus clientes) — pantalla propia (🔧 en Usuarios), los configura
-  el admin. (2) **Set de ocho sobre tareas**, POR ACCESO (usuario × proyecto):
-  crear frentes/sub frentes/tareas; editar fechas, marcar hechas, editar,
-  archivar/eliminar, asignar responsable — con alcance "todas" o "solo
-  asignadas" (asignar con "solo asignadas" = puede soltar lo suyo, no tomar lo
-  ajeno). El mismo componente (🔑) sirve para clientes y consultores invitados.
-  Todo se refuerza en la base de datos (RLS + triggers campo a campo).
-- **Defaults por rol (al crear/asignar):** consultor → crear proyectos ✓,
-  archivar/eliminar los suyos ✓, invitar clientes ✓, configurar permisos ✗.
-  Cliente (ejecutor del plan) → crear tareas ✓, fechas y hechas "solo
-  asignadas", asignar responsable "todas", estructura ✗. Consultor invitado a
-  proyecto ajeno → todo habilitado ("un colega, no un cliente"). Ajustables
-  caso a caso; ya no arranca todo en "No". **Los comentarios no se configuran:
-  todos comentan siempre** (append-only).
-- **Miembros:** el dueño de un proyecto ve **quiénes** están asignados
-  (botón "Miembros" en el encabezado), pero **no sus permisos**; configura solo
-  a los clientes de sus proyectos y solo con el permiso habilitado. Solo el
-  admin asigna consultores a proyectos (propios o ajenos).
-- **Ser miembro = ver el proyecto en la barra lateral.** El admin **no** queda
-  asociado por default a cada proyecto (ni a los que crean los consultores): se
-  **agrega o saca** a sí mismo como miembro desde el Módulo de Usuarios. Su
-  poder no cambia — sigue viendo y gestionando cualquier proyecto desde ahí —,
-  pero su barra solo muestra los proyectos donde es miembro. La lista de
-  miembros de un proyecto no incluye admins que no se agregaron.
-- **Alta por invitación (§8):** el admin crea el usuario y le envía un correo con
-  enlace (caduca en 7 días, reenviable); el invitado define su contraseña. Un
-  consultor con el permiso "invitar clientes" también puede invitar a los
-  clientes de sus proyectos. Ver DEPLOY.md para el proveedor de correo y las
-  Edge Functions.
-- **Administración → Proyectos** (hermano de Usuarios): módulo dueño de la
-  relación usuario↔proyecto (miembros, 🔑) y del ciclo de vida — **archivar**
-  (lo saca de la barra, Resumen y Mis Tareas conservándolo) y **eliminar en
-  cascada** (solo sobre archivados), ambas con el permiso
-  `archivarEliminarProyectos` verificado en la base. _Administrar ≠ ser
-  miembro_: el admin ve y gestiona todos los proyectos aunque su barra solo
-  muestre los suyos. Unirse/salir se hace desde el **modal de Miembros**.
-- **Notificaciones in-app:** tres eventos sobre tus tareas — te asignaron,
-  replanificaron o comentaron (nunca por acciones propias) —, **generadas por
-  triggers en la base**. Entrada en la barra con contador naranja, panel
-  emergente que marca leído **al cerrarlo**, y clic que **navega a la tarea con
-  un realce** (contorno que no tapa el color de categoría). Con la barra
-  contraída, una **campana fija** abre el mismo panel.
-- **Baja de usuarios:** eliminar = desactivar + invisible (sin borrado físico,
-  para no huérfanar el historial); dar de alta el mismo correo **reactiva** la
-  fila y recupera sus accesos.
-
-**CRUD (Fase 1) — con interacción inline (Bloque 2)**
-- Proyectos: crear / editar (nombre, descripción, color, estado) / eliminar. Multi-proyecto.
-- Frentes: crear / renombrar / eliminar (sidebar). Un proyecto **sin frentes**
-  ofrece además **"Agregar frente"** en el cuerpo de la Gantt y la Tabla, para
-  crear el primero sin ir a la sidebar (si tienes el permiso). Sub Frentes:
-  **crear y renombrar inline** en la tabla (sin ventanas) / eliminar.
-- Tareas: **creación inline** ("+ Tarea" abre una fila vacía con el cursor en el
-  título; Enter guarda y encadena la siguiente), **edición inline** de título y
-  responsable (click directo en la celda), marcar hecha, replanificar (un click en
-  la fecha abre el calendario; elegir guarda), archivar y eliminar.
-- **Comentarios acumulables** por tarea (N5): hilo con autor y fecha, append-only —
-  cada comentario suma, nunca reemplaza. Chip 💬 en la fila; el hilo vive en el
-  panel de detalle. **Todos los miembros comentan, siempre**; no se editan.
-
-**Historial de replanificaciones (5.6)**
-- En Supabase, un **trigger nativo** registra cada cambio de `fecha_objetivo`, de modo
-  que ningún camino de edición lo eluda (recomendación del documento). El actor se pasa
-  vía el RPC `replanificar_tarea`. En modo Local, la misma regla se aplica en código.
-
-**Usuarios y roles (Fase 2 — reestructurado)**
-- **Login**: Supabase Auth (email + contraseña). El Admin crea al usuario con su email;
-  cuando esa persona inicia sesión por primera vez, un trigger vincula su cuenta.
-- **Módulo de Usuarios** — **Admins**: listar, crear (con 3 roles y defaults),
-  editar, desactivar/reactivar; asignar proyectos a **consultores y clientes**
-  (cualquier proyecto, propio o de otro consultor, e **incluirse/excluirse a sí
-  mismos** como miembro); 🔧 permisos de proyecto del consultor; 🔑 permisos del
-  acceso (por proyecto). **Consultores** acceden al **mismo módulo, acotado**:
-  ven solo a la gente con acceso a **sus** proyectos (clientes y otros
-  consultores); invitan y configuran a los **clientes** de esos proyectos según
-  sus permisos (`invitarClientes` / `configurarPermisosClientes`); a los demás
-  consultores los ven pero no los editan; no ven usuarios ni proyectos ajenos.
-- **Sin límite de admins**: se eliminó la regla de "exactamente 2".
-- **RLS real**: las políticas de Postgres garantizan a nivel de base de datos la
-  visibilidad por rol (admin todo; consultor dueño + asignados; cliente
-  invitados) y la escritura por permisos — la interfaz es una capa de
-  conveniencia, no la barrera de seguridad. `scripts/validar-rls.mjs` la valida
-  rol por rol contra la API.
-
-**Migración a roles (runbook — aplicar en este orden)**
-0. **Respaldo**: export manual de la base (Dashboard → Database, o `pg_dump`).
-   El plan gratuito no trae backups automáticos.
-1. **Migración 12** (`20260707000012_roles_y_permisos.sql`): modelo + backfill
-   (rol consultor, dueño = admin creador, accesos generalizados con permisos,
-   los clientes demo conservan su configuración) + RLS completa. Todo junto.
-2. **Redeploy de la Edge Function** `invitar-usuario` (`supabase functions deploy
-   invitar-usuario`): ahora autoriza también a consultores con permiso.
-3. **Migración 13** (`20260707000013_fix_replan_fecha_origen.sql`): corrige la
-   regla de replanificación (§1 del pedido post-validación). La migración 12,
-   al pasar el trigger de historial a `security definer`, perdió la guardia
-   `old.fecha_objetivo <= current_date`; sin ella, mover una fecha **futura**
-   contaba como replanificación. La migración 13 la restaura (evaluar sobre la
-   fecha de **origen**). Se aplica sola, sin dependencias de datos.
-4. **Compuerta de validación** (crítica): correr `scripts/validar-rls.mjs`, que
-   verifica rol por rol que la RLS **impide** el acceso indebido — no solo que
-   la UI lo oculta. Sin entorno local, se corre desde **GitHub Actions**:
-   cargar los secrets del repo (ver cabecera de
-   `.github/workflows/validar-rls.yml`) y lanzar el workflow **"Validar RLS
-   (compuerta)"** desde la pestaña Actions (Run workflow). Verde = pasa;
-   rojo = la RLS deja pasar algo indebido.
-5. **Recién entonces** invitar usuarios reales.
-
-**Fase 3 — Pulido**
-- **Mis Tareas (Módulo 3)**: únicamente las tareas donde el usuario
-  es responsable, de todos sus proyectos, con las vencidas primero. Mismo formato que
-  las demás tablas (check, pills, colores de fila) con columnas Proyecto y Ubicación;
-  usa el sistema común de filtros (Fecha Objetivo / Estado / **Proyecto**) con
-  guardados propios del contexto, separados de los de cada proyecto. En mobile,
-  Proyecto se fusiona dentro de Ubicación (ruta completa) y sale Atraso.
-  Tiene además el **conmutador Tabla / Gantt** (#190): la misma grilla del
-  proyecto aplicada a las tareas propias, cruzando proyectos, con una **columna
-  extra muy angosta** a la izquierda —nombre del proyecto **rotado** sobre su
-  color, repetida en cada frente, truncada con "…" y nombre completo en el
-  tooltip cuando no cabe—. Es de **lectura y replanificación** (mover fechas,
-  marcar hechas, abrir el detalle): sin crear ni eliminar, y con una sola fila
-  de carga al pie (el total diario del usuario). El filtro y el orden se
-  comparten entre ambas vistas. En mobile no hay Gantt.
-- **Panel lateral de detalle** (backlog de 7.2): click sobre una tarea o una marca del
-  Gantt abre un panel con el detalle completo, la línea de tiempo del historial y las
-  acciones operativas (marcar hecha, replanificar, archivar) para admins. Se cierra
-  con ✕, con Escape o al hacer click fuera.
-- **Cuenta de usuario (#207)**: desde el pie de la barra lateral se entra a
-  **Mi cuenta**, donde cada quien cambia su **nombre**, sus **iniciales** y su
-  **contraseña** (pidiendo la actual). El correo, el rol y el estado no se
-  tocan desde ahí: los gestiona el admin. Las **iniciales escritas a mano se
-  respetan para siempre**; las que nunca se escribieron siguen al nombre y se
-  recalculan al cambiarlo — la salida para cuando dos personas de nombre
-  parecido chocan.
-- **Recuperar contraseña (#205)**: desde el login, "¿Olvidaste tu contraseña?"
-  manda por Resend un enlace de **1 hora y un solo uso**; al usarlo se cierran
-  todas las sesiones abiertas de esa cuenta. Solo sirve para usuarios activos
-  **con cuenta ya creada** — un invitado que nunca aceptó, un desactivado y un
-  correo inexistente reciben el mismo mensaje y ningún correo. La pantalla que
-  define la contraseña es **la misma** que la de la invitación (#204): mismas
-  validaciones, distinto texto. Si el enlace venció o ya se usó, se explica qué
-  pasó y qué hacer (#206) — el reenvío sigue siendo una acción del admin.
-- **Menciones en comentarios (#208)**: escribir `@` ofrece a las personas **con
-  acceso a ese proyecto** y el mencionado recibe un aviso. Una sola
-  notificación por persona y comentario: si el mencionado es además el
-  responsable, gana el texto de la mención. En el texto guardado la mención es
-  un **id**, no un nombre, así que sigue apuntando a la persona correcta aunque
-  después se cambie el nombre.
-- **Editar el propio comentario (#209)**: solo el autor, sin límite de tiempo y
-  con marca visible de editado. **No se borra** ningún comentario: el hilo
-  acompaña al registro de replanificaciones y es el respaldo de por qué pasó lo
-  que pasó. Editar no genera notificaciones nuevas.
-- **Archivo de canceladas (6.3)**: archivar una tarea la saca del plan (vistas y
-  contadores) conservando su historial; queda consultable por sub frente y puede
-  restaurarse. Distinto de eliminar (definitivo).
-- **Resumen / indicadores por proyecto**: tarjetas con % de avance, barra de progreso y
-  contadores (hechas, pendientes, por replanificar, replanificadas abiertas) de todos
-  los proyectos visibles. Disponible también para clientes (con sus proyectos).
+Para una instalación nueva, el camino completo —migraciones, primer admin,
+Edge Functions y sus secretos, despliegue en Vercel— es
+[`DEPLOY.md`](DEPLOY.md).
 
 ## Modelo de datos y esquema
 
@@ -496,9 +129,23 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 - `supabase/migrations/20260707000017_delete_solo_archivado.sql` — endurece
   `proyecto_delete`: solo se elimina un proyecto **archivado** (la regla
   "archivar primero" pasa de la UI a la base).
+- `supabase/migrations/20260707000018_cuenta_y_comentarios.sql` — tabla
+  `recuperacion` (token de un solo uso, 1 hora, con RLS y **sin políticas**: no
+  se lee desde el cliente) para el "olvidé mi contraseña" (#205);
+  `usuario.iniciales_manual` y auto-edición del **perfil propio** —solo nombre e
+  iniciales— acotada por un trigger (#207); menciones `@` derivadas del texto
+  del comentario **en la base**, que resuelven mención y responsable en una sola
+  notificación (#208); y **edición del propio comentario** con marca de editado,
+  restringida al autor y sin borrado (#209).
+- `supabase/migrations/20260707000019_usuario_eliminado_fuera_de_la_tabla.sql` —
+  `usuario_select` suma `not eliminado`: la lectura directa de la tabla deja de
+  exponer lo que la vista `usuario_visible` oculta (#248). Va **junto con el
+  front de la misma entrega**: como Postgres aplica las políticas de SELECT
+  también a las filas de un `RETURNING`, `eliminarUsuario` dejó de pedir la fila
+  de vuelta y comprueba el borrado releyendo la vista.
 
-> La lista **completa y ordenada** de migraciones (1→17), lista para pegar en el
-> SQL Editor, está en [`DEPLOY.md`](DEPLOY.md) (Paso 2).
+> La lista **completa y ordenada** de las 19 migraciones (1→19), lista para
+> pegar en el SQL Editor, está en [`DEPLOY.md`](DEPLOY.md) (Paso 2).
 
 Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
 mismo email que registraste en el Módulo de Usuarios).
@@ -517,6 +164,10 @@ src/
   lib/
     dates.ts             Días hábiles y formato
     derive.ts            Estados derivados, colores y marcas (sección 6)
+    permisos.ts          makeCan + dueño/invitado (espejo de la RLS)
+    filtros.ts           Filtro de fecha/responsable/estado, igual en las dos vistas
+    orden.ts             Orden multinivel y escala de gravedad de los estados
+    vistaCongelada.ts    "Foto" de filas visibles + orden (P1)
     password.ts          Política de contraseña, compartida por los dos flujos (#204)
     vistas.ts            Vista guardada activa y su persistencia (#215)
     errores.ts           Traducción de fallos de red a lenguaje humano (#210)
@@ -532,10 +183,8 @@ src/
     client.ts            Cliente Supabase (por env)
     apply.ts             Aplicar mutaciones al estado local (con cascada)
     index.ts             Selección de adapter
-    seed.ts              Datos semilla + HOY simulado
-    vistaCongelada.ts    "Foto" de filas visibles + orden (P1)
-    filtros.ts / orden.ts  Filtrado y orden multinivel
-    permisos.ts          makeCan + dueño/invitado (espejo de la RLS)
+    seed.ts              Datos semilla + HOY simulado (solo modo Local: se carga
+                         bajo demanda, no viaja en el bundle de producción)
   components/
     Sidebar, Header, TableView, GanttView, MisTareasView, ResumenView,
     TaskPanel, TaskDetail, FiltrosBar, FechaEditable, RespPicker,
@@ -545,7 +194,7 @@ src/
     CampoPassword, Modal, TextPromptModal, …
     Iconos.tsx           Iconos de acción como SVG de trazo (#203)
 supabase/
-  migrations/            18 migraciones (1→18). Lista ordenada en DEPLOY.md.
+  migrations/            19 migraciones (1→19). Lista ordenada en DEPLOY.md.
   functions/             Edge Functions (Deno): invitar-usuario, aceptar-invitacion,
                          recuperar-contrasena
   seed.sql               Datos de arranque (opcional)
@@ -558,16 +207,16 @@ docs/
   documento-funcional-v3.1.md  (histórico)
 ```
 
-## Roadmap (sección 9)
+## Estado
 
-- **Fase 1 — Uso interno:** ✅ base de datos + CRUD + las dos vistas. Sin login.
-- **Fase 2 — Clientes:** ✅ login, roles admin/cliente, asignación de proyectos por
-  cliente, RLS real (Módulo 1).
-- **Fase 3 — Pulido:** ✅ Mis Tareas (Módulo 3), panel lateral de detalle, archivo de
-  canceladas, indicadores por proyecto.
+**Desplegado y en uso, con usuarios reales.** Las tres fases del alcance inicial
+—base de datos y las dos vistas, roles con RLS real, y el pulido (Mis Tareas,
+panel de detalle, archivo de canceladas, indicadores)— están completas, más los
+módulos posteriores: Administración de Proyectos y Usuarios, notificaciones,
+cuenta propia y recuperación de contraseña.
 
-Con esto, el alcance de la Versión 1 del Documento Funcional v3.1 está completo.
-Siguiente hito: **despliegue** — la guía paso a paso está en [DEPLOY.md](DEPLOY.md).
+Lo que se hizo después de cada solicitud está en [`CHANGELOG.md`](CHANGELOG.md);
+el estado funcional completo, en [`docs/PROYECTO.md`](docs/PROYECTO.md).
 
 ## Stack
 

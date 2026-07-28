@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Proyecto, Tarea, Usuario } from '../types'
 import type { Actions, Vista } from '../App'
-import { makeCan, type Can } from '../lib/permisos'
+import { MOTIVO_FECHA_HECHA, makeCan, puedeEditarFecha, type Can } from '../lib/permisos'
 import { cmp, formatoFecha } from '../lib/dates'
 import {
   CATEGORIA_LABEL,
@@ -10,10 +10,9 @@ import {
   esAtrasada,
   nReplanificaciones,
   textoAtraso,
-  type Categoria,
 } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
-import { CAMPOS_MIS_TAREAS, ordenarMulti, valorOrden, type OrdenMulti } from '../lib/orden'
+import { CAMPOS_MIS_TAREAS, GRAVEDAD, ordenarMulti, valorOrden, type OrdenMulti } from '../lib/orden'
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import { escribirVistaActiva, estadoInicial } from '../lib/vistas'
 import { FiltrosBar } from './FiltrosBar'
@@ -100,12 +99,14 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
     }
     // Atrasadas primero, luego por fecha objetivo ascendente; hechas al
     // final; las sin fecha al final de su grupo.
-    const peso = (c: Categoria) =>
-      c === 'atrasada_replan' ? 0 : c === 'atrasada' ? 1 : c === 'pendiente_replan' ? 2 : c === 'pendiente' ? 3 : 4
+    // #239: la escala sale de `GRAVEDAD` (lib/orden), la misma que usa el menú
+    // Ordenar. Antes estaba escrita otra vez acá, invertida a mano; el orden
+    // resultante es idéntico —GRAVEDAD descendente ES "lo más crítico primero"—
+    // pero ahora no pueden separarse si se agrega una categoría.
     return out.sort((a, b) => {
-      const pa = peso(categoriaDe(state, a.tarea, hoy))
-      const pb = peso(categoriaDe(state, b.tarea, hoy))
-      if (pa !== pb) return pa - pb
+      const ga = GRAVEDAD[categoriaDe(state, a.tarea, hoy)]
+      const gb = GRAVEDAD[categoriaDe(state, b.tarea, hoy)]
+      if (ga !== gb) return gb - ga
       if (!a.tarea.fechaObjetivo) return 1
       if (!b.tarea.fechaObjetivo) return -1
       return cmp(a.tarea.fechaObjetivo, b.tarea.fechaObjetivo)
@@ -346,8 +347,12 @@ function FilaTarea({
         <span className={`estado-chip estado-chip--${color}`}>{CATEGORIA_LABEL[cat]}</span>
       </td>
 
-      <td className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}>
-        {can.editarFechas(tarea) ? (
+      {/* #245: la fecha de una hecha no se edita en ninguna vista. */}
+      <td
+        className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}
+        title={tarea.hecha && can.editarFechas(tarea) ? MOTIVO_FECHA_HECHA : undefined}
+      >
+        {puedeEditarFecha(can, tarea) ? (
           <FechaEditable
             valor={tarea.fechaObjetivo}
             onCambiar={(nueva) => actions.cambiarFechaObjetivo(tarea.id, nueva)}

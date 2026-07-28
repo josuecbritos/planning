@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, PermisosTareas, Tarea, Usuario } from './types'
-import { HOY as HOY_SIM } from './data/seed'
-import { makeRepo } from './data'
-import { makeAuth } from './auth'
+import { HOY_SIMULADO } from './data/hoy'
+import { MENSAJE_SALIDA, makeAuth, type MotivoSalida } from './auth'
 import { supabaseConfigured } from './data/client'
 import { hoyISO } from './lib/dates'
 import { mensajeError } from './lib/errores'
 import { contar } from './lib/derive'
-import { esDuenoDe, makeCan, puedeCrearProyectos, usuariosVisiblesPara } from './lib/permisos'
+import { esDuenoDe, makeCan, miembrosDeProyecto, puedeCrearProyectos, usuariosVisiblesPara } from './lib/permisos'
 import type { Filtro } from './lib/filtros'
 import { CAMPOS_PROYECTO, type OrdenMulti } from './lib/orden'
 import { escribirVistaActiva, estadoInicial } from './lib/vistas'
@@ -21,6 +20,7 @@ import type {
   PatchProyecto,
   PatchTarea,
   PatchUsuario,
+  Repo,
 } from './data/repo'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
@@ -155,10 +155,31 @@ function leerAnchoSidebar(usuarioId: string | null): number {
   }
 }
 
-export default function App() {
-  const repo = useMemo(() => makeRepo(), [])
+export default function App({ repo }: { repo: Repo }) {
   const auth = useMemo(() => makeAuth(repo), [repo])
-  const HOY = useMemo(() => (supabaseConfigured ? hoyISO() : HOY_SIM), [])
+  // #247: "hoy" se recalcula solo. Antes se fijaba al montar, así que una
+  // pestaña abierta al cruzar la medianoche seguía calculando categorías,
+  // atrasos, la columna de hoy de la Gantt y la fecha de "marcar hecha" con el
+  // día anterior. Con sesiones que no expiran (#244), tener la aplicación
+  // abierta varios días es un caso real. Se revisa cada minuto y solo se
+  // actualiza el estado si el día CAMBIÓ, así no provoca renders de más ni
+  // interrumpe lo que se esté haciendo. En modo Local la fecha es simulada y
+  // fija a propósito: ahí no hay nada que recalcular.
+  const [HOY, setHoy] = useState<string>(() => (supabaseConfigured ? hoyISO() : HOY_SIMULADO))
+  useEffect(() => {
+    if (!supabaseConfigured) return
+    const revisar = () => setHoy((actual) => (hoyISO() === actual ? actual : hoyISO()))
+    const id = window.setInterval(revisar, 60_000)
+    // Volver a la pestaña tras dejarla dormida es el caso más frecuente de
+    // todos: se comprueba en el acto, sin esperar al siguiente minuto.
+    document.addEventListener('visibilitychange', revisar)
+    window.addEventListener('focus', revisar)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', revisar)
+      window.removeEventListener('focus', revisar)
+    }
+  }, [])
 
   // §8 / #205: enlaces por correo — invitación (#invitacion=TOKEN) y
   // recuperación (#recuperar=TOKEN). Tienen prioridad sobre todo: los dos
@@ -466,14 +487,61 @@ export default function App() {
     })
   }, [state, sesion, proyectosVisibles, peekProyectoId])
 
-  const run = useCallback(async (fn: () => Promise<(s: AppState) => AppState>) => {
-    try {
-      const patch = await fn()
-      setState((s) => (s ? patch(s) : s))
-    } catch (e) {
-      setError(mensajeError(e)) // #210
-    }
-  }, [])
+  // #244: la sesión se cayó sola. Se sale al login con el motivo, en vez de
+  // dejar un error del servidor —en inglés— sobre una pantalla que ya no
+  // responde. Lo que estuviera a medio escribir se pierde: decisión tomada.
+  const [motivoSalida, setMotivoSalida] = useState<MotivoSalida | null>(null)
+  /** Distingue el "Salir" del propio usuario del cierre involuntario. */
+  const salidaVoluntaria = useRef(false)
+  const salirPorSesion = useCallback(
+    (motivo: MotivoSalida) => {
+      salidaVoluntaria.current = true
+      setMotivoSalida(motivo)
+      setSesion(null)
+      setState(null)
+      setProyectoActivoId(null)
+      setTareaDetalleId(null)
+      setError(null)
+      void auth.logout().catch(() => {})
+    },
+    [auth],
+  )
+
+  // El servicio de autenticación avisa que la sesión dejó de existir (cambio
+  // de contraseña desde otro dispositivo, cierre en otra pestaña, refresco
+  // fallido). Si la cuenta siguiera activa no habría evento: una desactivación
+  // no cierra la sesión de Auth, la detecta `diagnosticar` al fallar la acción.
+  useEffect(
+    () =>
+      auth.alPerderSesion(() => {
+        if (salidaVoluntaria.current) {
+          salidaVoluntaria.current = false
+          return
+        }
+        salirPorSesion('expirada')
+      }),
+    [auth, salirPorSesion],
+  )
+
+  const run = useCallback(
+    async (fn: () => Promise<(s: AppState) => AppState>) => {
+      try {
+        const patch = await fn()
+        setState((s) => (s ? patch(s) : s))
+      } catch (e) {
+        // #244: antes de mostrar nada, se comprueba si el problema es que la
+        // sesión dejó de servir. Si lo es, se sale al login con el motivo en
+        // vez de dejar el error crudo del servidor y la pantalla muerta.
+        const motivo = await auth.diagnosticar().catch(() => null)
+        if (motivo) {
+          salirPorSesion(motivo)
+          return
+        }
+        setError(mensajeError(e)) // #210
+      }
+    },
+    [auth, salirPorSesion],
+  )
 
   const actions: Actions = useMemo(
     () => ({
@@ -621,6 +689,8 @@ export default function App() {
   )
 
   const onLogout = useCallback(async () => {
+    salidaVoluntaria.current = true // #244: salida propia, sin aviso
+    setMotivoSalida(null)
     await auth.logout()
     setSesion(null)
     setState(null)
@@ -741,7 +811,17 @@ export default function App() {
       cerrarNotificaciones()
       if (!state) return
       const tarea = state.tareas.find((t) => t.id === n.tareaId)
-      if (!tarea) return
+      // #246: la tarea ya no existe. Antes el clic no hacía nada y la
+      // notificación parecía rota. Se avisa por el banner de siempre y se
+      // retira de la lista (la base ya la borró en cascada; esto pone al día
+      // la pantalla sin recargar).
+      if (!tarea) {
+        setError('Esta tarea ya no existe.')
+        setState((prev) =>
+          prev ? { ...prev, notificaciones: prev.notificaciones.filter((x) => x.id !== n.id) } : prev,
+        )
+        return
+      }
       const sf = state.subFrentes.find((x) => x.id === tarea.subFrenteId)
       const f = sf && state.frentes.find((x) => x.id === sf.frenteId)
       if (f) {
@@ -801,6 +881,29 @@ export default function App() {
     [state, tareasVisibles, HOY],
   )
 
+  // #243: los permisos del panel de detalle son los del proyecto DE LA TAREA,
+  // no los del proyecto activo de la barra. El panel también se abre desde Mis
+  // Tareas, que cruza proyectos: con el `can` del activo, alguien con control
+  // total en A veía acciones que no le corresponden al abrir una tarea de B (y
+  // al revés). Es el mismo camino que usan las filas de Mis Tareas: un
+  // `makeCan` por el proyecto de la tarea.
+  //
+  // Vive acá arriba, con el resto de los hooks, porque más abajo empiezan los
+  // `return` tempranos (login, cargando) y un hook después de un return
+  // condicional rompe el orden de hooks de React.
+  const proyectoDeTarea = useMemo(() => {
+    if (!state || !tareaDetalleId) return null
+    const tarea = state.tareas.find((t) => t.id === tareaDetalleId)
+    if (!tarea) return null
+    const sub = state.subFrentes.find((sf) => sf.id === tarea.subFrenteId)
+    const frente = state.frentes.find((f) => f.id === sub?.frenteId)
+    return frente?.proyectoId ?? null
+  }, [state, tareaDetalleId])
+  const canDetalle = useMemo(
+    () => makeCan(state, sesion ?? null, proyectoDeTarea),
+    [state, sesion, proyectoDeTarea],
+  )
+
   // -- Render --
 
   if (enlace) {
@@ -821,7 +924,17 @@ export default function App() {
   }
 
   if (sesion === null) {
-    return <LoginPage modo={auth.modo} usuariosDemo={usuariosDemo} onLogin={onLogin} />
+    return (
+      <LoginPage
+        modo={auth.modo}
+        usuariosDemo={usuariosDemo}
+        onLogin={onLogin}
+        /* #244: por qué se cerró la sesión sola. Se ve al llegar al login,
+           sin pasos adicionales, y se va al primer intento de entrar. */
+        aviso={motivoSalida ? MENSAJE_SALIDA[motivoSalida] : null}
+        onAvisoVisto={() => setMotivoSalida(null)}
+      />
+    )
   }
 
   if (error && !state) {
@@ -842,17 +955,9 @@ export default function App() {
   // P5: en mobile la Gantt no existe; la vista efectiva se fuerza a Tabla.
   const vistaEfectiva: Vista = esMovil ? 'tabla' : vista
 
-  // Candidatos a responsable del proyecto activo: admins, el dueño y los
-  // usuarios con acceso.
-  const candidatosFiltro = proyecto
-    ? state.usuarios.filter(
-        (u) =>
-          u.activo &&
-          (u.rol === 'admin' ||
-            u.id === proyecto.duenoId ||
-            state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyecto.id)),
-      )
-    : []
+  // #228: el filtro de Responsable ofrece los MIEMBROS del proyecto activo, la
+  // misma lista que los selectores de la tabla, la Gantt y el panel.
+  const candidatosFiltro = miembrosDeProyecto(state, proyecto?.id ?? null)
   // Miembros (7): el admin y el dueño pueden abrir la lista del proyecto.
   const puedeVerMiembros = !!proyecto && (esAdmin || esDuenoDe(state, sesion, proyecto.id))
   // Mis Tareas: para el personal de la consultora (admins y consultores).
@@ -1103,7 +1208,7 @@ export default function App() {
           state={state}
           tarea={tareaDetalle}
           hoy={HOY}
-          can={can}
+          can={canDetalle}
           actions={actions}
           sesionId={sesion.id}
           onClose={() => setTareaDetalleId(null)}

@@ -8,4 +8,5 @@ export function makeAuth(repo: Repo): AuthService {
   return supabaseConfigured ? new SupabaseAuth() : new MemoryAuth(repo)
 }
 
-export type { AuthService } from './auth'
+export type { AuthService, MotivoSalida } from './auth'
+export { MENSAJE_SALIDA } from './auth'

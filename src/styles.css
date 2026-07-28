@@ -37,6 +37,11 @@
   --primario-hover: #333336;
   --sobre-primario: #ffffff;
   --naranja: #f97316;
+  /* #232: acento del pie de la barra lateral. La barra es oscura en los DOS
+     temas, así que el valor es fijo a propósito, como el resto de sus colores.
+     Antes se pedía `--primario-claro`, que no existe: funcionaba de casualidad
+     por el valor de respaldo escrito al lado. Es el mismo color de siempre. */
+  --sidebar-acento: #9fd0a8;
   --estructura: #1a1a1b;
   --borde-input: #71717a;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -122,7 +127,21 @@ body {
   font-size: 14px;
 }
 
-button { font-family: inherit; cursor: pointer; }
+/* #230: los botones NO heredan el color del texto por defecto — sin `color`
+   propio, el navegador les pone su negro. En modo claro eso pasa desapercibido
+   (el fondo es claro) y en oscuro el texto desaparece, que es lo que ocurría en
+   el menú de responsable. La corrección va en la raíz, no en ese menú: cualquier
+   botón que se agregue mañana y se olvide de declarar color sigue el tema, como
+   el resto del texto.
+   Es un selector de elemento (especificidad mínima): los botones que ya
+   declaran su color —los de la barra lateral, los tooltips y la tarjeta
+   flotante de la Gantt, que son zonas oscuras en los dos temas— siguen
+   mandando y no cambian. Se auditaron todos los botones de la aplicación en
+   ambos temas: solo dependían del negro por defecto el disparador del selector
+   de responsable (cuyo avatar y flecha declaran su propio color) y las opciones
+   de su menú; ninguno estaba sobre un fondo claro fijo, así que heredar el
+   color del tema no rompe ninguno. */
+button { font-family: inherit; cursor: pointer; color: inherit; }
 
 /* ---------- Layout ---------- */
 
@@ -439,10 +458,8 @@ table.tareas .col-desv { text-align: center; }
 .tarea-cell__row { display: flex; align-items: center; gap: 8px; }
 .tarea-cell__mark { flex: none; font-weight: 700; }
 .mk-verde { color: var(--verde-check); }
-.mk-rojo { color: var(--rojo); }
 
 /* El atraso se señala solo con la fecha en rojo y negrita (.fecha-vencida). */
-.fecha-tarde { color: var(--rojo); font-weight: 600; }
 .fecha-vencida { color: var(--rojo); font-weight: 700; }
 
 .chk { width: 18px; height: 18px; accent-color: var(--verde); cursor: pointer; }
@@ -520,6 +537,11 @@ table.tareas .col-desv { text-align: center; }
   z-index: 2500; min-width: 230px; background: var(--superficie); border-radius: 8px;
   box-shadow: var(--sombra-flotante); border: 1px solid var(--gris-borde);
   padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  /* #241: con muchos miembros el menú se salía de la pantalla y las últimas
+     personas quedaban fuera de alcance. Mismo criterio que el menú de filtros
+     (`.filtro-menu--portal`). Con pocos miembros no cambia nada: el tope solo
+     actúa cuando el contenido lo supera. */
+  max-height: 80vh; overflow-y: auto;
 }
 .resp-menu__opcion {
   display: flex; align-items: center; gap: 10px; text-align: left;
@@ -567,6 +589,13 @@ table.tareas .col-desv { text-align: center; }
 .comentario-nuevo textarea {
   font: inherit; font-size: 13px; border: 1px solid var(--gris-borde);
   border-radius: 7px; padding: 8px 10px; resize: vertical;
+  /* #231: sin fondo ni color propios, el campo usaba los del navegador —blanco
+     con letra negra—, así que en oscuro quedaba un recuadro blanco dentro del
+     panel. Toma los mismos que `.campo input, .campo textarea`, que es el
+     campo de referencia de la aplicación. Tamaño, forma y comportamiento no
+     cambian; en modo claro el resultado es el mismo de siempre porque ahí
+     --superficie es blanco y --texto es el color del cuerpo. */
+  color: var(--texto); background: var(--superficie);
 }
 .comentario-nuevo textarea:focus { outline: none; border-color: var(--verde); }
 .comentario-nuevo .btn { align-self: flex-end; }
@@ -1077,6 +1106,10 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 .hovercard__row { display: flex; justify-content: space-between; gap: 18px; }
 .hovercard__row span:first-child { color: #9f9fa6; }
+/* #242: responsable que ya no está disponible. Colores fijos como el resto de
+   la tarjeta, que es oscura en los dos temas a propósito. */
+.hovercard__apagado { color: #8e8e96; }
+.hovercard__motivo { color: #8e8e96; font-size: 11.5px; font-style: italic; margin-top: 2px; }
 /* Registro de auditoria del marcado (punto 1) */
 .hovercard__marcada { margin-top: 4px; font-size: 12px; color: #9ccc9c; }
 .hovercard__hist { margin-top: 8px; border-top: 1px solid #2f2f34; padding-top: 8px; }
@@ -1086,7 +1119,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .hovercard__chain .fecha--tachada { color: var(--rojo-tenue); text-decoration: line-through; }
 .hovercard__chain .fecha--vigente { background: #333338; color: #fff; font-weight: 600; }
 .hovercard__chain .flecha { color: #607d8b; }
-.hovercard__tarde { color: #ff8a80; font-weight: 600; margin-top: 6px; }
 
 /* pequeña ayuda visual de que hay tooltip */
 .trigger { cursor: help; }
@@ -1111,7 +1143,11 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .vacio-frentes .mudo { font-size: 13px; font-style: italic; }
 .vacio-frentes__form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .vacio-frentes__form input {
-  padding: 7px 10px; border: 1px solid var(--borde); border-radius: 8px;
+  /* #232: pedía `var(--borde)`, que no existe en ningún tema y no llevaba
+     valor de respaldo. Sin él la declaración entera se descarta y el campo se
+     quedaba sin el borde de la aplicación. Usa el mismo que el resto de los
+     campos (`.campo input`). */
+  padding: 7px 10px; border: 1px solid var(--borde-input); border-radius: 8px;
   background: var(--fondo); color: var(--texto); font: inherit; min-width: 220px;
 }
 
@@ -1163,8 +1199,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 .link-btn { background: none; border: none; color: var(--gris-texto); font-size: 12px; padding: 2px 4px; text-decoration: underline; }
 .link-btn:hover { color: #d4d4d8; }
-.link-btn--danger { color: #ef9a9a; }
-.link-btn--danger:hover { color: #ff8a80; }
 
 /* ---------- Sidebar: proyectos y frentes con CRUD ---------- */
 
@@ -1182,7 +1216,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .nav-proyecto--activo > .nav-proyecto__fila > .nav-proyecto__title { color: #fff; font-weight: 600; }
 .nav-proyecto__nombre { flex: 1; }
 .nav-proyecto__dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.nav-proyecto__acciones { display: flex; gap: 10px; padding: 2px 12px 8px 30px; }
 
 /* #178: nombre del proyecto + menú ⋯. El ⋯ aparece al pasar el cursor o
    cuando el proyecto está activo. */
@@ -1245,8 +1278,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .nav-frente-row:hover .nav-frente__menu-btn,
 .nav-frente-row--activo .nav-frente__menu-btn,
 .nav-frente__menu-btn[aria-expanded='true'] { visibility: visible; }
-.nav-frente--add { color: #8e8e96; font-style: italic; }
-.nav-frente--add:hover { color: #fff; }
 
 /* #225: SOLO en escritorio, el ⋯ del frente deja de reservar ancho: sale del
    flujo y se monta sobre el extremo derecho de la fila. El nombre dispone
@@ -1350,6 +1381,13 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .login__usuario-info { display: flex; flex-direction: column; }
 .login__usuario-info small { color: var(--gris-texto); }
 .login__error { margin-top: 12px; color: var(--rojo); font-size: 13px; }
+/* #244: por qué se cerró la sesión sola. No es un error de lo que la persona
+   acaba de hacer —todavía no ha hecho nada—, así que se lee como aviso. */
+.login__aviso {
+  margin: 14px 0 0; padding: 10px 12px; font-size: 13px; line-height: 1.45;
+  color: var(--ambar-texto); background: var(--ambar-suave);
+  border: 1px solid var(--ambar); border-radius: 8px;
+}
 /* #204/#205/#206: título de la pantalla de contraseña, aviso de éxito al
    pedir el enlace, detalle técnico del enlace caducado y enlace secundario
    ("¿Olvidaste tu contraseña?" / "Volver a iniciar sesión"). */
@@ -1458,7 +1496,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   font-family: var(--mono); border-radius: 6px; padding: 2px 7px;
   background: var(--primario); color: var(--sobre-primario);
 }
-.asignacion--propia { opacity: .92; }
 
 /* Miembros del proyecto (roles punto 7). #144: mismo aire que
    PermisosProyectoModal — padding del cuerpo, lista con más respiro y la
@@ -1484,7 +1521,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   background: var(--superficie); color: var(--texto);
 }
 .miembros-nota { width: 100%; font-size: 12px; color: var(--gris-texto); margin: 4px 0 0; }
-.usuarios-todos, .usuarios-sin { font-size: 12.5px; color: var(--gris-texto); font-style: italic; }
+.usuarios-sin { font-size: 12.5px; color: var(--gris-texto); font-style: italic; }
 .usuarios-aviso {
   font-size: 12.5px; color: var(--verde-check); background: var(--verde-suave);
   border-radius: 6px; padding: 6px 12px; margin: 0 0 12px;
@@ -1522,7 +1559,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .permisos__grupo:first-of-type { margin-top: 0; }
 .permisos__nota { font-size: 12px; color: var(--gris-texto); margin: 14px 0 0; line-height: 1.5; }
 .permisos .modal-acciones { margin-top: 18px; border-top: 1px solid var(--gris-linea); padding-top: 16px; }
-.asignaciones { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .asignacion {
   display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
   border: 1px solid var(--gris-borde); border-radius: 14px; padding: 3px 6px 3px 10px; background: var(--superficie);
@@ -1550,9 +1586,9 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   border: none; background: none; font: inherit; color: inherit;
   cursor: pointer; text-align: left; padding: 0;
 }
-.sesion--boton:hover .sesion__info b { color: var(--primario-claro, #9fd0a8); }
+.sesion--boton:hover .sesion__info b { color: var(--sidebar-acento); }
 .sesion--boton:focus-visible { outline: 2px solid var(--primario); outline-offset: 2px; border-radius: 4px; }
-.sesion--activa .sesion__info b { color: var(--primario-claro, #9fd0a8); }
+.sesion--activa .sesion__info b { color: var(--sidebar-acento); }
 .sidebar__footer .sesion__salir { color: #8e8e96; }
 .sidebar__footer .sesion__salir:hover { color: #ff8a80; }
 
@@ -1604,7 +1640,8 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   display: flex; flex-direction: column; gap: 12px;
 }
 .panel-accion { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; }
-.panel-accion__fecha { border: 1px solid var(--gris-borde); max-width: 170px; }
+/* #245: por qué no hay control de fecha en una tarea hecha. */
+.panel-nota { margin: 0; font-size: 12.5px; font-style: italic; color: var(--gris-texto); }
 
 /* ---------- Fase 3: archivadas ---------- */
 
@@ -1630,7 +1667,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 /* ---------- Fase 3: Mi Panel ---------- */
 
-.mipanel-filtros { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
 .mipanel-alerta { color: var(--rojo); font-weight: 700; }
 .mipanel-proyecto { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; }
 .mipanel-ruta { font-size: 12px; color: var(--gris-texto); }
@@ -1861,12 +1897,6 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 .proy-col { position: relative; display: flex; align-items: center; gap: 6px; overflow: visible; }
 .asignacion--ro { max-width: 118px; }
 .asignacion__nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.proy-mas { position: relative; flex: none; }
-.chip-mas {
-  border: 1px solid var(--gris-borde); background: var(--superficie); color: var(--gris-texto);
-  font: inherit; font-size: 12px; font-weight: 700; border-radius: 12px; padding: 3px 9px; cursor: pointer;
-}
-.chip-mas:hover { color: var(--texto); border-color: var(--primario); }
 .proy-pop {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 1200; min-width: 220px;
   background: var(--superficie); border: 1px solid var(--gris-borde); border-radius: 10px;
@@ -2128,6 +2158,11 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .main { height: 100vh; height: 100dvh; }
   .movil-menu { display: inline-flex; }
   .movil-tema { display: inline-flex; }
+  /* #241: los dos flotantes ocupan los 60px de abajo a la izquierda (14 de
+     margen + 46 de alto). Sin aire al final del scroll, el último control de
+     la tabla —el "+ Sub Frente"— quedaba debajo de ellos: se veía a medias y
+     el toque caía en el botón flotante. */
+  .content { padding-bottom: 74px; }
   .movil-velo {
     display: block; position: fixed; inset: 0;
     background: rgba(10, 10, 12, .45); z-index: 2050;
@@ -2254,3 +2289,27 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .gantt td.fija--tarea { font-size: 11px; padding: 3px 6px; }
   .gantt td.fija--frente, .gantt td.fija--sf { font-size: 10.5px; padding: 6px 6px; }
 }
+
+/* #229: responsable que ya no está entre los candidatos —dejó de ser miembro,
+   o fue desactivado/eliminado. La tarea lo sigue mostrando (con responsable en
+   la base nunca debe verse vacía), pero apagado: se distingue del responsable
+   normal y del "sin asignar", que es un círculo punteado. El motivo va en el
+   tooltip. Los responsables normales no cambian: estas reglas solo actúan con
+   la clase --apagado. */
+.avatar--apagado {
+  opacity: .45;
+  filter: grayscale(.85);
+  box-shadow: inset 0 0 0 1px var(--gris-borde);
+}
+/* Sin ficha del usuario en el cliente (eliminado, o ya no visible): marca
+   neutra en vez de un hueco. */
+.avatar--sinficha {
+  background: var(--superficie-3); color: var(--gris-texto);
+  border: 1.5px dashed var(--gris-borde);
+  filter: none; opacity: .7;
+}
+.resp-badge--apagado { opacity: .45; filter: grayscale(.85); }
+.resp-apagado { color: var(--gris-texto); font-style: italic; }
+/* En oscuro la opacidad sola no basta para separarlo del fondo: se compensa. */
+[data-tema='oscuro'] .avatar--apagado { opacity: .55; }
+[data-tema='oscuro'] .resp-badge--apagado { opacity: .55; }

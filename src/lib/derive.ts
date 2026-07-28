@@ -27,7 +27,7 @@ export function historialDe(state: AppState, tareaId: string): Replanificacion[]
     .sort((a, b) => a.numeroCambio - b.numeroCambio)
 }
 
-export function tieneHistorial(state: AppState, tareaId: string): boolean {
+function tieneHistorial(state: AppState, tareaId: string): boolean {
   return state.historial.some((h) => h.tareaId === tareaId)
 }
 
@@ -76,7 +76,7 @@ export function nReplanificaciones(state: AppState, tareaId: string): number {
  * >0 si se corrió hacia adelante (atraso), <0 si se adelantó, 0 si no cambió.
  * `undefined` si falta la original o la vigente (no se puede calcular).
  */
-export function desviacionHabiles(t: Tarea): number | undefined {
+function desviacionHabiles(t: Tarea): number | undefined {
   const vigente = fechaVigente(t)
   if (!t.fechaOriginal || !vigente) return undefined
   return difDiasHabiles(t.fechaOriginal, vigente)

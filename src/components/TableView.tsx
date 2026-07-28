@@ -3,7 +3,7 @@ import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../l
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
-import type { Can } from '../lib/permisos'
+import { MOTIVO_FECHA_HECHA, miembrosDeProyecto, puedeEditarFecha, responsableDeTarea, type Can } from '../lib/permisos'
 import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, nReplanificaciones, textoAtraso } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { formatoFecha } from '../lib/dates'
@@ -73,14 +73,9 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
       return n
     })
 
-  // Candidatos a responsable: admins, el dueño y quienes tienen acceso.
-  const candidatos = state.usuarios.filter(
-    (u) =>
-      u.activo &&
-      (u.rol === 'admin' ||
-        state.proyectos.some((p) => p.id === proyectoId && p.duenoId === u.id) ||
-        state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
-  )
+  // #228: candidatos a responsable = los MIEMBROS del proyecto (dueño + accesos
+  // activos). Ya no entran los admins no miembros: ver `miembrosDeProyecto`.
+  const candidatos = miembrosDeProyecto(state, proyectoId)
 
   // P1: lista FRESCA de ids (filtro+orden aplicados ahora) y existentes del
   // scope, recorriendo frentes→subs→tareas igual que el render. La foto se
@@ -647,7 +642,9 @@ function TareaFila({
 }) {
   const cat = categoriaDe(state, tarea, hoy)
   const color = colorTarea(state, tarea, hoy)
-  const resp = state.usuarios.find((u) => u.id === tarea.responsableId)
+  // #229: nunca "sin responsable" si la base sí tiene uno; si ya no es
+  // candidato se muestra apagado, con el motivo en el tooltip.
+  const resp = responsableDeTarea(state, tarea.responsableId, candidatos)
   const nComentarios = state.comentarios.filter((c) => c.tareaId === tarea.id).length
   const nReplan = nReplanificaciones(state, tarea.id)
 
@@ -724,9 +721,14 @@ function TareaFila({
             value={tarea.responsableId}
             onChange={(id) => actions.updateTarea(tarea.id, { responsableId: id })}
             ariaLabel={`Responsable: ${tarea.titulo}`}
+            apagado={resp.apagado}
+            responsable={resp.usuario}
+            motivo={resp.motivo}
           />
         ) : (
-          resp && <Avatar usuario={resp} />
+          resp.estado !== 'sin-asignar' && (
+            <Avatar usuario={resp.usuario} apagado={resp.apagado} motivo={resp.motivo} />
+          )
         )}
       </td>
 
@@ -736,8 +738,13 @@ function TareaFila({
         <span className={`estado-chip estado-chip--${color}`}>{CATEGORIA_LABEL[cat]}</span>
       </td>
 
-      <td className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}>
-        {can.editarFechas(tarea) ? (
+      {/* #245: en una tarea hecha la fecha se muestra como texto, no como
+          control: no es un botón que falla, es una fecha cerrada. */}
+      <td
+        className={`col-fecha${esAtrasada(cat) ? ' fecha-vencida' : ''}`}
+        title={tarea.hecha && can.editarFechas(tarea) ? MOTIVO_FECHA_HECHA : undefined}
+      >
+        {puedeEditarFecha(can, tarea) ? (
           <FechaEditable
             valor={tarea.fechaObjetivo}
             onCambiar={(nueva) => actions.cambiarFechaObjetivo(tarea.id, nueva)}

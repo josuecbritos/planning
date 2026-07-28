@@ -232,8 +232,7 @@ export function FiltrosBar({
         </div>
         {/* #223: "Con fecha" — todas las tareas que tienen fecha objetivo, sea
             cual sea. EXCLUYENTE con el resto del campo: se apaga al elegir
-            cualquier otra opción de fecha, y al activarla las apaga. No define
-            el horizonte de la Gantt (no es una ventana temporal). */}
+            cualquier otra opción de fecha, y al activarla las apaga. */}
         <button
           className={`filtro-op${filtro.conFecha ? ' filtro-op--on' : ''}`}
           onClick={() =>

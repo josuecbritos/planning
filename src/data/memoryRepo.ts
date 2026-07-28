@@ -3,6 +3,7 @@ import { hoyISO } from '../lib/dates'
 import { idsMencionados } from '../lib/menciones'
 import { DEFAULT_PERMISOS_PROYECTO, defaultPermisosTareas } from '../lib/permisos'
 import { initialState, proyectoConsultor } from './seed'
+import { derivarIniciales } from './repo'
 import type {
   NuevaTarea,
   NuevoFrente,
@@ -135,11 +136,6 @@ export class MemoryRepo implements Repo {
     this.actorId = id
   }
 
-  /** #207: misma derivación que la base (función `derivar_iniciales`). */
-  private static derivarIniciales(nombre: string): string {
-    return nombre.trim().split(/\s+/).filter(Boolean).map((p) => p[0]).join('').slice(0, 2).toUpperCase()
-  }
-
   /** #137: crea una notificación si hay destinatario y no es el propio actor. */
   private notificar(dest: string | undefined, tipo: TipoNotificacion, tareaId: string, dato?: { fecha?: string }) {
     if (!dest || !this.actorId || dest === this.actorId) return
@@ -203,6 +199,7 @@ export class MemoryRepo implements Repo {
     this.state.tareas = this.state.tareas.filter((t) => !subIds.includes(t.subFrenteId))
     this.state.historial = this.state.historial.filter((h) => !tareaIds.includes(h.tareaId))
     this.state.comentarios = this.state.comentarios.filter((c) => !tareaIds.includes(c.tareaId))
+    this.state.notificaciones = this.state.notificaciones.filter((x) => !tareaIds.includes(x.tareaId)) // #246
     this.state.accesos = this.state.accesos.filter((a) => a.proyectoId !== id)
     this.persist()
   }
@@ -230,6 +227,7 @@ export class MemoryRepo implements Repo {
     this.state.tareas = this.state.tareas.filter((t) => !subIds.includes(t.subFrenteId))
     this.state.historial = this.state.historial.filter((h) => !tareaIds.includes(h.tareaId))
     this.state.comentarios = this.state.comentarios.filter((c) => !tareaIds.includes(c.tareaId))
+    this.state.notificaciones = this.state.notificaciones.filter((x) => !tareaIds.includes(x.tareaId)) // #246
     this.persist()
   }
 
@@ -254,6 +252,7 @@ export class MemoryRepo implements Repo {
     this.state.tareas = this.state.tareas.filter((t) => t.subFrenteId !== id)
     this.state.historial = this.state.historial.filter((h) => !tareaIds.includes(h.tareaId))
     this.state.comentarios = this.state.comentarios.filter((c) => !tareaIds.includes(c.tareaId))
+    this.state.notificaciones = this.state.notificaciones.filter((n) => !tareaIds.includes(n.tareaId)) // #246
     this.persist()
   }
 
@@ -298,6 +297,9 @@ export class MemoryRepo implements Repo {
     this.state.tareas = this.state.tareas.filter((t) => t.id !== id)
     this.state.historial = this.state.historial.filter((h) => h.tareaId !== id)
     this.state.comentarios = this.state.comentarios.filter((c) => c.tareaId !== id)
+    // #246: espejo del ON DELETE CASCADE de la base. Sin esto las
+    // notificaciones de la tarea quedaban para siempre en modo Local.
+    this.state.notificaciones = this.state.notificaciones.filter((n) => n.tareaId !== id)
     this.persist()
   }
 
@@ -310,7 +312,7 @@ export class MemoryRepo implements Repo {
     const manual = Boolean(input.iniciales && input.iniciales.trim())
     const iniciales = manual
       ? input.iniciales!.trim().toUpperCase()
-      : MemoryRepo.derivarIniciales(input.nombre)
+      : derivarIniciales(input.nombre)
     // #136: si el correo ya existe, se REACTIVA la fila (aunque esté eliminada);
     // sus accesos quedan intactos. No se crea una fila nueva ni se toca el correo.
     const existente = this.state.usuarios.find((u) => u.email.toLowerCase() === email)
@@ -354,7 +356,7 @@ export class MemoryRepo implements Repo {
       u.iniciales = (patch.iniciales ?? '').trim().toUpperCase()
       if (patch.inicialesManual !== false) u.inicialesManual = true
     }
-    if (!u.inicialesManual) u.iniciales = MemoryRepo.derivarIniciales(u.nombre)
+    if (!u.inicialesManual) u.iniciales = derivarIniciales(u.nombre)
     this.persist()
     return clone(u)
   }

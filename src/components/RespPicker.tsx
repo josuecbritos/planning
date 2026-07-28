@@ -15,24 +15,62 @@ export function colorAvatar(id: string): string {
   return PALETA[h % PALETA.length]
 }
 
-export function Avatar({ usuario }: { usuario?: Usuario }) {
-  if (!usuario) return <span className="avatar avatar--vacio">—</span>
+/**
+ * #229: `apagado` marca al responsable que ya no está entre los candidatos —
+ * dejó de ser miembro, o fue desactivado/eliminado. Se sigue mostrando (una
+ * tarea con responsable nunca debe verse vacía), pero atenuado y con el motivo
+ * en el tooltip. Sin `usuario` pero con `apagado`, el cliente no tiene la ficha
+ * de la persona: se muestra una marca neutra en vez de un hueco.
+ */
+export function Avatar({
+  usuario,
+  apagado,
+  motivo,
+}: {
+  usuario?: Usuario
+  apagado?: boolean
+  motivo?: string
+}) {
+  if (!usuario) {
+    if (apagado) {
+      return (
+        <span className="avatar avatar--apagado avatar--sinficha" title={motivo}>
+          ?
+        </span>
+      )
+    }
+    return <span className="avatar avatar--vacio">—</span>
+  }
   return (
-    <span className="avatar" style={{ background: colorAvatar(usuario.id) }} title={usuario.nombre}>
+    <span
+      className={`avatar${apagado ? ' avatar--apagado' : ''}`}
+      style={{ background: colorAvatar(usuario.id) }}
+      title={apagado ? motivo : usuario.nombre}
+    >
       {usuario.iniciales}
     </span>
   )
 }
 
 interface Props {
-  /** Candidatos (los admins activos). */
+  /** #228: candidatos = los miembros del proyecto (dueño + accesos activos). */
   usuarios: Usuario[]
   value?: string
   onChange: (id?: string) => void
   ariaLabel?: string
+  /**
+   * #229: cómo mostrar el responsable ACTUAL cuando ya no es candidato. Antes
+   * el disparador buscaba el valor dentro de `usuarios` y, al no encontrarlo,
+   * pintaba el avatar de "sin asignar": la tarea se veía vacía aunque en la
+   * base siguiera asignada. Con esto se sigue mostrando, apagado.
+   */
+  apagado?: boolean
+  /** Usuario del responsable apagado (undefined si el cliente no lo tiene). */
+  responsable?: Usuario
+  motivo?: string
 }
 
-export function RespPicker({ usuarios, value, onChange, ariaLabel }: Props) {
+export function RespPicker({ usuarios, value, onChange, ariaLabel, apagado, responsable, motivo }: Props) {
   const [abierto, setAbierto] = useState(false)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -43,7 +81,10 @@ export function RespPicker({ usuarios, value, onChange, ariaLabel }: Props) {
     const r = triggerRef.current?.getBoundingClientRect()
     if (r) {
       const anchoMenu = 240
-      const altoEstimado = 46 * (usuarios.length + 1) + 12
+      // #241: el menú está acotado a 80vh y se desplaza; la estimación tiene
+      // que respetar ese tope o con muchos miembros se reposicionaría usando
+      // un alto que el menú nunca llega a tener.
+      const altoEstimado = Math.min(46 * (usuarios.length + 1) + 12, window.innerHeight * 0.8)
       let x = r.left
       let y = r.bottom + 4
       if (x + anchoMenu > window.innerWidth - 8) x = window.innerWidth - anchoMenu - 8
@@ -85,13 +126,25 @@ export function RespPicker({ usuarios, value, onChange, ariaLabel }: Props) {
         ref={triggerRef}
         type="button"
         className="resp-picker"
-        title={actual ? `${actual.nombre} (${actual.iniciales})` : 'Asignar responsable'}
+        title={
+          apagado
+            ? motivo
+            : actual
+              ? `${actual.nombre} (${actual.iniciales})`
+              : 'Asignar responsable'
+        }
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={abierto}
         onClick={() => (abierto ? setAbierto(false) : abrir())}
       >
-        {actual ? <Avatar usuario={actual} /> : <span className="avatar avatar--vacio">+</span>}
+        {apagado ? (
+          <Avatar usuario={responsable} apagado motivo={motivo} />
+        ) : actual ? (
+          <Avatar usuario={actual} />
+        ) : (
+          <span className="avatar avatar--vacio">+</span>
+        )}
         <span className="resp-picker__caret">▾</span>
       </button>
 

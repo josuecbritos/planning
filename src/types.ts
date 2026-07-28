@@ -1,5 +1,6 @@
-// Modelo de datos — Documento Funcional v3.1, seccion 5.
-// El dummy trabaja en memoria; las fechas se manejan como 'YYYY-MM-DD' (Date sin hora).
+// Modelo de datos. Lo comparten los dos backends —memoria y Supabase—, así que
+// es el contrato entre la interfaz y `data/`. Las fechas se manejan como
+// 'YYYY-MM-DD' (Date sin hora) para evitar desfases de zona horaria.
 
 /**
  * Roles (reestructuración roles-y-permisos):
@@ -9,7 +10,7 @@
  */
 export type Rol = 'admin' | 'consultor' | 'cliente'
 /** #133: el proyecto está activo o archivado (archivar lo saca de las vistas). */
-export type EstadoProyecto = 'activo' | 'archivado'
+type EstadoProyecto = 'activo' | 'archivado'
 
 /** Fecha ISO corta, ej. '2024-10-30'. */
 export type ISODate = string

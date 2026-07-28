@@ -1,9 +1,9 @@
 {
-  "name": "planificador-dummy",
+  "name": "andotek-planning",
   "private": true,
-  "version": "3.1.0",
+  "version": "1.0.0",
   "type": "module",
-  "description": "Dummy interactivo de la Herramienta de Planificacion de Proyectos (Documento Funcional v3.1)",
+  "description": "Andotek Planning — herramienta de planificacion de proyectos (Proyecto > Frente > Sub Frente > Tarea), con vistas Tabla y Gantt",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

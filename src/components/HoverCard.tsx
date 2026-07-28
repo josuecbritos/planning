@@ -5,13 +5,14 @@ import { createPortal } from 'react-dom'
 // cursor (seccion 6.6: "todo el detalle vive en el tooltip"). Usa position
 // fixed via portal para no ser recortada por los contenedores con scroll.
 
+// #239: tenía una prop `className` que ningún sitio le pasaba (los seis usos
+// envuelven un elemento que trae su propia clase). Se quita.
 interface Props {
   card: ReactNode
   children: ReactNode
-  className?: string
 }
 
-export function HoverCard({ card, children, className }: Props) {
+export function HoverCard({ card, children }: Props) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
 
   function place(e: React.MouseEvent) {
@@ -28,7 +29,7 @@ export function HoverCard({ card, children, className }: Props) {
 
   return (
     <span
-      className={`trigger${className ? ' ' + className : ''}`}
+      className="trigger"
       onMouseEnter={place}
       onMouseMove={place}
       onMouseLeave={() => setPos(null)}

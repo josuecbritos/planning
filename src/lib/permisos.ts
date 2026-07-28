@@ -18,7 +18,7 @@ import type {
 
 /** Cliente: ejecutor del plan — autonomía sobre SUS tareas, sin tocar la
  *  estructura (4.2). */
-export const DEFAULT_PERMISOS_CLIENTE: PermisosTareas = {
+const DEFAULT_PERMISOS_CLIENTE: PermisosTareas = {
   crearTareas: true,
   editarFechas: 'asignadas',
   marcarHechas: 'asignadas',
@@ -26,7 +26,7 @@ export const DEFAULT_PERMISOS_CLIENTE: PermisosTareas = {
 }
 
 /** Consultor invitado a proyecto ajeno: un colega — autonomía plena (4.3). */
-export const DEFAULT_PERMISOS_CONSULTOR_INVITADO: PermisosTareas = {
+const DEFAULT_PERMISOS_CONSULTOR_INVITADO: PermisosTareas = {
   crearFrentes: true,
   crearSubFrentes: true,
   crearTareas: true,
@@ -62,7 +62,7 @@ export function esDuenoDe(state: AppState, usuario: Usuario | null, proyectoId: 
 }
 
 /** Permisos del usuario DENTRO de un proyecto (los de su acceso). */
-export function permisosEn(state: AppState, usuario: Usuario | null, proyectoId: string): PermisosTareas {
+function permisosEn(state: AppState, usuario: Usuario | null, proyectoId: string): PermisosTareas {
   if (!usuario) return {}
   return (
     state.accesos.find((a) => a.usuarioId === usuario.id && a.proyectoId === proyectoId)?.permisos ?? {}
@@ -70,7 +70,7 @@ export function permisosEn(state: AppState, usuario: Usuario | null, proyectoId:
 }
 
 /** Permiso de NIVEL PROYECTO (3.1). Admin: siempre. */
-export function permisoProyecto(usuario: Usuario | null, permiso: keyof PermisosProyecto): boolean {
+function permisoProyecto(usuario: Usuario | null, permiso: keyof PermisosProyecto): boolean {
   if (!usuario) return false
   if (usuario.rol === 'admin') return true
   if (usuario.rol !== 'consultor') return false
@@ -150,6 +150,27 @@ export interface Can {
 }
 
 /**
+ * #245: ¿se puede editar la fecha objetivo de esta tarea? Permiso Y estado:
+ * **la fecha de una tarea HECHA no se edita en ninguna vista**.
+ *
+ * "Hecha es terminal" es una definición del modelo, pero además replanificar
+ * una hecha permitiría borrar hacia atrás el atraso de una entrega tardía
+ * —mover la fecha objetivo al día en que se hizo y que el registro diga que se
+ * cumplió a tiempo—, vaciando el historial de replanificaciones, que es el
+ * diferenciador del producto. El caso legítimo (marqué hecha por error, o la
+ * fecha estaba mal) se resuelve desmarcando primero: el check es reversible.
+ *
+ * La Gantt ya lo hacía; la tabla, Mis Tareas y el panel lo escribían distinto.
+ * Vive acá para que las cuatro vistas no puedan volver a separarse.
+ */
+export function puedeEditarFecha(can: Can, t: Tarea): boolean {
+  return can.editarFechas(t) && !t.hecha
+}
+
+/** Explicación para quien SÍ podría editar la fecha si la tarea no estuviera hecha. */
+export const MOTIVO_FECHA_HECHA = 'La fecha de una tarea hecha no se edita. Desmárcala para corregirla.'
+
+/**
  * Construye el Can para el PROYECTO ACTIVO. Admin y dueño: todo. Invitado
  * (cliente o consultor asignado): según los permisos de su acceso.
  * `proyectoId` null (sin proyecto activo): solo el admin conserva permisos.
@@ -178,5 +199,86 @@ export function makeCan(state: AppState | null, u: Usuario | null, proyectoId: s
     algunoDeTareas:
       total ||
       !!(p.editarFechas || p.marcarHechas || p.editarTareas || p.archivarEliminar || p.asignarResponsable),
+  }
+}
+
+/**
+ * #228: candidatos a RESPONSABLE de una tarea = los miembros del proyecto, o
+ * sea el dueño y los usuarios activos con acceso. Sin excepción por rol.
+ *
+ * Antes se colaban además TODOS los admins activos, fueran o no miembros. La
+ * intención era cómoda, pero chocaba con la regla que gobierna el resto de la
+ * aplicación: barra lateral, Resumen y Mis Tareas muestran solo los proyectos
+ * donde la persona es miembro. Una tarea asignada a un admin no miembro no le
+ * aparecía por ningún lado — trabajo asignado que su responsable no ve.
+ *
+ * Es la ÚNICA fuente de esta lista: tabla, Gantt, panel de detalle, creación de
+ * tarea y el filtro de Responsable la usan toda, para que no puedan divergir.
+ */
+export function miembrosDeProyecto(state: AppState, proyectoId: string | null): Usuario[] {
+  if (!proyectoId) return []
+  const proyecto = state.proyectos.find((p) => p.id === proyectoId)
+  return state.usuarios.filter(
+    (u) =>
+      u.activo &&
+      !u.eliminado &&
+      (u.id === proyecto?.duenoId ||
+        state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
+  )
+}
+
+/**
+ * #229: cómo mostrar al responsable de una tarea. Una tarea CON responsable en
+ * la base nunca debe verse como si no tuviera: si esa persona ya no está entre
+ * los candidatos, se muestra igual, apagada y con el motivo.
+ *
+ * `desconocido` es el caso en que el cliente no tiene la fila del usuario. Pasa
+ * de verdad con Supabase: la lista sale de la vista `usuario_visible`, que
+ * excluye a los eliminados y, para quien no es admin, a quien ya no comparte
+ * ningún proyecto. En modo memoria no ocurre —el estado conserva a todos—, así
+ * que verificar solo ahí escondería este caso.
+ */
+type EstadoResponsable = 'sin-asignar' | 'normal' | 'ex-miembro' | 'desactivado' | 'desconocido'
+
+interface ResponsableVista {
+  /** El usuario, si el cliente dispone de su ficha. */
+  usuario?: Usuario
+  estado: EstadoResponsable
+  /** Se muestra apagado y con `motivo` en el tooltip. */
+  apagado: boolean
+  motivo?: string
+}
+
+export function responsableDeTarea(
+  state: AppState,
+  responsableId: string | undefined,
+  candidatos: Usuario[],
+): ResponsableVista {
+  if (!responsableId) return { estado: 'sin-asignar', apagado: false }
+
+  const candidato = candidatos.find((u) => u.id === responsableId)
+  if (candidato) return { usuario: candidato, estado: 'normal', apagado: false }
+
+  const conocido = state.usuarios.find((u) => u.id === responsableId)
+  if (!conocido) {
+    return {
+      estado: 'desconocido',
+      apagado: true,
+      motivo: 'Responsable ya no disponible: la persona fue eliminada o dejó de ser visible para ti',
+    }
+  }
+  if (!conocido.activo || conocido.eliminado) {
+    return {
+      usuario: conocido,
+      estado: 'desactivado',
+      apagado: true,
+      motivo: `${conocido.nombre} está desactivado en el sistema`,
+    }
+  }
+  return {
+    usuario: conocido,
+    estado: 'ex-miembro',
+    apagado: true,
+    motivo: `${conocido.nombre} ya no es miembro de este proyecto`,
   }
 }

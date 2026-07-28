@@ -61,6 +61,17 @@ export type PatchUsuario = Partial<
   Pick<Usuario, 'nombre' | 'iniciales' | 'activo' | 'rol' | 'permisosProyecto' | 'inicialesManual'>
 >
 
+/**
+ * Iniciales derivadas del nombre: las primeras letras de las dos primeras
+ * palabras. Espejo de la función `derivar_iniciales` de la base (#207).
+ *
+ * #239: vivía por duplicado, una copia en cada repo. Vive acá, junto a los
+ * tipos que comparten los dos, para que no puedan separarse.
+ */
+export function derivarIniciales(nombre: string): string {
+  return nombre.trim().split(/\s+/).filter(Boolean).map((p) => p[0]).join('').slice(0, 2).toUpperCase()
+}
+
 export interface Repo {
   /** Nombre corto del backend activo, para mostrar en la UI. */
   readonly modo: 'memoria' | 'supabase'
