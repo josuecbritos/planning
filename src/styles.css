@@ -745,10 +745,14 @@ table.tareas .col-desv { text-align: center; }
 /* Menu "Ordenar" (punto 4 / #111): lista directa de campos con ↑↓. */
 .orden-campo { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 9px; }
 .orden-campo:hover { background: var(--velo); }
+/* #224: el contenido sobre fondo --primario usa --sobre-primario, el mismo
+   mecanismo que .btn--primary, .filtro-btn--activo y .seg__btn--on. Con #fff
+   fijo, en modo oscuro quedaba blanco sobre un fondo casi blanco (invisible).
+   En modo claro --sobre-primario es #ffffff: el resultado no cambia. */
 .orden-campo__prio {
   flex: none; width: 18px; height: 18px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; color: #fff;
+  font-size: 11px; font-weight: 700; color: var(--sobre-primario);
 }
 .orden-campo--activo .orden-campo__prio { background: var(--primario); }
 .orden-campo__label { flex: 1; min-width: 0; font-size: 13px; color: var(--texto); }
@@ -759,9 +763,9 @@ table.tareas .col-desv { text-align: center; }
 }
 .orden-campo__dir:hover { border-color: var(--primario); color: var(--primario); opacity: 1; }
 .orden-campo__dir--on {
-  background: var(--primario); border-color: var(--primario); color: #fff; opacity: 1;
+  background: var(--primario); border-color: var(--primario); color: var(--sobre-primario); opacity: 1;
 }
-.orden-campo__dir--on:hover { color: #fff; }
+.orden-campo__dir--on:hover { color: var(--sobre-primario); }
 /* Punto 5: opcion "Seleccionar todos" al pie de Responsable/Estado. */
 .filtro-op--todos { color: var(--primario); font-size: 12.5px; font-weight: 600; justify-content: center; margin-top: 2px; }
 
@@ -1117,13 +1121,16 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    cuando el proyecto está activo. */
 .nav-proyecto__fila { display: flex; align-items: center; }
 .nav-proyecto__fila .nav-proyecto__title { flex: 1; min-width: 0; }
-.nav-proyecto__menu-btn {
+.nav-proyecto__menu-btn, .nav-frente__menu-btn {
   flex: none; border: none; background: none; color: #8e8e96; cursor: pointer;
   font-size: 18px; line-height: 1; padding: 4px 8px; border-radius: 6px; visibility: hidden;
 }
-.nav-proyecto:hover .nav-proyecto__menu-btn,
-.nav-proyecto--activo .nav-proyecto__menu-btn { visibility: visible; }
-.nav-proyecto__menu-btn:hover { color: #fff; background: #27272a; }
+/* #222: el ⋯ del proyecto se acota a SU fila. Antes era descendente y, con la
+   lista de frentes dentro del proyecto activo, habría dejado visibles también
+   los ⋯ de los frentes (que en escritorio aparecen solo al pasar el mouse). */
+.nav-proyecto:hover > .nav-proyecto__fila > .nav-proyecto__menu-btn,
+.nav-proyecto--activo > .nav-proyecto__fila > .nav-proyecto__menu-btn { visibility: visible; }
+.nav-proyecto__menu-btn:hover, .nav-frente__menu-btn:hover { color: #fff; background: #27272a; }
 /* #184: popover flotante (portal fijo, a la derecha del ⋯), sobre el
    contenido — no ocupa lugar dentro del sidebar. */
 .nav-proyecto__menu--portal {
@@ -1141,13 +1148,20 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .nav-proyecto__menu-op:hover { background: #333338; color: #fff; }
 
 .nav-frentes { padding-bottom: 6px; }
-.nav-frente-row { display: flex; align-items: center; }
+.nav-frente-row { display: flex; align-items: center; padding-right: 4px; }
 .nav-frente-row--activo { background: #333338; border-radius: 6px; }
-.nav-frente--flex { flex: 1; }
-.nav-frente__tools { display: none; padding-right: 6px; }
-.nav-frente-row:hover .nav-frente__tools { display: inline-flex; gap: 2px; }
-.nav-frente__tools .icon-btn { color: #8e8e96; }
-.nav-frente__tools .icon-btn:hover { color: #fff; }
+/* #222: el nombre en UNA línea. El ⋯ reserva su lugar siempre (está oculto,
+   no ausente), así el ancho disponible no cambia al pasar el mouse y la fila
+   nunca crece de alto. El nombre completo queda en el title. */
+.nav-frente--flex { flex: 1; min-width: 0; padding-right: 4px; }
+.nav-frente--flex > span {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Visibilidad del ⋯ del frente: al pasar el mouse por SU fila, en el frente
+   seleccionado, y mientras su propio menú está abierto. */
+.nav-frente-row:hover .nav-frente__menu-btn,
+.nav-frente-row--activo .nav-frente__menu-btn,
+.nav-frente__menu-btn[aria-expanded='true'] { visibility: visible; }
 .nav-frente--add { color: #8e8e96; font-style: italic; }
 .nav-frente--add:hover { color: #fff; }
 
@@ -1932,11 +1946,11 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
      no caben. Se prefiere que el objetivo coincida con lo visible. Los demás
      controles de esta lista no tienen vecinos pegados, así que conservan la
      ampliación. */
-  .modal-x, .seg button, .nav-proyecto__menu-btn, .proy-num {
+  .modal-x, .seg button, .nav-proyecto__menu-btn, .nav-frente__menu-btn, .proy-num {
     position: relative;
   }
   .modal-x::before, .seg button::before,
-  .nav-proyecto__menu-btn::before, .proy-num::before {
+  .nav-proyecto__menu-btn::before, .nav-frente__menu-btn::before, .proy-num::before {
     content: ''; position: absolute; left: 50%; top: 50%;
     transform: translate(-50%, -50%);
     width: max(44px, 100%); height: max(44px, 100%);
@@ -1978,8 +1992,9 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .nav-proyecto__menu--portal { max-width: calc(100vw - 16px); }
   .nav-proyecto__menu-op { padding: 12px 14px; }
   /* En táctil no hay hover: el ⋯ se muestra en TODOS los proyectos, no solo
-     en el activo, para poder editar/archivar/agregar frente sin abrirlos. */
-  .nav-proyecto__menu-btn { visibility: visible; }
+     en el activo, para poder editar/archivar/agregar frente sin abrirlos.
+     #222: lo mismo para los frentes — su ⋯ está visible sin tocar nada antes. */
+  .nav-proyecto__menu-btn, .nav-frente__menu-btn { visibility: visible; }
 
   /* ---------- 3. Sidebar superpuesta (no ocupa ancho fijo) ---------- */
   .app, .app--sidebar-escondida { display: block; }

@@ -176,11 +176,13 @@ export function FiltrosBar({
         etiqueta={
           filtro.fecha
             ? `Fecha: ${etiquetaFecha(filtro.fecha)}${filtro.sinFecha ? ' + sin fecha' : ''}`
-            : filtro.sinFecha
-              ? 'Fecha: Sin fecha'
-              : 'Fecha'
+            : filtro.conFecha
+              ? 'Fecha: Con fecha'
+              : filtro.sinFecha
+                ? 'Fecha: Sin fecha'
+                : 'Fecha'
         }
-        activo={!!filtro.fecha || !!filtro.sinFecha}
+        activo={!!filtro.fecha || !!filtro.sinFecha || !!filtro.conFecha}
       >
         <div className="filtro-menu__grupo">Relativas (se recalculan)</div>
         {RELATIVAS.map((r) => (
@@ -190,6 +192,8 @@ export function FiltrosBar({
             onClick={() =>
               onCambiar({
                 ...filtro,
+                // #223: elegir cualquier otra opción de fecha apaga "Con fecha".
+                conFecha: undefined,
                 fecha:
                   filtro.fecha?.tipo === 'relativa' && filtro.fecha.valor === r
                     ? undefined
@@ -210,7 +214,7 @@ export function FiltrosBar({
             onChange={(e) => {
               const hasta = filtro.fecha?.tipo === 'rango' ? filtro.fecha.hasta : undefined
               const desde = e.target.value || undefined
-              onCambiar({ ...filtro, fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined })
+              onCambiar({ ...filtro, conFecha: undefined, fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined })
             }}
           />
           –
@@ -222,14 +226,33 @@ export function FiltrosBar({
             onChange={(e) => {
               const desde = filtro.fecha?.tipo === 'rango' ? filtro.fecha.desde : undefined
               const hasta = e.target.value || undefined
-              onCambiar({ ...filtro, fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined })
+              onCambiar({ ...filtro, conFecha: undefined, fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined })
             }}
           />
         </div>
+        {/* #223: "Con fecha" — todas las tareas que tienen fecha objetivo, sea
+            cual sea. EXCLUYENTE con el resto del campo: se apaga al elegir
+            cualquier otra opción de fecha, y al activarla las apaga. No define
+            el horizonte de la Gantt (no es una ventana temporal). */}
+        <button
+          className={`filtro-op${filtro.conFecha ? ' filtro-op--on' : ''}`}
+          onClick={() =>
+            onCambiar({
+              ...filtro,
+              fecha: undefined,
+              sinFecha: undefined,
+              conFecha: filtro.conFecha ? undefined : true,
+            })
+          }
+        >
+          Con fecha
+        </button>
         {/* Mismo formato que las demas opciones del campo (punto 1). */}
         <button
           className={`filtro-op${filtro.sinFecha ? ' filtro-op--on' : ''}`}
-          onClick={() => onCambiar({ ...filtro, sinFecha: filtro.sinFecha ? undefined : true })}
+          onClick={() =>
+            onCambiar({ ...filtro, conFecha: undefined, sinFecha: filtro.sinFecha ? undefined : true })
+          }
         >
           Sin fecha
         </button>
@@ -250,6 +273,7 @@ export function FiltrosBar({
               onCambiar({
                 ...filtro,
                 sinFecha: undefined,
+                conFecha: undefined,
                 fecha: filtro.fecha?.tipo === 'horizonte' ? undefined : { tipo: 'horizonte' },
               })
             }
@@ -257,10 +281,10 @@ export function FiltrosBar({
             En horizonte visible (Gantt)
           </button>
         )}
-        {(filtro.fecha || filtro.sinFecha) && (
+        {(filtro.fecha || filtro.sinFecha || filtro.conFecha) && (
           <button
             className="filtro-op filtro-op--quitar"
-            onClick={() => onCambiar({ ...filtro, fecha: undefined, sinFecha: undefined })}
+            onClick={() => onCambiar({ ...filtro, fecha: undefined, sinFecha: undefined, conFecha: undefined })}
           >
             Limpiar filtro
           </button>

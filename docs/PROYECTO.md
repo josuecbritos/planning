@@ -134,7 +134,14 @@ engorda (#185).
 
 En la barra lateral, hacer clic en un proyecto abre directamente **todos sus
 frentes**; editar, **agregar frente** y archivar viven en un menú **⋯** junto al
-nombre (#178/#189) — la lista de frentes contiene **solo frentes**. Ni los
+nombre (#178/#189) — la lista de frentes contiene **solo frentes**. Cada frente
+tiene su propio **⋯** con dos opciones, **Renombrar frente** y **Eliminar
+frente** (#222): antes eran dos iconos sueltos que aparecían al pasar el mouse y
+le quitaban ancho al nombre, partiéndolo en dos líneas y haciendo crecer la
+fila. El botón reserva su lugar siempre (está oculto, no ausente), así el nombre
+—en una sola línea, con el completo en el tooltip— no cambia de ancho y la fila
+nunca cambia de alto. Solo hay **un menú abierto a la vez**: abrir el de un
+frente cierra el de un proyecto y viceversa. Ni los
 proyectos ni los frentes muestran contador de tareas (#188): la lista se navega
 por color, nombre y jerarquía. Los contadores de **Administración** (usuarios y
 proyectos activos) sí se conservan. El control de plegar la barra es un

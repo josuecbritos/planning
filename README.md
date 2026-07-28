@@ -112,8 +112,9 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   cabecera y botonera **sticky** (la ✕ y Guardar siempre alcanzables); los
   cortos no cambian. El **panel de notificaciones** cierra el drawer y entra a
   **pantalla completa** con ✕ propio. El menú **⋯** se acota al viewport y, en
-  pantallas táctiles, se muestra en **todos** los proyectos (en escritorio sigue
-  apareciendo con hover). Las tablas de administración dan **ancho propio a la
+  pantallas táctiles, se muestra en **todos** los proyectos y **todos los
+  frentes** (en escritorio sigue apareciendo con hover), con la misma área
+  tocable de ≥44 px sin aumentar el alto de la fila. Las tablas de administración dan **ancho propio a la
   columna de identidad** y aceptan scroll horizontal. Los flotantes ☰/🌙 se
   **ocultan** mientras haya un modal o el panel abiertos. Las áreas táctiles
   llegan a **≥44 px** con un `::before` transparente, sin engordar las filas.
@@ -196,7 +197,7 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   una vista. No se ordena haciendo clic en el encabezado de columna.
 - **Filtros y orden guardables como "vista":** por Fecha Objetivo (relativas Hoy /
   Esta semana / Próxima semana / Este mes — semana de lunes a domingo —, rango
-  fijo o **Sin fecha**), Responsable (incluye **Sin asignar**) y Estado, con
+  fijo, **Con fecha** o **Sin fecha**), Responsable (incluye **Sin asignar**) y Estado, con
   multi-selección ("o" dentro del campo, "y" entre campos). Responsable y Estado
   incluyen **"Seleccionar todos"** (alterna a "Deseleccionar todos"). El **filtro y
   el orden se guardan juntos** como una sola vista, con nombre, **privados por
@@ -207,10 +208,24 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   además del Limpiar global. En la tabla filtran filas; en la Gantt, responsable y estado filtran
   tareas y **la fecha define el horizonte visible** — con la excepción de **Sin
   fecha**, que en la Gantt filtra (muestra solo las tareas sin fecha, como filas
-  sin marca, planificables ahí mismo) sin tocar el horizonte. En la tabla, los
+  sin marca, planificables ahí mismo) sin tocar el horizonte, y de **Con fecha**
+  (abajo). En la tabla, los
   filtros quedan **fijos arriba** al hacer scroll y los encabezados de columna se
   congelan justo debajo. Los desplegables de filtro se muestran **por encima del
   contenedor** (no se recortan aunque la tabla sea corta, p. ej. en Mis Tareas).
+- **"Con fecha"** (#223 — opción del filtro de Fecha, justo encima de "Sin
+  fecha"): muestra **solo las tareas que tienen Fecha Objetivo**, cualquiera sea.
+  Es **excluyente** dentro del campo: activarla apaga cualquier otra opción de
+  fecha —incluida "Sin fecha"— y elegir otra la apaga a ella; nunca quedan dos
+  encendidas. Sumarla a "Esta semana" anularía esa opción (todo lo de esta semana
+  ya tiene fecha) y sumarla a "Sin fecha" equivaldría a no filtrar. Volver a
+  tocarla la desactiva. **Filtra filas en las dos vistas** (en la Gantt también
+  esconde las tareas sin fecha) pero **no define el horizonte**: el selector
+  "Alrededor de hoy" / "Todo el proyecto" sigue disponible y no aparece el aviso
+  "Horizonte definido por el filtro de fecha". Está en las vistas de proyecto y en
+  Mis Tareas, y se guarda como parte de una vista. El comportamiento de "Sin
+  fecha" **no cambia** (sigue sumándose al resto); lo único nuevo entre ambas es
+  que se apagan mutuamente.
 - **"En horizonte visible (Gantt)"** (opción del filtro de Fecha): muestra las
   tareas con Fecha Objetivo **dentro del horizonte actual** de la Gantt, más las
   **sin fecha**. Solo se **activa desde la Gantt**; una vez activa **filtra ambas
@@ -232,6 +247,12 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   identidad con variantes ajustadas para fondo oscuro; el rastro de fechas
   anteriores queda visible incluso en tareas hechas (memoria histórica de la
   grilla; el color de fila y los contadores sí las tratan como Hecha).
+  Todo lo que se pinta **sobre un fondo destacado** usa la variable
+  `--sobre-primario` (blanco en claro, casi negro en oscuro), nunca `#fff` fijo:
+  con el color quemado, el contenido desaparecía al invertirse el fondo. Era el
+  caso del **número de prioridad y la flecha seleccionada del menú "Ordenar"**,
+  que quedaban blancos sobre un fondo casi blanco (#224); en modo claro el
+  resultado es idéntico al anterior, porque ahí la variable vale `#ffffff`.
 - **Roles y permisos (reestructuración):** tres roles — **Admin** (ve y
   gestiona absolutamente todo; puede haber **varios admins**), **Consultor**
   (los proyectos que **él creó** + los que el admin le asigne; no ve los de

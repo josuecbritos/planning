@@ -25,6 +25,14 @@ export interface Filtro {
   fecha?: FiltroFecha
   /** Incluir tareas SIN fecha objetivo ("o" con el criterio de fecha). */
   sinFecha?: boolean
+  /**
+   * #223: solo las tareas que SI tienen fecha objetivo, cualquiera sea.
+   * EXCLUYENTE con el resto del campo fecha (`fecha` y `sinFecha`): sumarla a
+   * "Esta semana" anularia esa opcion, y sumarla a "Sin fecha" no filtraria
+   * nada. A diferencia de las relativas y del rango, NO define el horizonte de
+   * la Gantt (no es una ventana temporal): solo filtra filas en ambas vistas.
+   */
+  conFecha?: boolean
   /** IDs de responsables ("o" entre si; acepta RESP_SIN_ASIGNAR). */
   responsables?: string[]
   /** Categorias del modelo ("o" entre si). */
@@ -58,6 +66,7 @@ export function filtroVacio(f: Filtro): boolean {
   return (
     !f.fecha &&
     !f.sinFecha &&
+    !f.conFecha &&
     !(f.responsables && f.responsables.length) &&
     !(f.estados && f.estados.length) &&
     !(f.proyectos && f.proyectos.length)
@@ -121,6 +130,9 @@ export function pasaFiltroTareas(state: AppState, t: Tarea, f: Filtro, hoy: ISOD
 /** Filtro completo (vista tabla): fecha + responsable + estado. */
 export function pasaFiltroCompleto(state: AppState, t: Tarea, f: Filtro, hoy: ISODate): boolean {
   if (!pasaFiltroTareas(state, t, f, hoy)) return false
+  // #223: "Con fecha" es excluyente dentro del campo fecha, así que resuelve
+  // sola: pasa todo lo que tenga fecha objetivo, sea cual sea.
+  if (f.conFecha) return !!t.fechaObjetivo
   // P4: "En horizonte visible" incluye SIEMPRE las tareas sin fecha, más las
   // que caen dentro del rango del horizonte de la Gantt.
   if (f.fecha?.tipo === 'horizonte') {
@@ -149,9 +161,12 @@ export function pasaFiltroCompleto(state: AppState, t: Tarea, f: Filtro, hoy: IS
 /**
  * Componente de fecha del filtro EN LA GANTT. La fecha normal (relativa/rango)
  * define el horizonte y NO filtra filas; las únicas que filtran filas son
- * "Sin fecha" y "En horizonte visible" (P4). Devuelve true si la tarea pasa.
+ * "Sin fecha", "Con fecha" (#223) y "En horizonte visible" (P4). Devuelve true
+ * si la tarea pasa.
  */
 export function pasaFechaGantt(f: Filtro, t: Tarea, hoy: ISODate): boolean {
+  // #223: filtra filas en la Gantt igual que en la tabla, sin tocar el horizonte.
+  if (f.conFecha) return !!t.fechaObjetivo
   if (f.fecha?.tipo === 'horizonte') {
     if (!t.fechaObjetivo) return true
     const { desde, hasta } = rangoDeFecha(f.fecha, hoy)
@@ -163,7 +178,7 @@ export function pasaFechaGantt(f: Filtro, t: Tarea, hoy: ISODate): boolean {
   return true
 }
 
-/** ¿La fecha del filtro FILTRA filas en la Gantt? (Sin fecha / En horizonte). */
+/** ¿La fecha del filtro FILTRA filas en la Gantt? (Sin fecha / Con fecha / En horizonte). */
 export function fechaFiltraGantt(f: Filtro): boolean {
-  return !!f.sinFecha || f.fecha?.tipo === 'horizonte'
+  return !!f.sinFecha || !!f.conFecha || f.fecha?.tipo === 'horizonte'
 }

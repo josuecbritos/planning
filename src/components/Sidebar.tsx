@@ -58,6 +58,9 @@ type ModalState =
   | { tipo: 'frente-editar'; id: string; nombre: string }
   | null
 
+/** #222: qué ⋯ está desplegado. Uno solo a la vez en toda la barra. */
+type MenuAbierto = { tipo: 'proyecto' | 'frente'; id: string } | null
+
 /** #187: chevron doble — comunica plegar/desplegar (no "fijar"). Mismo trazo
  *  que el resto de la iconografía de la barra (la campana es la referencia). */
 function IconoPlegar({ plegar }: { plegar: boolean }) {
@@ -108,20 +111,45 @@ export function Sidebar({
   actions,
 }: Props) {
   const [modal, setModal] = useState<ModalState>(null)
-  // #178/#184: menú ⋯ del proyecto abierto (id) o null, con su posición para
-  // renderizarlo como popover FUERA del sidebar (portal fijo, a la derecha).
-  // Se cierra al hacer clic fuera, al hacer scroll o al elegir una opción.
-  const [menuProyecto, setMenuProyecto] = useState<string | null>(null)
+  // #178/#184: menú ⋯ abierto, con su posición para renderizarlo como popover
+  // FUERA del sidebar (portal fijo, a la derecha). Se cierra al hacer clic
+  // fuera, al hacer scroll o al elegir una opción.
+  // #222: el estado es UNO SOLO para proyectos y frentes — así abrir el ⋯ de
+  // un frente cierra el de un proyecto y viceversa, sin coordinación extra.
+  const [menu, setMenu] = useState<MenuAbierto>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const cerrarMenu = () => {
-    setMenuProyecto(null)
+    setMenu(null)
     setMenuPos(null)
   }
+  /** Abre (o cierra, si ya estaba abierto) el ⋯ que corresponde al botón. */
+  const alternarMenu = (e: React.MouseEvent<HTMLButtonElement>, destino: NonNullable<MenuAbierto>) => {
+    if (menu && menu.tipo === destino.tipo && menu.id === destino.id) {
+      cerrarMenu()
+      return
+    }
+    // #196: la posición se ACOTA al viewport. Antes era siempre `r.right + 8`,
+    // que en una pantalla angosta dejaba el menú 66px fuera y cortaba el texto
+    // de las opciones. Si no cabe a la derecha, se ancla pegado al borde; el
+    // alto también se limita para no salirse abajo.
+    const r = e.currentTarget.getBoundingClientRect()
+    const ANCHO = 180
+    const MARGEN = 8
+    const left = Math.max(MARGEN, Math.min(r.right + MARGEN, window.innerWidth - ANCHO - MARGEN))
+    const top = Math.min(r.top, window.innerHeight - 150)
+    setMenuPos({ top: Math.max(MARGEN, top), left })
+    setMenu(destino)
+  }
   useEffect(() => {
-    if (!menuProyecto) return
+    if (!menu) return
     const fuera = (e: MouseEvent) => {
       const t = e.target as HTMLElement
-      if (!t.closest('.nav-proyecto__menu') && !t.closest('.nav-proyecto__menu-btn')) cerrarMenu()
+      if (
+        !t.closest('.nav-proyecto__menu') &&
+        !t.closest('.nav-proyecto__menu-btn') &&
+        !t.closest('.nav-frente__menu-btn')
+      )
+        cerrarMenu()
     }
     const onScroll = () => cerrarMenu()
     const id = setTimeout(() => document.addEventListener('mousedown', fuera), 0)
@@ -133,7 +161,7 @@ export function Sidebar({
       window.removeEventListener('scroll', onScroll, true)
       window.removeEventListener('resize', onScroll)
     }
-  }, [menuProyecto])
+  }, [menu])
 
   const frentes = state.frentes
     .filter((f) => f.proyectoId === proyectoActivoId)
@@ -223,28 +251,8 @@ export function Sidebar({
                   <button
                     className="nav-proyecto__menu-btn"
                     aria-label={`Opciones de ${p.nombre}`}
-                    aria-expanded={menuProyecto === p.id}
-                    onClick={(e) => {
-                      if (menuProyecto === p.id) {
-                        cerrarMenu()
-                        return
-                      }
-                      // #196: la posición se ACOTA al viewport. Antes era
-                      // siempre `r.right + 8`, que en una pantalla angosta
-                      // dejaba el menú 66px fuera y cortaba el texto de las
-                      // opciones. Si no cabe a la derecha, se ancla pegado al
-                      // borde; el alto también se limita para no salirse abajo.
-                      const r = e.currentTarget.getBoundingClientRect()
-                      const ANCHO = 180
-                      const MARGEN = 8
-                      const left = Math.max(
-                        MARGEN,
-                        Math.min(r.right + MARGEN, window.innerWidth - ANCHO - MARGEN),
-                      )
-                      const top = Math.min(r.top, window.innerHeight - 150)
-                      setMenuPos({ top: Math.max(MARGEN, top), left })
-                      setMenuProyecto(p.id)
-                    }}
+                    aria-expanded={menu?.tipo === 'proyecto' && menu.id === p.id}
+                    onClick={(e) => alternarMenu(e, { tipo: 'proyecto', id: p.id })}
                   >
                     ⋯
                   </button>
@@ -256,19 +264,22 @@ export function Sidebar({
                   {frentes.map((f) => (
                     <div key={f.id} className={`nav-frente-row${frenteSel === f.id ? ' nav-frente-row--activo' : ''}`}>
                       <button className="nav-frente nav-frente--flex" onClick={() => onSelectFrente(f.id)}>
-                        <span>{f.nombre}</span>
+                        <span title={f.nombre}>{f.nombre}</span>
                       </button>
+                      {/* #222: las acciones del frente pasan al ⋯, como las del
+                          proyecto. Los iconos sueltos le quitaban ancho al
+                          nombre al aparecer y la fila crecía de alto. El botón
+                          reserva su lugar siempre (visibility), así el nombre
+                          no cambia de ancho al pasar el mouse. */}
                       {can.editarEstructura && (
-                        <span className="nav-frente__tools">
-                          <button className="icon-btn" title="Renombrar" onClick={() => setModal({ tipo: 'frente-editar', id: f.id, nombre: f.nombre })}>✎</button>
-                          <button
-                            className="icon-btn"
-                            title="Eliminar frente"
-                            onClick={() => {
-                              if (confirm(`¿Eliminar el frente "${f.nombre}" y sus sub frentes y tareas?`)) actions.deleteFrente(f.id)
-                            }}
-                          >🗑</button>
-                        </span>
+                        <button
+                          className="nav-frente__menu-btn"
+                          aria-label={`Opciones de ${f.nombre}`}
+                          aria-expanded={menu?.tipo === 'frente' && menu.id === f.id}
+                          onClick={(e) => alternarMenu(e, { tipo: 'frente', id: f.id })}
+                        >
+                          ⋯
+                        </button>
                       )}
                     </div>
                   ))}
@@ -349,10 +360,10 @@ export function Sidebar({
       {/* #184: menú ⋯ del proyecto como popover FUERA del sidebar (portal
           fijo, a la derecha del botón), sobre el contenido — no desplaza nada
           dentro de la barra. */}
-      {menuProyecto &&
+      {menu?.tipo === 'proyecto' &&
         menuPos &&
         (() => {
-          const p = proyectos.find((x) => x.id === menuProyecto)
+          const p = proyectos.find((x) => x.id === menu.id)
           if (!p) return null
           return createPortal(
             <div
@@ -397,6 +408,45 @@ export function Sidebar({
                   Archivar
                 </button>
               )}
+            </div>,
+            document.body,
+          )
+        })()}
+
+      {/* #222: menú ⋯ del frente — mismo popover (portal fijo, acotado al
+          viewport) y exactamente dos opciones: renombrar y eliminar, con la
+          confirmación de siempre. */}
+      {menu?.tipo === 'frente' &&
+        menuPos &&
+        (() => {
+          const f = frentes.find((x) => x.id === menu.id)
+          if (!f) return null
+          return createPortal(
+            <div
+              className="nav-proyecto__menu nav-proyecto__menu--portal"
+              style={{ position: 'fixed', top: menuPos.top, left: menuPos.left }}
+              role="menu"
+            >
+              <button
+                className="nav-proyecto__menu-op"
+                onClick={() => {
+                  setModal({ tipo: 'frente-editar', id: f.id, nombre: f.nombre })
+                  cerrarMenu()
+                }}
+              >
+                Renombrar frente
+              </button>
+              <button
+                className="nav-proyecto__menu-op"
+                onClick={() => {
+                  cerrarMenu()
+                  if (confirm(`¿Eliminar el frente "${f.nombre}" y sus sub frentes y tareas?`)) {
+                    actions.deleteFrente(f.id)
+                  }
+                }}
+              >
+                Eliminar frente
+              </button>
             </div>,
             document.body,
           )
