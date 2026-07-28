@@ -268,6 +268,37 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   caso del **número de prioridad y la flecha seleccionada del menú "Ordenar"**,
   que quedaban blancos sobre un fondo casi blanco (#224); en modo claro el
   resultado es idéntico al anterior, porque ahí la variable vale `#ffffff`.
+- **Los botones siguen el tema por defecto (#230):** un `<button>` **no hereda**
+  el color del texto de su contenedor; si no se le declara uno, el navegador le
+  pone su negro. La regla base de la aplicación tampoco lo declaraba, así que
+  cualquier botón que se olvidara quedaba expuesto: en claro se veía bien por
+  casualidad —fondo claro— y en oscuro desaparecía. Le pasaba al **menú de
+  responsable**, cuyas opciones son botones sin color propio. La corrección va
+  **en la raíz** (`button { color: inherit }`), no en ese menú, para que el fallo
+  no pueda repetirse por olvido. Se auditaron todos los botones en ambos temas
+  antes de tocar nada: los únicos que dependían del negro por defecto eran el
+  disparador del selector de responsable y las opciones de su menú, ninguno sobre
+  un fondo claro fijo. Las zonas oscuras en los dos temas —barra lateral,
+  tooltips, tarjeta flotante de la Gantt— **declaran su propio color** (los
+  globos, su `#fff`; la tarjeta no tiene botones), así que no cambian. Único
+  efecto en modo claro: los nombres del menú de responsable pasan de `#000000` a
+  `#1a1c1d`, el color de texto de la aplicación — que es exactamente lo pedido.
+- **El campo de comentario nuevo sigue el tema (#231):** no declaraba fondo ni
+  color, así que usaba los del navegador —blanco y negro— y en oscuro quedaba un
+  recuadro blanco dentro de un panel oscuro. Ahora usa `var(--texto)` sobre
+  `var(--superficie)`, lo mismo que los campos de los modales y el de agregar
+  miembros; el borde de foco verde y el texto de ayuda ya eran legibles en los
+  dos temas. No cambia el tamaño, la forma ni el comportamiento.
+- **Colores que apuntaban a una variable inexistente (#232):** el campo de la
+  pantalla **sin frentes** pedía `var(--borde)`, que no existe en ningún tema y
+  no llevaba respaldo; una declaración con una variable indefinida se descarta
+  entera, así que el campo se quedaba **sin borde**. Ahora usa `--borde-input`,
+  el de los demás campos —cambia también en claro, y es lo que pide el criterio:
+  el mismo borde en los dos temas—. El nombre de la sesión en el pie de la barra
+  lateral pedía `var(--primario-claro, #9fd0a8)`: funcionaba **por el respaldo**,
+  no porque el color existiera. Se le dio nombre propio, `--sidebar-acento`, con
+  el mismo `#9fd0a8` de siempre; es fijo a propósito, porque la barra es oscura
+  en los dos temas. El aspecto del pie no cambia.
 - **Responsable de una tarea = miembro del proyecto (#228):** los candidatos son
   exactamente el **dueño y los usuarios activos con acceso**, sin excepción por
   rol. Antes se colaban además **todos los admins activos**, fueran o no
