@@ -1280,7 +1280,27 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    se le recorta el alto de línea para no engordar la fila. */
 .usuarios-tabla .proy-num { padding-top: 1px; padding-bottom: 1px; line-height: 1.2; }
 .usuarios-tabla .col-acc .icon-btn { filter: grayscale(1); }
-.usuario-nombre { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; }
+.usuario-nombre { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; max-width: 100%; }
+/* #213: el nombre es el único que cede espacio (el punto de color y el pill
+   mantienen el suyo) y se trunca con "…". Es un <button> para poder tocarlo,
+   pero hereda todo el aspecto del texto que era antes. */
+.usuario-nombre__txt {
+  border: none; background: none; padding: 0; margin: 0; font: inherit; color: inherit;
+  text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* #213: el globo con el nombre completo. Va en un portal con position fixed,
+   así que ningún `overflow` de la tabla puede recortarlo — que es justo lo que
+   arruinó el menú de Vistas cuando se abría hacia arriba en la primera fila. */
+.nombre-globo {
+  position: fixed; z-index: 140;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px;
+  background: var(--superficie); color: var(--texto);
+  border: 1px solid var(--gris-borde); box-shadow: 0 10px 24px rgba(0, 0, 0, .22);
+  font-size: 13px; font-weight: 600; line-height: 1.35;
+}
+/* Se envuelve en varias líneas: nunca se corta ni se trunca. */
+.nombre-globo__txt { white-space: normal; overflow-wrap: anywhere; }
 /* #181: una fila archivada/desactivada se ve atenuada por COLOR, no por
    opacity — así los iconos de acción (📦/🗑, ↺/🗑) quedan plenos y operables
    (opacity en la fila arrastraría también a los iconos). */
@@ -1899,6 +1919,16 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
     transform: translate(-50%, -50%);
     width: max(44px, 100%); height: max(44px, 100%);
   }
+  /* #214: SEPARACIÓN entre iconos vecinos. El área de 44px se extiende 22px a
+     cada lado del centro del botón; con los iconos pegados, los centros
+     quedaban a 26px y las áreas se solapaban 18px — tocar 👥 disparaba 📦. El
+     problema nunca fue el tamaño sino la falta de espacio. Con 10px de margen
+     lateral los centros quedan a 46px: cada área es exclusiva, con holgura.
+     Los iconos NO se agrandan y la fila NO crece de alto (el margen es
+     horizontal); la columna de acciones sí se ensancha, y eso es aceptable en
+     estas tablas, que ya admiten arrastre lateral. */
+  .usuarios-tabla .col-acc .icon-btn { margin-left: 10px; margin-right: 10px; }
+
   /* Los checkbox no admiten pseudo-elementos: se agrandan con el propio
      control, que ya vive en una celda con alto suficiente. */
   .usuarios-wrap input[type='checkbox'] { width: 22px; height: 22px; }

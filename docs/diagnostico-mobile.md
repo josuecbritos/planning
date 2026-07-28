@@ -356,6 +356,34 @@ ese trigger, y la regla que exige archivar primero es una **política RLS**, que
 el editor no aplica. Esa asimetría —el script tiene que archivar, el editor no
 debe— es la que conviene recordar.
 
+### Correcciones tras la verificación en el teléfono (#212–#214)
+
+Lo medido en el emulador no bastó: tres cosas solo se ven con el aparato en la
+mano. Todo aditivo dentro de `@media (max-width: 768px)`, sin tocar la base.
+
+| # | Qué pasaba | Qué se hizo | Medido en 390×844 |
+| --- | --- | --- | --- |
+| **#212** | Tocar una notificación abría el panel de detalle, que mide 359 px de 390 y **tapaba justo el plan** al que se acababa de navegar | En mobile se navega, se resalta y **no** se abre el panel; el detalle queda a un toque | mobile: 0 paneles con la tarea resaltada · escritorio: 1 panel, igual que antes |
+| **#213** | El nombre de la primera columna se seguía cortando, y en táctil un "…" es ilegible para siempre porque no hay hover | Se trunca con "…" y **al tocarlo** se abre un globo con el nombre entero y su pill; se envuelve en varias líneas | globo dentro de pantalla en primera fila, última fila y con nombre de 75 caracteres (2 líneas); el toque no dispara nada más |
+| **#214** | Al tocar un icono se activaba el de al lado (querer 👥 y que saliera 📦) | **Separación** entre iconos: los centros pasan de 26 a **46 px**, así cada área de 44 px es exclusiva | icono sigue en 16 px, fila sigue en 29 px, y cada icono recibe su propio toque en Proyectos y en Usuarios |
+
+**Por qué #214 no se detectó antes.** La medición de #199 comprobaba que cada
+área llegara a 44 px, y llegaba. Lo que no comprobaba es que **no se pisaran
+entre sí**: con los botones a 26 px de distancia, dos áreas de 44 se solapan 18
+px y el punto tocado cae en las dos. El problema nunca fue el tamaño sino la
+falta de espacio, y solo se manifiesta con un dedo real.
+
+**El globo de #213 va en un portal con `position: fixed`,** no dentro de la
+celda. Es la lección del menú de Vistas: un globo que se abre hacia arriba
+dentro de un contenedor con `overflow` queda recortado por más z-index que
+tenga. Fuera del árbol de la tabla, el overflow de nadie lo alcanza.
+
+**Un detalle que apareció al verificar:** el primer toque sobre un nombre justo
+después de cerrar un modal no abría nada. Al cerrarse el modal el navegador
+devuelve el scroll al body y dispara un evento `scroll` en el mismo tick que la
+apertura, que cerraba el globo antes de que se viera. Los cierres se enganchan
+ahora en el frame siguiente.
+
 ### Qué queda fuera
 
 - **Verificación en teléfono Android real** (#203): no es posible desde este

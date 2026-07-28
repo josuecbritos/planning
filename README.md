@@ -120,6 +120,17 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   Los iconos de acción son **SVG de trazo** (`components/Iconos.tsx`), no
   glifos: los símbolos de presentación de texto (✎ ⏻ ✉ ↺) salían como ▯ en
   Android porque no están en el set de emoji a color.
+- **Mobile — correcciones del teléfono real (#212–#214):** tocar una
+  **notificación** navega y resalta la tarea pero **no abre el panel de
+  detalle**, que en 390 px taparía justo el plan al que se acaba de llegar (en
+  escritorio se abre como siempre). En las tablas de administración, el nombre
+  de la primera columna se **trunca** y **al tocarlo** un globo muestra el
+  nombre entero con su pill, envuelto en varias líneas si hace falta — en
+  táctil no hay hover, así que un "…" sin salida es ilegible para siempre; el
+  globo va en un portal con `position: fixed` para que ningún `overflow` lo
+  recorte. Y los iconos de acción se **separan** hasta que sus áreas de 44 px
+  dejan de solaparse (centros a 46 px): el problema no era el tamaño sino la
+  falta de espacio, y por eso tocar 👥 disparaba 📦.
 - **Gantt editable — estándar por clics (sin arrastre):** clic izquierdo en una
   celda vacía planifica la tarea ese día; clic izquierdo sobre una marca **futura**
   la borra — si la marca venía de una replanificación, borrarla **deshace ese
@@ -465,7 +476,8 @@ src/
     TaskPanel, TaskDetail, FiltrosBar, FechaEditable, RespPicker,
     AdminProyectosView, ProyectoModal, MiembrosModal, UsersView,
     UsuarioModal, PermisosModal, PermisosProyectoModal, Notificaciones,
-    LoginPage, DefinirPassword, ConfiguracionView, Modal, TextPromptModal, …
+    LoginPage, DefinirPassword, ConfiguracionView, NombreTocable,
+    Modal, TextPromptModal, …
     Iconos.tsx           Iconos de acción como SVG de trazo (#203)
 supabase/
   migrations/            18 migraciones (1→18). Lista ordenada en DEPLOY.md.

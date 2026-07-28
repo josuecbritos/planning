@@ -5,6 +5,7 @@ import { esDuenoDe, puedeCrearProyectos, puedeEditarProyecto, puedeEliminarProye
 import { ProyectoModal } from './ProyectoModal'
 import { MiembrosModal } from './MiembrosModal'
 import { IconoArchivar, IconoEditar, IconoMiembros, IconoPapelera } from './Iconos'
+import { NombreTocable } from './NombreTocable'
 
 // Administración → Proyectos (#132). Reparto: este módulo es dueño de la
 // relación usuario↔proyecto (miembros, 🔑) y del ciclo de vida del proyecto
@@ -111,16 +112,20 @@ export function AdminProyectosView({ state, proyectos, sesion, actions }: Props)
               return (
                 <tr key={p.id} className={archivado ? 'usuario-inactivo' : ''}>
                   <td>
-                    <span className="usuario-nombre">
-                      <span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />
-                      {p.nombre}
-                      {/* #165: DUEÑO / MIEMBRO excluyentes, o nada. */}
-                      {soyDueno(p) ? (
-                        <span className="chip-dueno">Dueño</span>
-                      ) : soyMiembro(p) ? (
-                        <span className="chip-dueno chip-miembro">Miembro</span>
-                      ) : null}
-                    </span>
+                    {/* #213: el nombre se trunca y, al tocarlo en mobile, un
+                        globo muestra el nombre entero con su pill. */}
+                    <NombreTocable
+                      icono={<span className="nav-proyecto__dot" style={{ background: p.color ?? '#607d8b' }} />}
+                      nombre={p.nombre}
+                      /* #165: DUEÑO / MIEMBRO excluyentes, o nada. */
+                      pill={
+                        soyDueno(p) ? (
+                          <span className="chip-dueno">Dueño</span>
+                        ) : soyMiembro(p) ? (
+                          <span className="chip-dueno chip-miembro">Miembro</span>
+                        ) : undefined
+                      }
+                    />
                   </td>
                   <td>{dueno ? dueno.nombre : <span className="usuarios-sin">—</span>}</td>
                   <td>{nMiembros(p)}</td>
