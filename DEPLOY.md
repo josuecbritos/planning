@@ -211,6 +211,15 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
    > `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` los usa el código de las
    > funciones, pero **Supabase los inyecta automáticamente** en el entorno de
    > las Edge Functions: no hace falta configurarlos a mano.
+
+   **Para probar en un preview de Vercel** hace falta un secret más. Las
+   funciones responden con CORS acotado a `SITE_URL`, así que desde el dominio
+   del preview el navegador bloquea la respuesta y la app lo reporta como si
+   fuera un problema de conexión. Se agrega el origen del preview a la lista:
+   ```bash
+   supabase secrets set SITE_URLS="https://planning-git-<rama>-<cuenta>.vercel.app"
+   ```
+   Admite varios separados por coma. Es opcional: en producción no hace falta.
 4. Desde el Módulo de Usuarios, el botón ✉ envía (o reenvía) la invitación a
    cualquier usuario activo que aún no tenga cuenta.
 5. **Recuperar contraseña (#205).** Sale por el mismo Resend y la misma

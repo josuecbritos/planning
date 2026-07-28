@@ -96,7 +96,13 @@ reintroduce un hallazgo de la auditoría.
    `recuperar-contrasena`). No bajarlo. El front comparte la regla en
    `src/lib/password.ts`, pero esa es de conveniencia: la que manda es la del
    servidor.
-8. **CORS acotado a `SITE_URL`** en las Edge Functions; **secretos solo
+8. **CORS por lista de orígenes** en las Edge Functions, nunca `'*'`: `SITE_URL`
+   más lo que traiga el secret opcional `SITE_URLS` (separado por comas). La
+   respuesta refleja el `Origin` **solo si está en la lista**; cualquier otro
+   recibe `SITE_URL` y el navegador lo bloquea. `SITE_URLS` existe para las URL
+   de preview de Vercel, que son otro dominio: sin ella, probar los flujos de
+   correo en un preview falla con un error que parece de conexión. No poner ahí
+   dominios que no sean de este proyecto. **Secretos solo
    server-side** (`RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, etc. nunca en el
    front; el front usa solo la `anon key`).
 9. **Headers de `vercel.json`:** no quitarlos. Si se agrega un origen externo

@@ -42,6 +42,7 @@ export function ConfiguracionView({ usuario, actions, auth }: Props) {
   const [nueva, setNueva] = useState('')
   const [confirmar, setConfirmar] = useState('')
   const [cambiando, setCambiando] = useState(false)
+  const [verPass, setVerPass] = useState(false)
   const [avisoPass, setAvisoPass] = useState<{ ok: boolean; texto: string } | null>(null)
 
   // Las iniciales que se verían si nadie las hubiera escrito a mano.
@@ -126,7 +127,7 @@ export function ConfiguracionView({ usuario, actions, auth }: Props) {
             {siguenAlNombre ? (
               <>
                 Tus iniciales siguen a tu nombre: si lo cambias, se recalculan.
-                Escríbelas para fijarlas —útil cuando chocan con las de otra persona—.
+                Escríbelas para fijarlas.
               </>
             ) : (
               <>
@@ -146,11 +147,20 @@ export function ConfiguracionView({ usuario, actions, auth }: Props) {
         </form>
 
         <form className="config__bloque" onSubmit={guardarPassword}>
-          <h3>Contraseña</h3>
+          <div className="config__titulo">
+            <h3>Contraseña</h3>
+            {/* Un solo interruptor para los tres campos: escribir una
+                contraseña a ciegas y repetirla es donde se cometen los
+                errores que después parecen "no me acepta la clave". */}
+            <label className="config__ver">
+              <input type="checkbox" checked={verPass} onChange={(e) => setVerPass(e.target.checked)} />
+              Ver contraseñas
+            </label>
+          </div>
           <label className="campo">
             <span>Contraseña actual</span>
             <input
-              type="password"
+              type={verPass ? 'text' : 'password'}
               autoComplete="current-password"
               value={actual}
               onChange={(e) => setActual(e.target.value)}
@@ -159,7 +169,7 @@ export function ConfiguracionView({ usuario, actions, auth }: Props) {
           <label className="campo">
             <span>Contraseña nueva (mínimo 10 caracteres, con letras y números)</span>
             <input
-              type="password"
+              type={verPass ? 'text' : 'password'}
               autoComplete="new-password"
               value={nueva}
               onChange={(e) => setNueva(e.target.value)}
@@ -168,7 +178,7 @@ export function ConfiguracionView({ usuario, actions, auth }: Props) {
           <label className="campo">
             <span>Repite la nueva</span>
             <input
-              type="password"
+              type={verPass ? 'text' : 'password'}
               autoComplete="new-password"
               value={confirmar}
               onChange={(e) => setConfirmar(e.target.value)}
@@ -193,27 +203,6 @@ export function ConfiguracionView({ usuario, actions, auth }: Props) {
             )}
           </div>
         </form>
-
-        <div className="config__bloque config__bloque--info">
-          <h3>Lo que gestiona el administrador</h3>
-          <dl className="config__lista">
-            <div>
-              <dt>Correo</dt>
-              <dd>{usuario.email} — es la llave de tu cuenta y de tu inicio de sesión.</dd>
-            </div>
-            <div>
-              <dt>Rol</dt>
-              <dd>{ROL_LABEL[usuario.rol]}</dd>
-            </div>
-            <div>
-              <dt>Estado</dt>
-              <dd>{usuario.activo ? 'Activo' : 'Desactivado'}</dd>
-            </div>
-          </dl>
-          <p className="config__nota">
-            Si necesitas cambiar alguno de estos, escríbele a tu administrador.
-          </p>
-        </div>
       </div>
     </div>
   )

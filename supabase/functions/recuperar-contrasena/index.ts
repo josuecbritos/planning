@@ -25,11 +25,23 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const ORIGEN = Deno.env.get('SITE_URL') ?? '*'
-const cors = {
-  'Access-Control-Allow-Origin': ORIGEN,
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Vary': 'Origin',
+// CORS por LISTA de orígenes permitidos (invariante 8: acotado, nunca '*').
+// `SITE_URL` es la app en producción. `SITE_URLS` es opcional y admite orígenes
+// extra separados por coma — sirve para las URL de preview de Vercel, que son
+// de otro dominio y sin esto reciben un bloqueo del navegador que la app
+// reporta como si fuera un problema de conexión.
+const PERMITIDOS = [
+  Deno.env.get('SITE_URL'),
+  ...(Deno.env.get('SITE_URLS') ?? '').split(',').map((o) => o.trim()),
+].filter((o): o is string => Boolean(o))
+
+function corsDe(req: Request): Record<string, string> {
+  const origen = req.headers.get('Origin') ?? ''
+  return {
+    'Access-Control-Allow-Origin': PERMITIDOS.includes(origen) ? origen : (PERMITIDOS[0] ?? '*'),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Vary': 'Origin',
+  }
 }
 
 // Rate limiting por IP, best-effort y en memoria del contenedor, igual que en
@@ -73,6 +85,7 @@ const REGLA_PASSWORD = 'La contraseña debe tener al menos 10 caracteres e inclu
 const SIN_CUENTA = 'No hay una cuenta activa con ese correo. Contacta a tu administrador.'
 
 Deno.serve(async (req) => {
+  const cors = corsDe(req)
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
   const responder = (status: number, body: unknown) =>
