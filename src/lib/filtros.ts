@@ -7,6 +7,12 @@ import type { OrdenMulti } from './orden'
 // fecha), Responsable y Estado. Dentro de un campo los valores se combinan
 // como "o"; entre campos, como "y". Las fechas relativas se recalculan
 // siempre contra `hoy`; la semana va de lunes a domingo (como la Gantt).
+//
+// #234 — El filtro decide QUÉ TAREAS se ven; el horizonte de la Gantt decide
+// QUÉ DÍAS se ven. Son cosas distintas y ninguna manda sobre la otra: el
+// filtro se aplica igual en las dos vistas y el horizonte tiene su propio
+// control. La única opción que cruza los dos conceptos es `horizonte`, y lo
+// hace en un solo sentido y a pedido: filtra por lo que la Gantt muestra.
 
 export type FechaRelativa = 'hoy' | 'semana' | 'proxima' | 'mes'
 
@@ -73,9 +79,19 @@ export function filtroVacio(f: Filtro): boolean {
   )
 }
 
-/** true si el filtro restringe TAREAS (responsable/estado; la fecha no en Gantt). */
+/**
+ * true si el filtro restringe QUÉ TAREAS se ven. La fecha cuenta: filtra filas
+ * en las dos vistas (#234). No incluye `proyectos`, que acota frentes y solo
+ * existe en Mis Tareas.
+ */
 export function filtraTareas(f: Filtro): boolean {
-  return Boolean((f.responsables && f.responsables.length) || (f.estados && f.estados.length))
+  return Boolean(
+    (f.responsables && f.responsables.length) ||
+      (f.estados && f.estados.length) ||
+      f.fecha ||
+      f.sinFecha ||
+      f.conFecha,
+  )
 }
 
 /**
@@ -127,7 +143,13 @@ export function pasaFiltroTareas(state: AppState, t: Tarea, f: Filtro, hoy: ISOD
   return true
 }
 
-/** Filtro completo (vista tabla): fecha + responsable + estado. */
+/**
+ * Filtro completo: fecha + responsable + estado. Lo usan LAS DOS vistas — la
+ * tabla y la Gantt filtran las mismas filas con la misma regla (#234). La
+ * Gantt tenía su propia versión en la que la fecha no filtraba, solo movía el
+ * horizonte; eso confundía dos cosas distintas (qué tareas veo vs. qué días
+ * veo) y dejaba pasar tareas sin fecha con "Hoy" puesto.
+ */
 export function pasaFiltroCompleto(state: AppState, t: Tarea, f: Filtro, hoy: ISODate): boolean {
   if (!pasaFiltroTareas(state, t, f, hoy)) return false
   // #223: "Con fecha" es excluyente dentro del campo fecha, así que resuelve
@@ -158,27 +180,3 @@ export function pasaFiltroCompleto(state: AppState, t: Tarea, f: Filtro, hoy: IS
   return true
 }
 
-/**
- * Componente de fecha del filtro EN LA GANTT. La fecha normal (relativa/rango)
- * define el horizonte y NO filtra filas; las únicas que filtran filas son
- * "Sin fecha", "Con fecha" (#223) y "En horizonte visible" (P4). Devuelve true
- * si la tarea pasa.
- */
-export function pasaFechaGantt(f: Filtro, t: Tarea, hoy: ISODate): boolean {
-  // #223: filtra filas en la Gantt igual que en la tabla, sin tocar el horizonte.
-  if (f.conFecha) return !!t.fechaObjetivo
-  if (f.fecha?.tipo === 'horizonte') {
-    if (!t.fechaObjetivo) return true
-    const { desde, hasta } = rangoDeFecha(f.fecha, hoy)
-    if (desde && t.fechaObjetivo < desde) return false
-    if (hasta && t.fechaObjetivo > hasta) return false
-    return true
-  }
-  if (f.sinFecha) return !t.fechaObjetivo
-  return true
-}
-
-/** ¿La fecha del filtro FILTRA filas en la Gantt? (Sin fecha / Con fecha / En horizonte). */
-export function fechaFiltraGantt(f: Filtro): boolean {
-  return !!f.sinFecha || !!f.conFecha || f.fecha?.tipo === 'horizonte'
-}
