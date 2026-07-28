@@ -17,7 +17,7 @@ import { colorTarea, fechaVigente, marcasDe } from '../lib/derive'
 import { fechaFiltraGantt, filtraTareas, pasaFechaGantt, pasaFiltroTareas, rangoDeFecha, type Filtro } from '../lib/filtros'
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
-import type { Can } from '../lib/permisos'
+import { miembrosDeProyecto, responsableDeTarea, type Can } from '../lib/permisos'
 import { EmptyFrentes } from './EmptyFrentes'
 import { Marca } from './Marca'
 import { Avatar, RespPicker } from './RespPicker'
@@ -185,15 +185,9 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   // Candidatos a responsable: admins, el dueño y quienes tienen acceso. En
   // Mis Tareas no se reasigna responsable (sacaría la tarea de la propia
   // vista), así que la columna queda de solo lectura y no hay candidatos.
-  const candidatos = misTareas
-    ? []
-    : state.usuarios.filter(
-        (u) =>
-          u.activo &&
-          (u.rol === 'admin' ||
-            state.proyectos.some((p) => p.id === proyectoId && p.duenoId === u.id) ||
-            state.accesos.some((a) => a.usuarioId === u.id && a.proyectoId === proyectoId)),
-      )
+  // #228: los candidatos son los MIEMBROS del proyecto, la misma lista que usa
+  // la tabla y el panel de detalle (ver `miembrosDeProyecto`).
+  const candidatos = misTareas ? [] : miembrosDeProyecto(state, proyectoId ?? null)
 
   // #190: origen de los frentes. En un proyecto, los suyos (o el seleccionado);
   // en Mis Tareas, los de TODOS los proyectos visibles, ordenados por proyecto
@@ -1112,7 +1106,9 @@ function FilaGanttRow({
 
   const { tarea } = fila
   const color = colorTarea(state, tarea, hoy)
-  const resp = state.usuarios.find((u) => u.id === tarea.responsableId)
+  // #229: igual que en la tabla — el responsable que ya no es candidato se
+  // muestra apagado, no vacío.
+  const resp = responsableDeTarea(state, tarea.responsableId, candidatos)
 
   const marcas = new Map<ISODate, TipoMarca>()
   for (const mk of marcasDe(state, tarea, hoy)) marcas.set(mk.fecha, mk.tipo)
@@ -1248,9 +1244,14 @@ function FilaGanttRow({
             value={tarea.responsableId}
             onChange={(id) => actions.updateTarea(tarea.id, { responsableId: id })}
             ariaLabel={`Responsable: ${tarea.titulo}`}
+            apagado={resp.apagado}
+            responsable={resp.usuario}
+            motivo={resp.motivo}
           />
         ) : (
-          resp && <Avatar usuario={resp} />
+          resp.estado !== 'sin-asignar' && (
+            <Avatar usuario={resp.usuario} apagado={resp.apagado} motivo={resp.motivo} />
+          )
         )}
       </td>
 

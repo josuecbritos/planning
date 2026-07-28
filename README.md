@@ -268,6 +268,27 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   caso del **número de prioridad y la flecha seleccionada del menú "Ordenar"**,
   que quedaban blancos sobre un fondo casi blanco (#224); en modo claro el
   resultado es idéntico al anterior, porque ahí la variable vale `#ffffff`.
+- **Responsable de una tarea = miembro del proyecto (#228):** los candidatos son
+  exactamente el **dueño y los usuarios activos con acceso**, sin excepción por
+  rol. Antes se colaban además **todos los admins activos**, fueran o no
+  miembros, y eso chocaba con la regla que gobierna el resto de la aplicación:
+  barra lateral, Resumen y Mis Tareas muestran **solo los proyectos donde la
+  persona es miembro**. Una tarea asignada a un admin no miembro no le aparecía
+  por ningún lado. La lista sale de un único `miembrosDeProyecto` en
+  `lib/permisos.ts`, usado por la tabla, la Gantt, el panel de detalle, la
+  creación de tareas y el filtro de Responsable, para que no puedan divergir. Es
+  una regla **de interfaz**: no hay cambios en la base ni en las reglas de
+  acceso, y ninguna tarea existente se modifica.
+- **El responsable siempre se muestra, aunque ya no esté disponible (#229):**
+  una tarea con responsable en la base **nunca** se ve vacía. Si esa persona ya
+  no es candidata —dejó de ser miembro, o fue desactivada/eliminada— se sigue
+  mostrando, **apagada** (atenuada y en gris) y con el motivo en el tooltip. Al
+  abrir el selector no aparece entre las opciones: se reasigna a un miembro o se
+  deja sin responsable, y el aspecto vuelve a la normalidad. Cuando el cliente
+  **no tiene la ficha** de la persona se muestra una **marca neutra «?»**, no un
+  hueco: con Supabase la lista de usuarios sale de la vista `usuario_visible`,
+  que excluye a los eliminados y, para quien no es admin, a quien ya no comparte
+  ningún proyecto. Los responsables normales se ven exactamente igual que antes.
 - **Roles y permisos (reestructuración):** tres roles — **Admin** (ve y
   gestiona absolutamente todo; puede haber **varios admins**), **Consultor**
   (los proyectos que **él creó** + los que el admin le asigne; no ve los de
