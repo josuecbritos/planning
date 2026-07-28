@@ -634,3 +634,44 @@ contraído no cambia; y contraer y expandir devuelve una foto idéntica.
 **La lección para la próxima verificación por píxeles:** medir a dpr 1 no basta.
 Los zooms no enteros (110%, 125%) mueven los bordes a fracciones de píxel de
 dispositivo y sacan a la luz problemas que a 100% no existen.
+
+### #227, cierre: un solo criterio — desplegado igual que contraído
+
+El criterio final reemplaza a los anteriores: **el borde superior de un bloque
+desplegado se ve siempre igual que el de uno contraído**, en reposo, mientras se
+scrollea y con los encabezados congelados, a cualquier zoom. El contraído es la
+vara porque lo dibuja un elemento estático y siempre sale bien.
+
+Verificado comparando las dos líneas **en la misma captura**: se contrae el
+segundo sub frente para que su recuadro quede por debajo del encabezado
+congelado del primero, y se mide cuánto se aleja cada una del color de borde
+declarado. Diferencia 0 = indistinguibles.
+
+Aparecieron dos cosas al medir así:
+
+- **A 110% el que salía flojo era la VARA**, no el bloque (desvío 11 contra 3).
+  O sea: con la tinta repetida el encabezado congelado ya estaba mejor que el
+  recuadro contraído. Se le aplicó la misma técnica al `border-bottom` del
+  recuadro, con **capas de fondo** en vez de un pseudo-elemento: el fondo se
+  recorta al `border-radius` y las esquinas redondeadas se conservan.
+- **Dos trampas de medición propias**, no del producto: en modo oscuro "la fila
+  de píxeles más oscura" captura el fondo de página, que es más oscuro que la
+  línea (hay que comparar contra el color de borde declarado); y muestrear cerca
+  del borde izquierdo del recuadro contraído cae sobre la **esquina redondeada**,
+  que está suavizada.
+
+| Zoom | claro | oscuro |
+| --- | --- | --- |
+| 100% | 0 | 0 |
+| 110% | 3 | 4 |
+| 125% | 1 | 2 |
+| 150% / 175% / 200% | 0 | 0 |
+| Teléfono 390×844 | 0 | 0 |
+
+*(Mayor diferencia entre la línea del bloque desplegado y la del contraído, en
+17 posiciones de scroll por caso, 11 de ellas con el encabezado congelado.)*
+
+**Permanencia.** Las dos reglas de tinta repetida llevan su explicación al lado
+en `styles.css` (`table.tareas thead th::before` y `.subfrente__titulo--colapsado`).
+Sin ese comentario parecen redundancia y una limpieza las borraría, devolviendo
+el problema.

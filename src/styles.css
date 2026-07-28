@@ -1948,7 +1948,21 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 .frente-cabecera--colapsado {
   border-bottom: 1px solid var(--gris-borde); padding-bottom: 8px; margin-bottom: 8px;
 }
-.subfrente__titulo--colapsado { border-bottom: 1px solid var(--gris-borde); border-radius: 8px; }
+.subfrente__titulo--colapsado {
+  border-bottom: 1px solid var(--gris-borde); border-radius: 8px;
+  /* #227: misma tinta repetida que la línea del encabezado (ver más arriba, en
+     `table.tareas thead th::before`). El criterio es que el borde de un bloque
+     desplegado se vea IGUAL que el de uno contraído; a zoom 110% este borde
+     caía en una fracción de píxel y salía más flojo que aquel, así que la
+     diferencia aparecía por este lado. Se repinta con capas de fondo —no con
+     un pseudo-elemento— porque el fondo sí se recorta al `border-radius` y las
+     esquinas redondeadas del recuadro se conservan. */
+  background-image:
+    linear-gradient(to top, var(--gris-borde) 0 1px, transparent 1px),
+    linear-gradient(to top, var(--gris-borde) 0 1px, transparent 1px),
+    linear-gradient(to top, var(--gris-borde) 0 1px, transparent 1px),
+    linear-gradient(to top, var(--gris-borde) 0 1px, transparent 1px);
+}
 
 /* #169: acciones del encabezado del módulo (filtro + botón crear). */
 .usuarios-cabecera__acciones { display: flex; align-items: center; gap: 16px; }
