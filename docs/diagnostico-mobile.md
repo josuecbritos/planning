@@ -525,3 +525,57 @@ Tres decisiones de implementación:
 | Sin desbordes | con la barra en 340px: `scrollWidth - clientWidth` = 0 en `documentElement`, `body` y `.app`, en Tabla, Gantt, Resumen y Mis Tareas |
 | Modo escondido | se despliega en los 340px elegidos, tras el riel de 54px, y la manija acompaña al borde |
 | Teléfono | panel `fixed` de 300px, manija en `display: none`, aun con 400px guardados para ese usuario |
+
+---
+
+## 14. La línea superior de las tablas al congelarse los encabezados (#227)
+
+Bug preexistente, no introducido por #222–#226. Aplica a la vista Tabla del
+proyecto y a Mis Tareas, que comparten `table.tareas`; se corrigen juntas
+porque es el mismo mecanismo. El teléfono se verifica aquí porque el criterio 11
+del pedido lo pide expresamente, aunque el problema no era específico de mobile.
+
+**Qué pasaba.** El recuadro gris del sub frente no lleva línea abajo: se apoya
+en la de arriba de la tabla, y los dos se leen como un bloque. Pero esa línea
+era `table.tareas { border-top }`, es decir, de la **caja de la tabla**, y los
+encabezados son `position: sticky`. Al despegarse, los `th` se quedaban sin
+línea arriba mientras la de la tabla se iba con el scroll: el bloque se veía
+abierto por el borde superior, y como depende de si en ese momento están
+congelados o no, la línea aparecía y desaparecía durante el recorrido.
+
+**Qué se hizo.** Una línea de CSS: el `border-top` pasa de la tabla al `th`.
+Como el `th` es el que se congela, la línea viaja con él. Con
+`border-collapse: separate` y `border-spacing: 0` cae en el mismo píxel que
+antes, así que **el estado en reposo no cambia**: la tabla pierde 1px de borde y
+el `th` lo gana, y el alto total es el mismo.
+
+**Cómo se verificó.** Por píxeles, no a ojo. Se recorta una franja de 6px
+alrededor del borde superior del `thead`, se dibuja en un canvas y se comparan
+dos bandas contra el color de borde computado del propio `th`: la del borde
+superior (¿está la línea?) y la inmediatamente anterior (¿está doblada?).
+
+Dos trampas del método que costaron encontrar:
+
+- **El recuadro gris del sub frente no es una línea.** El primer detector
+  marcaba "línea" cualquier fila de píxeles distinta del fondo del encabezado, y
+  `--gris-sf` (#ececee) difiere de `--superficie-2` (#fafafa) lo bastante como
+  para colarse. Se cambió a comparar contra el color de borde real.
+- **Cuando el `th` llega al final de su tabla, la sticky lo empuja hacia
+  arriba** y termina **por detrás de la barra de filtros**. Ahí la franja
+  muestra la barra, no el encabezado: esas posiciones se descartan en vez de
+  contarse como "línea ausente".
+
+| Medición | `main` | con #227 |
+| --- | --- | --- |
+| Foto del bloque en reposo (SHA-256) | `a94c1be15b70cad4` | **`a94c1be15b70cad4`** (idéntica) |
+| Línea en el borde superior del `th` — Tabla, recorrido de 10 posiciones (8 con el encabezado congelado) | ausente en las 10 | **presente en las 10, nunca doble** |
+| Mis Tareas, 10 posiciones | ausente en las 10 | **presente en las 10** |
+| Modo oscuro, reposo + 8 posiciones | ausente | **presente** |
+| Teléfono 390×844 — Tabla (8 posiciones) y Mis Tareas (7) | ausente | **presente** |
+| Sub frente contraído | `border-bottom: 1px`, radio 8px | igual |
+| Contraer y volver a expandir | — | foto idéntica a la previa |
+
+En `main` la línea también aparece "ausente" **en reposo**: no es que no se vea
+—ahí la dibuja la tabla, 1px más arriba— sino que no está donde tiene que estar,
+que es en el encabezado. Eso es exactamente el bug, y la foto idéntica del
+bloque en reposo confirma que el resultado visual sin scroll no cambió.

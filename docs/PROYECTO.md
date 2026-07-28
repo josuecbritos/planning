@@ -94,7 +94,13 @@ completo con creación y edición **inline** (sin formularios).
   categorías).
 
 En la Tabla, frentes y sub frentes se **colapsan** con un chevron (▸/▾) para
-enfocar; el colapso es momentáneo (no se guarda).
+enfocar; el colapso es momentáneo (no se guarda). El recuadro gris del sub
+frente y su tabla se leen como **un solo bloque**: el recuadro no lleva línea
+abajo porque se apoya en la de arriba de la tabla. Esa línea vive en el
+encabezado (`th`), no en la tabla, para que **viaje con los encabezados cuando
+se congelan** al hacer scroll (#227); puesta en la tabla se quedaba atrás y el
+bloque se veía abierto por arriba. Vale igual para Mis Tareas, que usa la misma
+tabla.
 
 **Modelo de estados (derivado, no editable a mano):** cada tarea cae en una de
 cinco categorías excluyentes — Hecha (verde), Pendiente (sin color), Pendiente

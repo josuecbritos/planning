@@ -226,7 +226,9 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   sin marca, planificables ahí mismo) sin tocar el horizonte, y de **Con fecha**
   (abajo). En la tabla, los
   filtros quedan **fijos arriba** al hacer scroll y los encabezados de columna se
-  congelan justo debajo. Los desplegables de filtro se muestran **por encima del
+  congelan justo debajo, **conservando su línea superior** al despegarse (#227:
+  esa línea es del `th`, no de la tabla; puesta en la tabla se quedaba atrás con
+  el scroll y el bloque se veía abierto por arriba). Los desplegables de filtro se muestran **por encima del
   contenedor** (no se recortan aunque la tabla sea corta, p. ej. en Mis Tareas).
 - **"Con fecha"** (#223 — opción del filtro de Fecha, justo encima de "Sin
   fecha"): muestra **solo las tareas que tienen Fecha Objetivo**, cualquiera sea.

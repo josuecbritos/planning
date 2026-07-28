@@ -342,7 +342,7 @@ button { font-family: inherit; cursor: pointer; }
    la tabla para no duplicarse. Filas compactas (padding reducido). */
 table.tareas {
   width: 100%; border-collapse: separate; border-spacing: 0; background: var(--superficie);
-  border-left: 1px solid var(--gris-borde); border-top: 1px solid var(--gris-borde);
+  border-left: 1px solid var(--gris-borde);
 }
 table.tareas th, table.tareas td {
   border-right: 1px solid var(--gris-borde); border-bottom: 1px solid var(--gris-borde);
@@ -355,6 +355,14 @@ table.tareas th {
   /* Encabezados congelados JUSTO debajo de la barra de filtros sticky
      (--filtros-h la mide App); sin la barra, se congelan al tope. */
   position: sticky; top: var(--filtros-h, 0); z-index: 10;
+  /* #227: la línea de arriba es del ENCABEZADO, no de la tabla. Estaba en
+     `table.tareas { border-top }`, que se queda con la caja de la tabla y se
+     va con el scroll: al despegarse los th quedaban flotando sin línea arriba
+     y el bloque se veía abierto. Puesta en el th viaja con él, así que la
+     línea está siempre, congelado o no. En reposo cae en el mismo píxel (el
+     borde-spacing es 0), así que nada cambia sin scroll: el recuadro gris del
+     sub frente —que no lleva línea abajo— sigue apoyándose en ella. */
+  border-top: 1px solid var(--gris-borde);
 }
 
 /* Contenido centrado en Hecha, responsable y fechas.
