@@ -8,7 +8,7 @@ import type { OrdenMulti } from './orden'
 // como "o"; entre campos, como "y". Las fechas relativas se recalculan
 // siempre contra `hoy`; la semana va de lunes a domingo (como la Gantt).
 //
-// #234 — El componente de fecha hace DOS cosas, no una: filtra las tareas
+// #250 — El componente de fecha hace DOS cosas, no una: filtra las tareas
 // (igual en las dos vistas, con la misma función) y, en la Gantt, define el
 // horizonte visible. Antes solo hacía lo segundo, y por eso "Hoy" mostraba
 // tareas de cualquier día. Las dos van juntas: si el filtro deja las tareas de
@@ -17,7 +17,7 @@ import type { OrdenMulti } from './orden'
 
 export type FechaRelativa = 'hoy' | 'semana' | 'proxima' | 'mes'
 
-export type FiltroFecha =
+type FiltroFecha =
   | { tipo: 'relativa'; valor: FechaRelativa }
   | { tipo: 'rango'; desde?: ISODate; hasta?: ISODate }
   // P4: "En horizonte visible (Gantt)" — el rango del horizonte actual de la
@@ -81,7 +81,7 @@ export function filtroVacio(f: Filtro): boolean {
 }
 
 /**
- * true si el filtro restringe QUÉ TAREAS se ven. La fecha cuenta: desde #234
+ * true si el filtro restringe QUÉ TAREAS se ven. La fecha cuenta: desde #250
  * filtra filas también en la Gantt (antes solo movía el horizonte). No incluye
  * `proyectos`, que acota frentes y solo existe en Mis Tareas.
  */
@@ -146,7 +146,7 @@ export function pasaFiltroTareas(state: AppState, t: Tarea, f: Filtro, hoy: ISOD
 
 /**
  * Filtro completo: fecha + responsable + estado. Lo usan LAS DOS vistas — la
- * tabla y la Gantt filtran las mismas filas con la misma regla (#234). La
+ * tabla y la Gantt filtran las mismas filas con la misma regla (#250). La
  * Gantt tenía su propia versión en la que la fecha no filtraba —solo movía el
  * horizonte—, y por eso dejaba pasar tareas de otros días y sin fecha con
  * "Hoy" puesto. El horizonte lo sigue moviendo; lo que faltaba era filtrar.

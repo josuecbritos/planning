@@ -80,7 +80,7 @@ completo con creación y edición **inline** (sin formularios).
 - **Gantt** (grilla tipo Excel): planificación por clics, horizonte configurable,
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
 
-**El filtro de fecha filtra y además fija el horizonte (#234).** Son dos efectos
+**El filtro de fecha filtra y además fija el horizonte (#250).** Son dos efectos
 que van juntos, no uno u otro: deja **las tareas** que cumplen el criterio —con
 la misma regla que la tabla, así que ambas vistas muestran exactamente lo
 mismo— y ajusta **los días** visibles de la Gantt a ese rango; si el filtro deja
@@ -264,7 +264,8 @@ valor por defecto del navegador, cae al inicial (un `border` así desaparece).
 | --- | --- |
 | `PROYECTO.md` (este) | Visión general y estado actual. |
 | `documento-funcional-v3.1.md` | Especificación funcional detallada (incluye historia de decisiones). |
-| `README.md` | Uso, funcionalidades por bloque, estructura del código, migraciones. |
+| `README.md` | Uso y desarrollo: qué es, cómo se levanta, cómo se despliega, estructura del código y migraciones. |
+| `CHANGELOG.md` | Crónica de lo construido, solicitud por solicitud (#235: salió del README, que la había acumulado hasta las 600 líneas). |
 | `SEGURIDAD.md` | Invariantes de seguridad — leer antes de tocar RLS/auth/deploy. |
 | `auditoria-seguridad.md` | Informe de la auditoría (hallazgos por gravedad). |
 | `runbook-seguridad.md` | Pasos para aplicar las correcciones de seguridad. |

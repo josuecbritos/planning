@@ -8,7 +8,7 @@ import { useMemo, useRef } from 'react'
 // recálculo cambiaría la foto (una fila que ya no calza, o que cambiaría de
 // posición), `stale` es true para ofrecer "Actualizar vista".
 
-export interface VistaCongelada {
+interface VistaCongelada {
   /** ¿La vista está congelada? (hay filtro y/u orden activo). */
   congelada: boolean
   /** IDs que se muestran = congelados ∩ existentes (tolera borrados). */

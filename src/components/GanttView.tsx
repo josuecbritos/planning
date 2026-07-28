@@ -43,7 +43,7 @@ import { InlineText } from './InlineText'
  * Modos del horizonte: qué DÍAS se ven. Siempre arranca en 'hoy'; no se
  * persiste. El antiguo "Rango personalizado" se elimino: un rango especifico se
  * pide con el filtro de fechas (rango fijo), que ademas de filtrar las tareas
- * se traduce al horizonte (#234) — mientras hay filtro de fecha, el modo no se
+ * se traduce al horizonte (#250) — mientras hay filtro de fecha, el modo no se
  * elige.
  */
 type ModoHorizonte = 'hoy' | 'todo'
@@ -70,7 +70,7 @@ interface Props {
   hoy: string
   can: Can
   /** Filtro activo (punto 3). Se aplica entero —fecha incluida— igual que en
-   *  la tabla; la parte de fecha además define el horizonte visible (#234). */
+   *  la tabla; la parte de fecha además define el horizonte visible (#250). */
   filtro: Filtro
   /** Orden multinivel (punto 4): reordena las filas dentro de cada bloque de
    *  sub frente, sin mezclarlas entre bloques. */
@@ -219,7 +219,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   const filtraProyecto = !!(misTareas && filtro.proyectos && filtro.proyectos.length > 0)
   const pasaProyecto = (f: Frente) => !filtraProyecto || filtro.proyectos!.includes(f.proyectoId)
 
-  // #234: el filtro se aplica ENTERO, igual que en la tabla — fecha incluida.
+  // #250: el filtro se aplica ENTERO, igual que en la tabla — fecha incluida.
   // Antes la fecha NO filtraba filas aquí: solo se traducía al horizonte, así
   // que con "Hoy" puesto seguían apareciendo tareas de otros días y tareas sin
   // fecha. Ahora hace las dos cosas: filtra las tareas Y define la ventana de
@@ -390,7 +390,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   )
 
   // -- Rango de dias segun el modo de horizonte + toggle habiles/completa --
-  // Punto 3.5 + #234: el filtro de fecha hace LAS DOS COSAS — filtra las tareas
+  // Punto 3.5 + #250: el filtro de fecha hace LAS DOS COSAS — filtra las tareas
   // (arriba, igual que en la tabla) y define el horizonte, la ventana de días.
   // Van juntas a propósito: si "Esta semana" deja solo las tareas de la semana,
   // la ventana que corresponde es esa semana. Las relativas se recalculan
@@ -657,7 +657,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
             </button>
           </div>
           {/* El filtro de fecha define el horizonte además de filtrar las
-              tareas (#234), así que mientras esté puesto el modo no se elige.
+              tareas (#250), así que mientras esté puesto el modo no se elige.
               "En horizonte visible" es la excepción: NO fija el horizonte —al
               revés, deriva su rango de él—, así que deja el toggle disponible. */}
           {filtro.fecha && filtro.fecha.tipo !== 'horizonte' ? (

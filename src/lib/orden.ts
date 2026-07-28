@@ -14,7 +14,7 @@ export type CampoOrden = 'resp' | 'estado' | 'objetivo' | 'atraso' | 'proyecto'
 export type Direccion = 1 | -1
 
 /** Una regla de orden: un campo y su direccion. */
-export interface ReglaOrden {
+interface ReglaOrden {
   campo: CampoOrden
   dir: Direccion
 }

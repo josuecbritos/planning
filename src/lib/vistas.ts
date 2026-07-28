@@ -22,12 +22,12 @@ import type { OrdenMulti } from './orden'
 // empieza limpio, y eso es lo esperado.
 
 /** Contexto = id del proyecto, o 'mis-tareas'. */
-export type ContextoVista = string
+type ContextoVista = string
 
 export const claveGuardados = (usuarioId: string, contexto: ContextoVista) =>
   `planificador.filtros.${usuarioId}.${contexto}`
 
-export const claveActiva = (usuarioId: string, contexto: ContextoVista) =>
+const claveActiva = (usuarioId: string, contexto: ContextoVista) =>
   `planificador.vistaActiva.${usuarioId}.${contexto}`
 
 export function leerGuardados(usuarioId: string, contexto: ContextoVista): FiltroGuardado[] {
@@ -39,7 +39,7 @@ export function leerGuardados(usuarioId: string, contexto: ContextoVista): Filtr
   }
 }
 
-export function leerVistaActiva(usuarioId: string, contexto: ContextoVista): string | null {
+function leerVistaActiva(usuarioId: string, contexto: ContextoVista): string | null {
   try {
     return localStorage.getItem(claveActiva(usuarioId, contexto))
   } catch {
@@ -60,7 +60,7 @@ export function escribirVistaActiva(
   }
 }
 
-export interface EstadoVista {
+interface EstadoVista {
   filtro: Filtro
   orden: OrdenMulti
   vistaActivaId: string | null

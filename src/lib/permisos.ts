@@ -18,7 +18,7 @@ import type {
 
 /** Cliente: ejecutor del plan — autonomía sobre SUS tareas, sin tocar la
  *  estructura (4.2). */
-export const DEFAULT_PERMISOS_CLIENTE: PermisosTareas = {
+const DEFAULT_PERMISOS_CLIENTE: PermisosTareas = {
   crearTareas: true,
   editarFechas: 'asignadas',
   marcarHechas: 'asignadas',
@@ -26,7 +26,7 @@ export const DEFAULT_PERMISOS_CLIENTE: PermisosTareas = {
 }
 
 /** Consultor invitado a proyecto ajeno: un colega — autonomía plena (4.3). */
-export const DEFAULT_PERMISOS_CONSULTOR_INVITADO: PermisosTareas = {
+const DEFAULT_PERMISOS_CONSULTOR_INVITADO: PermisosTareas = {
   crearFrentes: true,
   crearSubFrentes: true,
   crearTareas: true,
@@ -62,7 +62,7 @@ export function esDuenoDe(state: AppState, usuario: Usuario | null, proyectoId: 
 }
 
 /** Permisos del usuario DENTRO de un proyecto (los de su acceso). */
-export function permisosEn(state: AppState, usuario: Usuario | null, proyectoId: string): PermisosTareas {
+function permisosEn(state: AppState, usuario: Usuario | null, proyectoId: string): PermisosTareas {
   if (!usuario) return {}
   return (
     state.accesos.find((a) => a.usuarioId === usuario.id && a.proyectoId === proyectoId)?.permisos ?? {}
@@ -70,7 +70,7 @@ export function permisosEn(state: AppState, usuario: Usuario | null, proyectoId:
 }
 
 /** Permiso de NIVEL PROYECTO (3.1). Admin: siempre. */
-export function permisoProyecto(usuario: Usuario | null, permiso: keyof PermisosProyecto): boolean {
+function permisoProyecto(usuario: Usuario | null, permiso: keyof PermisosProyecto): boolean {
   if (!usuario) return false
   if (usuario.rol === 'admin') return true
   if (usuario.rol !== 'consultor') return false
@@ -217,9 +217,9 @@ export function miembrosDeProyecto(state: AppState, proyectoId: string | null): 
  * ningún proyecto. En modo memoria no ocurre —el estado conserva a todos—, así
  * que verificar solo ahí escondería este caso.
  */
-export type EstadoResponsable = 'sin-asignar' | 'normal' | 'ex-miembro' | 'desactivado' | 'desconocido'
+type EstadoResponsable = 'sin-asignar' | 'normal' | 'ex-miembro' | 'desactivado' | 'desconocido'
 
-export interface ResponsableVista {
+interface ResponsableVista {
   /** El usuario, si el cliente dispone de su ficha. */
   usuario?: Usuario
   estado: EstadoResponsable

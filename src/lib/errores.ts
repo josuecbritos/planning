@@ -9,12 +9,12 @@
 // "contraseña incorrecta" o un "permiso denegado" son informativos y se
 // muestran como vienen — traducirlos también sería esconder información útil.
 
-export const MENSAJE_RED = 'No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.'
+const MENSAJE_RED = 'No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.'
 // Cuando el navegador SÍ tiene red pero la petición no llegó a destino, culpar
 // a la conexión manda a la persona a revisar donde no es. Pasó de verdad: una
 // Edge Function bloqueada por CORS desde un dominio de preview reportaba
 // "revisa tu conexión" mientras la conexión estaba perfecta.
-export const MENSAJE_SERVICIO =
+const MENSAJE_SERVICIO =
   'No pudimos completar la operación. Vuelve a intentarlo; si sigue igual, avísale a tu administrador.'
 
 // Firmas de fallo de red de los tres motores, más las que agrega el cliente de
@@ -46,7 +46,7 @@ function sinConexion(): boolean {
 }
 
 /** ¿Este error es una caída de red (y no una respuesta del servidor)? */
-export function esErrorDeRed(e: unknown): boolean {
+function esErrorDeRed(e: unknown): boolean {
   const texto = (e instanceof Error ? e.message : String(e ?? '')).toLowerCase()
   if (!texto) return false
   if (texto.includes(FIRMA_EDGE)) return sinConexion()

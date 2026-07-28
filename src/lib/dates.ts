@@ -27,7 +27,7 @@ export function parse(iso: ISODate): Date {
 }
 
 /** Formatea una Date UTC a 'YYYY-MM-DD'. */
-export function toISO(date: Date): ISODate {
+function toISO(date: Date): ISODate {
   const y = date.getUTCFullYear()
   const m = String(date.getUTCMonth() + 1).padStart(2, '0')
   const d = String(date.getUTCDate()).padStart(2, '0')
@@ -49,29 +49,11 @@ export function esFinDeSemana(iso: ISODate): boolean {
   return dow === 0 || dow === 6
 }
 
-/**
- * Ancla una fecha al dia habil mas cercano: sabado -> viernes, domingo ->
- * lunes. Las tareas no admiten fechas de fin de semana (la Gantt solo
- * representa dias habiles).
- */
-export function ajustarDiaHabil(iso: ISODate): ISODate {
-  const dow = parse(iso).getUTCDay()
-  if (dow === 6) return addDays(iso, -1)
-  if (dow === 0) return addDays(iso, 1)
-  return iso
-}
-
-/** Suma n dias habiles (omite fines de semana). n puede ser negativo. */
-export function addDiasHabiles(iso: ISODate, n: number): ISODate {
-  let cur = iso
-  const paso = n >= 0 ? 1 : -1
-  let restantes = Math.abs(n)
-  while (restantes > 0) {
-    cur = addDays(cur, paso)
-    if (!esFinDeSemana(cur)) restantes--
-  }
-  return cur
-}
+// #237/#239: aquí vivían `ajustarDiaHabil` y `addDiasHabiles`, sin ningún uso
+// en el proyecto y afirmando en su comentario que "las tareas no admiten
+// fechas de fin de semana" — regla derogada en la migración 7, que permite
+// cualquier día (la Gantt solo elige QUÉ días muestra). Se eliminan: código
+// muerto que declaraba vigente una regla que no existe.
 
 /**
  * Lista de dias habiles entre desde y hasta (ambos inclusive), en orden.
@@ -137,7 +119,7 @@ export function formatoFechaHora(ts: string): string {
 }
 
 /** "7 oct" — compacto, solo para el encabezado de semana del Gantt. */
-export function etiquetaCorta(iso: ISODate): string {
+function etiquetaCorta(iso: ISODate): string {
   const d = parse(iso)
   return `${d.getUTCDate()} ${NOMBRE_MES[d.getUTCMonth()]}`
 }

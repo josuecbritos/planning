@@ -423,10 +423,8 @@ table.tareas .col-desv { text-align: center; }
 .tarea-cell__row { display: flex; align-items: center; gap: 8px; }
 .tarea-cell__mark { flex: none; font-weight: 700; }
 .mk-verde { color: var(--verde-check); }
-.mk-rojo { color: var(--rojo); }
 
 /* El atraso se señala solo con la fecha en rojo y negrita (.fecha-vencida). */
-.fecha-tarde { color: var(--rojo); font-weight: 600; }
 .fecha-vencida { color: var(--rojo); font-weight: 700; }
 
 .chk { width: 18px; height: 18px; accent-color: var(--verde); cursor: pointer; }
@@ -504,6 +502,11 @@ table.tareas .col-desv { text-align: center; }
   z-index: 2500; min-width: 230px; background: var(--superficie); border-radius: 8px;
   box-shadow: var(--sombra-flotante); border: 1px solid var(--gris-borde);
   padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  /* #241: con muchos miembros el menú se salía de la pantalla y las últimas
+     personas quedaban fuera de alcance. Mismo criterio que el menú de filtros
+     (`.filtro-menu--portal`). Con pocos miembros no cambia nada: el tope solo
+     actúa cuando el contenido lo supera. */
+  max-height: 80vh; overflow-y: auto;
 }
 .resp-menu__opcion {
   display: flex; align-items: center; gap: 10px; text-align: left;
@@ -1068,6 +1071,10 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 .hovercard__row { display: flex; justify-content: space-between; gap: 18px; }
 .hovercard__row span:first-child { color: #9f9fa6; }
+/* #242: responsable que ya no está disponible. Colores fijos como el resto de
+   la tarjeta, que es oscura en los dos temas a propósito. */
+.hovercard__apagado { color: #8e8e96; }
+.hovercard__motivo { color: #8e8e96; font-size: 11.5px; font-style: italic; margin-top: 2px; }
 /* Registro de auditoria del marcado (punto 1) */
 .hovercard__marcada { margin-top: 4px; font-size: 12px; color: #9ccc9c; }
 .hovercard__hist { margin-top: 8px; border-top: 1px solid #2f2f34; padding-top: 8px; }
@@ -1077,7 +1084,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .hovercard__chain .fecha--tachada { color: var(--rojo-tenue); text-decoration: line-through; }
 .hovercard__chain .fecha--vigente { background: #333338; color: #fff; font-weight: 600; }
 .hovercard__chain .flecha { color: #607d8b; }
-.hovercard__tarde { color: #ff8a80; font-weight: 600; margin-top: 6px; }
 
 /* pequeña ayuda visual de que hay tooltip */
 .trigger { cursor: help; }
@@ -1158,8 +1164,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 .link-btn { background: none; border: none; color: var(--gris-texto); font-size: 12px; padding: 2px 4px; text-decoration: underline; }
 .link-btn:hover { color: #d4d4d8; }
-.link-btn--danger { color: #ef9a9a; }
-.link-btn--danger:hover { color: #ff8a80; }
 
 /* ---------- Sidebar: proyectos y frentes con CRUD ---------- */
 
@@ -1177,7 +1181,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .nav-proyecto--activo > .nav-proyecto__fila > .nav-proyecto__title { color: #fff; font-weight: 600; }
 .nav-proyecto__nombre { flex: 1; }
 .nav-proyecto__dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.nav-proyecto__acciones { display: flex; gap: 10px; padding: 2px 12px 8px 30px; }
 
 /* #178: nombre del proyecto + menú ⋯. El ⋯ aparece al pasar el cursor o
    cuando el proyecto está activo. */
@@ -1240,8 +1243,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .nav-frente-row:hover .nav-frente__menu-btn,
 .nav-frente-row--activo .nav-frente__menu-btn,
 .nav-frente__menu-btn[aria-expanded='true'] { visibility: visible; }
-.nav-frente--add { color: #8e8e96; font-style: italic; }
-.nav-frente--add:hover { color: #fff; }
 
 /* #225: SOLO en escritorio, el ⋯ del frente deja de reservar ancho: sale del
    flujo y se monta sobre el extremo derecho de la fila. El nombre dispone
@@ -1453,7 +1454,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   font-family: var(--mono); border-radius: 6px; padding: 2px 7px;
   background: var(--primario); color: var(--sobre-primario);
 }
-.asignacion--propia { opacity: .92; }
 
 /* Miembros del proyecto (roles punto 7). #144: mismo aire que
    PermisosProyectoModal — padding del cuerpo, lista con más respiro y la
@@ -1479,7 +1479,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   background: var(--superficie); color: var(--texto);
 }
 .miembros-nota { width: 100%; font-size: 12px; color: var(--gris-texto); margin: 4px 0 0; }
-.usuarios-todos, .usuarios-sin { font-size: 12.5px; color: var(--gris-texto); font-style: italic; }
+.usuarios-sin { font-size: 12.5px; color: var(--gris-texto); font-style: italic; }
 .usuarios-aviso {
   font-size: 12.5px; color: var(--verde-check); background: var(--verde-suave);
   border-radius: 6px; padding: 6px 12px; margin: 0 0 12px;
@@ -1517,7 +1517,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .permisos__grupo:first-of-type { margin-top: 0; }
 .permisos__nota { font-size: 12px; color: var(--gris-texto); margin: 14px 0 0; line-height: 1.5; }
 .permisos .modal-acciones { margin-top: 18px; border-top: 1px solid var(--gris-linea); padding-top: 16px; }
-.asignaciones { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .asignacion {
   display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
   border: 1px solid var(--gris-borde); border-radius: 14px; padding: 3px 6px 3px 10px; background: var(--superficie);
@@ -1599,7 +1598,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   display: flex; flex-direction: column; gap: 12px;
 }
 .panel-accion { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; }
-.panel-accion__fecha { border: 1px solid var(--gris-borde); max-width: 170px; }
 
 /* ---------- Fase 3: archivadas ---------- */
 
@@ -1625,7 +1623,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 /* ---------- Fase 3: Mi Panel ---------- */
 
-.mipanel-filtros { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
 .mipanel-alerta { color: var(--rojo); font-weight: 700; }
 .mipanel-proyecto { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; }
 .mipanel-ruta { font-size: 12px; color: var(--gris-texto); }
@@ -1856,12 +1853,6 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 .proy-col { position: relative; display: flex; align-items: center; gap: 6px; overflow: visible; }
 .asignacion--ro { max-width: 118px; }
 .asignacion__nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.proy-mas { position: relative; flex: none; }
-.chip-mas {
-  border: 1px solid var(--gris-borde); background: var(--superficie); color: var(--gris-texto);
-  font: inherit; font-size: 12px; font-weight: 700; border-radius: 12px; padding: 3px 9px; cursor: pointer;
-}
-.chip-mas:hover { color: var(--texto); border-color: var(--primario); }
 .proy-pop {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 1200; min-width: 220px;
   background: var(--superficie); border: 1px solid var(--gris-borde); border-radius: 10px;
@@ -2109,6 +2100,11 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .main { height: 100vh; height: 100dvh; }
   .movil-menu { display: inline-flex; }
   .movil-tema { display: inline-flex; }
+  /* #241: los dos flotantes ocupan los 60px de abajo a la izquierda (14 de
+     margen + 46 de alto). Sin aire al final del scroll, el último control de
+     la tabla —el "+ Sub Frente"— quedaba debajo de ellos: se veía a medias y
+     el toque caía en el botón flotante. */
+  .content { padding-bottom: 74px; }
   .movil-velo {
     display: block; position: fixed; inset: 0;
     background: rgba(10, 10, 12, .45); z-index: 2050;

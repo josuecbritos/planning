@@ -22,7 +22,7 @@ import type { AppState, Usuario } from '../types'
  * trigger de la base, en cambio, exige uuid: ahí la forma estricta es una
  * defensa —solo un id real puede terminar generando una notificación—.
  */
-export const RE_MENCION = /@\[([\w-]{2,64})\]/g
+const RE_MENCION = /@\[([\w-]{2,64})\]/g
 
 /** Ids mencionados en un texto ya guardado (sin repetir). */
 export function idsMencionados(texto: string): string[] {
@@ -31,7 +31,7 @@ export function idsMencionados(texto: string): string[] {
   return [...out]
 }
 
-export type ParteComentario =
+type ParteComentario =
   | { tipo: 'texto'; valor: string }
   | { tipo: 'mencion'; usuarioId: string }
 
