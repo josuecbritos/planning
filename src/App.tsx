@@ -133,6 +133,28 @@ function temaEfectivo(usuarioId: string | null): Tema {
   return leerTemaPref(usuarioId) ?? (sistemaPrefiereOscuro() ? 'oscuro' : 'claro')
 }
 
+// --- #226: ancho de la barra lateral, ajustable arrastrando su borde ---
+// Preferencia por usuario, con el MISMO mecanismo que el tema y el modo de la
+// barra (localStorage): no toca la base de datos. Solo aplica en escritorio;
+// en mobile la barra es un panel superpuesto de ancho fijo.
+export const SIDEBAR_ANCHO_MIN = 244
+export const SIDEBAR_ANCHO_MAX = 400
+
+function acotarAncho(px: number): number {
+  return Math.min(SIDEBAR_ANCHO_MAX, Math.max(SIDEBAR_ANCHO_MIN, Math.round(px)))
+}
+
+/** Ancho guardado del usuario, o el mínimo (= el ancho de siempre) si no hay. */
+function leerAnchoSidebar(usuarioId: string | null): number {
+  if (!usuarioId) return SIDEBAR_ANCHO_MIN
+  try {
+    const v = Number(localStorage.getItem(`planificador.sidebarAncho.${usuarioId}`))
+    return Number.isFinite(v) && v > 0 ? acotarAncho(v) : SIDEBAR_ANCHO_MIN
+  } catch {
+    return SIDEBAR_ANCHO_MIN
+  }
+}
+
 export default function App() {
   const repo = useMemo(() => makeRepo(), [])
   const auth = useMemo(() => makeAuth(repo), [repo])
@@ -162,6 +184,10 @@ export default function App() {
   // Punto 6: modo de la sidebar. Primera preferencia persistente de la app
   // (por usuario, sobrevive a recargas y sesiones posteriores).
   const [sidebarModo, setSidebarModo] = useState<SidebarModo>('fija')
+  // #226: ancho de la barra (escritorio), ajustable arrastrando su borde
+  // derecho. Se recuerda por usuario junto al modo y al tema.
+  const [sidebarAncho, setSidebarAncho] = useState(SIDEBAR_ANCHO_MIN)
+  const [redimensionando, setRedimensionando] = useState(false)
   // Punto 3/4 + #215/#221: filtro + orden de la pantalla de proyecto. Es UNO
   // solo, no un mapa por proyecto: al entrar a una pantalla se carga lo que
   // corresponda y al salir no queda nada que recordar. Cambiar de proyecto es
@@ -227,9 +253,11 @@ export default function App() {
     repo.setActor(sesion?.id ?? null)
   }, [repo, sesion])
 
-  // Cargar la preferencia de sidebar del usuario al iniciar sesion.
+  // Cargar las preferencias de sidebar del usuario al iniciar sesion: modo
+  // (punto 6) y ancho (#226).
   useEffect(() => {
     if (!sesion) return
+    setSidebarAncho(leerAnchoSidebar(sesion.id))
     try {
       const v = localStorage.getItem(`planificador.sidebar.${sesion.id}`)
       setSidebarModo(v === 'escondida' ? 'escondida' : 'fija')
@@ -293,6 +321,55 @@ export default function App() {
       return nuevo
     })
   }, [sesion])
+
+  // #226: persistir el ancho elegido. Se llama al soltar el arrastre y al
+  // restablecer con doble clic, no en cada píxel del movimiento.
+  const guardarAncho = useCallback(
+    (px: number) => {
+      if (!sesion) return
+      try {
+        localStorage.setItem(`planificador.sidebarAncho.${sesion.id}`, String(px))
+      } catch {
+        /* sin persistencia: el ancho aplica igual en esta sesion */
+      }
+    },
+    [sesion],
+  )
+
+  // #226: arrastre del borde derecho. Se usa `setPointerCapture` para que el
+  // gesto siga vivo aunque el cursor se salga de la manija o pase por encima
+  // de un iframe/tabla; el ancho se recalcula desde el DELTA, así vale igual
+  // con la barra fija (empieza en 0) que escondida (empieza en 54px).
+  const onResizeInicio = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault()
+      const manija = e.currentTarget
+      const x0 = e.clientX
+      const w0 = sidebarAncho
+      manija.setPointerCapture(e.pointerId)
+      setRedimensionando(true)
+      const mover = (ev: PointerEvent) => setSidebarAncho(acotarAncho(w0 + (ev.clientX - x0)))
+      const soltar = (ev: PointerEvent) => {
+        manija.removeEventListener('pointermove', mover)
+        manija.removeEventListener('pointerup', soltar)
+        manija.removeEventListener('pointercancel', soltar)
+        const fin = acotarAncho(w0 + (ev.clientX - x0))
+        setSidebarAncho(fin)
+        setRedimensionando(false)
+        guardarAncho(fin)
+      }
+      manija.addEventListener('pointermove', mover)
+      manija.addEventListener('pointerup', soltar)
+      manija.addEventListener('pointercancel', soltar)
+    },
+    [sidebarAncho, guardarAncho],
+  )
+
+  /** #226: doble clic en el borde → ancho por defecto. Nadie queda atrapado. */
+  const onResizeReset = useCallback(() => {
+    setSidebarAncho(SIDEBAR_ANCHO_MIN)
+    guardarAncho(SIDEBAR_ANCHO_MIN)
+  }, [guardarAncho])
 
   const toggleSidebarModo = useCallback(() => {
     setSidebarModo((m) => {
@@ -788,7 +865,12 @@ export default function App() {
     <div
       className={`app${sidebarModo === 'escondida' ? ' app--sidebar-escondida' : ''}${
         movilSidebar ? ' app--movil-abierta' : ''
-      }`}
+      }${redimensionando ? ' app--redimensionando' : ''}`}
+      /* #226: el ancho vive en una variable CSS. La columna de la grilla y la
+         barra desplegada del modo escondido la leen, así los dos modos usan
+         el ancho que eligió el usuario. En mobile no se usa (la barra es un
+         panel superpuesto de ancho fijo). */
+      style={{ '--sidebar-w': `${sidebarAncho}px` } as React.CSSProperties}
     >
       {/* Mobile: boton flotante que llama a la sidebar superpuesta; se
           cierra al elegir una opcion. Oculto en desktop via CSS. */}
@@ -887,6 +969,18 @@ export default function App() {
           onSelectPantalla={onSelectPantalla}
           onLogout={onLogout}
           actions={actions}
+        />
+        {/* #226: manija de ancho sobre el borde derecho de la barra. Oculta en
+            mobile por CSS (ahí la barra es un panel superpuesto de ancho fijo).
+            Doble clic devuelve el ancho por defecto. */}
+        <div
+          className="sidebar-resize"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Ajustar el ancho de la barra lateral"
+          title="Arrastra para ajustar el ancho · doble clic para restablecer"
+          onPointerDown={onResizeInicio}
+          onDoubleClick={onResizeReset}
         />
       </div>
       <div className="main">

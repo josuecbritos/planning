@@ -114,7 +114,10 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   **pantalla completa** con ✕ propio. El menú **⋯** se acota al viewport y, en
   pantallas táctiles, se muestra en **todos** los proyectos y **todos los
   frentes** (en escritorio sigue apareciendo con hover), con la misma área
-  tocable de ≥44 px sin aumentar el alto de la fila. Las tablas de administración dan **ancho propio a la
+  tocable de ≥44 px sin aumentar el alto de la fila. En el frente, ese ⋯
+  **conserva su lugar en el teléfono** —está siempre visible y montarlo sobre el
+  texto lo taparía— mientras que en escritorio se monta sobre el extremo derecho
+  para no quitarle ancho al nombre (#225). Las tablas de administración dan **ancho propio a la
   columna de identidad** y aceptan scroll horizontal. Los flotantes ☰/🌙 se
   **ocultan** mientras haya un modal o el panel abiertos. Las áreas táctiles
   llegan a **≥44 px** con un `::before` transparente, sin engordar las filas.
@@ -181,6 +184,18 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   franja de íconos (uno por proyecto) siempre clicable; al pasar el mouse la barra
   completa se despliega al lado y se repliega al salir. La preferencia se recuerda
   por usuario entre sesiones.
+- **Ancho de la barra ajustable (#226):** se arrastra el **borde derecho**, que
+  al acercar el cursor muestra una línea y cambia a `col-resize`. Va entre
+  **244px** (el ancho de siempre; más angosta no aporta y para eso está el modo
+  escondido) y **400px**, y el arrastre se detiene en los topes. El cambio se ve
+  **en vivo** y el contenido se reacomoda con él; **doble clic** en el borde
+  devuelve el ancho por defecto. El ancho se recuerda **por usuario** con el
+  mismo mecanismo que el tema y el modo de la barra —`localStorage`, sin tocar
+  la base de datos— y la barra **escondida se despliega con ese mismo ancho**.
+  El valor vive en la variable CSS `--sidebar-w`, que leen la columna de la
+  grilla, la barra desplegada y el panel de notificaciones (anclado a su borde).
+  Solo en escritorio: en el teléfono la barra es un panel superpuesto de ancho
+  fijo y no hay nada que arrastrar.
 - **Menú "Ordenar"** (junto a Filtrar, en tabla y Gantt): la lista de campos
   ordenables está **a la vista**, cada uno con controles **↑ ascendente / ↓
   descendente**. Tocar una dirección **activa** ese campo como **prioridad 1**

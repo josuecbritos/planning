@@ -128,7 +128,9 @@ button { font-family: inherit; cursor: pointer; }
 
 .app {
   display: grid;
-  grid-template-columns: 244px 1fr;
+  /* #226: el ancho lo fija App con la variable --sidebar-w (preferencia del
+     usuario, entre 244 y 400). El fallback es el ancho de siempre. */
+  grid-template-columns: var(--sidebar-w, 244px) 1fr;
   height: 100vh;
   overflow: hidden;
 }
@@ -170,14 +172,44 @@ button { font-family: inherit; cursor: pointer; }
 .app--sidebar-escondida .sidebar {
   /* Se despliega AL LADO de la franja (no encima): la franja de iconos
      queda siempre visible y clicable, como pide el punto 6. */
-  position: absolute; top: 0; left: 54px; bottom: 0; width: 244px; z-index: 1600;
+  /* #226: al desplegarse usa el ancho que dejó el usuario, como la barra fija. */
+  position: absolute; top: 0; left: 54px; bottom: 0; width: var(--sidebar-w, 244px); z-index: 1600;
   opacity: 0; pointer-events: none; transform: translateX(-10px);
   transition: opacity .16s ease, transform .16s ease;
   box-shadow: 10px 0 34px rgba(15, 24, 32, .38);
   border-left: 1px solid #27272a;
 }
-.app--sidebar-escondida .sidebar-zona:hover .sidebar {
+.app--sidebar-escondida .sidebar-zona:hover .sidebar,
+.app--redimensionando.app--sidebar-escondida .sidebar {
   opacity: 1; pointer-events: auto; transform: none;
+}
+
+/* #226: manija de ancho sobre el borde derecho de la barra. En reposo es
+   invisible; al acercar el cursor aparece una línea que indica que se puede
+   arrastrar. Solo escritorio (en mobile se oculta más abajo). */
+.sidebar-resize {
+  position: absolute; top: 0; bottom: 0; right: -3px; width: 7px;
+  z-index: 1650; cursor: col-resize; touch-action: none;
+}
+.sidebar-resize::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 50%;
+  width: 2px; transform: translateX(-50%);
+  background: transparent; transition: background .12s ease;
+}
+.sidebar-resize:hover::after,
+.app--redimensionando .sidebar-resize::after { background: #6b6b75; }
+/* Mientras se arrastra, el ancho cambia en cada movimiento: cualquier
+   transición sobre la barra convertiría el gesto en un arrastre con inercia. */
+.app--redimensionando .sidebar { transition: none; }
+/* Con la barra escondida, la manija vive en el borde de la barra desplegada
+   (54px del riel + el ancho), y solo cuando esa barra está a la vista. */
+.app--sidebar-escondida .sidebar-resize {
+  right: auto; left: calc(54px + var(--sidebar-w, 244px) - 3px);
+  opacity: 0; pointer-events: none;
+}
+.app--sidebar-escondida .sidebar-zona:hover .sidebar-resize,
+.app--redimensionando.app--sidebar-escondida .sidebar-resize {
+  opacity: 1; pointer-events: auto;
 }
 /* #191: un solo control de plegado visible a la vez. Con la barra desplegada
    (hover sobre la zona) manda el de la cabecera, así que el del riel se
@@ -1148,12 +1180,28 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .nav-proyecto__menu-op:hover { background: #333338; color: #fff; }
 
 .nav-frentes { padding-bottom: 6px; }
-.nav-frente-row { display: flex; align-items: center; padding-right: 4px; }
-.nav-frente-row--activo { background: #333338; border-radius: 6px; }
-/* #222: el nombre en UNA línea. El ⋯ reserva su lugar siempre (está oculto,
-   no ausente), así el ancho disponible no cambia al pasar el mouse y la fila
-   nunca crece de alto. El nombre completo queda en el title. */
-.nav-frente--flex { flex: 1; min-width: 0; padding-right: 4px; }
+/* #225: el fondo de la fila lo pinta LA FILA, no el botón del nombre. Así el
+   ⋯ montado encima (escritorio) puede heredarlo con `--fila-fondo` y quedar
+   legible sobre el texto en lugar de chocar contra él. */
+.nav-frente-row {
+  --fila-fondo: transparent;
+  display: flex; align-items: center; position: relative;
+}
+.nav-frente-row--activo { --fila-fondo: #333338; background: var(--fila-fondo); border-radius: 6px; }
+.nav-frente-row:hover,
+.nav-frente-row:has(.nav-frente__menu-btn[aria-expanded='true']) {
+  --fila-fondo: #27272a; background: var(--fila-fondo); border-radius: 6px;
+}
+.nav-frentes .nav-frente:hover { background: none; }
+/* #225: la sangría de los frentes no comunicaba jerarquía —el nombre del
+   proyecto arrancaba a 36px y el del frente a 38px, prácticamente alineados—
+   pero sí consumía ancho. Los frentes se alinean ahora con el CUADRADITO DE
+   COLOR del proyecto (8px del contenedor + 10px), que es lo que marca el
+   comienzo del bloque; la jerarquía la dan el punto, la negrita y el hecho de
+   que los frentes solo aparecen bajo el proyecto abierto. */
+.nav-frentes .nav-frente { padding-left: 10px; padding-right: 8px; }
+/* #222: el nombre en UNA línea; el completo queda en el title. */
+.nav-frente--flex { flex: 1; min-width: 0; }
 .nav-frente--flex > span {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -1164,6 +1212,33 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .nav-frente__menu-btn[aria-expanded='true'] { visibility: visible; }
 .nav-frente--add { color: #8e8e96; font-style: italic; }
 .nav-frente--add:hover { color: #fff; }
+
+/* #225: SOLO en escritorio, el ⋯ del frente deja de reservar ancho: sale del
+   flujo y se monta sobre el extremo derecho de la fila. El nombre dispone
+   SIEMPRE de todo el ancho, así que su medida no cambia al aparecer el botón
+   — la deformación que corrigió #222 no vuelve por esta puerta. En mobile el
+   botón está siempre visible (no hay hover) y montarlo taparía el texto de
+   forma permanente: ahí conserva su lugar, tal como quedó en #222. */
+@media (min-width: 769px) {
+  .nav-frentes .nav-frente__menu-btn {
+    position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+    background: var(--fila-fondo);
+  }
+  /* Degradado hacia la izquierda: el texto se desvanece bajo el botón en vez
+     de chocar contra su borde. Toma el color de la fila, así vale igual para
+     la fila normal (#27272a) y la seleccionada (#333338). */
+  .nav-frentes .nav-frente__menu-btn::after {
+    content: ''; position: absolute; right: 100%; top: 0; bottom: 0; width: 22px;
+    background: linear-gradient(to right, transparent, var(--fila-fondo));
+    pointer-events: none;
+  }
+  /* El hover del propio botón necesita separarse del fondo de la fila, que ya
+     es #27272a: si no, no se notaría que está apuntado. */
+  .nav-frentes .nav-frente__menu-btn:hover { background: #45454d; }
+  .nav-frentes .nav-frente__menu-btn:hover::after {
+    background: linear-gradient(to right, transparent, #45454d);
+  }
+}
 
 /* ---------- Header: chip de modo ---------- */
 
@@ -1767,7 +1842,10 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 
 /* #137: panel emergente de notificaciones + vista completa. */
 .notif-panel {
-  position: fixed; top: 60px; left: 240px; z-index: 1600; width: 360px; max-width: 92vw;
+  /* #226: el panel se ancla al borde de la barra; con la barra ensanchada
+     debe correrse con ella, no quedarse debajo. El -4px conserva exactamente
+     la posición de siempre con el ancho por defecto (244 - 4 = 240). */
+  position: fixed; top: 60px; left: calc(var(--sidebar-w, 244px) - 4px); z-index: 1600; width: 360px; max-width: 92vw;
   background: var(--superficie); border: 1px solid var(--gris-borde); border-radius: 12px;
   box-shadow: 0 18px 48px rgba(15,24,32,.24); overflow: hidden;
   display: flex; flex-direction: column;
@@ -2015,6 +2093,9 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   /* El modo escondida (franja + hover) es de escritorio: se neutraliza. */
   .sidebar-mini { display: none; }
   .sidebar__plegar { display: none; }
+  /* #226: el ajuste de ancho es solo de escritorio. En el teléfono la barra es
+     un panel que se abre por encima del contenido, con su ancho de siempre. */
+  .sidebar-resize { display: none; }
   .app--sidebar-escondida .sidebar {
     position: static; opacity: 1; pointer-events: auto; transform: none;
     width: auto; box-shadow: none; border-left: none;
