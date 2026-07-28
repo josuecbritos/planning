@@ -12,6 +12,7 @@ import {
   type FiltroGuardado,
 } from '../lib/filtros'
 import type { CampoOrden, CampoOrdenOpc, Direccion, OrdenMulti } from '../lib/orden'
+import { claveGuardados, coincideConVista, leerGuardados } from '../lib/vistas'
 import { TextPromptModal } from './TextPromptModal'
 import { Avatar } from './RespPicker'
 
@@ -54,6 +55,10 @@ interface Props {
   camposOrden: CampoOrdenOpc[]
   /** P4: ¿estamos en la Gantt? Solo ahí se puede ACTIVAR "En horizonte visible". */
   vistaGantt?: boolean
+  /** #215: id de la vista guardada en la que se está, o null. */
+  vistaActivaId?: string | null
+  /** #215: entrar o salir de una vista. Solo lo dispara este desplegable. */
+  onVistaActiva?: (id: string | null) => void
   /** P1: la foto quedó desactualizada → mostrar "Actualizar vista". */
   stale?: boolean
   /** P1: recalcula la foto (re-snapshot). */
@@ -71,21 +76,18 @@ export function FiltrosBar({
   onCambiarOrden,
   camposOrden,
   vistaGantt = false,
+  vistaActivaId = null,
+  onVistaActiva,
   stale = false,
   onActualizarVista,
 }: Props) {
-  const clave = `planificador.filtros.${usuarioId}.${contexto}`
+  const clave = claveGuardados(usuarioId, contexto)
   const [guardados, setGuardados] = useState<FiltroGuardado[]>([])
   const [modal, setModal] = useState<{ tipo: 'guardar' } | { tipo: 'renombrar'; id: string; nombre: string } | null>(null)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(clave)
-      setGuardados(raw ? (JSON.parse(raw) as FiltroGuardado[]) : [])
-    } catch {
-      setGuardados([])
-    }
-  }, [clave])
+    setGuardados(leerGuardados(usuarioId, contexto))
+  }, [usuarioId, contexto])
 
   function persistir(lista: FiltroGuardado[]) {
     setGuardados(lista)
@@ -98,6 +100,14 @@ export function FiltrosBar({
 
   const activo = !filtroVacio(filtro)
   const ordenActivo = orden.length > 0
+  // #215: la vista en la que se está y si tiene cambios sin guardar. El
+  // asterisco aparece en cuanto filtro u orden dejan de coincidir con lo
+  // guardado — cambiarlo y limpiarlo cuentan igual, sin excepciones.
+  const vistaActiva = guardados.find((g) => g.id === vistaActivaId)
+  const modificada = !!vistaActiva && !coincideConVista(vistaActiva, filtro, orden)
+  const etiquetaVistas = vistaActiva
+    ? `Vistas · ${vistaActiva.nombre}${modificada ? ' *' : ''}`
+    : `Vistas${guardados.length ? ` (${guardados.length})` : ''}`
   const nResp = filtro.responsables?.length ?? 0
   const nEst = filtro.estados?.length ?? 0
   const nProy = filtro.proyectos?.length ?? 0
@@ -133,6 +143,12 @@ export function FiltrosBar({
   const todosResp = [...(candidatos?.map((u) => u.id) ?? []), RESP_SIN_ASIGNAR]
   const allResp = todosResp.length > 0 && todosResp.every((id) => filtro.responsables?.includes(id))
   const toggleTodosResp = () => onCambiar({ ...filtro, responsables: allResp ? undefined : todosResp })
+  // #220: Proyecto tenía selección múltiple pero no el "Seleccionar todos"
+  // que sí tienen Responsable y Estado. En Mis Tareas, donde Responsable no
+  // aplica, era el único multi-selección sin la opción. Era una omisión.
+  const todosProy = proyectos?.map((p) => p.id) ?? []
+  const allProy = todosProy.length > 0 && todosProy.every((id) => filtro.proyectos?.includes(id))
+  const toggleTodosProy = () => onCambiar({ ...filtro, proyectos: allProy ? undefined : todosProy })
   const allEstados = ESTADOS.every((c) => filtro.estados?.includes(c))
   const toggleTodosEstados = () => onCambiar({ ...filtro, estados: allEstados ? undefined : [...ESTADOS] })
   const toggleProyecto = (id: string) => {
@@ -299,6 +315,10 @@ export function FiltrosBar({
             </label>
           ))}
           {proyectos.length === 0 && <div className="filtro-menu__vacio">Sin proyectos.</div>}
+          {/* #220: mismo control, mismo aspecto y mismo lugar que en los otros. */}
+          <button className="filtro-op filtro-op--todos" onClick={toggleTodosProy}>
+            {allProy ? 'Deseleccionar todos' : 'Seleccionar todos'}
+          </button>
           {nProy > 0 && (
             <button
               className="filtro-op filtro-op--quitar"
@@ -403,19 +423,33 @@ export function FiltrosBar({
         </button>
       )}
 
-      <Desplegable etiqueta={`Vistas${guardados.length ? ` (${guardados.length})` : ''}`} activo={false} alDerecha>
+      <Desplegable etiqueta={etiquetaVistas} activo={!!vistaActiva} alDerecha>
         {guardados.length === 0 && <div className="filtro-menu__vacio">Aún no guardas vistas en este proyecto.</div>}
-        {guardados.map((g) => (
-          <div key={g.id} className="filtro-guardado">
+        {guardados.map((g) => {
+          const esActiva = g.id === vistaActivaId
+          return (
+          <div key={g.id} className={`filtro-guardado${esActiva ? ' filtro-guardado--activa' : ''}`}>
             <button
               className="filtro-guardado__aplicar"
-              title="Aplicar esta vista (filtro + orden)"
+              // #215: la activa se ve marcada, y tocarla la DESMARCA — es la
+              // forma de quedar sin vista. Entrar y salir de una vista pasa
+              // solo por aquí.
+              title={esActiva ? 'Salir de esta vista (queda todo limpio)' : 'Aplicar esta vista (filtro + orden)'}
               onClick={() => {
-                onCambiar(g.filtro)
-                onCambiarOrden(g.orden ?? [])
+                if (esActiva) {
+                  onCambiar({})
+                  onCambiarOrden([])
+                  onVistaActiva?.(null)
+                } else {
+                  onCambiar(g.filtro)
+                  onCambiarOrden(g.orden ?? [])
+                  onVistaActiva?.(g.id)
+                }
               }}
             >
+              <span className="filtro-guardado__marca" aria-hidden="true">{esActiva ? '✓' : ''}</span>
               {g.nombre}
+              {esActiva && modificada && <span className="filtro-guardado__mod" title="Con cambios sin guardar"> *</span>}
             </button>
             {/* #160/#175: tooltip rápido (data-tip, misma inmediatez que el
                 resto de la app). El menú de Vistas no recorta el globo porque
@@ -445,13 +479,18 @@ export function FiltrosBar({
                 // #141: confirmar antes de borrar una vista guardada.
                 if (confirm(`¿Eliminar la vista guardada "${g.nombre}"?`)) {
                   persistir(guardados.filter((x) => x.id !== g.id))
+                  // #215: si se borra la que estaba activa, los filtros se
+                  // quedan tal cual —nadie pidió cambiarlos— pero pasan a ser
+                  // temporales: al salir y volver se entra limpio.
+                  if (esActiva) onVistaActiva?.(null)
                 }
               }}
             >
               🗑
             </button>
           </div>
-        ))}
+          )
+        })}
       </Desplegable>
 
       <button
@@ -472,7 +511,14 @@ export function FiltrosBar({
           titulo="Guardar vista"
           label='Nombre (ej. "Mis atrasadas", "Por estado y fecha")'
           textoBoton="Guardar"
-          onSubmit={(nombre) => persistir([...guardados, { id: uid(), nombre, filtro, orden }])}
+          onSubmit={(nombre) => {
+            // #215: guardar una vista nueva te deja DENTRO de ella. Es el acto
+            // deliberado de "esto quiero que quede"; quedar fuera de lo que
+            // acabas de guardar sería desconcertante.
+            const nueva = { id: uid(), nombre, filtro, orden }
+            persistir([...guardados, nueva])
+            onVistaActiva?.(nueva.id)
+          }}
           onClose={() => setModal(null)}
         />
       )}

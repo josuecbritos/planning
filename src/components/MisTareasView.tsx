@@ -15,6 +15,7 @@ import {
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { CAMPOS_MIS_TAREAS, ordenarMulti, valorOrden, type OrdenMulti } from '../lib/orden'
 import { useVistaCongelada } from '../lib/vistaCongelada'
+import { escribirVistaActiva, estadoInicial } from '../lib/vistas'
 import { FiltrosBar } from './FiltrosBar'
 import { GanttView } from './GanttView'
 import { HoverCard } from './HoverCard'
@@ -64,11 +65,23 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
   // la vista vuelve a Tabla (el conmutador se oculta y no habría forma de
   // salir de la grilla).
   const vistaEfectiva: Vista = esMovil ? 'tabla' : vista
-  const [filtro, setFiltro] = useState<Filtro>({})
+  // #215: al entrar se restaura la vista guardada activa —y solo eso—. Un
+  // filtro puesto a mano es temporal: esta pantalla se desmonta al salir, así
+  // que se pierde, que es justo lo esperado.
+  const inicial = useMemo(() => estadoInicial(usuario.id, 'mis-tareas'), [usuario.id])
+  const [filtro, setFiltro] = useState<Filtro>(inicial.filtro)
+  const [vistaActivaId, setVistaActivaId] = useState<string | null>(inicial.vistaActivaId)
+  const cambiarVistaActiva = useCallback(
+    (id: string | null) => {
+      escribirVistaActiva(usuario.id, 'mis-tareas', id)
+      setVistaActivaId(id)
+    },
+    [usuario.id],
+  )
   // Orden multinivel del menu "Ordenar" (punto 4). Momentaneo salvo que se
   // guarde como vista; el "orden base" aqui es el propio de Mis Tareas
   // (atrasadas primero, luego por fecha).
-  const [orden, setOrden] = useState<OrdenMulti>([])
+  const [orden, setOrden] = useState<OrdenMulti>(inicial.orden)
   // P1: nonce para re-snapshot de la vista congelada ("Actualizar vista").
   const [snapNonce, setSnapNonce] = useState(0)
   // P1: la Gantt reporta su propia foto desactualizada (tiene su recorrido).
@@ -190,6 +203,8 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
         orden={orden}
         onCambiarOrden={setOrden}
         camposOrden={CAMPOS_MIS_TAREAS}
+        vistaActivaId={vistaActivaId}
+        onVistaActiva={cambiarVistaActiva}
         stale={vistaEfectiva === 'tabla' ? stale : ganttStale}
         onActualizarVista={() => setSnapNonce((n) => n + 1)}
       />

@@ -549,12 +549,18 @@ table.tareas .col-desv { text-align: center; }
 .config__acciones { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .config__ok { font-size: 12.5px; color: var(--verde); }
 .config__error { font-size: 12.5px; color: var(--rojo); }
-.config__titulo { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.config__ver {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 12.5px; color: var(--gris-texto); cursor: pointer;
+/* #217: ojo dentro del campo. El input reserva sitio a la derecha para que el
+   texto no pase por debajo del botón. */
+.campo-password { position: relative; display: block; }
+.campo-password input { width: 100%; padding-right: 38px; }
+.campo-password__ojo {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  border: none; background: none; cursor: pointer; color: var(--gris-texto);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 6px; padding: 0;
 }
-.config__ver input { width: 15px; height: 15px; cursor: pointer; }
+.campo-password__ojo:hover { color: var(--texto); background: var(--velo-fuerte); }
+.campo-password__ojo:focus-visible { outline: 2px solid var(--primario); outline-offset: -2px; }
 
 /* ---------- Leyenda ---------- */
 
@@ -728,6 +734,12 @@ table.tareas .col-desv { text-align: center; }
 }
 .filtro-guardado .icon-btn { opacity: 0; }
 .filtro-guardado:hover .icon-btn { opacity: 1; }
+/* #215: la vista en la que se está, marcada dentro del desplegable. La marca
+   ocupa su sitio siempre (aunque esté vacía) para que los nombres no bailen
+   al entrar y salir de una vista. */
+.filtro-guardado__marca { display: inline-block; width: 12px; color: var(--primario); }
+.filtro-guardado--activa .filtro-guardado__aplicar { font-weight: 700; }
+.filtro-guardado__mod { color: var(--ambar); font-weight: 700; }
 .filtro-guardado .icon-btn:disabled { opacity: .25; cursor: default; }
 
 /* Menu "Ordenar" (punto 4 / #111): lista directa de campos con ↑↓. */
@@ -1405,15 +1417,18 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .sidebar__footer .sesion { border-left: none; padding-left: 0; }
 .sidebar__footer .sesion__info b { color: #fff; }
 .sidebar__footer .sesion__info small { color: #8e8e96; }
-/* #207: el pie es ahora la entrada a "Mi cuenta". Se comporta como botón
-   (cursor, foco, realce) sin dejar de leerse como la ficha de la sesión. */
+/* #207: el pie es la entrada a "Mi cuenta".
+   #218: sin recuadro. El botón no dibuja nada propio —ni fondo, ni relleno,
+   ni margen— para no descuadrarse respecto del botón de tema y del enlace
+   "Salir", que son sus vecinos en el pie. Lo pulsable es el nombre, y se nota
+   por el cursor y porque el nombre se aclara al pasar. */
 .sesion--boton {
-  border: none; background: transparent; font: inherit; color: inherit;
-  cursor: pointer; text-align: left; border-radius: 8px; padding: 4px 6px; margin: -4px -6px;
+  border: none; background: none; font: inherit; color: inherit;
+  cursor: pointer; text-align: left; padding: 0;
 }
-.sesion--boton:hover { background: rgba(255, 255, 255, .07); }
-.sesion--boton:focus-visible { outline: 2px solid var(--primario); outline-offset: 1px; }
-.sesion--activa { background: rgba(255, 255, 255, .1); }
+.sesion--boton:hover .sesion__info b { color: var(--primario-claro, #9fd0a8); }
+.sesion--boton:focus-visible { outline: 2px solid var(--primario); outline-offset: 2px; border-radius: 4px; }
+.sesion--activa .sesion__info b { color: var(--primario-claro, #9fd0a8); }
 .sidebar__footer .sesion__salir { color: #8e8e96; }
 .sidebar__footer .sesion__salir:hover { color: #ff8a80; }
 
@@ -1909,25 +1924,29 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   /* #199: área tocable de 44×44 SIN engordar la fila. El glifo mantiene su
      tamaño; el objetivo se extiende por fuera con un pseudo-elemento absoluto
      que NO ocupa lugar en el flujo, así que la altura de fila no cambia.
-     Se usa `::before` porque `::after` ya es el globo de los tooltips. */
-  .icon-btn, .modal-x, .seg button, .nav-proyecto__menu-btn, .proy-num {
+     Se usa `::before` porque `::after` ya es el globo de los tooltips.
+     #216: los `.icon-btn` quedan FUERA de esta ampliación. Van en fila, uno
+     pegado al otro, y un área invisible más grande que el icono invade al
+     vecino: se tocaba lo que se veía y respondía el de al lado. Separarlos lo
+     bastante como para que cuatro áreas de 44px no se pisen exige ~176px, que
+     no caben. Se prefiere que el objetivo coincida con lo visible. Los demás
+     controles de esta lista no tienen vecinos pegados, así que conservan la
+     ampliación. */
+  .modal-x, .seg button, .nav-proyecto__menu-btn, .proy-num {
     position: relative;
   }
-  .icon-btn::before, .modal-x::before, .seg button::before,
+  .modal-x::before, .seg button::before,
   .nav-proyecto__menu-btn::before, .proy-num::before {
     content: ''; position: absolute; left: 50%; top: 50%;
     transform: translate(-50%, -50%);
     width: max(44px, 100%); height: max(44px, 100%);
   }
-  /* #214: SEPARACIÓN entre iconos vecinos. El área de 44px se extiende 22px a
-     cada lado del centro del botón; con los iconos pegados, los centros
-     quedaban a 26px y las áreas se solapaban 18px — tocar 👥 disparaba 📦. El
-     problema nunca fue el tamaño sino la falta de espacio. Con 10px de margen
-     lateral los centros quedan a 46px: cada área es exclusiva, con holgura.
-     Los iconos NO se agrandan y la fila NO crece de alto (el margen es
-     horizontal); la columna de acciones sí se ensancha, y eso es aceptable en
-     estas tablas, que ya admiten arrastre lateral. */
-  .usuarios-tabla .col-acc .icon-btn { margin-left: 10px; margin-right: 10px; }
+  /* #216 (corrige #214): la separación baja de 20px a 4px por icono. Con 20
+     los cuatro de Usuarios no cabían en la columna y se veían absurdamente
+     sueltos. Ya no hace falta tanta: al quitar la ampliación invisible del
+     área (abajo), el objetivo de cada icono coincide con lo que se ve, y dos
+     cosas que se ven separadas ya no pueden pisarse. */
+  .usuarios-tabla .col-acc .icon-btn { margin-left: 2px; margin-right: 2px; }
 
   /* Los checkbox no admiten pseudo-elementos: se agrandan con el propio
      control, que ya vive en una celda con alto suficiente. */

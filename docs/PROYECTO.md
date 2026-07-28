@@ -71,7 +71,12 @@ completo con creación y edición **inline** (sin formularios).
 
 **Vistas:**
 - **Tabla** (estilo Monday): estado, responsable, fechas, atraso, comentarios;
-  filtros y orden guardables como "vista" por proyecto.
+  filtros y orden guardables como "vista" por proyecto. **La vista guardada
+  persiste** (#215): se entra en ella desde el desplegable, se ve cuál es, se
+  marca con un asterisco si tiene cambios sin guardar y sobrevive a recargar.
+  Salir de la pantalla —y cambiar de proyecto lo es— descarta todo lo no
+  guardado: la regla queda sin excepciones, lo que se guardó explícitamente
+  persiste y lo demás se descarta.
 - **Gantt** (grilla tipo Excel): planificación por clics, horizonte configurable,
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
 - **Mis Tareas:** las tareas donde el usuario es responsable, en todos sus
