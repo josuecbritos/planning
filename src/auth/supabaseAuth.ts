@@ -61,4 +61,17 @@ export class SupabaseAuth implements AuthService {
   async logout(): Promise<void> {
     await this.db.auth.signOut()
   }
+
+  async cambiarPassword(actual: string, nueva: string): Promise<void> {
+    // Supabase no ofrece "verificar contraseña actual", así que se comprueba
+    // reintentando el login con ella. Es la práctica habitual y no deja
+    // ninguna sesión colgando: signInWithPassword renueva la que ya existe.
+    const { data } = await this.db.auth.getSession()
+    const email = data.session?.user.email
+    if (!email) throw new Error('No hay sesión')
+    const { error: errActual } = await this.db.auth.signInWithPassword({ email, password: actual })
+    if (errActual) throw new Error('La contraseña actual no es correcta')
+    const { error } = await this.db.auth.updateUser({ password: nueva })
+    if (error) throw new Error(error.message)
+  }
 }

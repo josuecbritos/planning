@@ -6,6 +6,20 @@ import type { Repo } from '../data/repo'
 // del estado (sin password). La sesion se conserva en localStorage.
 
 const SESSION_KEY = 'planificador.sesion.v1'
+// #207: el modo Local no tiene contraseñas (se entra eligiendo usuario), así
+// que para poder ejercitar el flujo se guarda una por correo. La primera vez
+// no hay nada guardado y se acepta cualquier "actual"; a partir de ahí se
+// comprueba de verdad. Es una simulación local, nunca una credencial: en
+// Supabase la contraseña vive en Auth y esto no se usa.
+const PASSWORDS_KEY = 'planificador.passwords.v1'
+
+function leerPasswords(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(PASSWORDS_KEY) ?? '{}')
+  } catch {
+    return {}
+  }
+}
 
 export class MemoryAuth implements AuthService {
   readonly modo = 'memoria' as const
@@ -41,6 +55,20 @@ export class MemoryAuth implements AuthService {
   async logout(): Promise<void> {
     try {
       localStorage.removeItem(SESSION_KEY)
+    } catch {
+      /* sin storage */
+    }
+  }
+
+  async cambiarPassword(actual: string, nueva: string): Promise<void> {
+    const u = await this.getUsuarioActual()
+    if (!u) throw new Error('No hay sesión')
+    const guardadas = leerPasswords()
+    const previa = guardadas[u.email]
+    if (previa && previa !== actual) throw new Error('La contraseña actual no es correcta')
+    guardadas[u.email] = nueva
+    try {
+      localStorage.setItem(PASSWORDS_KEY, JSON.stringify(guardadas))
     } catch {
       /* sin storage */
     }

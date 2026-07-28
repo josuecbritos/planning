@@ -40,6 +40,7 @@ function unwrap(res: { data: unknown; error: { message: string } | null }): any 
 
 const toUsuario = (r: Row): Usuario => ({
   id: r.id, nombre: r.nombre, iniciales: r.iniciales ?? '', email: r.email, rol: r.rol,
+  inicialesManual: r.iniciales_manual ?? undefined, // #207
   activo: r.activo, authId: r.auth_id ?? undefined,
   permisosProyecto: r.permisos_proyecto ?? undefined,
 })
@@ -49,6 +50,7 @@ const toAcceso = (r: Row): Acceso => ({
 })
 const toComentario = (r: Row): Comentario => ({
   id: r.id, tareaId: r.tarea_id, autorId: r.autor_id ?? undefined, texto: r.texto, timestamp: r.timestamp,
+  editado: r.editado ?? undefined, // #209
 })
 const toProyecto = (r: Row): Proyecto => ({
   id: r.id, nombre: r.nombre, descripcion: r.descripcion ?? undefined, color: r.color ?? undefined, estado: r.estado,
@@ -297,6 +299,8 @@ export class SupabaseRepo implements Repo {
     const upd: Row = {}
     if ('nombre' in patch) upd.nombre = patch.nombre
     if ('iniciales' in patch) upd.iniciales = patch.iniciales
+    // #207: si nunca se fijaron a mano, la base las recalcula con el nombre.
+    if ('inicialesManual' in patch) upd.iniciales_manual = patch.inicialesManual
     if ('activo' in patch) upd.activo = patch.activo
     if ('rol' in patch) upd.rol = patch.rol
     if ('permisosProyecto' in patch) upd.permisos_proyecto = patch.permisosProyecto ?? {}
@@ -353,6 +357,15 @@ export class SupabaseRepo implements Repo {
         .insert({ tarea_id: tareaId, autor_id: autorId ?? null, texto: texto.trim() })
         .select()
         .single(),
+    )
+    return toComentario(row)
+  }
+
+  async editComentario(id: string, texto: string): Promise<Comentario> {
+    // Solo el texto: el trigger de la base rechaza cualquier otro cambio y es
+    // quien pone la marca de editado. La RLS comprueba que seas el autor.
+    const row = unwrap(
+      await this.db.from('comentario').update({ texto: texto.trim() }).eq('id', id).select().single(),
     )
     return toComentario(row)
   }

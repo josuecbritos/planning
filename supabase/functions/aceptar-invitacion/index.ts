@@ -48,9 +48,12 @@ Deno.serve(async (req) => {
   if (limitado(ip)) return responder(429, { error: 'Demasiados intentos. Espera un momento y reintenta.' })
 
   try {
-    const { token, password } = await req.json()
+    // `verificar` (#206): comprueba el token SIN consumirlo, para que la
+    // pantalla pueda explicar de entrada que el enlace venció o ya se usó, en
+    // vez de hacer escribir una contraseña que va a ser rechazada.
+    const { token, password, verificar } = await req.json()
     if (!token) return responder(400, { error: 'Falta el token de invitación' })
-    if (!contrasenaValida(password)) return responder(400, { error: REGLA_PASSWORD })
+    if (!verificar && !contrasenaValida(password)) return responder(400, { error: REGLA_PASSWORD })
 
     const admin = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -75,6 +78,10 @@ Deno.serve(async (req) => {
       .maybeSingle()
     if (!usuario || !usuario.activo) return responder(404, { error: 'Usuario no encontrado o inactivo' })
     if (usuario.auth_id) return responder(409, { error: 'La cuenta ya está activa: inicia sesión' })
+
+    // Hasta aquí llegan las comprobaciones que no modifican nada: si solo se
+    // pedía verificar, se responde sin consumir la invitación.
+    if (verificar) return responder(200, { ok: true, verificado: true })
 
     // Defensa de C1: marcar la invitación como USADA ANTES de crear la cuenta.
     // El trigger vincular_usuario_auth solo enlaza cuentas cuya invitación

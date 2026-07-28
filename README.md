@@ -332,6 +332,31 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
   Gantt abre un panel con el detalle completo, la línea de tiempo del historial y las
   acciones operativas (marcar hecha, replanificar, archivar) para admins. Se cierra
   con ✕, con Escape o al hacer click fuera.
+- **Cuenta de usuario (#207)**: desde el pie de la barra lateral se entra a
+  **Mi cuenta**, donde cada quien cambia su **nombre**, sus **iniciales** y su
+  **contraseña** (pidiendo la actual). El correo, el rol y el estado no se
+  tocan desde ahí: los gestiona el admin. Las **iniciales escritas a mano se
+  respetan para siempre**; las que nunca se escribieron siguen al nombre y se
+  recalculan al cambiarlo — la salida para cuando dos personas de nombre
+  parecido chocan.
+- **Recuperar contraseña (#205)**: desde el login, "¿Olvidaste tu contraseña?"
+  manda por Resend un enlace de **1 hora y un solo uso**; al usarlo se cierran
+  todas las sesiones abiertas de esa cuenta. Solo sirve para usuarios activos
+  **con cuenta ya creada** — un invitado que nunca aceptó, un desactivado y un
+  correo inexistente reciben el mismo mensaje y ningún correo. La pantalla que
+  define la contraseña es **la misma** que la de la invitación (#204): mismas
+  validaciones, distinto texto. Si el enlace venció o ya se usó, se explica qué
+  pasó y qué hacer (#206) — el reenvío sigue siendo una acción del admin.
+- **Menciones en comentarios (#208)**: escribir `@` ofrece a las personas **con
+  acceso a ese proyecto** y el mencionado recibe un aviso. Una sola
+  notificación por persona y comentario: si el mencionado es además el
+  responsable, gana el texto de la mención. En el texto guardado la mención es
+  un **id**, no un nombre, así que sigue apuntando a la persona correcta aunque
+  después se cambie el nombre.
+- **Editar el propio comentario (#209)**: solo el autor, sin límite de tiempo y
+  con marca visible de editado. **No se borra** ningún comentario: el hilo
+  acompaña al registro de replanificaciones y es el respaldo de por qué pasó lo
+  que pasó. Editar no genera notificaciones nuevas.
 - **Archivo de canceladas (6.3)**: archivar una tarea la saca del plan (vistas y
   contadores) conservando su historial; queda consultable por sub frente y puede
   restaurarse. Distinto de eliminar (definitivo).
@@ -417,6 +442,9 @@ src/
   lib/
     dates.ts             Días hábiles y formato
     derive.ts            Estados derivados, colores y marcas (sección 6)
+    password.ts          Política de contraseña, compartida por los dos flujos (#204)
+    errores.ts           Traducción de fallos de red a lenguaje humano (#210)
+    menciones.ts         Menciones @ en comentarios: marcador por id (#208)
   auth/
     auth.ts              Interfaz del servicio de autenticación
     memoryAuth.ts        Login simulado ("entrar como…") para modo Local
@@ -437,11 +465,12 @@ src/
     TaskPanel, TaskDetail, FiltrosBar, FechaEditable, RespPicker,
     AdminProyectosView, ProyectoModal, MiembrosModal, UsersView,
     UsuarioModal, PermisosModal, PermisosProyectoModal, Notificaciones,
-    LoginPage, AceptarInvitacion, Modal, TextPromptModal, …
+    LoginPage, DefinirPassword, ConfiguracionView, Modal, TextPromptModal, …
     Iconos.tsx           Iconos de acción como SVG de trazo (#203)
 supabase/
-  migrations/            17 migraciones (1→17). Lista ordenada en DEPLOY.md.
-  functions/             Edge Functions (Deno): invitar-usuario, aceptar-invitacion
+  migrations/            18 migraciones (1→18). Lista ordenada en DEPLOY.md.
+  functions/             Edge Functions (Deno): invitar-usuario, aceptar-invitacion,
+                         recuperar-contrasena
   seed.sql               Datos de arranque (opcional)
 scripts/
   validar-rls.mjs        Compuerta de RLS (rol por rol contra la API)

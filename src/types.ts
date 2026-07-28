@@ -63,6 +63,13 @@ export interface Usuario {
    * historial quedan intactos. Reactivable dando de alta el mismo correo.
    */
   eliminado?: boolean
+  /**
+   * #207: ¿las iniciales las escribió alguien a mano? Si es asi se respetan
+   * para siempre; si no, siguen al nombre y se recalculan al cambiarlo. Sin
+   * esta bandera los dos casos son indistinguibles (unas iniciales derivadas
+   * y unas escritas iguales a la derivacion se ven idénticas).
+   */
+  inicialesManual?: boolean
 }
 
 /**
@@ -158,15 +165,21 @@ export interface Comentario {
   autorId?: string
   texto: string
   timestamp: string
+  /**
+   * #209: momento de la última edición, o ausente si nunca se editó. Solo el
+   * autor puede editar, y el borrado no existe: el hilo acompaña al registro
+   * de replanificaciones como respaldo de por qué pasó lo que pasó.
+   */
+  editado?: string
 }
 
 /**
- * Notificación in-app (#137). La generan triggers de la base para tres
- * eventos sobre tareas donde eres responsable: te asignaron, replanificaron o
- * comentaron. Apunta a una tarea (el clic navega a ella). El texto se arma en
+ * Notificación in-app (#137). La generan triggers de la base: tres eventos
+ * sobre tareas donde eres responsable —te asignaron, replanificaron o
+ * comentaron— y, desde #208, que alguien te mencionó en un comentario. Apunta a una tarea (el clic navega a ella). El texto se arma en
  * el front a partir del tipo + la tarea + el autor.
  */
-export type TipoNotificacion = 'asignacion' | 'replan' | 'comentario'
+export type TipoNotificacion = 'asignacion' | 'replan' | 'comentario' | 'mencion'
 export interface Notificacion {
   id: string
   usuarioId: string // destinatario

@@ -503,6 +503,57 @@ table.tareas .col-desv { text-align: center; }
 }
 .comentario-nuevo textarea:focus { outline: none; border-color: var(--verde); }
 .comentario-nuevo .btn { align-self: flex-end; }
+.comentario-nuevo .comentario-campo textarea { width: 100%; }
+
+/* #209: marca de editado y acción del autor. El "editado" es un dato, no una
+   acción: se lee al lado de la hora, en el mismo tono apagado. */
+.comentario__editado {
+  font-size: 10.5px; color: var(--gris-texto); font-style: italic;
+  border: 1px solid var(--gris-linea); border-radius: 999px; padding: 0 6px;
+}
+.comentario__fecha + .comentario__editado { margin-left: 0; }
+.comentario__editar { font-size: 11.5px; }
+.comentario-acciones { display: flex; gap: 8px; justify-content: flex-end; }
+.comentario-acciones .btn { align-self: auto; }
+
+/* #208: menciones. En el texto ya publicado se distinguen con el color de
+   marca; en el editor, la lista de sugerencias flota sobre el textarea. */
+.mencion { color: var(--primario); font-weight: 600; }
+.comentario-campo { position: relative; display: flex; flex-direction: column; }
+.mencion-lista {
+  position: absolute; z-index: 40; left: 0; right: 0; top: 100%;
+  margin: 4px 0 0; padding: 4px; list-style: none;
+  background: var(--superficie); border: 1px solid var(--gris-borde);
+  border-radius: 8px; box-shadow: 0 8px 20px rgba(0, 0, 0, .16);
+  max-height: 190px; overflow-y: auto;
+}
+.mencion-lista button {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  border: none; background: transparent; font: inherit; font-size: 13px;
+  padding: 6px 8px; border-radius: 6px; cursor: pointer; text-align: left;
+  color: var(--texto);
+}
+.mencion-lista button:hover { background: var(--gris-sf); }
+.mencion-lista .resp-badge { width: 22px; height: 22px; font-size: 10px; }
+.mencion-lista__vacio { font-size: 12px; color: var(--gris-texto); padding: 6px 8px; }
+
+/* #207: Configuración de la propia cuenta. */
+.config { display: flex; flex-direction: column; gap: 18px; max-width: 620px; }
+.config__bloque {
+  border: 1px solid var(--gris-linea); border-radius: 10px;
+  background: var(--superficie); padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.config__bloque h3 { margin: 0; font-size: 14px; }
+.config__bloque--info { background: transparent; }
+.config__nota { margin: 0; font-size: 12px; color: var(--gris-texto); line-height: 1.5; }
+.config__acciones { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.config__ok { font-size: 12.5px; color: var(--verde); }
+.config__error { font-size: 12.5px; color: var(--rojo); }
+.config__lista { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.config__lista > div { display: flex; gap: 10px; font-size: 13px; }
+.config__lista dt { min-width: 70px; color: var(--gris-texto); }
+.config__lista dd { margin: 0; }
 
 /* ---------- Leyenda ---------- */
 
@@ -1162,6 +1213,14 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .login__usuario-info { display: flex; flex-direction: column; }
 .login__usuario-info small { color: var(--gris-texto); }
 .login__error { margin-top: 12px; color: var(--rojo); font-size: 13px; }
+/* #204/#205/#206: título de la pantalla de contraseña, aviso de éxito al
+   pedir el enlace, detalle técnico del enlace caducado y enlace secundario
+   ("¿Olvidaste tu contraseña?" / "Volver a iniciar sesión"). */
+.login__titulo { margin: 0 0 6px; font-size: 16px; }
+.login__aviso { margin-top: 12px; color: var(--verde); font-size: 13px; }
+.login__detalle { font-size: 12px; color: var(--gris-texto); margin: 0 0 14px; }
+.login__link { display: block; margin: 12px auto 0; font-size: 12.5px; color: var(--gris-texto); }
+.login__link:hover { color: var(--primario); }
 .login__submit { width: 100%; margin-top: 4px; padding: 9px; }
 
 /* ---------- Sesion en el header ---------- */
@@ -1325,6 +1384,15 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .sidebar__footer .sesion { border-left: none; padding-left: 0; }
 .sidebar__footer .sesion__info b { color: #fff; }
 .sidebar__footer .sesion__info small { color: #8e8e96; }
+/* #207: el pie es ahora la entrada a "Mi cuenta". Se comporta como botón
+   (cursor, foco, realce) sin dejar de leerse como la ficha de la sesión. */
+.sesion--boton {
+  border: none; background: transparent; font: inherit; color: inherit;
+  cursor: pointer; text-align: left; border-radius: 8px; padding: 4px 6px; margin: -4px -6px;
+}
+.sesion--boton:hover { background: rgba(255, 255, 255, .07); }
+.sesion--boton:focus-visible { outline: 2px solid var(--primario); outline-offset: 1px; }
+.sesion--activa { background: rgba(255, 255, 255, .1); }
 .sidebar__footer .sesion__salir { color: #8e8e96; }
 .sidebar__footer .sesion__salir:hover { color: #ff8a80; }
 
