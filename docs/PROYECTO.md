@@ -79,6 +79,16 @@ completo con creación y edición **inline** (sin formularios).
   persiste y lo demás se descarta.
 - **Gantt** (grilla tipo Excel): planificación por clics, horizonte configurable,
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
+
+**El filtro de fecha filtra y además fija el horizonte (#234).** Son dos efectos
+que van juntos, no uno u otro: deja **las tareas** que cumplen el criterio —con
+la misma regla que la tabla, así que ambas vistas muestran exactamente lo
+mismo— y ajusta **los días** visibles de la Gantt a ese rango; si el filtro deja
+las de esta semana, la ventana es esa semana. El bug era que en la Gantt hacía
+solo lo segundo, y por eso "Hoy" mostraba tareas de cualquier día y hasta las
+que no tienen fecha. Las opciones que no son una ventana temporal —"Sin fecha",
+"Con fecha"— filtran sin tocar el horizonte, y "En horizonte visible" va al
+revés: deriva su rango del horizonte en vez de definirlo.
 - **Mis Tareas:** las tareas donde el usuario es responsable, en todos sus
   proyectos, vencidas primero. Tiene el mismo conmutador **Tabla / Gantt** que
   un proyecto (#190): la Gantt muestra la **carga propia repartida en el
