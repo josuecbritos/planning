@@ -138,10 +138,17 @@ nombre (#178/#189) — la lista de frentes contiene **solo frentes**. Cada frent
 tiene su propio **⋯** con dos opciones, **Renombrar frente** y **Eliminar
 frente** (#222): antes eran dos iconos sueltos que aparecían al pasar el mouse y
 le quitaban ancho al nombre, partiéndolo en dos líneas y haciendo crecer la
-fila. El botón reserva su lugar siempre (está oculto, no ausente), así el nombre
-—en una sola línea, con el completo en el tooltip— no cambia de ancho y la fila
-nunca cambia de alto. Solo hay **un menú abierto a la vez**: abrir el de un
-frente cierra el de un proyecto y viceversa. Ni los
+fila. En escritorio ese ⋯ **no ocupa ancho**: sale del flujo y se monta sobre el
+extremo derecho de la fila, con el fondo de la fila y un degradado que desvanece
+el texto bajo él (#225). En el teléfono, donde está siempre visible, conserva su
+lugar. En los dos casos el nombre —en una sola línea, con el completo en el
+tooltip— dispone del mismo ancho con y sin el mouse encima, y la fila nunca
+cambia de alto. Los frentes se alinean con el **cuadradito de color** del
+proyecto, no con su texto: la sangría anterior no comunicaba jerarquía (36 vs
+38px) y sí consumía ancho. Solo hay **un menú abierto a la vez**: abrir el de un
+frente cierra el de un proyecto y viceversa. La barra mide 244px por defecto y
+el usuario puede **ajustar su ancho arrastrando el borde derecho** (entre 244 y
+400px, doble clic para restablecer; se recuerda por usuario, #226). Ni los
 proyectos ni los frentes muestran contador de tareas (#188): la lista se navega
 por color, nombre y jerarquía. Los contadores de **Administración** (usuarios y
 proyectos activos) sí se conservan. El control de plegar la barra es un

@@ -440,3 +440,88 @@ Tres detalles que costaron:
 | Toque impreciso abre el menú del frente | tap a +8/+14 px del centro → abre "Renombrar frente" / "Eliminar frente" |
 | El menú no se corta por la derecha | x=202, ancho=168 → borde derecho en 370 de 390 |
 | El alto de la fila no crece | 30 px por fila; área tocable 44×44 sobre un botón visible de 34×26 |
+
+---
+
+## 13. Ancho del nombre del frente y barra ajustable (#225–#226)
+
+Ronda siguiente. **#225 toca ambos entornos** (la alineación aplica también en
+teléfono); **#226 es solo de escritorio** y se registra por completitud.
+
+### #225 — El ⋯ deja de cobrar ancho en escritorio, pero no en el teléfono
+
+#222 le dio al ⋯ un lugar reservado de forma permanente. Eso es lo que impide
+que la barra se deforme al aparecer el botón, pero le cobra ese ancho al nombre
+todo el tiempo: en `main`, el nombre de un frente disponía de **132px** de los
+244 que mide la barra, y se cortaba con "…" en casos normales ("Desarrollo
+Herrami…").
+
+Dos cambios, y la razón por la que son distintos según el entorno:
+
+- **Escritorio:** el ⋯ sale del flujo (`position: absolute`) y se monta sobre el
+  extremo derecho de la fila. Como nunca ocupó ancho, el nombre dispone del
+  total **con y sin el mouse encima**: la deformación que corrigió #222 no
+  vuelve por esta puerta. Se verificó midiendo el ancho disponible en reposo y
+  en hover, además del `scrollWidth`/`clientWidth` del texto.
+- **Teléfono:** ahí el botón está **siempre** visible porque no hay hover, así
+  que montarlo taparía el nombre de forma permanente. Conserva su lugar, tal
+  como quedó en #222. La regla del montaje va en `@media (min-width: 769px)`,
+  no como base con un revert en mobile: el requisito es que el teléfono no
+  cambie, y una excepción explícita es más difícil de romper por accidente que
+  una anulación.
+
+Para que el ⋯ montado se lea **sobre** el texto y no **contra** él, el fondo de
+la fila pasó del botón del nombre a la fila (`--fila-fondo`). El ⋯ lo hereda con
+`background: var(--fila-fondo)` y un `::after` de 22px lo degrada hacia la
+izquierda, así que sirve igual para la fila normal (`#27272a`) y la seleccionada
+(`#333338`) sin duplicar reglas.
+
+**La sangría, que era un problema anterior a #222.** El nombre del proyecto
+arrancaba a 48px del borde de la barra y el del frente a 50px: prácticamente
+alineados, así que la sangría no comunicaba jerarquía —esa la dan el punto de
+color, la negrita y el hecho de que los frentes solo aparecen bajo el proyecto
+abierto— pero sí consumía ancho. Los frentes se alinean ahora con el
+**cuadradito de color** (30px), en escritorio y en teléfono.
+
+| Medida (escritorio 1440×900, barra en 244px) | `main` | con #225 |
+| --- | --- | --- |
+| Ancho disponible para el nombre | 132px | **186px (+41%)** |
+| Inicio del nombre del frente | 50px | **30px** (= el punto de color) |
+| Ancho con y sin el mouse encima | — | 186 → 186px, fila 30 → 30px |
+
+El pedido estimaba llegar a ~214px. No es alcanzable **manteniendo la
+alineación con el punto**, que es el requisito explícito: `.nav-proyecto` aporta
+12px de padding a cada lado que la estimación no consideraba. 186px es el techo
+con esa alineación; para ir más allá está #226.
+
+### #226 — Ancho de la barra ajustable (solo escritorio)
+
+El ancho vive en la variable CSS `--sidebar-w` que App fija en `.app`. La leen
+la columna de la grilla, la barra desplegada del modo escondido y el panel de
+notificaciones (que estaba clavado en `left: 240px` y, con la barra ensanchada,
+habría quedado debajo de ella; ahora es `calc(var(--sidebar-w) - 4px)`, idéntico
+a lo de siempre con el ancho por defecto).
+
+Tres decisiones de implementación:
+
+- **`setPointerCapture`,** no listeners en `window`: el gesto sobrevive a que el
+  cursor salga de la manija o pase sobre una tabla con su propio scroll.
+- **El ancho se recalcula desde el DELTA** del puntero, no desde `clientX`
+  absoluto. Así vale igual con la barra fija (empieza en 0) que escondida
+  (empieza en 54px), sin ramificar.
+- **`.app--redimensionando`** mantiene desplegada la barra escondida mientras
+  dura el arrastre —si no, al alejarse el cursor del riel la barra se replegaría
+  a mitad del gesto— y desactiva su transición, que convertiría el arrastre en
+  un movimiento con inercia.
+
+| Criterio | Medido en 1440×900 |
+| --- | --- |
+| Señal de arrastre | `col-resize` sobre una zona de 7px; la línea aparece al acercarse (transparente → `#6b6b75`) |
+| Cambio en vivo y contenido reacomodado | 244 → 284 → 350px durante el gesto; `.main` 1196 → 1090px |
+| Nombres más largos | ancho disponible del frente 186 → 292px |
+| Topes | el arrastre se detiene en 400px y en 244px |
+| Persistencia | sobrevive a recargar y a cerrar/abrir sesión; **por usuario** (otro usuario arranca en 244px) |
+| Doble clic | vuelve a 244px |
+| Sin desbordes | con la barra en 340px: `scrollWidth - clientWidth` = 0 en `documentElement`, `body` y `.app`, en Tabla, Gantt, Resumen y Mis Tareas |
+| Modo escondido | se despliega en los 340px elegidos, tras el riel de 54px, y la manija acompaña al borde |
+| Teléfono | panel `fixed` de 300px, manija en `display: none`, aun con 400px guardados para ese usuario |
