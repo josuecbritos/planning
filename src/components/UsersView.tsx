@@ -5,6 +5,7 @@ import { puedeInvitarClientesEn, usuariosVisiblesPara } from '../lib/permisos'
 import { UsuarioModal } from './UsuarioModal'
 import { PermisosProyectoModal } from './PermisosProyectoModal'
 import { supabaseConfigured, getClient } from '../data/client'
+import { mensajeError } from '../lib/errores'
 import {
   IconoCorreo,
   IconoEditar,
@@ -42,6 +43,22 @@ type ModalState =
   | { tipo: 'permisos-proyecto'; usuario: Usuario }
   | null
 
+/**
+ * Texto de un fallo de la Edge Function. La función responde su propio mensaje
+ * en español (#249) dentro del cuerpo JSON; supabase-js lo envuelve en uno
+ * genérico en inglés. Se prefiere el del cuerpo y, si no hay, se traduce el
+ * envoltorio con `mensajeError`.
+ */
+async function textoDeError(error: unknown): Promise<string> {
+  try {
+    const ctx = await (error as { context?: Response }).context?.json()
+    if (ctx?.error) return String(ctx.error)
+  } catch {
+    /* sin cuerpo JSON: queda el mensaje del envoltorio */
+  }
+  return (error as Error).message
+}
+
 const ROL_ORDEN: Record<Usuario['rol'], number> = { admin: 0, consultor: 1, cliente: 2 }
 const ROL_LABEL: Record<Usuario['rol'], string> = { admin: 'Admin', consultor: 'Consultor', cliente: 'Cliente' }
 
@@ -64,7 +81,12 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
   )
 
   // §8: envia (o reenvia) la invitacion por correo via Edge Function.
-  async function invitar(u: Usuario) {
+  //
+  // #257: `recienCreado` distingue las dos entradas. Crear un usuario ahora
+  // manda la invitación en el mismo acto —es lo que la interfaz ya prometía con
+  // "+ Cliente" y con el texto de la pantalla vacía—; el sobre se conserva para
+  // REENVIAR, que sigue haciendo falta porque la invitación caduca a los 7 días.
+  async function invitar(u: Usuario, recienCreado = false) {
     if (!supabaseConfigured) return
     setInvitandoId(u.id)
     setAvisoInvitacion(null)
@@ -72,13 +94,27 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
       const { error } = await getClient().functions.invoke('invitar-usuario', {
         body: { usuarioId: u.id },
       })
-      if (error) throw new Error(error.message)
+      if (error) throw new Error(await textoDeError(error))
       setAvisoInvitacion(`Invitación enviada a ${u.email} (caduca en 7 días).`)
     } catch (e) {
-      setAvisoInvitacion(`No se pudo enviar la invitación: ${(e as Error).message}`)
+      const detalle = mensajeError(e)
+      // El usuario YA quedó creado: no se deshace nada. Se dice qué pasó y por
+      // dónde sigue, que es el sobre de su fila.
+      setAvisoInvitacion(
+        recienCreado
+          ? `Usuario creado, pero no pudimos enviarle la invitación: ${detalle} Reenvíala con el sobre de su fila.`
+          : `No se pudo enviar la invitación: ${detalle}`,
+      )
     } finally {
       setInvitandoId(null)
     }
+  }
+
+  // #257: crear e invitar son un solo acto. Si la creación falla, `run` ya
+  // mostró el error y no hay a quién invitar.
+  async function crearEInvitar(datos: Parameters<Actions['createUsuario']>[0]) {
+    const creado = await actions.createUsuario(datos)
+    if (creado) await invitar(creado, true)
   }
 
   // Usuarios visibles: la regla vive en permisos.ts (usuariosVisiblesPara) para
@@ -165,7 +201,7 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
       {modal?.tipo === 'nuevo' && (
         <UsuarioModal
           soloCliente={!esAdminActor}
-          onSubmit={(d) => actions.createUsuario(d)}
+          onSubmit={(d) => void crearEInvitar(d)}
           onClose={() => setModal(null)}
         />
       )}

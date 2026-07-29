@@ -503,3 +503,60 @@ siete hallazgos que tocaban permisos, sesión, base de datos y Edge Functions.
   Resend, excepción) se registra en el servidor; al cliente le llega un mensaje
   genérico en español que dice qué hacer. Los mensajes útiles del flujo —"Esta
   invitación ya fue usada", "El enlace expiró"— no cambian.
+
+## Correcciones para la salida en vivo (#252–#259)
+
+Seis correcciones salidas del uso real, necesarias para entregar la herramienta
+a clientes. Sin cambios en la base de datos. (#255, tiempo real, y #258, borrado
+definitivo de usuarios, van aparte.)
+
+- **#252 — Los mensajes del login, en español.** Al equivocarse en la contraseña
+  la pantalla mostraba "Invalid login credentials", el texto crudo del servicio
+  de autenticación. Es el mismo patrón ya corregido en #244 (sesión inválida) y
+  #249 (funciones de servidor), pero el login había quedado fuera de los dos
+  porque no pasa por las funciones: llama directo a Auth. Ahora hay **cuatro
+  textos fijos** —credenciales incorrectas, cuenta desactivada, demasiados
+  intentos, fallo de conexión— y un genérico para lo no previsto; el texto
+  original **nunca** llega a la pantalla. Se clasifica por el `status`/`code` de
+  la respuesta, no por su mensaje, que viene en inglés y cambia entre versiones.
+  El de credenciales dice "correo o contraseña" **sin precisar cuál falló**
+  (decir que el correo no existe permitiría enumerar cuentas), el de cuenta
+  desactivada es literalmente la misma constante que el de #244, y el de
+  demasiados intentos no promete ningún plazo, porque el límite lo fija Auth y
+  no es exacto.
+- **#253 — La tarea recién creada aparece aunque haya un orden aplicado.** Con la
+  vista congelada, crear una tarea encendía el aviso "↻ Actualizar vista" y nada
+  más: la tarea no se veía, y eso se lee como que no se guardó. Ahora se fuerza
+  su aparición con el **mismo mecanismo** que ya usaba la llegada desde una
+  notificación —el mismo `forzarIds`, ampliado de un id a un conjunto porque
+  encadenando con Enter se crean varias—. La lista **no se reordena sola**: la
+  nueva entra al final de su sub frente y el resto se queda donde está hasta
+  tocar "Actualizar vista". Vale igual con filtro aplicado, caso que se da en la
+  Gantt (la tabla esconde su fila de creación mientras se filtra).
+- **#254 — El cliente ve Mis Tareas.** El producto define al cliente como
+  ejecutor del plan —le asigna tareas, le da permisos sobre las suyas y le manda
+  notificaciones— pero no le daba ninguna pantalla donde verlas juntas: con tres
+  o cuatro proyectos tenía que entrar uno por uno y filtrar a mano. Es la
+  **misma** pantalla que ven admins y consultores, no una variante recortada: ya
+  filtra por responsable dentro de los proyectos donde uno es miembro. No le da
+  permisos nuevos a nadie.
+- **#256 — La fila de creación planifica con el botón "Planificar".** Mostraba
+  un campo `dd/mm/aaaa` mientras que una tarea sin fecha muestra el botón:
+  planificar tiene peso en este producto —queda registrado y moverlo después
+  genera una replanificación con historial— y un campo de fecha suelto invita a
+  poner una fecha de pasada. Misma pieza, mismo comportamiento; la tarea sigue
+  pudiendo nacer sin fecha.
+- **#257 — Crear un usuario le envía la invitación.** El correo salía recién al
+  tocar el sobre, en un paso aparte, pero la interfaz prometía otra cosa ("+
+  Cliente", "Invita a alguien con + Cliente"): se creaba el usuario, se creía
+  haber invitado y la persona nunca se enteraba. Ya pasó en el uso real. El
+  sobre se conserva para **reenviar** —la invitación caduca a los 7 días— y al
+  crear se ve la misma confirmación que muestra el reenvío. Si la creación
+  funciona pero el envío falla, el usuario **queda creado** y se avisa que la
+  invitación no salió y que se reintenta con el sobre.
+- **#259 — La fila de creación ya no arrastra el responsable y la fecha.**
+  Heredarlos al guardar con Enter es deliberado y útil: encadenar varias tareas
+  de la misma persona para la misma fecha. El problema era que sobrevivían al
+  **cierre** de la fila: se volvía a abrir con "+ Tarea" y seguían puestos, así
+  que se asignaban tareas a alguien sin querer. Encadenar hereda; reabrir empieza
+  en blanco.

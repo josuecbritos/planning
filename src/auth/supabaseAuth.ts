@@ -1,6 +1,8 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { AuthError, SupabaseClient } from '@supabase/supabase-js'
 import type { Usuario } from '../types'
 import type { AuthService, MotivoSalida } from './auth'
+import { MENSAJE_LOGIN } from './auth'
+import { esErrorDeRed } from '../lib/errores'
 import { getClient } from '../data/client'
 
 // Login real con Supabase Auth (email + password). El registro en `usuario`
@@ -17,6 +19,24 @@ const toUsuario = (r: Row): Usuario => ({
   // crear proyecto, que depende de permisos_proyecto.crearProyectos).
   permisosProyecto: r.permisos_proyecto ?? undefined,
 })
+
+/**
+ * #252: traduce el fallo de `signInWithPassword` a uno de los mensajes del
+ * pedido. Se mira el ESTADO de la respuesta —el `status` HTTP y el `code` de
+ * Auth—, no el texto: "Invalid login credentials" es inglés, cambia entre
+ * versiones y no debe llegar nunca a la pantalla.
+ *
+ * `401`/`400` cubren credenciales incorrectas y correo inexistente: Auth
+ * responde igual para los dos, que es justo lo que queremos mostrar.
+ */
+function clasificarLogin(error: AuthError): string {
+  if (esErrorDeRed(error)) return MENSAJE_LOGIN.conexion
+  const codigo = (error.code ?? '').toLowerCase()
+  if (error.status === 429 || codigo.includes('rate')) return MENSAJE_LOGIN.intentos
+  if (codigo === 'user_banned') return MENSAJE_LOGIN.intentos
+  if (error.status === 400 || error.status === 401) return MENSAJE_LOGIN.credenciales
+  return MENSAJE_LOGIN.generico
+}
 
 export class SupabaseAuth implements AuthService {
   readonly modo = 'supabase' as const
@@ -79,16 +99,26 @@ export class SupabaseAuth implements AuthService {
 
   async login(email: string, password?: string): Promise<Usuario> {
     if (!password) throw new Error('Ingresa tu contraseña')
+
     const { data, error } = await this.db.auth.signInWithPassword({ email, password })
-    if (error) throw new Error(error.message)
-    const perfil = await this.perfilDe(data.user.id)
-    if (!perfil) {
+    if (error) throw new Error(clasificarLogin(error))
+
+    // La cuenta de Auth es válida, pero la aplicación exige además una ficha de
+    // usuario activa. Sin ficha (nunca se creó, o se eliminó: `usuario_visible`
+    // no devuelve eliminados) o desactivada, el camino de la persona es el
+    // mismo —hablar con su administrador—, así que el mensaje es el mismo. No
+    // se distingue en pantalla: cuál de los dos es no le sirve a quien mira, y
+    // decirlo revelaría qué correos existen en el sistema.
+    let perfil: Usuario | null
+    try {
+      perfil = await this.perfilDe(data.user.id)
+    } catch (e) {
       await this.db.auth.signOut()
-      throw new Error('Tu cuenta no está registrada en el sistema. Pide a un Admin que te cree como usuario.')
+      throw new Error(esErrorDeRed(e) ? MENSAJE_LOGIN.conexion : MENSAJE_LOGIN.generico)
     }
-    if (!perfil.activo) {
+    if (!perfil || !perfil.activo) {
       await this.db.auth.signOut()
-      throw new Error('Tu usuario está desactivado.')
+      throw new Error(MENSAJE_LOGIN.desactivada)
     }
     return perfil
   }

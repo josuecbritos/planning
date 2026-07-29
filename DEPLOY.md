@@ -239,8 +239,11 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
    > origen con `'*'`. Si tras un despliegue las invitaciones o el recuperar
    > contraseña dejan de funcionar con ese mensaje, el secret falta o quedó
    > vacío: revísalo en Edge Functions → Secrets.
-4. Desde el Módulo de Usuarios, el botón ✉ envía (o reenvía) la invitación a
-   cualquier usuario activo que aún no tenga cuenta.
+4. Desde el Módulo de Usuarios, **crear un usuario ya le envía la invitación**
+   (#257): no hay un segundo paso. El botón ✉ de cada fila queda para
+   **reenviarla** —hace falta, porque caduca a los 7 días— y sigue apareciendo
+   solo mientras esa persona no haya activado su cuenta. Si el envío falla, el
+   usuario queda creado igual y el aviso dice que se reintente con el sobre.
 5. **Recuperar contraseña (#205).** Sale por el mismo Resend y la misma
    `SITE_URL`, así que no hay secretos nuevos que configurar. El enlace es
    `SITE_URL/#recuperar=<token>`, dura **1 hora** y sirve una vez; al usarlo se

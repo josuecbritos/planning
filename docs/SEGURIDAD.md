@@ -200,6 +200,16 @@ reintroduce un hallazgo de la auditoría.
     para invitar"—: esos son parte del producto, no una fuga. La regla al
     escribir un `return` de error nuevo: si el texto sale de un objeto de error
     ajeno (`err.message`, el body de un fetch), va al log, no a la respuesta.
+19. **El login no revela qué correos tienen cuenta (#252).** Un intento fallido
+    responde siempre "Correo o contraseña incorrectos", sin distinguir si el
+    correo no existe, si la contraseña está mal o si la cuenta no tiene ficha en
+    `usuario`. Distinguirlos —por texto, por tiempo o por código— permitiría
+    enumerar cuentas probando direcciones. Tampoco llega nunca el mensaje del
+    servicio de autenticación: se clasifica por el `status`/`code` de la
+    respuesta y se muestra uno de los textos fijos, y lo no previsto sale como
+    genérico. La cuenta desactivada SÍ se distingue, pero solo **después** de
+    autenticar correctamente: ahí quien pregunta ya demostró conocer la
+    contraseña, así que no hay nada que enumerar.
 
 ---
 

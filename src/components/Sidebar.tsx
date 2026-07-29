@@ -20,8 +20,6 @@ interface Props {
   pantalla: Pantalla
   /** Módulo de Usuarios: admin (todo) o consultor (acotado a sus proyectos). */
   puedeVerUsuarios: boolean
-  /** Mis Tareas: para el personal de la consultora (admins y consultores). */
-  conMisTareas: boolean
   /** #137: cuántas notificaciones sin leer (contador naranja si > 0). */
   noLeidas: number
   /** #137: ¿el panel emergente de notificaciones está abierto? */
@@ -91,7 +89,6 @@ export function Sidebar({
   frenteSel,
   pantalla,
   puedeVerUsuarios,
-  conMisTareas,
   noLeidas,
   notifAbierto,
   onNotificaciones,
@@ -216,14 +213,17 @@ export function Sidebar({
         >
           <span>Resumen</span>
         </button>
-        {conMisTareas && (
-          <button
-            className={`nav-frente nav-pantalla${pantalla === 'mipanel' ? ' nav-frente--activo' : ''}`}
-            onClick={() => onSelectPantalla('mipanel')}
-          >
-            <span>Mis Tareas</span>
-          </button>
-        )}
+        {/* #254: Mis Tareas es para TODOS los roles. El cliente es ejecutor del
+            plan —se le asignan tareas y se le notifica— y hasta ahora no tenía
+            dónde verlas juntas. Es la misma pantalla, no una variante: ya filtra
+            por responsable dentro de los proyectos donde uno es miembro, así que
+            cada quien ve lo suyo y los permisos siguen saliendo del acceso. */}
+        <button
+          className={`nav-frente nav-pantalla${pantalla === 'mipanel' ? ' nav-frente--activo' : ''}`}
+          onClick={() => onSelectPantalla('mipanel')}
+        >
+          <span>Mis Tareas</span>
+        </button>
       </div>
 
       <div className="sidebar__section">
