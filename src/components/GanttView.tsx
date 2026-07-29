@@ -82,6 +82,9 @@ interface Props {
   snapshotNonce: number
   /** P1: informa si la foto quedó desactualizada (para "Actualizar vista"). */
   onStale: (stale: boolean) => void
+  /** #253: ids recién creados. Se muestran aunque la foto congelada o el filtro
+   *  los dejen fuera; el resto de la grilla no se reordena. */
+  tareasNuevas?: string[]
   actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
@@ -164,7 +167,10 @@ function ventanaHoy(hoy: ISODate): { desde: ISODate; hasta: ISODate } {
   }
 }
 
-export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, onCambiarFiltro, snapshotNonce, onStale, actions, onAbrirTarea, misTareas }: Props) {
+// Referencia estable para el valor por defecto (ver TableView).
+const SIN_NUEVAS: string[] = []
+
+export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, onCambiarFiltro, snapshotNonce, onStale, actions, onAbrirTarea, misTareas, tareasNuevas = SIN_NUEVAS }: Props) {
   // #190: en modo Mis Tareas la grilla es de lectura y replanificación —
   // ninguna afordancia de creación (una tarea creada aquí no sería del
   // usuario hasta asignársela, así que aparecería y desaparecería sola).
@@ -265,7 +271,26 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     snapshotNonce,
   ])
   const { congelada, visibleIds, indice, stale } = useVistaCongelada(frescoIds, existentesIds, activo, firma)
-  useEffect(() => onStale(stale), [stale, onStale])
+
+  // #253: aquí se puede crear CON filtro puesto (la tabla esconde su fila de
+  // creación mientras se filtra; la grilla no), así que es donde el caso se ve
+  // más seguido. Mismo remedio que en la tabla: la recién creada se muestra
+  // aunque la foto o el filtro la dejen fuera, con "Actualizar vista" encendido.
+  const forzarIds = useMemo(() => {
+    const fuera = new Set<string>()
+    for (const id of tareasNuevas) {
+      const t = state.tareas.find((x) => x.id === id)
+      if (!t || t.archivada || !esMia(t)) continue
+      const enVista = congelada
+        ? visibleIds.has(t.id)
+        : !hayFiltroTareas || pasaFiltroCompleto(state, t, filtro, hoy)
+      if (!enVista) fuera.add(t.id)
+    }
+    return fuera
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tareasNuevas, state, congelada, visibleIds, hayFiltroTareas, filtro, hoy])
+
+  useEffect(() => onStale(stale || forzarIds.size > 0), [stale, forzarIds, onStale])
 
   // -- Filas (incluye contenedores vacios §6.4.26 e inputs inline §6.4.25) --
   const filas = useMemo<FilaGantt[]>(() => {
@@ -289,12 +314,19 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           // entre bloques). P1: con la vista congelada se muestran EXACTAMENTE las
           // tareas de la foto (membresía + orden), sin sacar ni reordenar por
           // ediciones; sin congelar, se filtra y ordena en vivo.
+          // #253: las forzadas entran al final del bloque, sin mover al resto.
           const tareas = congelada
             ? todasSub
-                .filter((t) => visibleIds.has(t.id))
-                .sort((a, b) => (indice.get(a.id) ?? 0) - (indice.get(b.id) ?? 0))
+                .filter((t) => visibleIds.has(t.id) || forzarIds.has(t.id))
+                .sort(
+                  (a, b) =>
+                    (indice.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+                    (indice.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+                )
             : ordenarMulti(
-                todasSub.filter((t) => !hayFiltroTareas || (pasaProyecto(f) && pasaEnGantt(t))),
+                todasSub.filter(
+                  (t) => !hayFiltroTareas || (pasaProyecto(f) && pasaEnGantt(t)) || forzarIds.has(t.id),
+                ),
                 orden,
                 (t, campo) => valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
               )
@@ -382,7 +414,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, frentesFuente, omitirVacios, crearEn, filtro, orden, hoy, hayFiltroTareas, congelada, visibleIds, indice])
+  }, [state, frentesFuente, omitirVacios, crearEn, filtro, orden, hoy, hayFiltroTareas, congelada, visibleIds, indice, forzarIds])
 
   const filasTarea = useMemo(
     () => filas.filter((f): f is Extract<FilaGantt, { tipo: 'tarea' }> => f.tipo === 'tarea'),

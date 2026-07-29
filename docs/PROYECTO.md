@@ -71,6 +71,15 @@ que pertenece esa tarea**. Antes usaba los del proyecto activo de la barra, así
 que alguien con control total en A veía botones que no le corresponden al abrir
 una tarea de B — y al revés, quien tenía permisos en B no los veía.
 
+**Mis Tareas es para todos los roles (#254).** El cliente es ejecutor del plan
+—se le asignan tareas, se le dan permisos sobre las suyas y se le notifica—, así
+que también necesita verlas juntas; con tres o cuatro proyectos, entrar uno por
+uno y filtrar a mano no es una forma razonable de saber qué le toca. Es la MISMA
+pantalla, no una variante recortada: ya filtra por responsable dentro de los
+proyectos donde uno es miembro, así que cada quien ve lo suyo. No le da permisos
+nuevos a nadie: lo que se puede hacer sobre cada tarea sigue saliendo del acceso
+a ese proyecto.
+
 **Si la sesión deja de valer, se vuelve al login diciendo por qué (#244).** Dos
 casos, dos mensajes: sesión inválida ("Tu sesión ha expirado. Vuelve a
 ingresar.") y cuenta dada de baja ("Tu cuenta fue desactivada. Para volver a
@@ -78,6 +87,15 @@ activarla ponte en contacto con tu administrador."). Se distinguen preguntando
 por el **estado** —hay sesión, existe el usuario, su perfil sigue activo—, nunca
 leyendo el texto del error. Si esa consulta falla no hay evidencia de nada: se
 muestra el error normal y **no se echa a nadie**.
+
+**Ningún mensaje del login sale del servicio de autenticación (#252).** Cuatro
+textos fijos, en español: credenciales incorrectas, cuenta desactivada,
+demasiados intentos y fallo de conexión; lo que no cae en ninguno sale como un
+genérico. Se clasifica por el **código de la respuesta**, no por su texto —que
+viene en inglés y cambia entre versiones—. El de credenciales dice "correo o
+contraseña" **sin precisar cuál falló**: decir que el correo no existe
+permitiría averiguar quién tiene cuenta probando direcciones. El de cuenta
+desactivada es literalmente la misma constante que el de #244.
 
 ## 4. Funcionalidades
 
@@ -120,6 +138,26 @@ revés: deriva su rango del horizonte en vez de definirlo.
 
 En la Tabla, frentes y sub frentes se **colapsan** con un chevron (▸/▾) para
 enfocar; el colapso es momentáneo (no se guarda).
+
+**Al crear una tarea, la tarea aparece (#253).** Con un orden (o un filtro)
+aplicado, la vista congelada dejaba fuera a la recién creada: salía el aviso
+"↻ Actualizar vista" y nada más, y eso se lee como que la tarea no se guardó.
+Ahora se fuerza su aparición con el **mismo mecanismo** que ya usaba la llegada
+desde una notificación, con el aviso encendido. La lista **no se reordena sola**
+—ese es el punto de la vista congelada—: la nueva entra al final de su sub
+frente y todo lo demás se queda donde está hasta tocar "Actualizar vista", que
+entonces recalcula y la manda a su lugar. Encadenando con Enter, todas aparecen.
+
+**La fila de creación (#256/#259).** La fecha se pone con el botón
+**"Planificar"**, la misma pieza que en una tarea sin fecha: planificar tiene
+peso en este producto —queda registrado y moverlo después genera una
+replanificación con historial—, y un campo `dd/mm/aaaa` suelto invitaba a poner
+una fecha de pasada. Y la fila **hereda mientras se encadena, pero parte en
+blanco al reabrirse**: guardar con Enter y seguir escribiendo conserva
+responsable y fecha (cargar varias tareas de la misma persona para el mismo día
+es un caso real), mientras que cerrarla —clic fuera, Escape, cambiar de
+pantalla— y volver a abrirla con "+ Tarea" empieza de cero. Antes esos valores
+sobrevivían al cierre y se asignaban tareas a alguien sin querer.
 
 **Modelo de estados (derivado, no editable a mano):** cada tarea cae en una de
 cinco categorías excluyentes — Hecha (verde), Pendiente (sin color), Pendiente
@@ -238,8 +276,14 @@ fila y recupera sus accesos.
 según sus permisos.
 
 **Alta por invitación:** el admin (o un consultor con permiso, para clientes de
-sus proyectos) crea al usuario y le envía un correo con enlace (caduca a 7 días,
-un solo uso, reenviable). La persona define su contraseña y entra.
+sus proyectos) crea al usuario y **en el mismo acto se le envía** el correo con
+el enlace (caduca a 7 días, un solo uso). La persona define su contraseña y
+entra. Antes crear y enviar eran dos pasos y la interfaz prometía lo contrario
+—el botón dice "+ Cliente" y la pantalla vacía, "Invita a alguien"—: se creaba
+el usuario, se creía haber invitado y la persona nunca se enteraba (#257). El
+sobre ✉ se conserva para **reenviar**, que sigue haciendo falta porque la
+invitación caduca. Si la creación funciona pero el envío falla, el usuario queda
+creado y se dice que la invitación no salió y que se reintenta con el sobre.
 
 **Recuperar contraseña:** desde el login, con un enlace propio de 1 hora y un
 solo uso que cierra todas las sesiones al usarse. Solo para usuarios activos con

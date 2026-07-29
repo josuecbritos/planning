@@ -38,6 +38,9 @@ interface Props {
   onAbrirTarea: (tareaId: string) => void
   /** #137: tarea a resaltar al llegar desde una notificación (scroll + realce). */
   resaltarTareaId?: string | null
+  /** #253: ids recién creados en esta sesión de trabajo. Se muestran aunque la
+   *  foto congelada o el filtro los dejen fuera (sin reordenar el resto). */
+  tareasNuevas?: string[]
   /** #219: sube en cada llegada desde una notificación. Entra en las
    *  dependencias del realce para que tocar DOS VECES la misma notificación
    *  —o tocarla estando ya en ese proyecto— vuelva a resaltar y a centrar la
@@ -45,7 +48,11 @@ interface Props {
   resaltarNonce?: number
 }
 
-export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, snapshotNonce, onStale, actions, onAbrirTarea, resaltarTareaId, resaltarNonce = 0 }: Props) {
+// Referencia estable para el valor por defecto: un `[]` nuevo en cada render
+// invalidaría los memos que dependen de él.
+const SIN_NUEVAS: string[] = []
+
+export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, snapshotNonce, onStale, actions, onAbrirTarea, resaltarTareaId, resaltarNonce = 0, tareasNuevas = SIN_NUEVAS }: Props) {
   const filtrando = !filtroVacio(filtro)
   // P1: la vista se congela cuando hay filtro y/u orden activo.
   const activo = filtrando || orden.length > 0
@@ -104,22 +111,33 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   const firma = JSON.stringify([proyectoId, frenteSel, filtro, orden, snapshotNonce])
   const { congelada, visibleIds, indice, stale } = useVistaCongelada(frescoIds, existentesIds, activo, firma)
 
-  // #137: ¿la tarea a resaltar queda FUERA de la vista actual (por filtro o por
-  // la foto congelada)? Si es del proyecto pero no se muestra, se fuerza su
-  // aparición y se marca la vista como desactualizada ("Actualizar vista").
-  const resaltadaExcluida = useMemo(() => {
-    if (!resaltarTareaId) return false
-    const t = state.tareas.find((x) => x.id === resaltarTareaId)
-    if (!t || t.archivada) return false
-    const sf = state.subFrentes.find((x) => x.id === t.subFrenteId)
-    const fr = sf && state.frentes.find((x) => x.id === sf.frenteId)
-    if (!fr || fr.proyectoId !== proyectoId) return false
-    const enVista = congelada ? visibleIds.has(t.id) : !filtrando || pasaFiltroCompleto(state, t, filtro, hoy)
-    return !enVista
-  }, [resaltarTareaId, state, proyectoId, congelada, visibleIds, filtrando, filtro, hoy])
-  const forzarId = resaltadaExcluida ? resaltarTareaId ?? null : null
+  // #137/#253: tareas que quedan FUERA de la vista actual (por el filtro o por
+  // la foto congelada) y que hay que mostrar igual. Son dos casos con el mismo
+  // remedio: la tarea a la que se llega desde una notificación (#137) y la que
+  // se acaba de crear (#253) —que si no, con un orden aplicado, no aparecía y
+  // se leía como que no se había guardado—. En ambos se fuerza la aparición y
+  // se enciende "Actualizar vista"; la lista NO se reordena sola.
+  //
+  // Es un conjunto y no un id porque encadenando con Enter se crean varias
+  // seguidas, y todas tienen que verse.
+  const forzarIds = useMemo(() => {
+    const fuera = new Set<string>()
+    for (const id of [resaltarTareaId, ...tareasNuevas]) {
+      if (!id) continue
+      const t = state.tareas.find((x) => x.id === id)
+      if (!t || t.archivada) continue
+      const sf = state.subFrentes.find((x) => x.id === t.subFrenteId)
+      const fr = sf && state.frentes.find((x) => x.id === sf.frenteId)
+      if (!fr || fr.proyectoId !== proyectoId) continue
+      const enVista = congelada ? visibleIds.has(t.id) : !filtrando || pasaFiltroCompleto(state, t, filtro, hoy)
+      if (!enVista) fuera.add(t.id)
+    }
+    return fuera
+    // Al retomarse la foto (cambio de filtro/orden o "Actualizar vista"), las
+    // forzadas pasan a estar dentro y este conjunto se vacía solo.
+  }, [resaltarTareaId, tareasNuevas, state, proyectoId, congelada, visibleIds, filtrando, filtro, hoy])
 
-  useEffect(() => onStale(stale || resaltadaExcluida), [stale, resaltadaExcluida, onStale])
+  useEffect(() => onStale(stale || forzarIds.size > 0), [stale, forzarIds, onStale])
 
   // #137: al llegar desde una notificación, asegura que el frente y el sub
   // frente de la tarea estén expandidos para poder verla.
@@ -165,7 +183,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           congelada={congelada}
           visibleIds={visibleIds}
           indice={indice}
-          forzarId={forzarId}
+          forzarIds={forzarIds}
           realceId={realceId}
           colapsado={frentesCol.has(f.id)}
           colapsable={frenteColapsable}
@@ -195,7 +213,7 @@ function FrentePagina({
   congelada,
   visibleIds,
   indice,
-  forzarId,
+  forzarIds,
   realceId,
   colapsado,
   colapsable,
@@ -216,7 +234,7 @@ function FrentePagina({
   congelada: boolean
   visibleIds: Set<string>
   indice: Map<string, number>
-  forzarId: string | null
+  forzarIds: Set<string>
   realceId?: string | null
   colapsado: boolean
   colapsable: boolean
@@ -235,7 +253,7 @@ function FrentePagina({
   // las haya sacado del filtro); se omite solo si su foto quedó vacía. #137: el
   // sub que contiene la tarea forzada nunca se omite.
   const coincidencias = (subId: string) =>
-    (forzarId && state.tareas.some((t) => t.subFrenteId === subId && t.id === forzarId)) ||
+    state.tareas.some((t) => t.subFrenteId === subId && forzarIds.has(t.id)) ||
     (congelada
       ? state.tareas.some((t) => t.subFrenteId === subId && visibleIds.has(t.id))
       : state.tareas.some(
@@ -278,7 +296,7 @@ function FrentePagina({
               congelada={congelada}
               visibleIds={visibleIds}
               indice={indice}
-              forzarId={forzarId}
+              forzarIds={forzarIds}
               realceId={realceId}
               colapsado={subsCol.has(sf.id)}
               onToggleColapso={() => onToggleSub(sf.id)}
@@ -354,7 +372,7 @@ function SubFrenteTabla({
   congelada,
   visibleIds,
   indice,
-  forzarId,
+  forzarIds,
   realceId,
   colapsado,
   onToggleColapso,
@@ -372,7 +390,7 @@ function SubFrenteTabla({
   congelada: boolean
   visibleIds: Set<string>
   indice: Map<string, number>
-  forzarId: string | null
+  forzarIds: Set<string>
   realceId?: string | null
   colapsado: boolean
   onToggleColapso: () => void
@@ -394,11 +412,12 @@ function SubFrenteTabla({
         orden,
         (t, campo) => valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
       )
-  // #137: la tarea forzada (excluida por el filtro/foto) se inserta igual para
-  // poder resaltarla; el aviso "Actualizar vista" ya está activo.
-  if (forzarId && !tareas.some((t) => t.id === forzarId)) {
-    const extra = todas.find((t) => t.id === forzarId)
-    if (extra) tareas = [...tareas, extra]
+  // #137/#253: las forzadas (excluidas por el filtro o por la foto) se insertan
+  // igual —al final, sin tocar el orden de las demás— para poder verlas. El
+  // aviso "Actualizar vista" ya está encendido.
+  if (forzarIds.size > 0) {
+    const extras = todas.filter((t) => forzarIds.has(t.id) && !tareas.some((x) => x.id === t.id))
+    if (extras.length) tareas = [...tareas, ...extras]
   }
   const archivadas = filtrando ? [] : todas.filter((t) => t.archivada)
 
@@ -530,6 +549,23 @@ function NuevaTareaFila({
   const filaRef = useRef<HTMLTableRowElement>(null)
   const tituloRef = useRef<HTMLInputElement>(null)
 
+  /**
+   * #259: la fila parte EN BLANCO cada vez que se abre con "+ Tarea".
+   *
+   * Encadenar (guardar con Enter y seguir en la misma fila) conserva
+   * responsable y fecha a propósito: cargar varias tareas de la misma persona
+   * para la misma fecha es un caso real. Lo que estaba mal es que esos valores
+   * sobrevivían al CIERRE de la fila: se volvía a abrir horas después y seguían
+   * puestos, así que se asignaban tareas a alguien sin querer. Encadenar hereda;
+   * reabrir empieza de cero.
+   */
+  function abrir() {
+    setTitulo('')
+    setResponsableId('')
+    setFechaObjetivo('')
+    setActiva(true)
+  }
+
   function guardar(): boolean {
     const limpio = titulo.trim()
     if (!limpio) return false
@@ -570,7 +606,7 @@ function NuevaTareaFila({
     return (
       <tr className="fila-add">
         <td colSpan={7}>
-          <button className="btn btn--ghost" onClick={() => setActiva(true)}>
+          <button className="btn btn--ghost" onClick={abrir}>
             + Tarea
           </button>
         </td>
@@ -603,13 +639,20 @@ function NuevaTareaFila({
         />
       </td>
       <td className="col-estado mudo">—</td>
+      {/* #256: la misma pieza que una tarea sin fecha —el botón "Planificar"—,
+          no un campo de fecha suelto. Planificar tiene peso en este producto
+          (queda registrado, y moverlo después genera una replanificación con
+          historial); un `dd/mm/aaaa` invita a poner una fecha de pasada. Al
+          elegirla se devuelve el foco al título: así el guardado por foco-fuera
+          no se dispara al cerrarse el calendario, y se sigue escribiendo. */}
       <td className="col-fecha">
-        <input
-          className="fecha-input"
-          type="date"
-          value={fechaObjetivo}
-          onChange={(e) => setFechaObjetivo(e.target.value)}
-          aria-label="Fecha objetivo de la nueva tarea"
+        <FechaEditable
+          valor={fechaObjetivo || undefined}
+          onCambiar={(nueva) => {
+            setFechaObjetivo(nueva)
+            tituloRef.current?.focus()
+          }}
+          ariaLabel="Fecha objetivo de la nueva tarea"
         />
       </td>
       <td className="col-desv mudo">—</td>

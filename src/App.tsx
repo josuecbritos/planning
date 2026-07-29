@@ -70,7 +70,9 @@ export interface Actions {
   toggleHecha: (tareaId: string, hecha: boolean) => Promise<void>
   /** `nueva = null` desplanifica (borra la marca; queda "sin fecha"). */
   cambiarFechaObjetivo: (tareaId: string, nueva: string | null) => Promise<void>
-  createUsuario: (i: NuevoUsuario) => Promise<void>
+  /** #257: devuelve el usuario creado (o null si falló) para poder invitarlo
+   *  en el mismo acto. `run` ya se encargó de mostrar el error si lo hubo. */
+  createUsuario: (i: NuevoUsuario) => Promise<Usuario | null>
   updateUsuario: (id: string, p: PatchUsuario) => Promise<void>
   /** #136: eliminar = desactivar + invisible (no hard delete). */
   eliminarUsuario: (id: string) => Promise<void>
@@ -240,6 +242,12 @@ export default function App({ repo }: { repo: Repo }) {
   // navegar desde un aviso.
   const [notifAbierto, setNotifAbierto] = useState(false)
   const [tareaResaltada, setTareaResaltada] = useState<string | null>(null)
+  // #253: ids de las tareas creadas desde la última foto. Con un orden (o un
+  // filtro) aplicado, la vista congelada dejaba fuera a la recién creada y se
+  // leía como que no se había guardado. Se fuerza su aparición con el MISMO
+  // mecanismo que ya usa la llegada desde una notificación, y se enciende
+  // "Actualizar vista"; la lista no se reordena sola.
+  const [tareasNuevas, setTareasNuevas] = useState<string[]>([])
   // #219: contador que sube en cada llegada desde una notificación. Sin él, si
   // ya estás en el proyecto de la tarea, `setTareaResaltada` asigna el MISMO
   // valor, React descarta la actualización y el efecto del realce no vuelve a
@@ -596,6 +604,7 @@ export default function App({ repo }: { repo: Repo }) {
       createTarea: (i) =>
         run(async () => {
           const t = await repo.createTarea(i)
+          setTareasNuevas((prev) => (prev.includes(t.id) ? prev : [...prev, t.id]))
           return (s) => apply.upsertTarea(s, t)
         }),
       updateTarea: (id, p) =>
@@ -620,11 +629,15 @@ export default function App({ repo }: { repo: Repo }) {
           const { tarea, historial } = await repo.cambiarFechaObjetivo(tareaId, nueva, sesion?.id, HOY)
           return (s) => apply.setHistorialTarea(apply.upsertTarea(s, tarea), tareaId, historial)
         }),
-      createUsuario: (i) =>
-        run(async () => {
+      createUsuario: async (i) => {
+        const salida: { usuario: Usuario | null } = { usuario: null }
+        await run(async () => {
           const u = await repo.createUsuario(i)
+          salida.usuario = u
           return (s) => apply.upsertUsuario(s, u)
-        }),
+        })
+        return salida.usuario
+      },
       updateUsuario: (id, p) =>
         run(async () => {
           const u = await repo.updateUsuario(id, p)
@@ -704,6 +717,7 @@ export default function App({ repo }: { repo: Repo }) {
     setSnapshotNonce((n) => n + 1)
     setVistaStale(false)
     setTareaResaltada(null)
+    setTareasNuevas([])
   }, [])
 
   // Cambiar de vista/proyecto recalcula la foto naturalmente (no cuenta como
@@ -960,8 +974,6 @@ export default function App({ repo }: { repo: Repo }) {
   const candidatosFiltro = miembrosDeProyecto(state, proyecto?.id ?? null)
   // Miembros (7): el admin y el dueño pueden abrir la lista del proyecto.
   const puedeVerMiembros = !!proyecto && (esAdmin || esDuenoDe(state, sesion, proyecto.id))
-  // Mis Tareas: para el personal de la consultora (admins y consultores).
-  const conMisTareas = esAdmin || sesion.rol === 'consultor'
   // Módulo de Usuarios (§4): admin (todo) o consultor (acotado a sus proyectos:
   // ve a la gente con acceso a ellos y gestiona a los clientes según permisos).
   const puedeVerUsuarios = esAdmin || sesion.rol === 'consultor'
@@ -1054,7 +1066,6 @@ export default function App({ repo }: { repo: Repo }) {
           frenteSel={frenteSel}
           pantalla={pantalla}
           puedeVerUsuarios={puedeVerUsuarios}
-          conMisTareas={conMisTareas}
           noLeidas={noLeidas}
           notifAbierto={notifAbierto}
           onNotificaciones={abrirNotificaciones}
@@ -1103,7 +1114,7 @@ export default function App({ repo }: { repo: Repo }) {
             actions={actions}
             onIrAProyectos={() => onSelectPantalla('admin-proyectos')}
           />
-        ) : pantalla === 'mipanel' && conMisTareas ? (
+        ) : pantalla === 'mipanel' ? (
           <MisTareasView
             state={state}
             usuario={sesion}
@@ -1170,6 +1181,7 @@ export default function App({ repo }: { repo: Repo }) {
                   onAbrirTarea={abrirDetalle}
                   resaltarTareaId={tareaResaltada}
                   resaltarNonce={resaltadoNonce}
+                  tareasNuevas={tareasNuevas}
                 />
               ) : (
                 <GanttView
@@ -1185,6 +1197,7 @@ export default function App({ repo }: { repo: Repo }) {
                   onStale={setVistaStale}
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
+                  tareasNuevas={tareasNuevas}
                 />
               )}
             </div>
