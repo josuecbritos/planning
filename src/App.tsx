@@ -11,6 +11,7 @@ import type { Filtro } from './lib/filtros'
 import { CAMPOS_PROYECTO, type OrdenMulti } from './lib/orden'
 import { escribirVistaActiva, estadoInicial } from './lib/vistas'
 import * as apply from './data/apply'
+import { suscribirTabla } from './data/tiempoReal'
 import type {
   NuevaTarea,
   NuevoFrente,
@@ -437,6 +438,67 @@ export default function App({ repo }: { repo: Repo }) {
       .catch((e) => vivo && setError(mensajeError(e)))
     return () => {
       vivo = false
+    }
+  }, [repo, sesion])
+
+  // #255 — La campana en tiempo real (entrega 1 de 2: SOLO notificaciones).
+  //
+  // El canal AVISA; la verdad se relee de la base (principio 1): cada evento,
+  // la reconexión y el despertar de la pestaña disparan la MISMA relectura,
+  // cuyo resultado REEMPLAZA la lista — nunca se acumulan eventos. Por eso el
+  // eco no existe: marcar leídas actualiza el estado local y el aviso que
+  // vuelve por el canal relee ese mismo estado final (el contador baja UNA
+  // vez). Y por eso una pestaña dormida queda bien al despertar: no importa
+  // qué eventos se perdió, la relectura trae la realidad.
+  //
+  // Si el canal no conecta, no pasa nada visible (principio 2): la campana
+  // queda como siempre, actualizada al recargar. En modo Local no hay canal.
+  //
+  // La entrega 2 (#260) NO copia este efecto: suma sus tablas a la misma
+  // cañería (`suscribirTabla`, en data/tiempoReal.ts) con su propia relectura.
+  useEffect(() => {
+    if (repo.modo !== 'supabase' || !sesion) return
+    let vivo = true
+    let pendiente: number | null = null
+
+    // Coalesce: una ráfaga de avisos (p. ej. el borrado en cascada de varias
+    // notificaciones) produce UNA relectura, no una por evento.
+    const releer = () => {
+      if (pendiente !== null) return
+      pendiente = window.setTimeout(async () => {
+        pendiente = null
+        try {
+          const ns = await repo.loadNotificaciones()
+          if (vivo) setState((prev) => (prev ? { ...prev, notificaciones: ns } : prev))
+        } catch {
+          // Silencio (principio 2): el próximo aviso o el próximo foco
+          // reintentan; mientras tanto la campana muestra lo último leído.
+        }
+      }, 250)
+    }
+
+    const sub = suscribirTabla({
+      tabla: 'notificacion',
+      // Acota el tráfico a lo propio. La BARRERA es la RLS, que Realtime
+      // evalúa con el JWT del suscriptor; esto solo evita ruido.
+      filtro: `usuario_id=eq.${sesion.id}`,
+      alAviso: releer,
+    })
+
+    // Pestaña dormida o fuera de foco: el canal pudo perder eventos que no se
+    // recuperan. Al volver, se relee — el mismo patrón que #247 con "hoy".
+    const alVolver = () => {
+      if (document.visibilityState === 'visible') releer()
+    }
+    document.addEventListener('visibilitychange', alVolver)
+    window.addEventListener('focus', alVolver)
+
+    return () => {
+      vivo = false
+      if (pendiente !== null) window.clearTimeout(pendiente)
+      document.removeEventListener('visibilitychange', alVolver)
+      window.removeEventListener('focus', alVolver)
+      sub.cerrar()
     }
   }, [repo, sesion])
 

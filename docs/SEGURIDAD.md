@@ -72,6 +72,20 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
 - Los errores internos se registran en el servidor y al cliente le llega un
   mensaje genérico en español; los mensajes útiles del flujo no cambian.
 
+**Migración 20 — `20260707000020_tiempo_real_notificaciones.sql` (#255)**
+- Publica `notificacion` —y SOLO esa tabla— en la publicación
+  `supabase_realtime`. Realtime evalúa las políticas de RLS DEL SUSCRIPTOR
+  para INSERT/UPDATE: el canal entrega a cada quien exactamente lo que la
+  lectura normal le entregaría.
+- REPLICA IDENTITY queda en DEFAULT **a propósito**: Realtime no aplica RLS a
+  los DELETE (la fila ya no existe), así que lo único que puede viajar en
+  ellos es lo que la replica identity incluya. Con DEFAULT es la clave
+  primaria — un uuid opaco. Con FULL sería la fila completa, repartida a
+  cualquier autenticado suscrito: una fuga silenciosa.
+- La compuerta trae el caso "el canal de tiempo real no reparte de más": tres
+  oyentes simultáneos sobre una notificación real (destinatario, otro usuario
+  sin filtro y el admin sin filtro); solo el destinatario debe recibirla.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.
@@ -210,6 +224,20 @@ reintroduce un hallazgo de la auditoría.
     genérico. La cuenta desactivada SÍ se distingue, pero solo **después** de
     autenticar correctamente: ahí quien pregunta ya demostró conocer la
     contraseña, así que no hay nada que enumerar.
+20. **El canal de tiempo real respeta la RLS, y una tabla solo se publica con
+    su RLS verificada (#255).** La publicación `supabase_realtime` define qué
+    tablas emiten cambios por WebSocket; agregar una tabla ahí es abrirle un
+    canal de salida a sus filas, filtrado por las políticas de RLS del
+    suscriptor (INSERT/UPDATE) — así que NUNCA publicar una tabla cuya RLS no
+    esté validada por la compuerta. Los DELETE son la excepción: Realtime no
+    les aplica RLS, y lo que viaja lo decide REPLICA IDENTITY — por eso las
+    tablas publicadas se quedan en DEFAULT (solo la clave primaria; FULL
+    repartiría la fila entera a cualquier autenticado). Del lado del cliente,
+    los eventos son AVISOS, no datos: la verdad se relee de la base
+    (`data/tiempoReal.ts`, principio 1 del pedido); ningún código debe
+    construir estado a partir del contenido de un evento. La entrega 2 (#260)
+    suma sus tablas a esta misma publicación y a esta misma cañería, con estos
+    mismos tres candados.
 
 ---
 
@@ -250,6 +278,14 @@ funciones de permisos.**
   credenciales `RLS_*` estén configuradas).
 - El script lee `usuario_visible` (invariante 3), tanto en `perfilDe` como en la
   consulta base del admin.
+- **Caso de #255**: `probarCanalTiempoReal` abre tres canales a la vez sobre
+  `notificacion` —el destinatario con su filtro, otro usuario SIN filtro (un
+  cliente malicioso no pondría filtro) y el admin sin filtro— y genera una
+  notificación real asignando una tarea. Solo el destinatario debe recibir el
+  INSERT; cero INSERT/UPDATE para los otros dos, admin incluido (la política
+  de `notificacion` no tiene bypass de admin y el canal debe respetarlo).
+  Requiere Realtime activo y la migración 20 aplicada; sin eso, el caso falla
+  con "el canal conecta".
 - **Caso de #248**: `compararTablaContraVista` pide `usuario` (la tabla) y
   `usuario_visible` (la vista) con la misma sesión y exige que la tabla no
   devuelva ninguna fila que la vista no tenga. Si el grant acotado se revocara
