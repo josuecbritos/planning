@@ -103,6 +103,137 @@ async function compararTablaContraVista(c, rotulo) {
   )
 }
 
+// #255 — El canal de tiempo real no reparte de más. Es la prueba central de
+// la entrega 1: Realtime evalúa la RLS del SUSCRIPTOR para INSERT/UPDATE, y
+// acá se comprueba con tres oyentes a la vez sobre una notificación real:
+//   · B (el destinatario), suscrito con su filtro → DEBE recibirla.
+//   · C (otro usuario), suscrito SIN filtro, como lo haría un cliente
+//     malicioso → NO debe recibir ningún INSERT/UPDATE.
+//   · El admin, también sin filtro → tampoco: la política de notificacion no
+//     tiene bypass de admin, y el canal debe respetarlo igual que la lectura.
+// Los DELETE quedan fuera de la aserción: Realtime no les aplica RLS (la fila
+// ya no existe) y por diseño viajan solo con la clave primaria — ver la
+// migración 20. Se registran aparte, como dato.
+// La notificación se genera DE VERDAD: el admin crea un proyecto de prueba
+// (__prueba_rls_rt_*, el barrido de limpieza lo recoge) y asigna una tarea a
+// B; el trigger notif_asignacion hace el resto.
+async function probarCanalTiempoReal(admin) {
+  const rotulo = 'canal'
+  const emailB = process.env.RLS_CONSULTOR_A_EMAIL
+  const passB = process.env.RLS_CONSULTOR_A_PASS
+  const emailC = process.env.RLS_CLIENTE_EMAIL ?? process.env.RLS_CONSULTOR_B_EMAIL
+  const passC = process.env.RLS_CLIENTE_PASS ?? process.env.RLS_CONSULTOR_B_PASS
+  if (!emailB || !passB || !emailC || !passC) {
+    console.log('  SKIP  [canal] hacen falta RLS_CONSULTOR_A_* y (RLS_CLIENTE_* o RLS_CONSULTOR_B_*)')
+    return
+  }
+
+  const b = await sesion(emailB, passB)
+  const cAjeno = await sesion(emailC, passC)
+  const yoB = await perfilDe(b)
+  const yoC = await perfilDe(cAjeno)
+  if (!yoB || !yoC) {
+    marca(false, rotulo, 'sesiones del canal legibles')
+    return
+  }
+
+  // El token del suscriptor es lo que Realtime usa para evaluar la RLS.
+  for (const cli of [b, cAjeno, admin]) {
+    const { data } = await cli.auth.getSession()
+    if (data.session) await cli.realtime.setAuth(data.session.access_token)
+  }
+
+  const eventos = { B: [], C: [], admin: [] }
+  const canales = []
+  function escuchar(cliente, nombre, filtro) {
+    return new Promise((resolver) => {
+      const canal = cliente
+        .channel(`compuerta:${nombre}:${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'notificacion', ...(filtro ? { filter: filtro } : {}) },
+          (ev) => eventos[nombre].push(ev.eventType),
+        )
+        .subscribe((estado) => {
+          if (estado === 'SUBSCRIBED') resolver(true)
+          if (estado === 'CHANNEL_ERROR' || estado === 'TIMED_OUT') resolver(false)
+        })
+      canales.push({ cliente, canal })
+      setTimeout(() => resolver(false), 10_000)
+    })
+  }
+
+  try {
+    const suscritos = await Promise.all([
+      escuchar(b, 'B', `usuario_id=eq.${yoB.id}`),
+      escuchar(cAjeno, 'C'),   // sin filtro: simula un cliente modificado
+      escuchar(admin, 'admin'), // sin filtro: ni el admin recibe lo ajeno
+    ])
+    if (!suscritos.every(Boolean)) {
+      marca(false, rotulo, 'el canal conecta', '¿Realtime activo y migración 20 aplicada?')
+      return
+    }
+
+    // Generar una notificación real para B: el admin le asigna una tarea.
+    const { data: proy, error: errProy } = await admin
+      .from('proyecto')
+      .insert({ nombre: `__prueba_rls_rt_${Date.now()}` })
+      .select()
+      .single()
+    if (errProy) {
+      marca(false, rotulo, 'preparación (proyecto de prueba)', errProy.message)
+      return
+    }
+    const { data: fr } = await admin
+      .from('frente').insert({ proyecto_id: proy.id, nombre: 'rt', orden: 0 }).select().single()
+    const { data: sf } = await admin
+      .from('sub_frente').insert({ frente_id: fr.id, nombre: 'rt', orden: 0 }).select().single()
+    const { error: errT } = await admin
+      .from('tarea')
+      .insert({ sub_frente_id: sf.id, titulo: 'rt', responsable_id: yoB.id, orden: 0 })
+    if (errT) {
+      marca(false, rotulo, 'preparación (tarea que notifica)', errT.message)
+      return
+    }
+
+    // Espera activa: los eventos tardan típicamente < 1 s; techo de 10 s.
+    const limite = Date.now() + 10_000
+    while (Date.now() < limite && !eventos.B.includes('INSERT')) {
+      await new Promise((r) => setTimeout(r, 250))
+    }
+    // Margen extra: si una fuga viniera en camino, que alcance a llegar.
+    await new Promise((r) => setTimeout(r, 1_500))
+
+    const conContenido = (lista) => lista.filter((t) => t === 'INSERT' || t === 'UPDATE')
+    marca(
+      eventos.B.includes('INSERT'),
+      rotulo,
+      'el destinatario SÍ recibe su notificación en vivo',
+      `eventos de B: ${eventos.B.join(',') || 'ninguno'}`,
+    )
+    marca(
+      conContenido(eventos.C).length === 0,
+      rotulo,
+      'otro usuario (sin filtro) NO recibe la notificación ajena',
+      conContenido(eventos.C).length ? `FUGA: ${eventos.C.join(',')}` : 'cero INSERT/UPDATE',
+    )
+    marca(
+      conContenido(eventos.admin).length === 0,
+      rotulo,
+      'ni el admin recibe por el canal notificaciones que no son suyas',
+      conContenido(eventos.admin).length ? `FUGA: ${eventos.admin.join(',')}` : 'cero INSERT/UPDATE',
+    )
+  } finally {
+    // Cerrar ANTES de la limpieza: el borrado en cascada emite DELETEs (solo
+    // clave primaria) que ensuciarían el conteo sin aportar nada.
+    for (const { cliente, canal } of canales) {
+      try { await cliente.removeChannel(canal) } catch { /* nada */ }
+    }
+    await b.auth.signOut()
+    await cAjeno.auth.signOut()
+  }
+}
+
 async function limpiarProyectosDePrueba(admin) {
   if (!admin) return
   const { data: previos } = await admin.from('proyecto').select('id').like('nombre', '__prueba_rls_%')
@@ -397,6 +528,9 @@ async function main() {
 
     await c.auth.signOut()
   }
+
+  // ---------- #255: el canal de tiempo real ----------
+  await probarCanalTiempoReal(admin)
 
   } finally {
     await limpiarProyectosDePrueba(admin)

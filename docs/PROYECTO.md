@@ -268,6 +268,28 @@ la lista, en vez de no hacer nada (#246); borrar una tarea, un sub frente, un
 frente o un proyecto se lleva por delante sus notificaciones en los dos
 backends.
 
+**Tiempo real — entrega 1: la campana (#255).** Las notificaciones llegan sin
+recargar: el contador sube solo, y si el panel está abierto la lista se
+actualiza — la nueva aparece y la que dejó de existir desaparece. Sin destello
+ni aviso emergente, a propósito: las notificaciones de este producto son pocas
+y de alta señal. Tres principios rigen la implementación y también la entrega
+2 (#260, que llevará los datos del proyecto al mismo mecanismo):
+
+1. **El canal avisa; la verdad se relee de la base.** Los eventos perdidos no
+   se recuperan, así que nunca son fuente de verdad: cada aviso, la
+   reconexión y el despertar de la pestaña disparan la misma relectura, cuyo
+   resultado reemplaza la lista. El eco desaparece por construcción: releer
+   tras una acción propia devuelve el mismo estado, no lo aplica dos veces.
+2. **Degradación silenciosa.** Si el canal no conecta, la aplicación funciona
+   exactamente como antes —todo al recargar— sin ningún error visible.
+3. **La cañería es una sola** (`data/tiempoReal.ts`): conexión, reconexión y
+   semántica de los avisos viven ahí, y las tablas se suscriben. La entrega 2
+   suma tablas a ese módulo; no construye otro.
+
+El canal respeta la RLS del suscriptor (es el punto crítico: a nadie le llega
+lo que no le corresponde — invariante 20 de `SEGURIDAD.md`) y el modo Local
+sigue sin tiempo real.
+
 **Baja de usuarios (#136):** eliminar = desactivar + invisible (sin borrado
 físico, para no huérfanar el historial). Dar de alta el mismo correo reactiva la
 fila y recupera sus accesos.
@@ -332,6 +354,9 @@ valor por defecto del navegador, cae al inicial (un `border` así desaparece).
   petición en vez de abrirse a cualquiera. Los errores internos se registran en
   el servidor y al cliente le llega un mensaje genérico en español (#249). Se
   despliegan a mano desde el dashboard (no hay CLI en este proyecto).
+- **Tiempo real:** Supabase Realtime sobre la publicación `supabase_realtime`
+  (hoy solo `notificacion`). Una sola cañería en el cliente
+  (`data/tiempoReal.ts`); los eventos son avisos de releer, nunca datos.
 - **Despliegue:** Vercel (frontend estático + `vercel.json` con headers de
   seguridad). Migraciones en `supabase/migrations/`, aplicadas desde el dashboard.
 

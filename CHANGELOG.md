@@ -560,3 +560,41 @@ definitivo de usuarios, van aparte.)
   **cierre** de la fila: se volvía a abrir con "+ Tarea" y seguían puestos, así
   que se asignaban tareas a alguien sin querer. Encadenar hereda; reabrir empieza
   en blanco.
+
+## Tiempo real, entrega 1 de 2: la campana (#255)
+
+El cambio más complejo del proyecto hasta ahora, partido en dos a propósito:
+esta entrega cubre **solo las notificaciones** (una tabla, riesgo acotado); la
+entrega 2 (#260) llevará los datos del proyecto al mismo mecanismo. El riesgo
+principal no era que no funcionara, sino que funcionara **de más**: el canal
+nuevo tenía que respetar exactamente las mismas reglas de acceso que la lectura
+normal.
+
+- **La campana refleja el estado real sin recargar.** Llega una notificación y
+  el contador sube solo; si el panel está abierto, la nueva aparece en la lista
+  y la que dejó de existir desaparece. Sin destello ni aviso emergente, por
+  decisión de producto.
+- **Migración 20** (aditiva): publica `notificacion` —y solo esa tabla— en la
+  publicación `supabase_realtime`. Realtime evalúa la RLS **del suscriptor**
+  para INSERT/UPDATE; los DELETE, a los que no puede aplicar RLS, viajan solo
+  con la clave primaria porque REPLICA IDENTITY queda en DEFAULT a propósito
+  (con FULL, el borrado repartiría la fila entera a cualquier autenticado).
+- **La cañería es una** (`data/tiempoReal.ts`): conexión, reconexión con
+  espera creciente, degradación silenciosa y la semántica de los avisos viven
+  ahí; la entrega 2 suma tablas a ese módulo, no construye otro.
+- **El canal avisa; la verdad se relee.** Cada evento, la reconexión y el
+  despertar de la pestaña disparan la misma relectura
+  (`repo.loadNotificaciones`), cuyo resultado reemplaza la lista. El eco
+  desaparece por construcción (marcar leídas baja el contador UNA vez) y una
+  pestaña dormida queda bien al despertar aunque haya perdido eventos.
+- **Si el canal no conecta, no pasa nada visible:** la aplicación funciona
+  exactamente como antes, todo al recargar. El modo Local sigue sin tiempo
+  real, intacto.
+- **La compuerta de RLS trae el caso "el canal no reparte de más":** tres
+  oyentes simultáneos sobre una notificación real — el destinatario (debe
+  recibirla), otro usuario suscrito sin filtro (cero eventos con contenido) y
+  el admin sin filtro (tampoco: la política de notificaciones no tiene bypass
+  de admin, y el canal lo respeta).
+- Invariante 20 nuevo en `SEGURIDAD.md`: una tabla solo se publica en
+  `supabase_realtime` con su RLS validada, replica identity en DEFAULT, y los
+  eventos son avisos, nunca datos.

@@ -79,6 +79,14 @@ orden** el contenido de:
     una fila que la política ya no deja ver, y mostraría "no se pudo eliminar"
     en un borrado que sí ocurrió—. Aplicarla después de que el front esté en
     producción no deja ninguna ventana rota.
+20. `supabase/migrations/20260707000020_tiempo_real_notificaciones.sql` —
+    tiempo real, entrega 1 (#255): publica `notificacion` (y SOLO esa tabla)
+    en la publicación `supabase_realtime`, con REPLICA IDENTITY en DEFAULT a
+    propósito (los DELETE viajan solo con la clave primaria; el porqué está
+    en la cabecera del archivo). El orden con el front es indiferente: el
+    front nuevo sin la migración simplemente no recibe eventos y funciona
+    como siempre (degradación silenciosa), y el front viejo con la migración
+    no escucha nada. Aplicar la migración cuando se quiera encender el vivo.
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
