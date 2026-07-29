@@ -1,4 +1,4 @@
-import type { Acceso, AppState, Comentario, Frente, Notificacion, PermisosTareas, Proyecto, Replanificacion, SubFrente, TipoNotificacion, Tarea, Usuario } from '../types'
+import type { Acceso, AppState, Comentario, Frente, PermisosTareas, Proyecto, Replanificacion, SubFrente, TipoNotificacion, Tarea, Usuario } from '../types'
 import { hoyISO } from '../lib/dates'
 import { idsMencionados } from '../lib/menciones'
 import { DEFAULT_PERMISOS_PROYECTO, defaultPermisosTareas } from '../lib/permisos'
@@ -533,12 +533,6 @@ export class MemoryRepo implements Repo {
       tarea: clone(t),
       historial: clone(this.state.historial.filter((h) => h.tareaId === id)),
     }
-  }
-
-  /** #255: en modo Local no hay tiempo real, pero el contrato es el mismo.
-   *  La "base" de este repo es su propio estado: se devuelve lo del actor. */
-  async loadNotificaciones(): Promise<Notificacion[]> {
-    return clone(this.state.notificaciones.filter((n) => n.usuarioId === this.actorId))
   }
 
   async marcarNotificacionesLeidas(usuarioId: string): Promise<string[]> {

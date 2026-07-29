@@ -86,6 +86,17 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   oyentes simultáneos sobre una notificación real (destinatario, otro usuario
   sin filtro y el admin sin filtro); solo el destinatario debe recibirla.
 
+**Migración 21 — `20260707000021_tiempo_real_datos.sql` (#260)**
+- Suma a la publicación las siete tablas de datos (`tarea`, `frente`,
+  `sub_frente`, `proyecto`, `acceso_proyecto`, `comentario`,
+  `replanificacion`), todas con REPLICA IDENTITY en DEFAULT — mismo
+  razonamiento que la 20. `usuario` queda fuera a sabiendas.
+- Sin filtro de servidor en el cliente para estas tablas: la barrera es la RLS
+  por membresía, que Realtime evalúa con el JWT del suscriptor.
+- La compuerta amplía el caso del canal: `tarea` como representante de la
+  familia de datos — el MIEMBRO del proyecto de prueba recibe el INSERT; el no
+  miembro, suscrito sin filtro, cero INSERT/UPDATE.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.
@@ -236,8 +247,11 @@ reintroduce un hallazgo de la auditoría.
     los eventos son AVISOS, no datos: la verdad se relee de la base
     (`data/tiempoReal.ts`, principio 1 del pedido); ningún código debe
     construir estado a partir del contenido de un evento. La entrega 2 (#260)
-    suma sus tablas a esta misma publicación y a esta misma cañería, con estos
-    mismos tres candados.
+    sumó las siete tablas de datos a esta misma publicación y a esta misma
+    cañería, con estos mismos tres candados; en ellas no hay filtro de
+    servidor a propósito — la barrera es la RLS por membresía. Cualquier tabla
+    futura entra igual: RLS validada, replica identity DEFAULT, eventos como
+    avisos.
 
 ---
 
@@ -278,14 +292,15 @@ funciones de permisos.**
   credenciales `RLS_*` estén configuradas).
 - El script lee `usuario_visible` (invariante 3), tanto en `perfilDe` como en la
   consulta base del admin.
-- **Caso de #255**: `probarCanalTiempoReal` abre tres canales a la vez sobre
-  `notificacion` —el destinatario con su filtro, otro usuario SIN filtro (un
-  cliente malicioso no pondría filtro) y el admin sin filtro— y genera una
-  notificación real asignando una tarea. Solo el destinatario debe recibir el
-  INSERT; cero INSERT/UPDATE para los otros dos, admin incluido (la política
-  de `notificacion` no tiene bypass de admin y el canal debe respetarlo).
-  Requiere Realtime activo y la migración 20 aplicada; sin eso, el caso falla
-  con "el canal conecta".
+- **Caso de #255/#260**: `probarCanalTiempoReal` abre canales simultáneos
+  sobre `notificacion` y sobre `tarea`, y genera el hecho real completo (el
+  admin crea un proyecto de prueba, hace MIEMBRO al consultor A y le asigna
+  una tarea). En `notificacion`: solo el destinatario recibe el INSERT; cero
+  INSERT/UPDATE para otro usuario sin filtro y para el admin sin filtro (la
+  política no tiene bypass de admin y el canal debe respetarlo). En `tarea`
+  (representante de la familia de datos, que comparte los predicados de
+  membresía): el miembro recibe el INSERT; el no miembro, suscrito sin filtro,
+  cero. Requiere Realtime activo y las migraciones 20 y 21 aplicadas.
 - **Caso de #248**: `compararTablaContraVista` pide `usuario` (la tabla) y
   `usuario_visible` (la vista) con la misma sesión y exige que la tabla no
   devuelva ninguna fila que la vista no tenga. Si el grant acotado se revocara

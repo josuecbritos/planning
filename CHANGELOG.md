@@ -598,3 +598,43 @@ normal.
 - Invariante 20 nuevo en `SEGURIDAD.md`: una tabla solo se publica en
   `supabase_realtime` con su RLS validada, replica identity en DEFAULT, y los
   eventos son avisos, nunca datos.
+
+## Tiempo real, entrega 2 de 2: los datos (#260)
+
+Completa el alcance definido por el criterio del dueño: **todo lo que genera
+notificaciones debe poder verse sin recargar**. Bloqueaba la salida en vivo —
+las notificaciones avisaban de tareas que no se podían ver hasta recargar.
+
+- **Migración 21** (aditiva): suma a la publicación `supabase_realtime` las
+  siete tablas de datos — `tarea`, `frente` y `sub_frente` (una tarea sin su
+  contenedor no se puede mostrar), `proyecto`, `acceso_proyecto` (te agregan a
+  un proyecto y aparece solo), `comentario` y `replanificacion` (la entrada del
+  historial, no solo la fecha nueva). Todas con REPLICA IDENTITY en DEFAULT,
+  mismo razonamiento que la migración 20. `usuario` queda fuera a sabiendas: un
+  cambio de nombre se ve al recargar.
+- **La cañería no se tocó**: `data/tiempoReal.ts` quedó byte a byte igual; el
+  efecto de App la llama con siete tablas más. Sin filtro de servidor en las de
+  datos: la barrera es la RLS por membresía, evaluada con el JWT del suscriptor.
+- **La relectura es una y es completa** (`loadState`), a propósito: la
+  notificación y su tarea llegan en el mismo estado, atómicamente. Con
+  relecturas separadas la campana podía anunciar una tarea que el navegador no
+  tenía — y el clic diría "Esta tarea ya no existe" siendo mentira. Ahora el
+  texto de la notificación muestra el nombre de la tarea, el clic lleva a ella
+  sin recargar, y ese mensaje vuelve a significar exactamente lo que dice. (El
+  método de relectura ligera de la entrega 1 quedaba muerto y se retiró.)
+- **Los cambios ajenos pasan por la vista congelada, igual que los propios**:
+  con filtro u orden nada se reordena solo, se enciende "↻ Actualizar vista", y
+  una tarea ajena nueva se fuerza a aparecer como una propia (#253 ampliado: el
+  conjunto de forzadas ahora también se alimenta de la relectura del canal).
+- **Dos protecciones nuevas.** Un cambio ajeno no pisa lo que se está
+  escribiendo: los borradores viven como estado local de los componentes y el
+  fondo se actualiza sin interrumpirlos; al guardar, gana el último en guardar.
+  Y si te quitan el acceso al proyecto que miras —o lo archivan o eliminan—, la
+  aplicación te lleva al **Resumen**, sin error; el "peek" de las
+  notificaciones (#179) se respeta.
+- **La compuerta amplía el caso del canal**: `tarea` como representante de la
+  familia de datos — el miembro del proyecto de prueba recibe el INSERT en
+  vivo; el no miembro, suscrito sin filtro, cero eventos con contenido.
+- Reconexión, pestaña dormida y degradación silenciosa funcionan para los
+  datos igual que para la campana: son la misma relectura y la misma cañería.
+  El modo Local sigue sin tiempo real, intacto.

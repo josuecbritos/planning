@@ -87,6 +87,13 @@ orden** el contenido de:
     front nuevo sin la migración simplemente no recibe eventos y funciona
     como siempre (degradación silenciosa), y el front viejo con la migración
     no escucha nada. Aplicar la migración cuando se quiera encender el vivo.
+21. `supabase/migrations/20260707000021_tiempo_real_datos.sql` — tiempo real,
+    entrega 2 (#260): suma a la publicación las siete tablas de datos —`tarea`,
+    `frente`, `sub_frente`, `proyecto`, `acceso_proyecto`, `comentario`,
+    `replanificacion`—, todas con REPLICA IDENTITY en DEFAULT (mismo
+    razonamiento que la 20: los DELETE viajan solo con la clave primaria).
+    `usuario` queda fuera a sabiendas. Igual que la 20, el orden con el front
+    es indiferente: la migración es lo que enciende los datos en vivo.
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego

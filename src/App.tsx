@@ -441,49 +441,88 @@ export default function App({ repo }: { repo: Repo }) {
     }
   }, [repo, sesion])
 
-  // #255 — La campana en tiempo real (entrega 1 de 2: SOLO notificaciones).
+  // El estado del último render, para que la relectura del canal pueda
+  // compararse contra "lo que había" sin sumar dependencias al efecto.
+  const stateRef = useRef<AppState | null>(null)
+  stateRef.current = state
+
+  // #255/#260 — Tiempo real: la campana (entrega 1) y los datos (entrega 2).
   //
-  // El canal AVISA; la verdad se relee de la base (principio 1): cada evento,
-  // la reconexión y el despertar de la pestaña disparan la MISMA relectura,
-  // cuyo resultado REEMPLAZA la lista — nunca se acumulan eventos. Por eso el
-  // eco no existe: marcar leídas actualiza el estado local y el aviso que
-  // vuelve por el canal relee ese mismo estado final (el contador baja UNA
-  // vez). Y por eso una pestaña dormida queda bien al despertar: no importa
-  // qué eventos se perdió, la relectura trae la realidad.
+  // El canal AVISA; la verdad se relee de la base (principio 1): cada evento
+  // —de cualquier tabla—, la reconexión y el despertar de la pestaña disparan
+  // la MISMA relectura, cuyo resultado REEMPLAZA el estado. Nunca se aplica el
+  // contenido de un evento. Por eso el eco no existe (releer tras una acción
+  // propia devuelve el mismo estado final) y una pestaña dormida queda bien al
+  // despertar sin importar qué eventos perdió.
   //
-  // Si el canal no conecta, no pasa nada visible (principio 2): la campana
-  // queda como siempre, actualizada al recargar. En modo Local no hay canal.
+  // La relectura es UNA y es COMPLETA (loadState) a propósito: la notificación
+  // y su tarea llegan en el mismo estado, atómicamente. Con relecturas
+  // separadas la campana podía anunciar una tarea que el navegador aún no
+  // tenía — y el clic diría "ya no existe" siendo mentira, justo lo que el
+  // pedido prohíbe.
   //
-  // La entrega 2 (#260) NO copia este efecto: suma sus tablas a la misma
-  // cañería (`suscribirTabla`, en data/tiempoReal.ts) con su propia relectura.
+  // Los borradores en curso (un título a medio editar, un comentario a medio
+  // escribir, un selector abierto) NO se pisan: viven como estado local de sus
+  // componentes, y las filas tienen key estable — reemplazar el estado de
+  // fondo re-renderiza sin desmontar. Al guardar, gana el último en guardar.
+  //
+  // Si el canal no conecta, no pasa nada visible (principio 2): todo al
+  // recargar, como siempre. En modo Local no hay canal.
+  //
+  // #260: las tablas publicadas son las que hacen VISIBLE lo que las
+  // notificaciones anuncian (criterio del dueño). `usuario` queda fuera a
+  // sabiendas: un cambio de nombre se ve al recargar. Las de datos van SIN
+  // filtro de servidor: su visibilidad la decide la RLS por membresía, que
+  // Realtime evalúa con el JWT del suscriptor. La cañería es la de #255
+  // (`suscribirTabla`), sin cambios.
+  const TABLAS_VIVAS = [
+    'tarea', 'frente', 'sub_frente', 'proyecto',
+    'acceso_proyecto', 'comentario', 'replanificacion',
+  ]
   useEffect(() => {
     if (repo.modo !== 'supabase' || !sesion) return
     let vivo = true
     let pendiente: number | null = null
 
-    // Coalesce: una ráfaga de avisos (p. ej. el borrado en cascada de varias
-    // notificaciones) produce UNA relectura, no una por evento.
+    // Coalesce: una ráfaga de avisos (p. ej. crear frente + sub frente +
+    // tarea, o un borrado en cascada) produce UNA relectura, no una por evento.
     const releer = () => {
       if (pendiente !== null) return
       pendiente = window.setTimeout(async () => {
         pendiente = null
         try {
-          const ns = await repo.loadNotificaciones()
-          if (vivo) setState((prev) => (prev ? { ...prev, notificaciones: ns } : prev))
+          const ns = await repo.loadState()
+          if (!vivo) return
+          // #253 aplicado a los AJENOS: una tarea que otro creó se trata igual
+          // que una creada por uno mismo — se fuerza su aparición aunque la
+          // foto congelada la deje fuera, con "Actualizar vista" encendido, y
+          // sin reordenar nada. "Actualizar vista" las suelta, como siempre.
+          const prev = stateRef.current
+          if (prev) {
+            const conocidas = new Set(prev.tareas.map((t) => t.id))
+            const recienLlegadas = ns.tareas.filter((t) => !conocidas.has(t.id)).map((t) => t.id)
+            if (recienLlegadas.length) {
+              setTareasNuevas((pv) => [...pv, ...recienLlegadas.filter((id) => !pv.includes(id))])
+            }
+          }
+          setState(ns)
         } catch {
           // Silencio (principio 2): el próximo aviso o el próximo foco
-          // reintentan; mientras tanto la campana muestra lo último leído.
+          // reintentan; mientras tanto la pantalla muestra lo último leído.
         }
       }, 250)
     }
 
-    const sub = suscribirTabla({
-      tabla: 'notificacion',
-      // Acota el tráfico a lo propio. La BARRERA es la RLS, que Realtime
-      // evalúa con el JWT del suscriptor; esto solo evita ruido.
-      filtro: `usuario_id=eq.${sesion.id}`,
-      alAviso: releer,
-    })
+    const subs = [
+      suscribirTabla({
+        tabla: 'notificacion',
+        // Acota el tráfico a lo propio. La BARRERA es la RLS, que Realtime
+        // evalúa con el JWT del suscriptor; esto solo evita ruido.
+        filtro: `usuario_id=eq.${sesion.id}`,
+        alAviso: releer,
+      }),
+      ...TABLAS_VIVAS.map((tabla) => suscribirTabla({ tabla, alAviso: releer })),
+    ]
 
     // Pestaña dormida o fuera de foco: el canal pudo perder eventos que no se
     // recuperan. Al volver, se relee — el mismo patrón que #247 con "hoy".
@@ -498,9 +537,12 @@ export default function App({ repo }: { repo: Repo }) {
       if (pendiente !== null) window.clearTimeout(pendiente)
       document.removeEventListener('visibilitychange', alVolver)
       window.removeEventListener('focus', alVolver)
-      sub.cerrar()
+      for (const s of subs) s.cerrar()
     }
+    // TABLAS_VIVAS es constante; no entra en las dependencias.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repo, sesion])
+
 
   // Proyectos visibles = de los que ERES MIEMBRO (pedido §3): dueño o con
   // acceso. Vale para TODOS los roles, admin incluido — el admin ya no queda
@@ -528,6 +570,26 @@ export default function App({ repo }: { repo: Repo }) {
     () => proyectosMiembro.filter((p) => p.estado !== 'archivado'),
     [proyectosMiembro],
   )
+
+  // #260 — El acceso quitado no rompe la pantalla. Si el proyecto que se está
+  // mirando deja de ser accesible —quitaron el acceso, lo archivaron o lo
+  // eliminaron—, la aplicación lleva al Resumen, sin error. Decisión del
+  // pedido: al Resumen, y la persona sigue trabajando.
+  //
+  // El "peek" (#179, mirar un proyecto ajeno llegando desde una notificación)
+  // se respeta: ahí `proyectoActivoId` nunca fue de un miembro y la vista es
+  // deliberada; solo se expulsa si el proyecto desapareció o se archivó.
+  useEffect(() => {
+    if (!state || pantalla !== 'proyectos' || !proyectoActivoId) return
+    const p = state.proyectos.find((x) => x.id === proyectoActivoId)
+    const esMiembro = proyectosVisibles.some((x) => x.id === proyectoActivoId)
+    const esPeek = proyectoActivoId === peekProyectoId && !!p && p.estado !== 'archivado'
+    if (esMiembro || esPeek) return
+    setPantalla('resumen')
+    setProyectoActivoId(null)
+    setPeekProyectoId(null)
+    setTareaDetalleId(null)
+  }, [state, pantalla, proyectoActivoId, proyectosVisibles, peekProyectoId])
 
   // #146: administrar ≠ ser miembro. El módulo Administración → Proyectos usa
   // TODO lo que la RLS entrega: para el admin son todos los proyectos (sea o no
