@@ -1,0 +1,54 @@
+-- =====================================================================
+-- #281 — CAUSA RAÍZ ENCONTRADA: la política `acceso_select` desplegada
+-- era una versión vieja.
+--
+-- CÓMO SE ENCONTRÓ. La migración 22 repuso la cadena de funciones y la
+-- vista `usuario_visible` bajo la hipótesis de que ahí estaba la pieza
+-- divergente — y el defecto PERSISTIÓ. El respaldo `pg_dump` tomado antes
+-- de aplicarla mostró que toda esa cadena ya estaba en su versión
+-- canónica; lo divergente era otra cosa. La pista definitiva fue el
+-- síntoma fino: el consultor veía "a sí mismo y a UN admin" — justo el
+-- DUEÑO del proyecto. El selector de responsables exige dos entregas:
+-- la persona por `usuario_visible` (funcionaba) y su FILA DE ACCESO por
+-- `acceso_proyecto` (no llegaba). En el respaldo, la política vivía así:
+--
+--   CREATE POLICY acceso_select ON public.acceso_proyecto FOR SELECT
+--     USING (usuario_id = usuario_actual_id()
+--            OR es_admin() OR es_dueno_proyecto(proyecto_id));
+--
+-- mientras que la migración 12 la define así:
+--
+--   create policy acceso_select on acceso_proyecto for select
+--     using (usuario_id = usuario_actual_id()
+--            or tiene_acceso_proyecto(proyecto_id));
+--
+-- Con la versión vieja, un INVITADO (miembro por fila de acceso, no
+-- dueño) solo ve SU PROPIA fila: los demás miembros desaparecen de la
+-- lista de candidatos aunque la vista los entregue. El dueño y el admin
+-- no lo notan — para ellos ambas versiones coinciden. Esa política no es
+-- de ninguna migración del repo: quedó de una iteración anterior al
+-- registro de migraciones, y como las políticas se reponen con
+-- drop+create (no con "or replace"), ninguna migración posterior la
+-- pisó hasta ahora.
+--
+-- QUÉ HACE ESTA MIGRACIÓN. Repone `acceso_select` tal como la define la
+-- migración 12 — no reescribe la regla. La versión correcta es un
+-- superconjunto de la vieja (`tiene_acceso_proyecto` = admin, dueño o
+-- invitado), así que nadie pierde visibilidad: los invitados RECUPERAN
+-- la que les faltaba. Las otras tres políticas de la tabla
+-- (`acceso_insert` / `acceso_update` / `acceso_delete`) se compararon
+-- contra el mismo respaldo y están idénticas a la migración 12: no se
+-- tocan.
+--
+-- ANTES DE APLICAR: respaldo con `pg_dump` (DEPLOY.md §Mantenimiento).
+-- DESPUÉS DE APLICAR: correr la compuerta `scripts/validar-rls.mjs` —
+-- trae un caso nuevo que atrapa exactamente esta divergencia: el
+-- INVITADO del proyecto de prueba debe ver la fila de acceso de su
+-- co-miembro (hasta ahora solo se comprobaba la entrega de la vista).
+-- =====================================================================
+
+drop policy if exists acceso_select on acceso_proyecto;
+-- Miembros visibles para quien ve el proyecto (7) y cada uno ve sus accesos.
+create policy acceso_select on acceso_proyecto for select using (
+  usuario_id = usuario_actual_id() or tiene_acceso_proyecto(proyecto_id)
+);

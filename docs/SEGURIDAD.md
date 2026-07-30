@@ -112,6 +112,29 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
 - Deja también cerrado el hueco de la compuerta que dejó pasar esto: solo se
   comprobaba el AISLAMIENTO de `usuario_visible` (que nadie vea de más), nunca
   la ENTREGA (que un miembro vea a sus co-miembros). Ver caso nuevo abajo.
+- **Desenlace (registro):** al aplicarla, el respaldo `pg_dump` previo mostró
+  que toda esta cadena YA estaba canónica en la base desplegada — el defecto
+  persistió y la pieza divergente resultó ser otra: la política
+  `acceso_select` (ver migración 24). La 22 queda como red de seguridad
+  idempotente sobre la cadena.
+
+**Migración 24 — `20260707000024_reponer_politica_acceso.sql` (#281, causa raíz)**
+- La política `acceso_select` desplegada era una **versión vieja**, ajena al
+  registro de migraciones: `usuario_id = usuario_actual_id() OR es_admin() OR
+  es_dueno_proyecto(proyecto_id)` — un INVITADO veía solo su propia fila de
+  acceso. El selector de responsables exige dos entregas (la persona por
+  `usuario_visible` Y su fila por `acceso_proyecto`); la primera funcionaba,
+  la segunda no — de ahí el síntoma "solo yo y el dueño". Se detectó
+  comparando el respaldo `pg_dump` contra la migración 12, después de que la
+  22 descartara con evidencia la cadena de funciones.
+- Repone la versión de la migración 12: `usuario_id = usuario_actual_id() or
+  tiene_acceso_proyecto(proyecto_id)` — superconjunto de la vieja: nadie
+  pierde visibilidad; los invitados recuperan la de los co-miembros.
+  `acceso_insert`/`update`/`delete` estaban idénticas al repo y no se tocan.
+- Moraleja para el runbook: las políticas se reponen con drop+create — una
+  política vieja NO la pisa ningún `create or replace` posterior; si se
+  sospecha divergencia, comparar TAMBIÉN las políticas del dump, no solo
+  funciones y vistas.
 
 **Migración 23 — `20260707000023_notificaciones_por_acceso.sql` (#283)**
 - La política de `notificacion` (select y update) suma la condición
@@ -350,10 +373,12 @@ funciones de permisos.**
   del todo, la lectura falla y el caso se da por bueno igual: sin lectura
   directa no hay nada que comparar.
 - **Caso de #281/#283**: `probarMiembrosYNotificaciones` arma un proyecto de
-  prueba con dos cuentas como miembros y comprueba lo que a la compuerta le
-  faltaba: la **entrega** — cada miembro VE al otro por `usuario_visible`
-  (#281; hasta esta ronda solo se probaba el aislamiento, y una base con
-  `comparte_proyecto` divergente pasaba la compuerta entera). Con una
+  prueba con dos cuentas como miembros (invitadas por el admin) y comprueba lo
+  que a la compuerta le faltaba: la **entrega** — cada miembro VE al otro por
+  `usuario_visible`, y el INVITADO ve las **filas de acceso** de sus
+  co-miembros por `acceso_proyecto` (hasta esta ronda solo se probaba el
+  aislamiento, y la base con la `acceso_select` vieja pasaba la compuerta
+  entera — ese era el hueco por el que #281 llegó a producción). Con una
   notificación real de asignación recorre además el ciclo completo de #283:
   se entrega con acceso, se oculta al quitarlo, "marcar leída" no la alcanza
   mientras está oculta, y al devolver el acceso reaparece sin leer.

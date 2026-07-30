@@ -102,9 +102,10 @@ orden** el contenido de:
     `usuario_visible`: las migraciones del repo son correctas (verificado
     reproduciendo 1→21 en un Postgres limpio), así que el defecto solo puede
     estar en una base desplegada que divergió. Antes de reponer, **imprime
-    (RAISE NOTICE) las definiciones vivas**: guarda esa salida — es el
-    registro de cuál era la pieza divergente. Sobre una base ya correcta es
-    inofensiva. **Correr la compuerta después.**
+    (RAISE NOTICE) las definiciones vivas**. Sobre una base ya correcta es
+    inofensiva. *(Resultado al aplicarla: el respaldo demostró que toda esta
+    cadena YA estaba canónica en la base — la pieza divergente resultó ser la
+    política `acceso_select`; ver migración 24.)*
 23. `supabase/migrations/20260707000023_notificaciones_por_acceso.sql` —
     corrección de #283: la entrega de notificaciones queda condicionada al
     acceso al proyecto de la tarea (`tiene_acceso_proyecto(proyecto_de_tarea(...))`,
@@ -115,6 +116,16 @@ orden** el contenido de:
     estado de las ocultas. El orden con el front es indiferente: el front de
     esta entrega replica el filtro para el modo Local y no depende de la
     política. **Correr la compuerta después.**
+24. `supabase/migrations/20260707000024_reponer_politica_acceso.sql` — **la
+    causa raíz de #281**, encontrada comparando el respaldo `pg_dump` contra
+    las migraciones: la política `acceso_select` desplegada era una versión
+    vieja (invitado ve solo SU fila de acceso; el selector de responsables
+    exige ver las de todos los miembros). Repone la versión de la migración
+    12 (`usuario_id = usuario_actual_id() or tiene_acceso_proyecto(...)`),
+    que es un superconjunto de la vieja: nadie pierde visibilidad, los
+    invitados recuperan la que faltaba. Las otras tres políticas de la tabla
+    estaban idénticas al repo y no se tocan. **Correr la compuerta después**
+    (trae el caso que atrapa exactamente esta divergencia).
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego

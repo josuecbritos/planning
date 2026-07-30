@@ -695,3 +695,31 @@ las notificaciones avisaban de tareas que no se podían ver hasta recargar.
   suscriptor filtra también los eventos. Verificado en un Postgres local
   (políticas reales, ciclo completo) y con Playwright en modo Local; la
   compuerta recorre el ciclo con una notificación real.
+
+## #281, el desenlace: la causa raíz era la política `acceso_select` (migración 24)
+
+Aplicada la migración 22, el defecto persistió — y el respaldo `pg_dump`
+previo permitió comparar la base desplegada contra las migraciones pieza por
+pieza: **toda la cadena de funciones y la vista ya estaban canónicas**. La
+pista definitiva fue el síntoma fino: el consultor veía "a sí mismo y a UN
+admin" — justo el **dueño** del proyecto. El selector exige dos entregas: la
+persona por `usuario_visible` (funcionaba) y su **fila de acceso** por
+`acceso_proyecto` (no llegaba). En el respaldo, `acceso_select` vivía en una
+versión vieja, ajena al registro de migraciones — `usuario_id =
+usuario_actual_id() OR es_admin() OR es_dueno_proyecto(proyecto_id)` —, con la
+que un INVITADO ve solo su propia fila. Como las políticas se reponen con
+drop+create, ningún `create or replace` posterior la pisó jamás.
+
+- **Migración 24** repone la versión de la migración 12 (`usuario_id =
+  usuario_actual_id() or tiene_acceso_proyecto(proyecto_id)`), superconjunto
+  de la vieja: nadie pierde visibilidad y los invitados recuperan la de sus
+  co-miembros. Las otras tres políticas de la tabla estaban idénticas al repo.
+  Verificado en el Postgres local: la política vieja reproduce exactamente el
+  síntoma y la 24 lo cura, con el aislamiento intacto.
+- **La compuerta suma la segunda mitad del caso #281**: el invitado del
+  proyecto de prueba debe ver las filas de acceso de sus co-miembros — el
+  hueco exacto por el que esta divergencia pasó inadvertida.
+- La migración 22 queda como red de seguridad idempotente sobre la cadena de
+  funciones, con su radiografía; el runbook anota la moraleja: ante sospecha
+  de divergencia, comparar también las POLÍTICAS del dump, no solo funciones
+  y vistas.

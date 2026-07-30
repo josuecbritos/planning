@@ -340,6 +340,24 @@ async function probarMiembrosYNotificaciones(admin) {
       '#281 y el otro miembro también lo ve a él',
       (vistaC ?? []).some((u) => u.id === yoA.id) ? `${vistaC.length} visibles` : 'NO le llega su co-miembro',
     )
+    // La lista de candidatos exige DOS entregas: la persona por la vista (recién
+    // probado) y su FILA DE ACCESO por acceso_proyecto. La causa real de #281
+    // fue esta segunda: una política acceso_select vieja en la base desplegada
+    // dejaba que un INVITADO viera solo su propia fila (migración 24 la repone).
+    // Acá A es invitado del proyecto de prueba (lo creó el admin): exactamente
+    // el caso que la divergencia rompía.
+    const { data: accesosDePrueba } = await a
+      .from('acceso_proyecto')
+      .select('usuario_id')
+      .eq('proyecto_id', proy.id)
+    marca(
+      (accesosDePrueba ?? []).some((x) => x.usuario_id === yoC.id),
+      rotulo,
+      '#281 el INVITADO ve las filas de acceso de sus co-miembros (migración 24)',
+      (accesosDePrueba ?? []).length
+        ? `${accesosDePrueba.length} accesos visibles`
+        : 'NO le llega ningún acceso del proyecto',
+    )
 
     // ---- #283: entrega de notificaciones condicionada al acceso ----
     const { data: fr } = await admin
