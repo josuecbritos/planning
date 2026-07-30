@@ -723,3 +723,48 @@ drop+create, ningún `create or replace` posterior la pisó jamás.
   funciones, con su radiografía; el runbook anota la moraleja: ante sospecha
   de divergencia, comparar también las POLÍTICAS del dump, no solo funciones
   y vistas.
+
+## Cinco para la salida en vivo (#274, #285, #279, #284, #282)
+
+- **#274 — La aplicación siempre parte en Resumen.** Para todos los roles y en
+  cada entrada — no se recuerda el último proyecto visitado (decisión tomada).
+  Fueron dos líneas: el estado inicial de `pantalla` y el `onLogin`. Llegar
+  desde una notificación sigue abriendo la tarea (incluido el "peek" de #179),
+  la expulsión por pérdida de acceso sigue llevando a Resumen y la vista
+  Tabla/Gantt se sigue recordando por proyecto.
+- **#285 — El calendario marca el día de hoy y tiene botón "Hoy".** Hoy va con
+  borde (anillo interior con `--primario`, sin correr el layout); el elegido
+  sigue relleno; si coinciden, relleno con borde (el anillo pasa a
+  `--sobre-primario` para leerse sobre el relleno, en claro y oscuro). Si el
+  mes visible es otro, hoy no aparece — correcto, sin compensar. El botón
+  "Hoy" devuelve la vista al mes actual y SOLO navega: la regla central de
+  #262 (únicamente el clic en un día asigna) queda intacta y verificada.
+- **#279 — Filtro "Próximo día hábil".** Quinta relativa, después de "Hoy": un
+  solo día — el siguiente que no es sábado ni domingo (L-J: mañana; V/S/D: el
+  lunes) —, recalculada con la fecha del día en cada uso. Filtra filas Y mueve
+  el horizonte de la Gantt (#250) sin código extra: la opción vive en
+  `rangoDeFecha` como las otras cuatro. "Hábil" es L-V y nada más (sin
+  feriados, a propósito); un viernes la tarea del sábado NO entra — rango
+  literal, como las demás. Las vistas guardadas viejas siguen funcionando y
+  las nuevas guardan y restauran la opción.
+- **#284 — En mobile, la campana como botón flotante.** Reemplaza al
+  interruptor de tema junto al ☰, con el contador de no leídas (mismo criterio
+  que la campana de la franja); tocarla abre Notificaciones a pantalla
+  completa y cierra el menú lateral (#195). El interruptor de tema queda en el
+  pie de la barra lateral también en el teléfono — de paso se corrigió que en
+  mobile estaba OCULTO por arrastre de la clase del chevron de plegar
+  (`.sidebar__plegar`), es decir, el menú no ofrecía el tema. Todo acotado por
+  media query; en escritorio no cambia nada.
+- **#282 — Diagnóstico del aviso "Tu sesión ha expirado" (informe en
+  `docs/diagnostico-282-sesion-expirada.md`).** Caso A ("Salir" mostró el
+  aviso una vez): la protección era una bandera de UN SOLO USO y un "Salir"
+  puede producir más de una señal en la misma pestaña (SIGNED_OUT duplicado, o
+  una acción en vuelo cuyo catch diagnostica 'expirada' sin pasar por la
+  bandera). Se corrigió cerrando la carrera —la bandera pasó a CERROJO
+  (`salidaEnCurso`) que solo se rearma al volver a entrar— sin tocar textos ni
+  cuándo se expulsa. Verificado: 10 salidas con señales duplicadas en
+  escritorio y 10 en mobile, cero avisos; la expiración real y la cuenta
+  desactivada (#244) siguen avisando igual. Quedan como decisión de producto,
+  documentadas en el informe: qué debería ver la SEGUNDA pestaña cuando se
+  cierra sesión en la otra, y si el texto del caso B (volver al día siguiente,
+  donde el mensaje es literalmente correcto) amerita una redacción más amable.

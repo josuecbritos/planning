@@ -86,7 +86,13 @@ ingresar.") y cuenta dada de baja ("Tu cuenta fue desactivada. Para volver a
 activarla ponte en contacto con tu administrador."). Se distinguen preguntando
 por el **estado** —hay sesión, existe el usuario, su perfil sigue activo—, nunca
 leyendo el texto del error. Si esa consulta falla no hay evidencia de nada: se
-muestra el error normal y **no se echa a nadie**.
+muestra el error normal y **no se echa a nadie**. Un **cerrojo de salida**
+(#282) evita que el "Salir" voluntario muestre el aviso de expiración: se
+levanta al iniciar cualquier salida y solo se rearma al volver a entrar, así
+las señales duplicadas del servicio o una acción en vuelo que falla durante el
+logout no avisan de más. El diagnóstico completo —incluidos los casos que
+quedaron como decisión de producto— está en
+[`docs/diagnostico-282-sesion-expirada.md`](diagnostico-282-sesion-expirada.md).
 
 **Ningún mensaje del login sale del servicio de autenticación (#252).** Cuatro
 textos fijos, en español: credenciales incorrectas, cuenta desactivada,
@@ -121,7 +127,13 @@ las de esta semana, la ventana es esa semana. El bug era que en la Gantt hacía
 solo lo segundo, y por eso "Hoy" mostraba tareas de cualquier día y hasta las
 que no tienen fecha. Las opciones que no son una ventana temporal —"Sin fecha",
 "Con fecha"— filtran sin tocar el horizonte, y "En horizonte visible" va al
-revés: deriva su rango del horizonte en vez de definirlo.
+revés: deriva su rango del horizonte en vez de definirlo. Las relativas son
+cinco (#279): Hoy, **Próximo día hábil** —un solo día: el siguiente que no es
+sábado ni domingo; de lunes a jueves es mañana, de viernes a domingo es el
+lunes—, Esta semana, Próxima semana y Este mes. Se recalculan con la fecha del
+día en cada uso y son excluyentes entre sí. "Hábil" es L-V y nada más: la
+herramienta no conoce feriados a propósito, y un viernes la tarea del sábado
+NO entra en el filtro — cada opción muestra su rango literal.
 - **Mis Tareas:** las tareas donde el usuario es responsable, en todos sus
   proyectos, vencidas primero. Tiene el mismo conmutador **Tabla / Gantt** que
   un proyecto (#190): la Gantt muestra la **carga propia repartida en el
@@ -134,7 +146,11 @@ revés: deriva su rango del horizonte en vez de definirlo.
   detalle, sin crear ni eliminar nada (una tarea creada ahí no sería del
   usuario hasta asignársela). Al pie, una sola fila con su total diario.
 - **Resumen:** indicadores por proyecto (avance, total y desglose de las cinco
-  categorías).
+  categorías). **Es la pantalla de entrada (#274):** la aplicación SIEMPRE
+  parte ahí, para todos los roles, también al volver a entrar — no se recuerda
+  el último proyecto visitado (decisión tomada). Llegar desde una notificación
+  sigue abriendo la tarea, la expulsión por pérdida de acceso sigue llevando a
+  Resumen, y la vista Tabla/Gantt se sigue recordando por proyecto.
 
 En la Tabla, frentes y sub frentes se **colapsan** con un chevron (▸/▾) para
 enfocar; el colapso es momentáneo (no se guarda).
@@ -366,7 +382,11 @@ registro de replanificaciones.
 override manual persistente por usuario), diseño responsive (mobile prioriza
 Tabla y Mis Tareas; los modales altos, el panel de notificaciones y el menú ⋯
 tienen tratamiento propio en pantalla angosta) e iconos de acción como SVG, no
-como glifos del sistema.
+como glifos del sistema. En mobile los dos botones flotantes son **el ☰ y la
+campana de notificaciones con su contador (#284)** — el contador se ve sin
+abrir el menú; tocarla abre Notificaciones a pantalla completa y cierra el
+menú lateral. El interruptor de tema vive en el pie de la barra lateral,
+también en el teléfono (el flotante de tema se retiró).
 
 **Regla de color del tema (#230–#232):** el color se declara siempre, nunca se
 hereda por accidente del navegador. Los `<button>` no heredan el color del texto

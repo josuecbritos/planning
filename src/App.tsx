@@ -200,7 +200,10 @@ export default function App({ repo }: { repo: Repo }) {
   const [state, setState] = useState<AppState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [vista, setVista] = useState<Vista>('tabla')
-  const [pantalla, setPantalla] = useState<Pantalla>('proyectos')
+  // #274: la aplicación SIEMPRE parte en Resumen — también al volver a entrar,
+  // sea cual sea el rol. No se recuerda el último proyecto visitado: decisión
+  // tomada, no simplificación. (Llegar desde una notificación navega después.)
+  const [pantalla, setPantalla] = useState<Pantalla>('resumen')
   // P1: vista congelada ("foto"). El nonce fuerza el re-snapshot al tocar
   // "Actualizar vista"; `vistaStale` lo reporta la vista activa (tabla/Gantt).
   const [snapshotNonce, setSnapshotNonce] = useState(0)
@@ -644,11 +647,23 @@ export default function App({ repo }: { repo: Repo }) {
   // dejar un error del servidor —en inglés— sobre una pantalla que ya no
   // responde. Lo que estuviera a medio escribir se pierde: decisión tomada.
   const [motivoSalida, setMotivoSalida] = useState<MotivoSalida | null>(null)
-  /** Distingue el "Salir" del propio usuario del cierre involuntario. */
-  const salidaVoluntaria = useRef(false)
+  /**
+   * #282: CERROJO de salida — se levanta al iniciar cualquier salida (el
+   * "Salir" del usuario o una expulsión por sesión) y solo se baja al volver
+   * a entrar (onLogin). Antes era una bandera de un solo uso que consumía el
+   * primer SIGNED_OUT, pero un "Salir" puede producir MÁS de una señal en la
+   * misma pestaña: el servicio puede emitir SIGNED_OUT duplicado, y una
+   * acción en vuelo al momento de salir falla al revocarse la sesión — su
+   * catch diagnostica 'expirada' sin pasar por la bandera. La segunda señal
+   * encontraba la bandera consumida y mostraba "Tu sesión ha expirado" tras
+   * una salida voluntaria (caso A de #282). Con el cerrojo, toda señal
+   * posterior a una salida ya en curso se ignora.
+   */
+  const salidaEnCurso = useRef(false)
   const salirPorSesion = useCallback(
     (motivo: MotivoSalida) => {
-      salidaVoluntaria.current = true
+      if (salidaEnCurso.current) return // #282: ya se salió; nada que avisar
+      salidaEnCurso.current = true
       setMotivoSalida(motivo)
       setSesion(null)
       setState(null)
@@ -667,10 +682,9 @@ export default function App({ repo }: { repo: Repo }) {
   useEffect(
     () =>
       auth.alPerderSesion(() => {
-        if (salidaVoluntaria.current) {
-          salidaVoluntaria.current = false
-          return
-        }
+        // #282: sin consumo — el cerrojo sigue puesto hasta el próximo login,
+        // así un SIGNED_OUT duplicado del mismo "Salir" tampoco avisa.
+        if (salidaEnCurso.current) return
         salirPorSesion('expirada')
       }),
     [auth, salirPorSesion],
@@ -839,15 +853,16 @@ export default function App({ repo }: { repo: Repo }) {
   const onLogin = useCallback(
     async (email: string, password?: string) => {
       const u = await auth.login(email, password)
+      salidaEnCurso.current = false // #282: sesión nueva, el cerrojo se rearma
       setSesion(u)
-      setPantalla('proyectos')
+      setPantalla('resumen') // #274: cada entrada parte en Resumen
       setFrenteSel('todos')
     },
     [auth],
   )
 
   const onLogout = useCallback(async () => {
-    salidaVoluntaria.current = true // #244: salida propia, sin aviso
+    salidaEnCurso.current = true // #244/#282: salida propia, sin aviso
     setMotivoSalida(null)
     await auth.logout()
     setSesion(null)
@@ -1145,15 +1160,23 @@ export default function App({ repo }: { repo: Repo }) {
       >
         {movilSidebar ? '✕' : '☰'}
       </button>
-      {/* Interruptor de tema visible y alcanzable en mobile (además del que
-          vive en el pie de la sidebar). Oculto en desktop via CSS. */}
-      <button
-        className="movil-tema"
-        aria-label={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-        title={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-        onClick={toggleTema}
-      >
-        {tema === 'oscuro' ? '☀' : '🌙'}
+      {/* #284: la campana reemplaza al interruptor de tema como segundo botón
+          flotante — el contador de no leídas se ve sin abrir el menú. Tocarla
+          abre Notificaciones a pantalla completa y cierra el menú lateral,
+          igual que la campana del menú (#195). El interruptor de tema queda
+          en el pie de la barra lateral, que en mobile es el menú ☰. Oculto en
+          desktop via CSS. */}
+      <button className="movil-campana" aria-label="Notificaciones" onClick={abrirNotificaciones}>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M6 9.5a6 6 0 0 1 12 0c0 3.6.9 5.2 1.8 6.2.4.4.1 1.1-.5 1.1H4.7c-.6 0-.9-.7-.5-1.1C5.1 14.7 6 13.1 6 9.5Z"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+          <path d="M9.7 19.5a2.4 2.4 0 0 0 4.6 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+        {noLeidas > 0 && <span className="movil-campana__badge">{noLeidas}</span>}
       </button>
       {movilSidebar && <div className="movil-velo" onClick={() => setMovilSidebar(false)} />}
       {/* Punto 6: en modo escondida queda una franja de iconos siempre

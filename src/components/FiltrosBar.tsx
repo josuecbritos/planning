@@ -30,7 +30,8 @@ const ESTADO_COLOR: Record<Categoria, string> = {
   atrasada: 'var(--rojo)',
   atrasada_replan: 'var(--morado)',
 }
-const RELATIVAS: FechaRelativa[] = ['hoy', 'semana', 'proxima', 'mes']
+// #279: "Próximo día hábil" va después de "Hoy", como pide el pedido.
+const RELATIVAS: FechaRelativa[] = ['hoy', 'proxHabil', 'semana', 'proxima', 'mes']
 
 function uid(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
