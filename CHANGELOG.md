@@ -768,3 +768,54 @@ drop+create, ningún `create or replace` posterior la pisó jamás.
   documentadas en el informe: qué debería ver la SEGUNDA pestaña cuando se
   cierra sesión en la otra, y si el texto del caso B (volver al día siguiente,
   donde el mensaje es literalmente correcto) amerita una redacción más amable.
+
+## #286 — Eliminar un usuario fallaba con «new row violates row-level security policy»
+
+**La causa, reproducida contra la base.** Se levantó un Postgres 16 limpio con
+las migraciones 1→24 en orden y **los mismos grants del `pg_dump` de
+producción**, y el error salió idéntico. De ahí, aislando:
+
+- Falla **con y sin `auth_id`**. La pista del reporte —los tres usuarios que
+  fallaban nunca completaron el registro— era **coincidencia**: son cuentas de
+  prueba recientes, y el defecto alcanzaba a cualquier usuario.
+- Columna por columna: `nombre` pasa, `activo` pasa, **solo `eliminado` falla**.
+- Con `usuario_select` relajada a `using (true)`, el MISMO update pasa.
+
+**La regla de PostgreSQL detrás:** en un UPDATE, si quien ejecuta tiene
+derechos de SELECT sobre la tabla, **las políticas de SELECT se aplican como
+WITH CHECK sobre la fila NUEVA** — para impedir dejar una fila en un estado que
+uno ya no podría ver. Y eso es exactamente lo que hace eliminar: la política
+exige `not eliminado` (migración 19), así que marcar `eliminado = true` deja la
+fila fuera de la política y Postgres rechaza. La política de UPDATE nunca
+estuvo implicada: su `WITH CHECK` empieza por `es_admin()`, verdadero para el
+actor (comprobado en la misma sesión). Es decir: **una política de SELECT
+restrictiva puede bloquear escrituras legítimas**, no solo lecturas.
+
+**La corrección (migración 25).** El borrado lógico pasa a la RPC
+`eliminar_usuario`, SECURITY DEFINER — el MISMO patrón que
+`crear_o_reactivar_usuario` (migración 16), su operación inversa, y por la
+misma razón: tiene que tocar filas que la política y la vista ocultan. La
+autorización se replica adentro (`es_admin()`, idéntica a la que ya exigía la
+política), así que **no se amplía quién puede modificar `usuario`**; el UPDATE
+directo sigue rechazando a un no-admin, verificado. El front llama a la RPC en
+vez de hacer el UPDATE, y conserva la comprobación por la vista de #248.
+
+**Lo que NO se hizo, a propósito:** relajar `usuario_select` para dejar ver los
+eliminados habría "arreglado" el UPDATE rompiendo el invariante de #248 (la
+tabla no expone más que la vista) y una decisión del producto. Grants intactos
+—las mismas seis columnas, `email` fuera—. Tareas, comentarios, historial y
+accesos del usuario se conservan: #258 (borrado definitivo) sigue fuera.
+
+**La compuerta suma la cara positiva que le faltaba:** un admin elimina a un
+usuario **sin `auth_id`**, desaparece de `usuario_visible`, no reaparece con
+"ver desactivados", se recupera dando de alta el mismo correo (misma fila), y
+un no-admin es rechazado por la RPC. Es el hueco exacto por el que este defecto
+llegó a producción: se probaba a fondo quién NO puede tocar `usuario`, nunca
+que un admin SÍ pudiera completar el borrado.
+
+**Verificación:** ciclo completo contra el Postgres local con las políticas
+reales (eliminar sin/con `auth_id`, invisible en la vista, no reaparece,
+reactivación, rechazo a consultor y a cliente, UPDATE directo sigue bloqueado)
+y 6 comprobaciones del contrato del front con un cliente de prueba (llama a la
+RPC con el parámetro exacto, ya no hace el UPDATE, propaga el error del
+servidor y conserva el aviso de #248). Regresión demo en verde.

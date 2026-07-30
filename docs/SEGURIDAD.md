@@ -136,6 +136,33 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   sospecha divergencia, comparar TAMBIÉN las políticas del dump, no solo
   funciones y vistas.
 
+**Migración 25 — `20260707000025_eliminar_usuario_rpc.sql` (#286)**
+- **Regla de PostgreSQL que causó el defecto, y que conviene tener presente
+  al escribir políticas:** en un UPDATE, si quien ejecuta tiene derechos de
+  SELECT sobre la tabla, las políticas de **SELECT se aplican como WITH CHECK
+  sobre la fila NUEVA**. Es deliberado —impide dejar una fila en un estado
+  que uno ya no podría ver— y significa que **una política de SELECT
+  restrictiva puede bloquear escrituras legítimas**, no solo lecturas. Aquí:
+  `usuario_select` exige `not eliminado` (migración 19), así que marcar
+  `eliminado = true` se rechazaba con «new row violates row-level security
+  policy» — para todos, admin incluido.
+- El borrado lógico pasa a la RPC `eliminar_usuario(uuid)`, SECURITY DEFINER
+  con `search_path` fijo: el MISMO patrón que `crear_o_reactivar_usuario`
+  (migración 16), su operación inversa, y por la misma razón — tiene que
+  tocar filas que la política y la vista ocultan. La autorización se replica
+  DENTRO (`es_admin()`, idéntica a lo que ya exigía la política para este
+  caso): **no amplía quién puede modificar `usuario`**. RPC legítima del
+  autenticado: se revoca EXECUTE solo a `anon` (invariante 5).
+- **No se relajó `usuario_select`.** Habría "arreglado" el UPDATE a costa de
+  exponer eliminados a los admins, rompiendo el invariante de #248 (la tabla
+  no expone más que la vista) y una decisión del producto. Grants intactos:
+  las mismas seis columnas, `email` sigue fuera.
+- La compuerta suma el caso que faltaba: la cara POSITIVA del borrado — un
+  admin elimina a un usuario **sin `auth_id`** (el perfil de las cuentas del
+  reporte), desaparece de `usuario_visible`, no reaparece con "ver
+  desactivados", se recupera dando de alta el mismo correo, y un no-admin es
+  rechazado por la RPC.
+
 **Migración 23 — `20260707000023_notificaciones_por_acceso.sql` (#283)**
 - La política de `notificacion` (select y update) suma la condición
   `tiene_acceso_proyecto(proyecto_de_tarea(tarea_id))` al

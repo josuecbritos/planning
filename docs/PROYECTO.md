@@ -64,6 +64,18 @@ del principio: hace todo en cualquier proyecto.
 **Los permisos se hacen cumplir en la base de datos** (RLS + triggers), no solo
 en la interfaz. Ver `SEGURIDAD.md`.
 
+**Eliminar un usuario es un borrado LÓGICO y va por RPC (#136/#286).** Eliminar
+marca `activo = false` y `eliminado = true`: la persona desaparece de la
+interfaz —eliminado es distinto de desactivado: no reaparece ni con "ver
+desactivados"— y se recupera dando de alta el mismo correo, con sus accesos.
+Va por la RPC `eliminar_usuario` (admin, comprobado en la base) y no por un
+UPDATE directo, porque PostgreSQL aplica las políticas de SELECT como WITH
+CHECK sobre la fila nueva de un UPDATE: como la política exige `not
+eliminado`, marcar la fila como eliminada se rechazaba a sí misma. Es el mismo
+patrón que la operación inversa, `crear_o_reactivar_usuario`. El borrado
+DEFINITIVO (#258) sigue sin definirse: tareas, comentarios, historial y
+accesos de la persona se conservan.
+
 **Los permisos son del proyecto de la tarea, no del que esté abierto (#243).**
 El panel de detalle se abre también desde Mis Tareas y desde una notificación,
 que cruzan proyectos: sus acciones se calculan con los permisos del proyecto **al

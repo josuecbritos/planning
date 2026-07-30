@@ -126,6 +126,21 @@ orden** el contenido de:
     invitados recuperan la que faltaba. Las otras tres políticas de la tabla
     estaban idénticas al repo y no se tocan. **Correr la compuerta después**
     (trae el caso que atrapa exactamente esta divergencia).
+25. `supabase/migrations/20260707000025_eliminar_usuario_rpc.sql` — corrige
+    #286 (eliminar un usuario fallaba con «new row violates row-level
+    security policy»). PostgreSQL aplica las políticas de SELECT como WITH
+    CHECK sobre la fila NUEVA de un UPDATE cuando quien ejecuta tiene
+    derechos de SELECT; como `usuario_select` exige `not eliminado`
+    (migración 19), marcar `eliminado = true` se rechazaba solo. El borrado
+    lógico pasa a la RPC `eliminar_usuario` (SECURITY DEFINER, mismo patrón
+    que `crear_o_reactivar_usuario`, su inversa), con la autorización
+    replicada adentro (`es_admin()`): **no amplía quién puede modificar
+    `usuario`** y no toca políticas ni grants. Va **junto con el front de la
+    misma entrega** (`supabaseRepo.eliminarUsuario` llama a la RPC): el front
+    viejo con la migración aplicada sigue fallando igual que hoy, y el front
+    nuevo sin la migración no encuentra la función. **Correr la compuerta
+    después** (trae el caso nuevo: un admin elimina a un usuario sin
+    `auth_id`, y un no-admin no puede).
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego

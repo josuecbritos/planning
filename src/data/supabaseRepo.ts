@@ -290,16 +290,22 @@ export class SupabaseRepo implements Repo {
   }
 
   async eliminarUsuario(id: string): Promise<void> {
-    // #136: desactivar + invisible (no hay hard delete). Admin-only por RLS.
+    // #136: desactivar + invisible (no hay hard delete). Admin-only.
     //
-    // #248: sin `RETURNING`. Desde la migración 19 la política de SELECT
-    // excluye a los eliminados, y PostgreSQL aplica esas políticas a las filas
-    // que devuelve un RETURNING: pedir la fila de vuelta justo después de
-    // marcarla eliminada no devolvería nada. Como el update sin filas tampoco
-    // da error, el efecto se comprueba releyendo la vista: si sigue visible,
-    // no se eliminó (típicamente, sin permiso).
-    const { error } = await this.db.from('usuario').update({ activo: false, eliminado: true }).eq('id', id)
+    // #286: va por RPC, no por UPDATE directo. PostgreSQL aplica las políticas
+    // de SELECT como WITH CHECK sobre la fila NUEVA de un UPDATE cuando quien
+    // ejecuta tiene derechos de SELECT — impide dejar una fila en un estado
+    // que uno ya no podría ver—, y eso es exactamente lo que hace eliminar:
+    // `usuario_select` exige `not eliminado` (migración 19), así que marcar
+    // `eliminado = true` se rechazaba con "new row violates row-level security
+    // policy". La RPC es SECURITY DEFINER —mismo patrón que
+    // `crear_o_reactivar_usuario`, la operación inversa, y por la misma razón—
+    // y replica la autorización adentro: no amplía quién puede modificar la
+    // tabla. Migración 25.
+    const { error } = await this.db.rpc('eliminar_usuario', { p_usuario: id })
     if (error) throw new Error(error.message)
+    // Se conserva la comprobación por la vista (#248): si sigue visible, algo
+    // impidió el borrado y no se puede dar por hecho.
     const { data } = await this.db.from('usuario_visible').select('id').eq('id', id).maybeSingle()
     if (data) throw new Error('No se pudo eliminar el usuario. Revisa que tengas permiso para hacerlo.')
   }
