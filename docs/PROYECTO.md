@@ -268,26 +268,44 @@ la lista, en vez de no hacer nada (#246); borrar una tarea, un sub frente, un
 frente o un proyecto se lleva por delante sus notificaciones en los dos
 backends.
 
-**Tiempo real — entrega 1: la campana (#255).** Las notificaciones llegan sin
-recargar: el contador sube solo, y si el panel está abierto la lista se
-actualiza — la nueva aparece y la que dejó de existir desaparece. Sin destello
-ni aviso emergente, a propósito: las notificaciones de este producto son pocas
-y de alta señal. Tres principios rigen la implementación y también la entrega
-2 (#260, que llevará los datos del proyecto al mismo mecanismo):
+**Tiempo real (#255 la campana, #260 los datos).** Las notificaciones llegan
+sin recargar —el contador sube solo, el panel se actualiza— y, desde #260,
+también **lo que anuncian**: la tarea asignada aparece con su frente y su sub
+frente, el comentario entra al hilo abierto, la replanificación trae su entrada
+de historial, y el proyecto al que te agregan aparece en la barra. El criterio
+que define el alcance, dado por el dueño: todo lo que genera notificaciones
+debe poder verse sin recargar. Por eso el texto de la notificación muestra el
+nombre de la tarea y el clic lleva a ella sin recargar — y "Esta tarea ya no
+existe" vuelve a significar exactamente eso. Sin destello ni aviso emergente, a
+propósito: las notificaciones de este producto son pocas y de alta señal. Tres
+principios rigen la implementación:
 
 1. **El canal avisa; la verdad se relee de la base.** Los eventos perdidos no
-   se recuperan, así que nunca son fuente de verdad: cada aviso, la
-   reconexión y el despertar de la pestaña disparan la misma relectura, cuyo
-   resultado reemplaza la lista. El eco desaparece por construcción: releer
-   tras una acción propia devuelve el mismo estado, no lo aplica dos veces.
+   se recuperan, así que nunca son fuente de verdad: cada aviso —de cualquier
+   tabla—, la reconexión y el despertar de la pestaña disparan la misma
+   relectura completa, cuyo resultado reemplaza el estado. El eco desaparece
+   por construcción, y la relectura única garantiza coherencia: la campana
+   nunca anuncia una tarea que el navegador no tenga.
 2. **Degradación silenciosa.** Si el canal no conecta, la aplicación funciona
    exactamente como antes —todo al recargar— sin ningún error visible.
 3. **La cañería es una sola** (`data/tiempoReal.ts`): conexión, reconexión y
    semántica de los avisos viven ahí, y las tablas se suscriben. La entrega 2
-   suma tablas a ese módulo; no construye otro.
+   sumó las suyas a ese módulo, sin tocarlo.
+
+**Cómo conviven los cambios ajenos con el trabajo en curso (#260):** pasan por
+la **vista congelada**, igual que los propios — con filtro u orden aplicados
+nada se reordena solo; se enciende "↻ Actualizar vista" y una tarea ajena
+nueva se fuerza a aparecer como una propia (#253). **Un cambio ajeno no pisa
+lo que se está escribiendo**: los borradores viven como estado local de sus
+componentes y el fondo se actualiza sin interrumpirlos (al guardar, gana el
+último en guardar). Y si te **quitan el acceso** al proyecto que miras —o lo
+archivan o eliminan—, la aplicación te lleva al **Resumen**, sin error; el
+"peek" desde una notificación se respeta.
 
 El canal respeta la RLS del suscriptor (es el punto crítico: a nadie le llega
-lo que no le corresponde — invariante 20 de `SEGURIDAD.md`) y el modo Local
+lo que no le corresponde — invariante 20 de `SEGURIDAD.md`; en las tablas de
+datos la barrera es la membresía, sin filtro de servidor). `usuario` queda
+fuera a sabiendas —un cambio de nombre se ve al recargar— y el modo Local
 sigue sin tiempo real.
 
 **Baja de usuarios (#136):** eliminar = desactivar + invisible (sin borrado
@@ -355,8 +373,10 @@ valor por defecto del navegador, cae al inicial (un `border` así desaparece).
   el servidor y al cliente le llega un mensaje genérico en español (#249). Se
   despliegan a mano desde el dashboard (no hay CLI en este proyecto).
 - **Tiempo real:** Supabase Realtime sobre la publicación `supabase_realtime`
-  (hoy solo `notificacion`). Una sola cañería en el cliente
-  (`data/tiempoReal.ts`); los eventos son avisos de releer, nunca datos.
+  (`notificacion` desde #255 y las siete tablas de datos desde #260; `usuario`
+  queda fuera a sabiendas). Una sola cañería en el cliente
+  (`data/tiempoReal.ts`); los eventos son avisos de releer, nunca datos, y la
+  relectura es una sola y completa — la notificación y su tarea llegan juntas.
 - **Despliegue:** Vercel (frontend estático + `vercel.json` con headers de
   seguridad). Migraciones en `supabase/migrations/`, aplicadas desde el dashboard.
 

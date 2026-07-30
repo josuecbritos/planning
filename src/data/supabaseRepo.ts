@@ -379,16 +379,6 @@ export class SupabaseRepo implements Repo {
     return toComentario(row)
   }
 
-  /** #255: la relectura de la campana. La misma consulta del loadState —RLS
-   *  entrega solo las notificaciones del usuario del JWT— acotada a esta
-   *  tabla, para no arrastrar el estado entero por cada aviso del canal. */
-  async loadNotificaciones(): Promise<Notificacion[]> {
-    const rows = unwrap(
-      await this.db.from('notificacion').select('*').order('creada', { ascending: false }),
-    )
-    return rows.map(toNotificacion)
-  }
-
   async marcarNotificacionesLeidas(usuarioId: string): Promise<string[]> {
     const rows = unwrap(
       await this.db

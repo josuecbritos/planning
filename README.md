@@ -52,7 +52,7 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 ## Conectar Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com) (capa gratuita).
-2. Aplica el esquema **completo**, las 20 migraciones en orden:
+2. Aplica el esquema **completo**, las 21 migraciones en orden:
    ```bash
    supabase link --project-ref TU_REF
    supabase db push          # aplica supabase/migrations/ en orden
@@ -144,7 +144,7 @@ Edge Functions y sus secretos, despliegue en Vercel— es
   también a las filas de un `RETURNING`, `eliminarUsuario` dejó de pedir la fila
   de vuelta y comprueba el borrado releyendo la vista.
 
-> La lista **completa y ordenada** de las 20 migraciones (1→20), lista para
+> La lista **completa y ordenada** de las 21 migraciones (1→21), lista para
 > pegar en el SQL Editor, está en [`DEPLOY.md`](DEPLOY.md) (Paso 2).
 
 Para crear los usuarios en Supabase Auth: panel → Authentication → Add user (con el
@@ -194,7 +194,7 @@ src/
     CampoPassword, Modal, TextPromptModal, …
     Iconos.tsx           Iconos de acción como SVG de trazo (#203)
 supabase/
-  migrations/            20 migraciones (1→20). Lista ordenada en DEPLOY.md.
+  migrations/            21 migraciones (1→21). Lista ordenada en DEPLOY.md.
   functions/             Edge Functions (Deno): invitar-usuario, aceptar-invitacion,
                          recuperar-contrasena
   seed.sql               Datos de arranque (opcional)

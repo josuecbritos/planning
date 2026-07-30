@@ -103,9 +103,11 @@ async function compararTablaContraVista(c, rotulo) {
   )
 }
 
-// #255 — El canal de tiempo real no reparte de más. Es la prueba central de
-// la entrega 1: Realtime evalúa la RLS del SUSCRIPTOR para INSERT/UPDATE, y
-// acá se comprueba con tres oyentes a la vez sobre una notificación real:
+// #255/#260 — El canal de tiempo real no reparte de más. Realtime evalúa la
+// RLS del SUSCRIPTOR para INSERT/UPDATE, y acá se comprueba con oyentes
+// simultáneos sobre dos tablas de un mismo hecho real:
+//
+// `notificacion` (entrega 1) — RLS por destinatario:
 //   · B (el destinatario), suscrito con su filtro → DEBE recibirla.
 //   · C (otro usuario), suscrito SIN filtro, como lo haría un cliente
 //     malicioso → NO debe recibir ningún INSERT/UPDATE.
@@ -114,9 +116,17 @@ async function compararTablaContraVista(c, rotulo) {
 // Los DELETE quedan fuera de la aserción: Realtime no les aplica RLS (la fila
 // ya no existe) y por diseño viajan solo con la clave primaria — ver la
 // migración 20. Se registran aparte, como dato.
-// La notificación se genera DE VERDAD: el admin crea un proyecto de prueba
-// (__prueba_rls_rt_*, el barrido de limpieza lo recoge) y asigna una tarea a
-// B; el trigger notif_asignacion hace el resto.
+// `tarea` (entrega 2) — RLS por MEMBRESÍA, sin filtro de servidor. Se prueba
+// como representante de la familia de datos (frente, sub_frente, proyecto,
+// acceso_proyecto, comentario, replanificacion comparten los mismos predicados
+// de membresía, ya validados por esta compuerta en lectura):
+//   · B, hecho MIEMBRO del proyecto de prueba → DEBE recibir el INSERT.
+//   · C, no miembro, suscrito sin filtro → cero INSERT/UPDATE.
+//   (El admin ve todas las tareas por RLS, así que su canal de tarea SÍ
+//   recibiría — no es fuga; no se asierta.)
+// Todo se genera DE VERDAD: el admin crea un proyecto de prueba
+// (__prueba_rls_rt_*, el barrido de limpieza lo recoge), agrega a B como
+// miembro y asigna una tarea a B; los triggers hacen el resto.
 async function probarCanalTiempoReal(admin) {
   const rotulo = 'canal'
   const emailB = process.env.RLS_CONSULTOR_A_EMAIL
@@ -143,15 +153,15 @@ async function probarCanalTiempoReal(admin) {
     if (data.session) await cli.realtime.setAuth(data.session.access_token)
   }
 
-  const eventos = { B: [], C: [], admin: [] }
+  const eventos = { B: [], C: [], admin: [], 'B:tarea': [], 'C:tarea': [] }
   const canales = []
-  function escuchar(cliente, nombre, filtro) {
+  function escuchar(cliente, nombre, filtro, tabla = 'notificacion') {
     return new Promise((resolver) => {
       const canal = cliente
         .channel(`compuerta:${nombre}:${Date.now()}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'notificacion', ...(filtro ? { filter: filtro } : {}) },
+          { event: '*', schema: 'public', table: tabla, ...(filtro ? { filter: filtro } : {}) },
           (ev) => eventos[nombre].push(ev.eventType),
         )
         .subscribe((estado) => {
@@ -168,6 +178,10 @@ async function probarCanalTiempoReal(admin) {
       escuchar(b, 'B', `usuario_id=eq.${yoB.id}`),
       escuchar(cAjeno, 'C'),   // sin filtro: simula un cliente modificado
       escuchar(admin, 'admin'), // sin filtro: ni el admin recibe lo ajeno
+      // #260: la familia de datos, sin filtro — la barrera es la RLS por
+      // membresía. B será miembro del proyecto de prueba; C no.
+      escuchar(b, 'B:tarea', null, 'tarea'),
+      escuchar(cAjeno, 'C:tarea', null, 'tarea'),
     ])
     if (!suscritos.every(Boolean)) {
       marca(false, rotulo, 'el canal conecta', '¿Realtime activo y migración 20 aplicada?')
@@ -184,6 +198,15 @@ async function probarCanalTiempoReal(admin) {
       marca(false, rotulo, 'preparación (proyecto de prueba)', errProy.message)
       return
     }
+    // #260: B entra como MIEMBRO (con eso la RLS le muestra la tarea y el
+    // canal debe entregársela); C queda fuera.
+    const { error: errAcc } = await admin
+      .from('acceso_proyecto')
+      .insert({ usuario_id: yoB.id, proyecto_id: proy.id })
+    if (errAcc) {
+      marca(false, rotulo, 'preparación (membresía de B)', errAcc.message)
+      return
+    }
     const { data: fr } = await admin
       .from('frente').insert({ proyecto_id: proy.id, nombre: 'rt', orden: 0 }).select().single()
     const { data: sf } = await admin
@@ -198,7 +221,10 @@ async function probarCanalTiempoReal(admin) {
 
     // Espera activa: los eventos tardan típicamente < 1 s; techo de 10 s.
     const limite = Date.now() + 10_000
-    while (Date.now() < limite && !eventos.B.includes('INSERT')) {
+    while (
+      Date.now() < limite &&
+      !(eventos.B.includes('INSERT') && eventos['B:tarea'].includes('INSERT'))
+    ) {
       await new Promise((r) => setTimeout(r, 250))
     }
     // Margen extra: si una fuga viniera en camino, que alcance a llegar.
@@ -222,6 +248,19 @@ async function probarCanalTiempoReal(admin) {
       rotulo,
       'ni el admin recibe por el canal notificaciones que no son suyas',
       conContenido(eventos.admin).length ? `FUGA: ${eventos.admin.join(',')}` : 'cero INSERT/UPDATE',
+    )
+    // #260 — la familia de datos, con `tarea` de representante.
+    marca(
+      eventos['B:tarea'].includes('INSERT'),
+      rotulo,
+      'el MIEMBRO sí recibe la tarea nueva en vivo (#260)',
+      `eventos de B/tarea: ${eventos['B:tarea'].join(',') || 'ninguno'} — ¿migración 21 aplicada?`,
+    )
+    marca(
+      conContenido(eventos['C:tarea']).length === 0,
+      rotulo,
+      'el NO miembro no recibe tareas de un proyecto ajeno (#260)',
+      conContenido(eventos['C:tarea']).length ? `FUGA: ${eventos['C:tarea'].join(',')}` : 'cero INSERT/UPDATE',
     )
   } finally {
     // Cerrar ANTES de la limpieza: el borrado en cascada emite DELETEs (solo

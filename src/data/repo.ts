@@ -4,7 +4,6 @@ import type {
   Comentario,
   Frente,
   ISODate,
-  Notificacion,
   Proyecto,
   Replanificacion,
   Rol,
@@ -149,10 +148,4 @@ export interface Repo {
   /** #137: marca como leídas TODAS las notificaciones del usuario actual.
    *  Devuelve los ids afectados (para reflejarlo en el estado local). */
   marcarNotificacionesLeidas(usuarioId: string): Promise<string[]>
-
-  /** #255: relee SOLO las notificaciones del usuario actual, para la campana
-   *  en tiempo real. El canal avisa; esta es la verdad (principio 1): se llama
-   *  ante cada aviso, al reconectar y al despertar la pestaña, y su resultado
-   *  REEMPLAZA la lista en memoria — nunca se suma a ella. */
-  loadNotificaciones(): Promise<Notificacion[]>
 }
