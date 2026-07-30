@@ -512,6 +512,18 @@ table.tareas .col-desv { text-align: center; }
 .fecha-cal__dia:hover { background: var(--gris-linea); }
 .fecha-cal__dia--sel { background: var(--primario); color: var(--sobre-primario); font-weight: 700; }
 .fecha-cal__dia--sel:hover { background: var(--primario); }
+/* #285: hoy SIEMPRE marcado — borde sin relleno (anillo interior, no corre el
+   layout). Si hoy es además el día elegido, el anillo va en el color del
+   texto-sobre-primario: relleno CON borde, legible en claro y en oscuro. */
+.fecha-cal__dia--hoy { box-shadow: inset 0 0 0 1.5px var(--primario); font-weight: 700; }
+.fecha-cal__dia--sel.fecha-cal__dia--hoy { box-shadow: inset 0 0 0 1.5px var(--sobre-primario); }
+.fecha-cal__pie { display: flex; justify-content: flex-end; margin-top: 6px; }
+.fecha-cal__ir-hoy {
+  background: none; border: 1px solid var(--gris-borde); color: var(--texto);
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 3px 10px; border-radius: 6px;
+}
+.fecha-cal__ir-hoy:hover { background: var(--gris-linea); }
 
 /* ---------- Bloque 2: interaccion inline ---------- */
 
@@ -1831,15 +1843,21 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.25);
 }
 .movil-velo { display: none; }
-/* Interruptor de tema flotante en mobile, junto al ☰ (superficie, para
-   distinguirlo del botón primario del menú). Oculto en desktop. */
-.movil-tema {
+/* #284: campana de notificaciones flotante en mobile, junto al ☰ (superficie,
+   para distinguirla del botón primario del menú). Reemplaza al interruptor de
+   tema, que vive en el pie de la barra lateral. Oculta en desktop. */
+.movil-campana {
   display: none; position: fixed; bottom: 14px; left: 68px; z-index: 2200;
   width: 46px; height: 46px; border-radius: 999px;
   border: 1px solid var(--gris-borde); background: var(--superficie);
   color: var(--texto); font-size: 18px; line-height: 1; cursor: pointer;
   align-items: center; justify-content: center;
   box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.25);
+}
+.movil-campana__badge {
+  position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px;
+  padding: 0 4px; border-radius: 999px; background: var(--naranja); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
 }
 /* La ruta con proyecto de Mis Tareas es exclusiva de mobile (8.2) */
 .ruta-proy { display: none; }
@@ -2083,13 +2101,13 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
      velo o eligiendo una opción, y su pie ya tiene su propio botón de tema y
      el de salir, así que no se pierde ninguna acción. */
   body:has(.modal-overlay) .movil-menu,
-  body:has(.modal-overlay) .movil-tema,
+  body:has(.modal-overlay) .movil-campana,
   body:has(.panel-detalle) .movil-menu,
-  body:has(.panel-detalle) .movil-tema,
+  body:has(.panel-detalle) .movil-campana,
   body:has(.notif-panel) .movil-menu,
-  body:has(.notif-panel) .movil-tema,
+  body:has(.notif-panel) .movil-campana,
   .app--movil-abierta .movil-menu,
-  .app--movil-abierta .movil-tema { display: none; }
+  .app--movil-abierta .movil-campana { display: none; }
 
   /* #199: área tocable de 44×44 SIN engordar la fila. El glifo mantiene su
      tamaño; el objetivo se extiende por fuera con un pseudo-elemento absoluto
@@ -2156,7 +2174,7 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .app, .app--sidebar-escondida { display: block; }
   .main { height: 100vh; height: 100dvh; }
   .movil-menu { display: inline-flex; }
-  .movil-tema { display: inline-flex; }
+  .movil-campana { display: inline-flex; }
   /* #241: los dos flotantes ocupan los 60px de abajo a la izquierda (14 de
      margen + 46 de alto). Sin aire al final del scroll, el último control de
      la tabla —el "+ Sub Frente"— quedaba debajo de ellos: se veía a medias y
@@ -2176,6 +2194,10 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   /* El modo escondida (franja + hover) es de escritorio: se neutraliza. */
   .sidebar-mini { display: none; }
   .sidebar__plegar { display: none; }
+  /* #284: el interruptor de tema comparte la clase del chevron de plegar,
+     pero en mobile SÍ debe verse — el flotante de tema ya no existe y este
+     pasa a ser el único acceso al modo oscuro en el teléfono. */
+  .sesion__tema { display: inline-flex; align-items: center; justify-content: center; }
   /* #226: el ajuste de ancho es solo de escritorio. En el teléfono la barra es
      un panel que se abre por encima del contenido, con su ancho de siempre. */
   .sidebar-resize { display: none; }

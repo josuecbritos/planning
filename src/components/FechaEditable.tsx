@@ -24,7 +24,7 @@ interface Props {
 
 const DIAS_SEMANA = ['lu', 'ma', 'mi', 'ju', 'vi', 'sa', 'do']
 const ANCHO_CAL = 248
-const ALTO_CAL = 300
+const ALTO_CAL = 330
 
 /** Año y mes (0-11) del mes que el calendario muestra. */
 interface Mes {
@@ -123,6 +123,9 @@ export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
   const primerDow = new Date(Date.UTC(mes.anio, mes.mes0, 1)).getUTCDay() // 0=do
   const huecos = (primerDow + 6) % 7
   const nDias = new Date(Date.UTC(mes.anio, mes.mes0 + 1, 0)).getUTCDate()
+  // #285: hoy se marca SIEMPRE (con borde; el elegido va relleno; si coinciden,
+  // relleno con borde). Si el mes visible es otro, hoy simplemente no aparece.
+  const hoy = hoyISO()
 
   return (
     <>
@@ -184,7 +187,9 @@ export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
                   <button
                     key={iso}
                     type="button"
-                    className={`fecha-cal__dia${iso === valor ? ' fecha-cal__dia--sel' : ''}`}
+                    className={`fecha-cal__dia${iso === valor ? ' fecha-cal__dia--sel' : ''}${
+                      iso === hoy ? ' fecha-cal__dia--hoy' : ''
+                    }`}
                     data-fecha={iso}
                     aria-label={formatoFecha(iso)}
                     onClick={() => elegir(iso)}
@@ -193,6 +198,13 @@ export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
                   </button>
                 )
               })}
+            </div>
+            {/* #285: "Hoy" SOLO navega al mes actual — no asigna ni cierra,
+                igual que las flechas (la regla central de #262 no se toca). */}
+            <div className="fecha-cal__pie">
+              <button type="button" className="fecha-cal__ir-hoy" onClick={() => setMes(mesDe(hoy))}>
+                Hoy
+              </button>
             </div>
           </div>,
           document.body,

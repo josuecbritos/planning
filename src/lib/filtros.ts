@@ -1,5 +1,5 @@
 import type { AppState, ISODate, Tarea } from '../types'
-import { addDays, inicioSemana } from './dates'
+import { addDays, esFinDeSemana, inicioSemana } from './dates'
 import { categoriaDe, type Categoria } from './derive'
 import type { OrdenMulti } from './orden'
 
@@ -15,7 +15,11 @@ import type { OrdenMulti } from './orden'
 // esta semana, la ventana que corresponde es esa semana. La excepción es
 // `horizonte`, que va al revés: deriva su rango del horizonte, no lo define.
 
-export type FechaRelativa = 'hoy' | 'semana' | 'proxima' | 'mes'
+// #279: 'proxHabil' = el siguiente día que no es sábado ni domingo (L-J:
+// mañana; V/S/D: el lunes). Hábil significa L-V y nada más: la herramienta no
+// conoce feriados y esta opción no se los enseña. Un valor NUEVO no rompe las
+// vistas guardadas con los cuatro anteriores.
+export type FechaRelativa = 'hoy' | 'proxHabil' | 'semana' | 'proxima' | 'mes'
 
 type FiltroFecha =
   | { tipo: 'relativa'; valor: FechaRelativa }
@@ -64,6 +68,7 @@ export interface FiltroGuardado {
 
 export const FECHA_RELATIVA_LABEL: Record<FechaRelativa, string> = {
   hoy: 'Hoy',
+  proxHabil: 'Próximo día hábil',
   semana: 'Esta semana',
   proxima: 'Próxima semana',
   mes: 'Este mes',
@@ -104,6 +109,14 @@ export function rangoDeFecha(f: FiltroFecha, hoy: ISODate): { desde?: ISODate; h
   switch (f.valor) {
     case 'hoy':
       return { desde: hoy, hasta: hoy }
+    case 'proxHabil': {
+      // Un solo día, literal como las otras cuatro: mañana, o el lunes si
+      // mañana cae en fin de semana. Un viernes, la tarea del sábado NO entra
+      // — cada opción muestra su rango y nada más (decisión de #279).
+      let d = addDays(hoy, 1)
+      while (esFinDeSemana(d)) d = addDays(d, 1)
+      return { desde: d, hasta: d }
+    }
     case 'semana': {
       const lunes = inicioSemana(hoy)
       return { desde: lunes, hasta: addDays(lunes, 6) }
