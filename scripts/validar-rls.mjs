@@ -419,6 +419,79 @@ async function probarMiembrosYNotificaciones(admin) {
   }
 }
 
+// #286 — El borrado LÓGICO de un usuario funciona, y sigue siendo admin-only.
+//
+// El hueco que dejó pasar el defecto: la compuerta probaba a fondo quién NO
+// puede tocar `usuario`, pero nunca que un admin SÍ pudiera completar el
+// borrado. Y no podía: PostgreSQL aplica las políticas de SELECT como WITH
+// CHECK sobre la fila nueva de un UPDATE, y `usuario_select` exige
+// `not eliminado` — marcar `eliminado = true` se rechazaba solo.
+//
+// El caso usa un usuario recién creado por `crear_o_reactivar_usuario`, que
+// nace SIN `auth_id` (nunca completó el registro): exactamente el perfil de
+// las tres cuentas del reporte. Queda marcado como eliminado —invisible en
+// la interfaz, recuperable dando de alta el mismo correo—, así que no hay
+// nada que limpiar después.
+async function probarBorradoLogicoDeUsuario(admin) {
+  const rotulo = 'usuarios'
+  const correo = `__prueba_rls_286_${Date.now()}@example.invalid`
+  const { data: creado, error: errCrear } = await admin.rpc('crear_o_reactivar_usuario', {
+    p_nombre: 'Prueba RLS 286',
+    p_iniciales: 'PR',
+    p_email: correo,
+    p_rol: 'cliente',
+  })
+  if (errCrear || !creado) {
+    marca(false, rotulo, 'preparación (usuario de prueba sin auth_id)', errCrear?.message ?? 'sin fila')
+    return
+  }
+  const id = creado.id
+  marca(creado.auth_id == null, rotulo, '#286 el usuario de prueba nace SIN auth_id', `auth_id=${creado.auth_id}`)
+
+  // Un no-admin no puede eliminar: la RPC replica la autorización adentro.
+  const emailOtro = process.env.RLS_CLIENTE_EMAIL ?? process.env.RLS_CONSULTOR_A_EMAIL
+  const passOtro = process.env.RLS_CLIENTE_PASS ?? process.env.RLS_CONSULTOR_A_PASS
+  if (emailOtro && passOtro) {
+    const otro = await sesion(emailOtro, passOtro)
+    const { error: errNoAdmin } = await otro.rpc('eliminar_usuario', { p_usuario: id })
+    marca(!!errNoAdmin, rotulo, '#286 un NO admin no puede eliminar usuarios', errNoAdmin ? 'rechazado' : 'FUGA: lo permitió')
+    await otro.auth.signOut()
+  } else {
+    console.log('  SKIP  [usuarios] sin credenciales no-admin para la prueba negativa de #286')
+  }
+
+  // El admin SÍ puede, y el usuario desaparece de la vista.
+  const { error: errBorrar } = await admin.rpc('eliminar_usuario', { p_usuario: id })
+  marca(!errBorrar, rotulo, '#286 un admin SÍ puede eliminar a un usuario sin auth_id', errBorrar?.message ?? '')
+  const { data: sigue } = await admin.from('usuario_visible').select('id').eq('id', id).maybeSingle()
+  marca(!sigue, rotulo, '#286 y el eliminado desaparece de usuario_visible', sigue ? 'sigue visible' : '')
+
+  // Eliminado ≠ desactivado: no reaparece ni mirando "ver desactivados" (la
+  // vista no devuelve eliminados a nadie, admin incluido).
+  const { data: todos } = await admin.from('usuario_visible').select('id')
+  marca(
+    !(todos ?? []).some((u) => u.id === id),
+    rotulo,
+    '#286 tampoco reaparece en el listado completo (eliminado ≠ desactivado)',
+  )
+
+  // Y se recupera dando de alta el MISMO correo, como promete la interfaz.
+  const { data: revivido, error: errRevivir } = await admin.rpc('crear_o_reactivar_usuario', {
+    p_nombre: 'Prueba RLS 286',
+    p_iniciales: 'PR',
+    p_email: correo,
+    p_rol: 'cliente',
+  })
+  marca(
+    !errRevivir && revivido?.id === id && revivido?.activo === true,
+    rotulo,
+    '#286 dar de alta el mismo correo lo recupera (misma fila)',
+    errRevivir?.message ?? `id ${revivido?.id === id ? 'coincide' : 'DISTINTO'}`,
+  )
+  // Se deja eliminado para no dejar cuentas de prueba activas en la base.
+  await admin.rpc('eliminar_usuario', { p_usuario: id })
+}
+
 async function limpiarProyectosDePrueba(admin) {
   if (!admin) return
   const { data: previos } = await admin.from('proyecto').select('id').like('nombre', '__prueba_rls_%')
@@ -716,6 +789,9 @@ async function main() {
 
   // ---------- #281/#283: membresía visible y entrega de notificaciones ----------
   await probarMiembrosYNotificaciones(admin)
+
+  // ---------- #286: el borrado lógico de usuarios funciona y sigue acotado ----------
+  await probarBorradoLogicoDeUsuario(admin)
 
   // ---------- #255: el canal de tiempo real ----------
   await probarCanalTiempoReal(admin)
