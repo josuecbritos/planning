@@ -273,6 +273,134 @@ async function probarCanalTiempoReal(admin) {
   }
 }
 
+// #281/#283 — Membresía y entrega de notificaciones, con datos REALES.
+//
+// #281 dejó a la vista un hueco de la compuerta: para `usuario_visible` solo
+// se comprobaba el AISLAMIENTO (que nadie vea de más), nunca la ENTREGA (que
+// un consultor vea a los demás miembros de su proyecto). Una base desplegada
+// con la cadena `comparte_proyecto` divergente pasaba la compuerta entera.
+// Aquí se cierra: el admin arma un proyecto de prueba con dos cuentas como
+// miembros y se asierta que cada una VE a la otra por la vista.
+//
+// #283 — la política de `notificacion` (migración 23) condiciona la entrega
+// al acceso al proyecto de la tarea. Con una notificación real (asignación
+// por trigger) se comprueba el ciclo completo: se entrega con acceso, se
+// oculta al quitarlo, "marcar leída" no la alcanza mientras está oculta, y
+// al devolver el acceso reaparece con su estado de leída intacto.
+async function probarMiembrosYNotificaciones(admin) {
+  const rotulo = 'miembros'
+  const emailA = process.env.RLS_CONSULTOR_A_EMAIL
+  const passA = process.env.RLS_CONSULTOR_A_PASS
+  const emailC = process.env.RLS_CLIENTE_EMAIL ?? process.env.RLS_CONSULTOR_B_EMAIL
+  const passC = process.env.RLS_CLIENTE_PASS ?? process.env.RLS_CONSULTOR_B_PASS
+  if (!emailA || !passA || !emailC || !passC) {
+    console.log('  SKIP  [miembros] hacen falta RLS_CONSULTOR_A_* y (RLS_CLIENTE_* o RLS_CONSULTOR_B_*)')
+    return
+  }
+  const a = await sesion(emailA, passA)
+  const cOtro = await sesion(emailC, passC)
+  try {
+    const yoA = await perfilDe(a)
+    const yoC = await perfilDe(cOtro)
+    if (!yoA || !yoC) {
+      marca(false, rotulo, 'sesiones de la prueba legibles')
+      return
+    }
+
+    const { data: proy, error: errProy } = await admin
+      .from('proyecto')
+      .insert({ nombre: `__prueba_rls_281_${Date.now()}` })
+      .select()
+      .single()
+    if (errProy) {
+      marca(false, rotulo, 'preparación (proyecto de prueba)', errProy.message)
+      return
+    }
+    const { error: errAcc } = await admin.from('acceso_proyecto').insert([
+      { usuario_id: yoA.id, proyecto_id: proy.id },
+      { usuario_id: yoC.id, proyecto_id: proy.id },
+    ])
+    if (errAcc) {
+      marca(false, rotulo, 'preparación (membresías)', errAcc.message)
+      return
+    }
+
+    // ---- #281: la ENTREGA de la vista (el caso que faltaba) ----
+    const { data: vistaA } = await a.from('usuario_visible').select('id')
+    marca(
+      (vistaA ?? []).some((u) => u.id === yoC.id),
+      rotulo,
+      '#281 el consultor VE a los demás miembros de su proyecto en usuario_visible',
+      (vistaA ?? []).some((u) => u.id === yoC.id) ? `${vistaA.length} visibles` : 'NO le llega su co-miembro',
+    )
+    const { data: vistaC } = await cOtro.from('usuario_visible').select('id')
+    marca(
+      (vistaC ?? []).some((u) => u.id === yoA.id),
+      rotulo,
+      '#281 y el otro miembro también lo ve a él',
+      (vistaC ?? []).some((u) => u.id === yoA.id) ? `${vistaC.length} visibles` : 'NO le llega su co-miembro',
+    )
+
+    // ---- #283: entrega de notificaciones condicionada al acceso ----
+    const { data: fr } = await admin
+      .from('frente').insert({ proyecto_id: proy.id, nombre: 'm', orden: 0 }).select().single()
+    const { data: sf } = await admin
+      .from('sub_frente').insert({ frente_id: fr.id, nombre: 'm', orden: 0 }).select().single()
+    const { data: tarea, error: errT } = await admin
+      .from('tarea')
+      .insert({ sub_frente_id: sf.id, titulo: 'm', responsable_id: yoA.id, orden: 0 })
+      .select()
+      .single()
+    if (errT) {
+      marca(false, rotulo, 'preparación (tarea que notifica)', errT.message)
+      return
+    }
+    // El trigger crea la notificación en la misma transacción del INSERT; el
+    // pequeño reintento es solo por elasticidad de la API.
+    let notif = null
+    const limite = Date.now() + 5_000
+    while (Date.now() < limite && !notif) {
+      const { data } = await a.from('notificacion').select('id, leida').eq('tarea_id', tarea.id)
+      notif = data?.[0] ?? null
+      if (!notif) await new Promise((r) => setTimeout(r, 250))
+    }
+    marca(
+      !!notif && notif.leida === false,
+      rotulo,
+      '#283 con acceso al proyecto, la notificación SÍ se entrega (sin leer)',
+      notif ? '' : 'no llegó la notificación de asignación',
+    )
+
+    await admin.from('acceso_proyecto').delete().eq('usuario_id', yoA.id).eq('proyecto_id', proy.id)
+    const { data: ocultas } = await a.from('notificacion').select('id').eq('tarea_id', tarea.id)
+    marca(
+      (ocultas ?? []).length === 0,
+      rotulo,
+      '#283 al perder el acceso, la notificación DEJA de entregarse',
+      (ocultas ?? []).length ? 'FUGA: sigue llegando' : '',
+    )
+    marca(
+      bloqueado(await a.from('notificacion').update({ leida: true }).eq('tarea_id', tarea.id).select('id')),
+      rotulo,
+      '#283 "marcar leída" no alcanza a una notificación oculta',
+    )
+
+    await admin.from('acceso_proyecto').insert({ usuario_id: yoA.id, proyecto_id: proy.id })
+    const { data: devueltas } = await a.from('notificacion').select('id, leida').eq('tarea_id', tarea.id)
+    marca(
+      (devueltas ?? []).length === 1 && devueltas[0].leida === false,
+      rotulo,
+      '#283 al devolver el acceso reaparece con su estado (sin leer) intacto',
+      (devueltas ?? []).length ? `leida=${devueltas[0]?.leida}` : 'no reapareció',
+    )
+    // La limpieza del proyecto (y la cascada que se lleva la notificación) la
+    // hace el barrido garantizado del final.
+  } finally {
+    await a.auth.signOut()
+    await cOtro.auth.signOut()
+  }
+}
+
 async function limpiarProyectosDePrueba(admin) {
   if (!admin) return
   const { data: previos } = await admin.from('proyecto').select('id').like('nombre', '__prueba_rls_%')
@@ -567,6 +695,9 @@ async function main() {
 
     await c.auth.signOut()
   }
+
+  // ---------- #281/#283: membresía visible y entrega de notificaciones ----------
+  await probarMiembrosYNotificaciones(admin)
 
   // ---------- #255: el canal de tiempo real ----------
   await probarCanalTiempoReal(admin)

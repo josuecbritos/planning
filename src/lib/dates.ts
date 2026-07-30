@@ -109,6 +109,12 @@ export function formatoFecha(iso: ISODate): string {
   return `${String(d.getUTCDate()).padStart(2, '0')}-${NOMBRE_MES[d.getUTCMonth()]}-${d.getUTCFullYear()}`
 }
 
+/** "oct 2024" — cabecera del calendario propio (#262). Mismo nombre corto de
+ *  mes que usa el resto de la interfaz. */
+export function etiquetaMes(anio: number, mes0: number): string {
+  return `${NOMBRE_MES[mes0]} ${anio}`
+}
+
 /** "07-oct-2024 14:30" — para timestamps (comentarios), en hora local. */
 export function formatoFechaHora(ts: string): string {
   const d = new Date(ts)

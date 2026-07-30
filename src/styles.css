@@ -237,6 +237,22 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
    proyectos) no saltan al ocultarse. */
 .app--sidebar-escondida .sidebar-zona:hover .sidebar-mini__btn { visibility: hidden; }
 
+/* #263: mientras el panel de notificaciones o un menú ⋯ estén abiertos, la
+   barra escondida se sostiene desplegada aunque el mouse salga de la zona
+   (clase que pone App). Sin esto, el popover quedaba flotando en medio de la
+   pantalla, desconectado de la barra que lo abrió. Mismo trío de reglas que
+   el hover. Solo escritorio: en mobile la barra es un panel superpuesto con
+   su propio mecanismo y no debe verse afectada. */
+@media (min-width: 769px) {
+  .app--sidebar-escondida.app--sidebar-sostenida .sidebar {
+    opacity: 1; pointer-events: auto; transform: none;
+  }
+  .app--sidebar-escondida.app--sidebar-sostenida .sidebar-resize {
+    opacity: 1; pointer-events: auto;
+  }
+  .app--sidebar-escondida.app--sidebar-sostenida .sidebar-mini__btn { visibility: hidden; }
+}
+
 .main {
   display: flex;
   flex-direction: column;
@@ -464,6 +480,38 @@ table.tareas .col-desv { text-align: center; }
 .fecha-btn:hover { background: var(--gris-linea); }
 .fecha-btn--vacia { color: var(--gris-texto); font-style: italic; border: 1px dashed var(--gris-borde); }
 .fecha-btn--vacia:hover { color: var(--texto); border-color: var(--primario); background: none; }
+
+/* #262: calendario propio del selector de fecha. Portal fijo (como los menús
+   ⋯), por eso no depende del overflow de la tabla. Navegar meses solo cambia
+   la grilla; únicamente el clic en un día asigna. */
+.fecha-cal {
+  z-index: 2200; background: var(--superficie); border: 1px solid var(--gris-borde);
+  border-radius: 10px; box-shadow: 0 14px 40px rgba(15, 24, 32, .22);
+  padding: 10px; font-size: 13px;
+}
+.fecha-cal__cabecera {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.fecha-cal__mes { font-weight: 700; }
+.fecha-cal__nav {
+  background: none; border: none; color: var(--gris-texto); cursor: pointer;
+  font: inherit; font-size: 16px; line-height: 1; width: 28px; height: 28px;
+  border-radius: 6px;
+}
+.fecha-cal__nav:hover { background: var(--gris-linea); color: var(--texto); }
+.fecha-cal__grilla {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+  text-align: center;
+}
+.fecha-cal__dow { color: var(--gris-texto); font-size: 11px; padding: 2px 0; }
+.fecha-cal__dia {
+  background: none; border: none; font: inherit; color: inherit; cursor: pointer;
+  padding: 4px 0; border-radius: 6px;
+}
+.fecha-cal__dia:hover { background: var(--gris-linea); }
+.fecha-cal__dia--sel { background: var(--primario); color: var(--sobre-primario); font-weight: 700; }
+.fecha-cal__dia--sel:hover { background: var(--primario); }
 
 /* ---------- Bloque 2: interaccion inline ---------- */
 

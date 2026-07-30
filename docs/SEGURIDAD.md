@@ -97,6 +97,45 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   familia de datos — el MIEMBRO del proyecto de prueba recibe el INSERT; el no
   miembro, suscrito sin filtro, cero INSERT/UPDATE.
 
+**Migración 22 — `20260707000022_reponer_cadena_visibilidad.sql` (#281)**
+- Repone la definición canónica de `es_dueno_proyecto`, `es_invitado_proyecto`,
+  `tiene_acceso_proyecto`, `comparte_proyecto` (tal como las dejó la migración
+  12, con el régimen de EXECUTE de la 15) y de la vista `usuario_visible` (tal
+  como la dejó la 18). Las migraciones del repo encadenan bien —verificado
+  reproduciendo 1→21 en un Postgres 16 limpio: la vista entrega a todos los
+  miembros y no expone a nadie de proyectos no compartidos—, así que el defecto
+  de #281 (un consultor veía solo al admin y a sí mismo) solo puede venir de
+  una **base desplegada divergente**: una función en versión anterior o una
+  migración aplicada fuera de orden.
+- Antes de reponer, **imprime con RAISE NOTICE las definiciones vivas**: la
+  salida del SQL Editor al aplicarla es el registro de qué había desplegado.
+- Deja también cerrado el hueco de la compuerta que dejó pasar esto: solo se
+  comprobaba el AISLAMIENTO de `usuario_visible` (que nadie vea de más), nunca
+  la ENTREGA (que un miembro vea a sus co-miembros). Ver caso nuevo abajo.
+
+**Migración 23 — `20260707000023_notificaciones_por_acceso.sql` (#283)**
+- La política de `notificacion` (select y update) suma la condición
+  `tiene_acceso_proyecto(proyecto_de_tarea(tarea_id))` al
+  `usuario_id = usuario_actual_id()` que ya tenía: la ENTREGA de una
+  notificación queda condicionada a que su destinatario hoy tenga acceso al
+  proyecto de la tarea — el mismo criterio del resto de la app. Al perder el
+  acceso las notificaciones no se borran: dejan de entregarse, y vuelven con
+  su leída/no leída intacto si el acceso se restituye (misma lógica que los
+  accesos guardados de un usuario desactivado).
+- `proyecto_de_tarea` es SECURITY DEFINER (como `proyecto_de_subfrente`):
+  dentro de una política, un subquery corre con la RLS del que consulta, y el
+  recorrido tarea → sub frente → frente debe hacerse por debajo de ella. Es
+  predicado de RLS: `authenticated` conserva EXECUTE (invariante 5); revocado
+  a `anon`.
+- La condición va TAMBIÉN en el update: sin ella, un "marcar todas como
+  leídas" marcaría las ocultas y al reincorporar al usuario volverían leídas.
+- La FK `tarea_id … on delete cascade` (migración 16) garantiza que la tarea
+  de una notificación existe mientras la notificación exista: no hace falta
+  rama para "tarea borrada".
+- Tiempo real: los eventos de INSERT/UPDATE se filtran con la RLS del
+  suscriptor, así que quien no tiene acceso tampoco recibe el aviso por el
+  canal — coherente con lo que puede leer.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.
@@ -171,9 +210,13 @@ reintroduce un hallazgo de la auditoría.
     política `USING (true)`.
 11. **Migraciones aditivas:** los cambios de base van como **archivos nuevos** en
     `supabase/migrations/`; no editar migraciones ya aplicadas.
-12. **Notificaciones privadas (#137).** `notificacion` scopea a su dueño:
-    `select`/`update` con `using (usuario_id = usuario_actual_id())` — nunca
-    `USING (true)`. **Sin política de insert/delete**: las generan triggers
+12. **Notificaciones privadas (#137) y condicionadas al acceso (#283).**
+    `notificacion` scopea a su dueño Y al proyecto: `select`/`update` con
+    `using (usuario_id = usuario_actual_id() and
+    tiene_acceso_proyecto(proyecto_de_tarea(tarea_id)))` (migración 23) — nunca
+    `USING (true)`, y la condición de acceso va en AMBAS políticas (sin ella en
+    el update, "marcar leídas" pisaría el estado de las ocultas).
+    **Sin política de insert/delete**: las generan triggers
     (`notif_asignacion`, `registrar_replanificacion`, `notif_comentario` —que
     desde #208 cubre también las menciones—,
     SECURITY DEFINER con `search_path` fijo y sin `EXECUTE` para
@@ -306,6 +349,14 @@ funciones de permisos.**
   devuelva ninguna fila que la vista no tenga. Si el grant acotado se revocara
   del todo, la lectura falla y el caso se da por bueno igual: sin lectura
   directa no hay nada que comparar.
+- **Caso de #281/#283**: `probarMiembrosYNotificaciones` arma un proyecto de
+  prueba con dos cuentas como miembros y comprueba lo que a la compuerta le
+  faltaba: la **entrega** — cada miembro VE al otro por `usuario_visible`
+  (#281; hasta esta ronda solo se probaba el aislamiento, y una base con
+  `comparte_proyecto` divergente pasaba la compuerta entera). Con una
+  notificación real de asignación recorre además el ciclo completo de #283:
+  se entrega con acceso, se oculta al quitarlo, "marcar leída" no la alcanza
+  mientras está oculta, y al devolver el acceso reaparece sin leer.
 
 ---
 

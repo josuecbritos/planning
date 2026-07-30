@@ -242,6 +242,11 @@ export default function App({ repo }: { repo: Repo }) {
   // #137: panel de notificaciones (anclado a la barra) y tarea a resaltar al
   // navegar desde un aviso.
   const [notifAbierto, setNotifAbierto] = useState(false)
+  // #263: ¿hay un menú ⋯ (proyecto o frente) desplegado en la barra? Con la
+  // barra escondida, mientras el panel de notificaciones o un ⋯ estén abiertos
+  // la barra se sostiene desplegada (clase app--sidebar-sostenida); si no, al
+  // salir el mouse la barra se contrae y el popover queda flotando, huérfano.
+  const [menuSidebarAbierto, setMenuSidebarAbierto] = useState(false)
   const [tareaResaltada, setTareaResaltada] = useState<string | null>(null)
   // #253: ids de las tareas creadas desde la última foto. Con un orden (o un
   // filtro) aplicado, la vista congelada dejaba fuera a la recién creada y se
@@ -601,12 +606,28 @@ export default function App({ repo }: { repo: Repo }) {
   )
 
   // #137: mis notificaciones (más recientes primero) y cuántas sin leer.
+  // #283: la entrega depende del acceso AL PROYECTO de la tarea — el mismo
+  // criterio del resto de la app (admin, dueño o fila de acceso). En Supabase
+  // la RLS ya filtra (migración 23) y esta condición no quita nada; en modo
+  // Local emula esa política. Las que no pasan no se borran: quedan guardadas
+  // e invisibles, y vuelven intactas si se recupera el acceso.
   const notifsMias = useMemo(() => {
     if (!state || !sesion) return [] as Notificacion[]
+    const conAccesoAlProyectoDe = (tareaId: string): boolean => {
+      if (esAdmin) return true
+      const t = state.tareas.find((x) => x.id === tareaId)
+      const sf = t && state.subFrentes.find((x) => x.id === t.subFrenteId)
+      const f = sf && state.frentes.find((x) => x.id === sf.frenteId)
+      if (!f) return false
+      return (
+        state.proyectos.some((p) => p.id === f.proyectoId && p.duenoId === sesion.id) ||
+        state.accesos.some((a) => a.usuarioId === sesion.id && a.proyectoId === f.proyectoId)
+      )
+    }
     return state.notificaciones
-      .filter((n) => n.usuarioId === sesion.id)
+      .filter((n) => n.usuarioId === sesion.id && conAccesoAlProyectoDe(n.tareaId))
       .sort((a, b) => (a.creada < b.creada ? 1 : -1))
-  }, [state, sesion])
+  }, [state, sesion, esAdmin])
   const noLeidas = notifsMias.filter((n) => !n.leida).length
 
   // Seleccion inicial / correccion de proyecto activo.
@@ -1106,7 +1127,9 @@ export default function App({ repo }: { repo: Repo }) {
     <div
       className={`app${sidebarModo === 'escondida' ? ' app--sidebar-escondida' : ''}${
         movilSidebar ? ' app--movil-abierta' : ''
-      }${redimensionando ? ' app--redimensionando' : ''}`}
+      }${redimensionando ? ' app--redimensionando' : ''}${
+        notifAbierto || menuSidebarAbierto ? ' app--sidebar-sostenida' : ''
+      }`}
       /* #226: el ancho vive en una variable CSS. La columna de la grilla y la
          barra desplegada del modo escondido la leen, así los dos modos usan
          el ancho que eligió el usuario. En mobile no se usa (la barra es un
@@ -1193,6 +1216,7 @@ export default function App({ repo }: { repo: Repo }) {
           noLeidas={noLeidas}
           notifAbierto={notifAbierto}
           onNotificaciones={abrirNotificaciones}
+          onMenuAbierto={setMenuSidebarAbierto}
           nProyectosAdmin={proyectosAdmin.filter((p) => p.estado !== 'archivado').length}
           /* #201: el mismo criterio que la pantalla de Usuarios — activos y,
              para el consultor, solo su gente. */

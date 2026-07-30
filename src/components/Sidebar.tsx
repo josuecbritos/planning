@@ -26,6 +26,10 @@ interface Props {
   notifAbierto: boolean
   /** #137: abre/cierra el panel de notificaciones (no cambia de pantalla). */
   onNotificaciones: () => void
+  /** #263: avisa cuando se abre/cierra un menú ⋯ (proyecto o frente). Con la
+   *  barra en modo escondido, App la sostiene desplegada mientras haya uno
+   *  abierto — si no, el menú quedaría flotando al salir el mouse. */
+  onMenuAbierto: (abierto: boolean) => void
   /** "+" de proyectos: admin o consultor con permiso crearProyectos. */
   puedeCrearProyecto: boolean
   /** #153: cuántos proyectos ve el usuario en Administración → Proyectos. */
@@ -92,6 +96,7 @@ export function Sidebar({
   noLeidas,
   notifAbierto,
   onNotificaciones,
+  onMenuAbierto,
   puedeCrearProyecto,
   nProyectosAdmin,
   nUsuarios,
@@ -115,6 +120,10 @@ export function Sidebar({
   // un frente cierra el de un proyecto y viceversa, sin coordinación extra.
   const [menu, setMenu] = useState<MenuAbierto>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+  // #263: el padre necesita saber si hay un ⋯ desplegado (ver Props).
+  useEffect(() => {
+    onMenuAbierto(menu !== null)
+  }, [menu, onMenuAbierto])
   const cerrarMenu = () => {
     setMenu(null)
     setMenuPos(null)
