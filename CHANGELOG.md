@@ -638,3 +638,60 @@ las notificaciones avisaban de tareas que no se podían ver hasta recargar.
 - Reconexión, pestaña dormida y degradación silenciosa funcionan para los
   datos igual que para la campana: son la misma relectura y la misma cañería.
   El modo Local sigue sin tiempo real, intacto.
+
+## Cuatro correcciones: calendario, barra sostenida, miembros y notificaciones (#262, #263, #281, #283)
+
+- **#262 — El selector de fecha ya no asigna al navegar meses.** La causa era
+  estructural: con el calendario nativo (`showPicker`) un cambio de mes y una
+  elección de día disparan el mismo `change` sin tecleo, indistinguibles. Se
+  reemplazó por un **calendario propio** en `FechaEditable` — misma API, mismos
+  cuatro puntos de uso (tabla, fila de creación, Mis Tareas, panel de detalle):
+  navegar meses solo cambia la grilla, únicamente el clic en un día asigna y
+  cierra, y clic fuera / Escape cierran sin tocar la fecha ni el historial. El
+  popover es un portal que sigue a su celda al hacer scroll, **no roba el foco**
+  (el guardado-por-foco-fuera de la fila de creación ya no se dispara) y el
+  cierre por clic-fuera va en fase de captura (varias celdas cortan la
+  propagación del mousedown). El panel de detalle aprendió que un clic en el
+  calendario no es "clic fuera del panel". Verificado con Playwright: 29
+  comprobaciones sobre los cuatro puntos, en claro y oscuro.
+- **#263 — La barra escondida se sostiene mientras haya algo abierto.** El
+  despliegue era puro `:hover` de CSS y ningún estado sabía que el panel de
+  notificaciones o un menú ⋯ (proyecto Y frente) estaban abiertos: al sacar el
+  mouse, la barra se contraía y el popover quedaba flotando. Ahora App marca
+  `app--sidebar-sostenida` mientras el panel o un ⋯ estén abiertos (el Sidebar
+  avisa con `onMenuAbierto`), y las mismas tres reglas del hover la mantienen
+  desplegada — acotadas a escritorio con `min-width: 769px`; el modo fijo y el
+  panel de mobile quedan intactos. La manija de ancho (#226) sigue funcionando
+  con el panel abierto, y el panel se mueve con ella.
+- **#281 — Un consultor no veía a todos los miembros de su proyecto.** La lista
+  de responsables se arma desde `usuario_visible`, cuya tercera condición
+  (`comparte_proyecto`) era la que fallaba. **La causa NO está en el repo**: se
+  reprodujo el escenario completo en un Postgres 16 limpio con las migraciones
+  1→21 en orden y la vista entrega a los cuatro miembros correctamente, para
+  consultor y para cliente, sin exponer gente de proyectos no compartidos. La
+  conclusión —la primera hipótesis del reporte— es que **la base desplegada
+  divergió de las migraciones** (una función en versión anterior o algo
+  aplicado fuera de orden; con `comparte_proyecto` divergente se reproduce
+  exactamente el síntoma "solo el admin y yo"). La **migración 22** repone la
+  definición canónica de la cadena completa y de la vista —no reescribe la
+  regla— e **imprime antes las definiciones vivas** (RAISE NOTICE): la salida
+  del SQL Editor al aplicarla queda como registro de cuál era la pieza
+  divergente. La compuerta suma el caso que le faltaba y que habría atrapado
+  esto: la **entrega** de la vista (cada miembro VE a su co-miembro), no solo
+  el aislamiento.
+- **#283 — Las notificaciones ya no sobreviven a perder el acceso.** La
+  política de `notificacion` era solo "mías"; la **migración 23** la condiciona
+  además al **acceso al proyecto de la tarea** (`tiene_acceso_proyecto(
+  proyecto_de_tarea(tarea_id))` — el mismo criterio del resto de la app, con el
+  helper SECURITY DEFINER porque dentro de una política un subquery corre con
+  la RLS del que consulta). Al quitar a alguien de un proyecto, sus
+  notificaciones de ahí dejan de entregarse y de contar en el contador — **no
+  se borran**, como los accesos guardados de un desactivado — y vuelven con su
+  leída/no leída intacto al reincorporarlo; la condición va también en el
+  UPDATE para que "marcar todas como leídas" no pise el estado de las ocultas.
+  El modo Local replica la regla (misma UX en el demo), el mensaje "Esta tarea
+  ya no existe" queda solo para su caso legítimo (tarea realmente borrada,
+  #246 sigue verde) y el canal de tiempo real es coherente solo: la RLS del
+  suscriptor filtra también los eventos. Verificado en un Postgres local
+  (políticas reales, ciclo completo) y con Playwright en modo Local; la
+  compuerta recorre el ciclo con una notificación real.

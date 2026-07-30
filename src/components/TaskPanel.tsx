@@ -42,9 +42,13 @@ export function TaskPanel({ state, tarea, hoy, can, actions, sesionId, onClose }
   // Cerrar al hacer clic fuera del panel (además del botón ✕ y Escape). El
   // listener se difiere un tick para que el mismo clic que abre el panel no
   // lo cierre de inmediato; los clics DENTRO del panel no lo cierran.
+  // #262: el calendario de fecha se monta como PORTAL fuera del aside — un
+  // clic en sus flechas de mes no es "fuera del panel" y no debe cerrarlo.
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
-      if (asideRef.current && !asideRef.current.contains(e.target as Node)) onClose()
+      const t = e.target as HTMLElement
+      if (t.closest('.fecha-cal')) return
+      if (asideRef.current && !asideRef.current.contains(t)) onClose()
     }
     const id = window.setTimeout(() => document.addEventListener('mousedown', onDown), 0)
     return () => {

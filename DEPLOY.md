@@ -94,6 +94,27 @@ orden** el contenido de:
     razonamiento que la 20: los DELETE viajan solo con la clave primaria).
     `usuario` queda fuera a sabiendas. Igual que la 20, el orden con el front
     es indiferente: la migración es lo que enciende los datos en vivo.
+22. `supabase/migrations/20260707000022_reponer_cadena_visibilidad.sql` —
+    corrección de #281 (un consultor no veía a los demás miembros de su
+    proyecto en el selector de responsable). Repone la definición canónica de
+    la cadena `es_dueno_proyecto` / `es_invitado_proyecto` /
+    `tiene_acceso_proyecto` / `comparte_proyecto` y de la vista
+    `usuario_visible`: las migraciones del repo son correctas (verificado
+    reproduciendo 1→21 en un Postgres limpio), así que el defecto solo puede
+    estar en una base desplegada que divergió. Antes de reponer, **imprime
+    (RAISE NOTICE) las definiciones vivas**: guarda esa salida — es el
+    registro de cuál era la pieza divergente. Sobre una base ya correcta es
+    inofensiva. **Correr la compuerta después.**
+23. `supabase/migrations/20260707000023_notificaciones_por_acceso.sql` —
+    corrección de #283: la entrega de notificaciones queda condicionada al
+    acceso al proyecto de la tarea (`tiene_acceso_proyecto(proyecto_de_tarea(...))`,
+    el mismo criterio del resto de la app). Al quitar a alguien de un
+    proyecto sus notificaciones de ahí dejan de llegarle (no se borran); si se
+    lo vuelve a agregar, reaparecen con su leída/no leída intacto. La
+    condición va también en el UPDATE ("marcar leídas") para no pisar el
+    estado de las ocultas. El orden con el front es indiferente: el front de
+    esta entrega replica el filtro para el modo Local y no depende de la
+    política. **Correr la compuerta después.**
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego

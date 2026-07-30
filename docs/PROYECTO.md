@@ -148,6 +148,18 @@ desde una notificación, con el aviso encendido. La lista **no se reordena sola*
 frente y todo lo demás se queda donde está hasta tocar "Actualizar vista", que
 entonces recalcula y la manda a su lugar. Encadenando con Enter, todas aparecen.
 
+**El selector de fecha es un calendario propio (#262).** Antes era el nativo
+del navegador (`showPicker`), y con él no había forma de distinguir "navegó de
+mes" de "eligió un día": tocar la flecha de mes asignaba esa fecha, la guardaba
+y cerraba — con historial de replanificación de por medio si la tarea ya tenía
+compromiso. Con el calendario propio la regla es inequívoca: **navegar meses
+solo cambia lo que se ve; únicamente el clic en un día concreto asigna y
+cierra; clic fuera o Escape cierran sin tocar nada**. Es la misma pieza en los
+cuatro puntos donde se edita fecha (fila de tabla, fila de creación, Mis Tareas
+y panel de detalle), se monta como popover que sigue a su celda al hacer scroll
+y no roba el foco (en la fila de creación, elegir día devuelve el foco al
+título, como siempre).
+
 **La fila de creación (#256/#259).** La fecha se pone con el botón
 **"Planificar"**, la misma pieza que en una tarea sin fecha: planificar tiene
 peso en este producto —queda registrado y moverlo después genera una
@@ -247,7 +259,12 @@ por color, nombre y jerarquía. Los contadores de **Administración** (usuarios 
 proyectos activos) sí se conservan. El control de plegar la barra es un
 **chevron doble**, no un pin: contrae, no ancla (#187). Con la barra contraída
 se ve solo el del riel y, al desplegarse, solo el de la cabecera: nunca los dos
-a la vez (#191).
+a la vez (#191). En modo escondido, **mientras el panel de notificaciones o un
+menú ⋯ (de proyecto o de frente) estén abiertos, la barra se sostiene
+desplegada** aunque el mouse salga de ella, y recién se contrae al cerrarse ese
+panel o menú (#263): sin eso, el popover quedaba flotando en medio de la
+pantalla, desconectado de la barra que lo abrió. Solo escritorio — la regla va
+acotada por media query y el panel de mobile no cambia.
 
 **Notificaciones in-app (#137):** cuatro eventos — te asignaron, replanificaron
 o comentaron una tarea tuya, y (desde #208) alguien te **mencionó** en un
@@ -266,7 +283,13 @@ genera la base, no el cliente. Si la tarea ya no existe —la borraron desde otr
 sesión— el clic avisa **"Esta tarea ya no existe."** y la notificación sale de
 la lista, en vez de no hacer nada (#246); borrar una tarea, un sub frente, un
 frente o un proyecto se lleva por delante sus notificaciones en los dos
-backends.
+backends. La **entrega está condicionada al acceso al proyecto** de la tarea
+(#283, mismo criterio que el resto de la app): al sacar a alguien de un
+proyecto, sus notificaciones de ahí **dejan de llegarle y de contar en el
+contador** — no se borran, igual que sus accesos guardados—, y si se lo vuelve
+a agregar reaparecen con su leída/no leída intacto ("marcar todas como leídas"
+tampoco toca las ocultas). En Supabase lo garantiza la RLS (migración 23); el
+modo Local replica la regla.
 
 **Tiempo real (#255 la campana, #260 los datos).** Las notificaciones llegan
 sin recargar —el contador sube solo, el panel se actualiza— y, desde #260,

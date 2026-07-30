@@ -535,10 +535,30 @@ export class MemoryRepo implements Repo {
     }
   }
 
+  /** #283: espejo de la política de la base (migración 23) — una notificación
+   *  solo se ENTREGA (y por lo tanto solo se puede marcar leída) si su
+   *  destinatario hoy tiene acceso al proyecto de la tarea: admin, dueño o
+   *  fila de acceso. Las demás quedan guardadas e intactas, como en Supabase. */
+  private notifEntregable(n: { usuarioId: string; tareaId: string }): boolean {
+    const u = this.state.usuarios.find((x) => x.id === n.usuarioId)
+    if (!u) return false
+    if (u.rol === 'admin') return true
+    const t = this.state.tareas.find((x) => x.id === n.tareaId)
+    const sf = t && this.state.subFrentes.find((x) => x.id === t.subFrenteId)
+    const f = sf && this.state.frentes.find((x) => x.id === sf.frenteId)
+    if (!f) return false
+    return (
+      this.state.proyectos.some((p) => p.id === f.proyectoId && p.duenoId === n.usuarioId) ||
+      this.state.accesos.some((a) => a.usuarioId === n.usuarioId && a.proyectoId === f.proyectoId)
+    )
+  }
+
   async marcarNotificacionesLeidas(usuarioId: string): Promise<string[]> {
     const ids: string[] = []
     for (const n of this.state.notificaciones) {
-      if (n.usuarioId === usuarioId && !n.leida) {
+      // #283: las ocultas por falta de acceso NO se marcan — si el usuario es
+      // reincorporado, vuelven con su estado de leída/no leída tal como estaba.
+      if (n.usuarioId === usuarioId && !n.leida && this.notifEntregable(n)) {
         n.leida = true
         ids.push(n.id)
       }
