@@ -222,6 +222,8 @@ export const initialState: AppState = {
   ],
   // Notificaciones de demo (#137) para la primera cuenta del picker (DV): dos
   // sin leer (contador naranjo) y una leída, sobre una tarea suya en Arauco.
+  // #289: el demo parte sin vistas guardadas.
+  vistas: [],
   notificaciones: [
     { id: 'n-1', usuarioId: 'u-dv', tipo: 'asignacion', tareaId: 't-1', autorId: 'u-jb', leida: false, creada: '2024-10-30T08:10:00Z' },
     { id: 'n-2', usuarioId: 'u-dv', tipo: 'comentario', tareaId: 't-9', autorId: 'u-jb', leida: false, creada: '2024-10-29T16:40:00Z' },

@@ -14,7 +14,7 @@ import {
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { CAMPOS_MIS_TAREAS, GRAVEDAD, ordenarMulti, valorOrden, type OrdenMulti } from '../lib/orden'
 import { useVistaCongelada } from '../lib/vistaCongelada'
-import { escribirVistaActiva, estadoInicial } from '../lib/vistas'
+import { escribirVistaActiva, estadoInicial, leerGuardados } from '../lib/vistas'
 import { FiltrosBar } from './FiltrosBar'
 import { GanttView } from './GanttView'
 import { HoverCard } from './HoverCard'
@@ -67,7 +67,16 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
   // #215: al entrar se restaura la vista guardada activa —y solo eso—. Un
   // filtro puesto a mano es temporal: esta pantalla se desmonta al salir, así
   // que se pierde, que es justo lo esperado.
-  const inicial = useMemo(() => estadoInicial(usuario.id, 'mis-tareas'), [usuario.id])
+  // #289: las vistas salen del estado (base de datos). `estadoInicial` se
+  // resuelve UNA vez al montar la pantalla, como siempre: por eso `state` no
+  // entra en las dependencias — un cambio ajeno no debe reiniciar el filtro
+  // que se está usando.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const inicial = useMemo(() => estadoInicial(state, usuario.id, 'mis-tareas'), [usuario.id])
+  const vistasGuardadas = useMemo(
+    () => leerGuardados(state, usuario.id, 'mis-tareas'),
+    [state, usuario.id],
+  )
   const [filtro, setFiltro] = useState<Filtro>(inicial.filtro)
   const [vistaActivaId, setVistaActivaId] = useState<string | null>(inicial.vistaActivaId)
   const cambiarVistaActiva = useCallback(
@@ -197,7 +206,10 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
           Los guardados viven en el contexto 'mis-tareas' (no por proyecto). */}
       <FiltrosBar
         contexto="mis-tareas"
-        usuarioId={usuario.id}
+        guardados={vistasGuardadas}
+        onCrearVista={(nombre, f, o) => actions.crearVista('mis-tareas', nombre, f, o)}
+        onGuardarVista={actions.guardarVista}
+        onEliminarVista={actions.eliminarVista}
         proyectos={proyectos}
         filtro={filtro}
         onCambiar={setFiltro}

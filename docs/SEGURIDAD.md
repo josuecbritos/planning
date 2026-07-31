@@ -186,6 +186,26 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   suscriptor, así que quien no tiene acceso tampoco recibe el aviso por el
   canal — coherente con lo que puede leer.
 
+**Migración 26 — `20260707000026_vistas_guardadas.sql` (#289)**
+- Tabla nueva `vista_guardada` (dueño, contexto, nombre, filtro, orden): las
+  vistas guardadas dejan `localStorage` y siguen al usuario a cualquier
+  computador. RLS habilitada; las CUATRO políticas son
+  `usuario_id = usuario_actual_id()`, ninguna `USING (true)` y **sin bypass de
+  admin a propósito**: una vista es preferencia personal, no dato del
+  proyecto. `revoke all ... from anon` + grants acotados a `authenticated`.
+- El dueño lo pone la BASE (`default usuario_actual_id()`), nunca el cliente
+  — mismo criterio que el autor del historial y de las notificaciones—, y la
+  política `with check` impide crear una vista a nombre de otro aunque el
+  `usuario_id` venga forzado desde el navegador.
+- **No crea ninguna función**, así que no hay EXECUTE que revocar. *(Nota que
+  deja el pedido y conviene tener presente: en Postgres las funciones nacen
+  ejecutables por `public`, y revocar solo a `anon` no basta. Revisarlo en las
+  funciones ya existentes es trabajo aparte, fuera del alcance de #289.)*
+- El puntero a "en qué vista estabas", el tema y el modo/ancho de la barra
+  lateral **siguen en el navegador**, por máquina: son decisiones del pedido.
+- La compuerta trae el caso nuevo: otro usuario no ve, no modifica ni borra
+  una vista ajena, y no puede crear una a nombre de otro.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.

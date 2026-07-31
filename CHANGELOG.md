@@ -819,3 +819,54 @@ reactivación, rechazo a consultor y a cliente, UPDATE directo sigue bloqueado)
 y 6 comprobaciones del contrato del front con un cliente de prueba (llama a la
 RPC con el parámetro exacto, ya no hace el UPDATE, propaga el error del
 servidor y conserva el aviso de #248). Regresión demo en verde.
+
+## #289 — Las vistas guardadas viven en la base, no en el navegador
+
+Vivían en `localStorage`, por usuario y por pantalla: entrar desde otro
+computador empezaba sin ninguna vista. **Nunca fue una decisión de producto** —
+la solicitud que las creó (#87) definía campos y comportamiento, no dónde se
+guardan—, así que ahora siguen a la persona a cualquier máquina.
+
+- **Migración 26 — tabla `vista_guardada`** (dueño, contexto, nombre, filtro,
+  orden). El **contexto** sigue siendo el id del proyecto o `'mis-tareas'`: lo
+  que antes vivía en la CLAVE de localStorage ahora son columnas. Es `text` y
+  no FK a propósito, porque `'mis-tareas'` no es un proyecto. `filtro` y
+  `orden` van como jsonb, la misma forma serializada que el front ya usaba.
+- **Privada de verdad**: RLS con las cuatro políticas en
+  `usuario_id = usuario_actual_id()`, sin `USING (true)` y **sin bypass de
+  admin a propósito** — una vista es preferencia personal, no dato del
+  proyecto. El dueño lo pone la BASE (`default usuario_actual_id()`), nunca el
+  cliente, y el `with check` impide crear una a nombre de otro aunque el id
+  venga forzado. `anon` sin privilegios. **No crea ninguna función**, así que
+  no hay EXECUTE que revocar.
+- **Viajan con el estado**, junto a proyectos, tareas y notificaciones — no se
+  leen al abrir el desplegable. `FiltrosBar` dejó de tocar `localStorage`:
+  recibe la lista ya filtrada y cuatro llamadas al repositorio (crear,
+  actualizar, renombrar, eliminar). `memoryRepo` mantiene su equivalente, así
+  que el modo sin base sigue igual.
+- **El comportamiento visible no cambia**: guardar, aplicar, renombrar y
+  borrar se ven y se hacen igual, con su confirmación; el asterisco de vista
+  modificada y toda la regla de #215/#221 quedan intactos (verificado).
+- **Tres decisiones del pedido, respetadas**: "en qué vista estabas" se queda
+  en el navegador —entrar desde un computador nuevo abre limpio, con las
+  vistas disponibles—; no hay importador de lo ya guardado (se vuelven a crear
+  una vez); y el tema y el modo/ancho de la barra lateral siguen siendo de
+  cada máquina.
+- **Consecuencias aceptadas**: las vistas no viajan en tiempo real (aparecen
+  al recargar), y las de un proyecto eliminado quedan en la base sin verse.
+- **La compuerta suma el caso pedido**: otro usuario no ve, no modifica ni
+  borra una vista ajena, y no puede crear una a nombre de otro.
+
+**Verificado**: ciclo completo contra Postgres 16 local con las políticas
+reales (dueño puesto por la base, aislamiento entre dos usuarios, el admin
+tampoco ve, suplantación rechazada, renombrar/borrar lo propio, `anon`
+bloqueado) y 20 comprobaciones Playwright del ciclo de interfaz — incluido
+"otro computador" (perfil de navegador nuevo con el mismo estado), contextos
+separados, cuenta ajena con el desplegable vacío y el asterisco de #215.
+Regresión demo y la ronda #274/#285/#279/#284 (45 comprobaciones, con su ciclo
+de guardar y restaurar una vista) en verde.
+
+**Nota que queda anotada, sin actuar**: el pedido advierte que en Postgres las
+funciones nacen ejecutables por `public` y que revocar solo a `anon` no basta.
+Esta migración no crea funciones, así que no la roza; revisar las revocaciones
+ya escritas en migraciones anteriores es trabajo aparte y **no se hizo aquí**.

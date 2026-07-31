@@ -1,3 +1,4 @@
+import type { AppState } from '../types'
 import type { Filtro, FiltroGuardado } from './filtros'
 import type { OrdenMulti } from './orden'
 
@@ -17,26 +18,41 @@ import type { OrdenMulti } from './orden'
 // lo mismo— te deja dentro, marcada como modificada con un asterisco. Es el
 // modelo documentado de Dynamics 365.
 //
-// Todo vive en localStorage, por usuario y por pantalla (cada proyecto por su
-// lado, Mis Tareas por el suyo). Nunca en la base: entrar desde otro computador
-// empieza limpio, y eso es lo esperado.
+// #289 — DÓNDE VIVE CADA COSA, que son dos cosas distintas:
+//
+//   · Las VISTAS GUARDADAS viven en la BASE, atadas al usuario (tabla
+//     `vista_guardada`, migración 26). Viajan con el resto del estado y
+//     siguen a la persona a cualquier computador. Antes vivían en
+//     localStorage, y eso nunca fue una decisión de producto: la solicitud
+//     que las creó (#87) no decía dónde guardarlas.
+//   · EN QUÉ VISTA ESTABAS sigue en localStorage, por máquina. Es
+//     deliberado: la vista guardada es tuya, dónde quedaste es de ese
+//     computador. Entrar desde uno nuevo abre limpio, con todas tus vistas
+//     disponibles en el desplegable.
+//
+// El agrupamiento no cambia: por usuario y por pantalla (cada proyecto por su
+// lado, Mis Tareas por el suyo). Antes eso vivía en la CLAVE de localStorage;
+// ahora son las columnas `usuario_id` y `contexto`.
 
 /** Contexto = id del proyecto, o 'mis-tareas'. */
 type ContextoVista = string
 
-export const claveGuardados = (usuarioId: string, contexto: ContextoVista) =>
-  `planificador.filtros.${usuarioId}.${contexto}`
-
 const claveActiva = (usuarioId: string, contexto: ContextoVista) =>
   `planificador.vistaActiva.${usuarioId}.${contexto}`
 
-export function leerGuardados(usuarioId: string, contexto: ContextoVista): FiltroGuardado[] {
-  try {
-    const raw = localStorage.getItem(claveGuardados(usuarioId, contexto))
-    return raw ? (JSON.parse(raw) as FiltroGuardado[]) : []
-  } catch {
-    return []
-  }
+/**
+ * Las vistas de ESA pantalla, para ESE usuario. Salen del estado ya cargado
+ * —no se leen bajo demanda al abrir el desplegable—: en Supabase la RLS solo
+ * entrega las propias, y el filtro por `usuarioId` mantiene la regla también
+ * en modo Local, donde el estado es uno solo para todos.
+ */
+export function leerGuardados(
+  state: AppState | null,
+  usuarioId: string,
+  contexto: ContextoVista,
+): FiltroGuardado[] {
+  if (!state) return []
+  return state.vistas.filter((v) => v.usuarioId === usuarioId && v.contexto === contexto)
 }
 
 function leerVistaActiva(usuarioId: string, contexto: ContextoVista): string | null {
@@ -75,10 +91,14 @@ const VACIO: EstadoVista = { filtro: {}, orden: [], vistaActivaId: null }
  * Si la vista activa ya no existe (se borró desde otra pestaña), se entra
  * limpio y se olvida la referencia.
  */
-export function estadoInicial(usuarioId: string, contexto: ContextoVista): EstadoVista {
+export function estadoInicial(
+  state: AppState | null,
+  usuarioId: string,
+  contexto: ContextoVista,
+): EstadoVista {
   const id = leerVistaActiva(usuarioId, contexto)
   if (!id) return VACIO
-  const vista = leerGuardados(usuarioId, contexto).find((v) => v.id === id)
+  const vista = leerGuardados(state, usuarioId, contexto).find((v) => v.id === id)
   if (!vista) {
     escribirVistaActiva(usuarioId, contexto, null)
     return VACIO

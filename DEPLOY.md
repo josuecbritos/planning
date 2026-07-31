@@ -142,6 +142,19 @@ orden** el contenido de:
     después** (trae el caso nuevo: un admin elimina a un usuario sin
     `auth_id`, y un no-admin no puede).
 
+26. `supabase/migrations/20260707000026_vistas_guardadas.sql` — #289: las
+    vistas guardadas (filtro + orden con nombre) pasan de `localStorage` a la
+    tabla nueva `vista_guardada`, atadas al usuario y al contexto (id de
+    proyecto, o 'mis-tareas'), y siguen a la persona a cualquier computador.
+    RLS habilitada con las cuatro políticas en `usuario_id =
+    usuario_actual_id()` — nadie ve las de nadie, tampoco un admin—; `anon`
+    sin privilegios. NO crea funciones. Va **junto con el front de la misma
+    entrega**: el front nuevo sin la tabla no puede leer ni guardar vistas, y
+    el front viejo con la tabla las sigue guardando en el navegador. **No hay
+    traspaso de lo ya guardado**: cada quien vuelve a crear sus vistas una
+    vez (decisión del pedido). **Correr la compuerta después** (caso nuevo:
+    nadie lee ni modifica las vistas de otro).
+
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
 `supabase link --project-ref TU_REF && supabase db push`. Todo el esquema puede

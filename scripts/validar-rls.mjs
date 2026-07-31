@@ -492,6 +492,77 @@ async function probarBorradoLogicoDeUsuario(admin) {
   await admin.rpc('eliminar_usuario', { p_usuario: id })
 }
 
+// #289 — Las vistas guardadas son privadas: nadie lee ni modifica las de
+// otro, tampoco un admin. La tabla `vista_guardada` no tiene bypass de admin
+// a propósito: una vista es preferencia personal, no dato del proyecto.
+async function probarVistasGuardadas(admin) {
+  const rotulo = 'vistas'
+  const emailOtro = process.env.RLS_CONSULTOR_A_EMAIL ?? process.env.RLS_CLIENTE_EMAIL
+  const passOtro = process.env.RLS_CONSULTOR_A_PASS ?? process.env.RLS_CLIENTE_PASS
+  if (!emailOtro || !passOtro) {
+    console.log('  SKIP  [vistas] sin credenciales no-admin para el caso de #289')
+    return
+  }
+  const otro = await sesion(emailOtro, passOtro)
+  let idAjena = null
+  try {
+    // El ADMIN guarda una vista suya. El dueño lo pone la base (default
+    // `usuario_actual_id()`), no el cliente: no se manda `usuario_id`.
+    const { data: mia, error: errCrear } = await admin
+      .from('vista_guardada')
+      .insert({ contexto: '__prueba_rls_289', nombre: `__prueba_289_${Date.now()}`, filtro: {}, orden: [] })
+      .select()
+      .single()
+    if (errCrear || !mia) {
+      marca(false, rotulo, 'preparación (vista de prueba del admin)', errCrear?.message ?? 'sin fila')
+      return
+    }
+    idAjena = mia.id
+    const { data: yoAdmin } = await admin.from('usuario_visible').select('id').limit(1)
+    marca(!!yoAdmin, rotulo, '#289 el admin puede guardar una vista propia')
+
+    // El OTRO usuario no la ve...
+    const { data: veOtro } = await otro.from('vista_guardada').select('id')
+    marca(
+      !(veOtro ?? []).some((v) => v.id === idAjena),
+      rotulo,
+      '#289 otro usuario NO ve la vista ajena',
+      (veOtro ?? []).some((v) => v.id === idAjena) ? 'FUGA' : `${veOtro?.length ?? 0} propias`,
+    )
+    // ...ni la renombra ni la borra.
+    marca(
+      bloqueado(await otro.from('vista_guardada').update({ nombre: 'HACKEADA' }).eq('id', idAjena).select('id')),
+      rotulo, '#289 otro usuario NO puede modificar la vista ajena',
+    )
+    marca(
+      bloqueado(await otro.from('vista_guardada').delete().eq('id', idAjena).select('id')),
+      rotulo, '#289 otro usuario NO puede borrar la vista ajena',
+    )
+    // Y no puede crear una a nombre de otro: la política `with check` manda,
+    // no el `usuario_id` que venga del cliente.
+    const { data: yoOtro } = await otro.auth.getUser()
+    const { data: perfilOtro } = await otro.from('usuario_visible').select('id').eq('auth_id', yoOtro.user.id).maybeSingle()
+    const { data: adminRow } = await admin.from('vista_guardada').select('usuario_id').eq('id', idAjena).single()
+    if (perfilOtro && adminRow && perfilOtro.id !== adminRow.usuario_id) {
+      marca(
+        bloqueado(
+          await otro
+            .from('vista_guardada')
+            .insert({ usuario_id: adminRow.usuario_id, contexto: '__prueba_rls_289', nombre: 'Suplantada' })
+            .select('id'),
+        ),
+        rotulo, '#289 nadie puede crear una vista a nombre de otro',
+      )
+    }
+    // La vista sigue intacta para su dueño.
+    const { data: sigue } = await admin.from('vista_guardada').select('nombre').eq('id', idAjena).maybeSingle()
+    marca(!!sigue && !sigue.nombre.includes('HACKEADA'), rotulo, '#289 la vista del dueño queda intacta', sigue?.nombre ?? 'desapareció')
+  } finally {
+    if (idAjena) await admin.from('vista_guardada').delete().eq('id', idAjena)
+    await otro.auth.signOut()
+  }
+}
+
 async function limpiarProyectosDePrueba(admin) {
   if (!admin) return
   const { data: previos } = await admin.from('proyecto').select('id').like('nombre', '__prueba_rls_%')
@@ -792,6 +863,9 @@ async function main() {
 
   // ---------- #286: el borrado lógico de usuarios funciona y sigue acotado ----------
   await probarBorradoLogicoDeUsuario(admin)
+
+  // ---------- #289: las vistas guardadas son privadas ----------
+  await probarVistasGuardadas(admin)
 
   // ---------- #255: el canal de tiempo real ----------
   await probarCanalTiempoReal(admin)

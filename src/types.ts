@@ -1,3 +1,4 @@
+import type { VistaGuardada } from './lib/filtros'
 // Modelo de datos. Lo comparten los dos backends —memoria y Supabase—, así que
 // es el contrato entre la interfaz y `data/`. Las fechas se manejan como
 // 'YYYY-MM-DD' (Date sin hora) para evitar desfases de zona horaria.
@@ -204,6 +205,9 @@ export interface AppState {
   accesos: Acceso[]
   comentarios: Comentario[]
   notificaciones: Notificacion[]
+  /** #289: vistas guardadas del usuario en sesión (la RLS solo entrega las
+   *  suyas). Viajan con el resto del estado, no se leen bajo demanda. */
+  vistas: VistaGuardada[]
 }
 
 // ---- Estados derivados ----

@@ -9,7 +9,7 @@ import { contar } from './lib/derive'
 import { esDuenoDe, makeCan, miembrosDeProyecto, puedeCrearProyectos, usuariosVisiblesPara } from './lib/permisos'
 import type { Filtro } from './lib/filtros'
 import { CAMPOS_PROYECTO, type OrdenMulti } from './lib/orden'
-import { escribirVistaActiva, estadoInicial } from './lib/vistas'
+import { escribirVistaActiva, estadoInicial, leerGuardados } from './lib/vistas'
 import * as apply from './data/apply'
 import { suscribirTabla } from './data/tiempoReal'
 import type {
@@ -90,6 +90,12 @@ export interface Actions {
   actualizarPerfil: (patch: PatchUsuario) => Promise<void>
   /** #137: marca todas las notificaciones del usuario actual como leídas. */
   marcarNotificacionesLeidas: () => Promise<void>
+  /** #289: vistas guardadas, ahora en la base. `crearVista` devuelve el id
+   *  que asignó la base (o null si falló), para poder entrar a la recién
+   *  creada como antes. */
+  crearVista: (contexto: string, nombre: string, filtro: Filtro, orden: OrdenMulti) => Promise<string | null>
+  guardarVista: (id: string, patch: { nombre?: string; filtro?: Filtro; orden?: OrdenMulti }) => Promise<void>
+  eliminarVista: (id: string) => Promise<void>
 }
 
 /** Vista de la pantalla de proyecto (punto 3/4): filtro, orden y la vista
@@ -608,6 +614,14 @@ export default function App({ repo }: { repo: Repo }) {
     [esAdmin, state, proyectosMiembro],
   )
 
+  // #289: las vistas guardadas del proyecto abierto. Salen del estado ya
+  // cargado; en Supabase la RLS solo entrega las propias y el filtro por
+  // usuario mantiene la regla también en modo Local.
+  const vistasDeProyecto = useMemo(
+    () => leerGuardados(state, sesion?.id ?? '', proyectoActivoId ?? ''),
+    [state, sesion, proyectoActivoId],
+  )
+
   // #137: mis notificaciones (más recientes primero) y cuántas sin leer.
   // #283: la entrega depende del acceso AL PROYECTO de la tarea — el mismo
   // criterio del resto de la app (admin, dueño o fila de acceso). En Supabase
@@ -846,8 +860,33 @@ export default function App({ repo }: { repo: Repo }) {
           const ids = sesion ? await repo.marcarNotificacionesLeidas(sesion.id) : []
           return (s) => apply.marcarNotificacionesLeidas(s, ids)
         }),
+      // #289 — vistas guardadas. `crearVista` no pasa por `run` porque
+      // necesita devolver el id nuevo a quien la llamó (para entrar a la
+      // vista recién creada); el diagnóstico de sesión se hace igual.
+      crearVista: async (contexto, nombre, filtro, orden) => {
+        try {
+          const v = await repo.createVista({ contexto, nombre, filtro, orden })
+          setState((s) => (s ? apply.upsertVista(s, v) : s))
+          return v.id
+        } catch (e) {
+          const motivo = await auth.diagnosticar().catch(() => null)
+          if (motivo) salirPorSesion(motivo)
+          else setError(mensajeError(e))
+          return null
+        }
+      },
+      guardarVista: (id, patch) =>
+        run(async () => {
+          const v = await repo.updateVista(id, patch)
+          return (s) => apply.upsertVista(s, v)
+        }),
+      eliminarVista: (id) =>
+        run(async () => {
+          await repo.deleteVista(id)
+          return (s) => apply.removeVista(s, id)
+        }),
     }),
-    [repo, run, HOY, sesion],
+    [repo, run, HOY, sesion, auth, salirPorSesion],
   )
 
   const onLogin = useCallback(
@@ -912,7 +951,11 @@ export default function App({ repo }: { repo: Repo }) {
   const sesionId = sesion?.id
   useEffect(() => {
     if (!proyectoActivoId || !sesionId || pantalla !== 'proyectos') return
-    setVistaActiva(estadoInicial(sesionId, proyectoActivoId))
+    setVistaActiva(estadoInicial(stateRef.current, sesionId, proyectoActivoId))
+    // `state` NO va en las dependencias a propósito: la vista de entrada se
+    // resuelve UNA vez al entrar a la pantalla (#221). Que llegue un cambio
+    // de otro no debe reiniciar el filtro que se está usando.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proyectoActivoId, pantalla, sesionId])
 
   // #215: entrar o salir de una vista guardada. Se persiste el id, nunca el
@@ -1324,7 +1367,10 @@ export default function App({ repo }: { repo: Repo }) {
             <div className="content" ref={contentRef}>
               <FiltrosBar
                 contexto={proyecto.id}
-                usuarioId={sesion.id}
+                guardados={vistasDeProyecto}
+                onCrearVista={(nombre, f, o) => actions.crearVista(proyecto.id, nombre, f, o)}
+                onGuardarVista={actions.guardarVista}
+                onEliminarVista={actions.eliminarVista}
                 candidatos={candidatosFiltro}
                 filtro={vistaActiva.filtro}
                 onCambiar={setFiltro}
