@@ -155,6 +155,26 @@ orden** el contenido de:
     vez (decisión del pedido). **Correr la compuerta después** (caso nuevo:
     nadie lee ni modifica las vistas de otro).
 
+27. `supabase/migrations/20260707000027_hoy_chile.sql` — #291: la base y la
+    aplicación pasan a coincidir en qué día es hoy, y ese día es el de
+    **Chile**. La base comparaba contra `current_date` (UTC en Supabase), así
+    que desde las 20:00 de Chile ya creía que era el día siguiente y una tarea
+    de MAÑANA le parecía comprometida: registraba **replanificaciones falsas**,
+    congelaba una fecha original que nunca existió y bloqueaba desplanificar
+    con "No puedes eliminar tareas que ya pasaron". Crea `hoy_chile()` —un
+    único lugar, con la zona por NOMBRE (`America/Santiago`), que resuelve
+    solo el cambio de hora— y redefine las tres funciones vigentes
+    (`registrar_replanificacion`, `normalizar_fechas_tarea`,
+    `desplanificar_tarea`) cambiando **únicamente** `current_date` por
+    `hoy_chile()`. `EXECUTE` cerrado **contra `public`** (#290), con grant
+    explícito a `authenticated` y `service_role`. El orden con el front es
+    indiferente: no hay cambios de front en esta entrega. **Correr la
+    compuerta después** (caso nuevo de la ventana de la tarde).
+    📋 Después de aplicarla, correr
+    `docs/consulta-291-replanificaciones-falsas.sql` en el SQL Editor para
+    listar los registros falsos ya escritos. **Es solo lectura: no borra
+    nada.**
+
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
 `supabase link --project-ref TU_REF && supabase db push`. Todo el esquema puede

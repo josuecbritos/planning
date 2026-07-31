@@ -870,3 +870,63 @@ de guardar y restaurar una vista) en verde.
 funciones nacen ejecutables por `public` y que revocar solo a `anon` no basta.
 Esta migración no crea funciones, así que no la roza; revisar las revocaciones
 ya escritas en migraciones anteriores es trabajo aparte y **no se hizo aquí**.
+
+## #291 — La base y la aplicación no coincidían en qué día es hoy
+
+El navegador calcula "hoy" con la hora local (correcta). La base usaba
+`current_date`, que sigue la zona del servidor — y ninguna migración la fija,
+así que quedaba en el valor por defecto de Supabase: **UTC**. Chile va 4 horas
+detrás en invierno y 3 en verano, de modo que **desde las 20:00 de Chile la
+base ya creía que era el día siguiente**. En esa ventana, una tarea planificada
+para MAÑANA le parecía comprometida y su movimiento se registraba como
+replanificación falsa; además congelaba una fecha original que nunca existió y
+bloqueaba desplanificar con "No puedes eliminar tareas que ya pasaron".
+
+Importa más que un color: el historial de replanificaciones es lo que mide si
+un proyecto se está moviendo. Un registro falso cada tarde ensucia justo esa
+medición y no se nota — parece un dato real.
+
+- **Migración 27 — `hoy_chile()`**: un único lugar que responde qué día es hoy,
+  con la zona por **nombre** (`America/Santiago`), no un desfase fijo — un `-4`
+  escrito a mano volvería a romperse en septiembre. Verificado que resuelve
+  sola el cambio de hora (enero −3, julio −4).
+- **Las tres funciones vigentes** (`registrar_replanificacion`,
+  `normalizar_fechas_tarea` y `desplanificar_tarea`) se redefinen cambiando
+  **únicamente** `current_date` por `hoy_chile()`. Las cuatro comparaciones que
+  el reporte identificó viven ahí. *(El pedido nombra `bloquear_fecha_original`:
+  así se llamaba en las migraciones 1 y 6; desde la 10 la lógica vigente vive
+  en `normalizar_fechas_tarea`.)*
+- **Descartado a propósito**: cambiar la zona horaria de la base entera. Es una
+  línea y arregla las cuatro de golpe, pero es configuración del servidor y no
+  un hecho del código: no viaja en las migraciones y un restablecimiento del
+  proyecto la deja atrás sin que nadie se entere.
+- **EXECUTE cerrado contra `public`** (#290), no solo contra `anon`, con grant
+  explícito a `authenticated` y `service_role`. Hace falta porque
+  `normalizar_fechas_tarea` NO es SECURITY DEFINER: corre con el rol que
+  escribe la tarea. Verificado en el ACL resultante.
+- **No se tocó nada del front**: `hoyISO()` y el navegador ya estaban bien; la
+  desalineada era la base. Tampoco cambia la forma de guardar fechas (siguen
+  siendo días sin hora) ni la regla de replanificación — ahora se aplica bien.
+
+**Verificado contra Postgres 16 con las migraciones 1→27**, y con la suerte de
+que la máquina de pruebas estaba **dentro de la ventana** (UTC ya en el día
+siguiente, Chile todavía no): con `current_date` el caso reproduce **1
+replanificación falsa**; con `hoy_chile()`, **cero**. Además: mover una tarea de
+HOY sí registra (control positivo), desplanificar una de MAÑANA no da error,
+desplanificar una de AYER sigue prohibido, y la fecha original se rehace en vez
+de congelar un compromiso inexistente. Fuera de la ventana ambas fechas
+coinciden, así que de día no cambia nada.
+
+**Datos ya malos — listado pendiente de correr, nada borrado.**
+`docs/consulta-291-replanificaciones-falsas.sql` identifica los registros
+falsos: aquellos en los que, **en hora de Chile**, la fecha anterior todavía era
+futura cuando se escribieron. Es **solo lectura**. Se validó contra datos
+sembrados (marca el registro del caso reportado e ignora uno legítimo del mismo
+día). **No se pudo correr contra la base real desde acá**: el servidor MCP de
+Supabase conectado a esta sesión apunta a otro proyecto. Hay que ejecutarla en
+el SQL Editor y decidir con los números a la vista — tocar el historial es
+tocar el diferenciador del producto, y esa decisión es de Josué.
+
+**La compuerta suma el caso de la ventana**: mover una tarea de mañana no
+registra replanificación y su fecha original se rehace; mover una de hoy sí
+registra; desplanificar una de mañana no da error.

@@ -206,6 +206,31 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
 - La compuerta trae el caso nuevo: otro usuario no ve, no modifica ni borra
   una vista ajena, y no puede crear una a nombre de otro.
 
+**Migración 27 — `20260707000027_hoy_chile.sql` (#291)**
+- La base comparaba las fechas de tarea contra `current_date`, que sigue la
+  zona del servidor — **UTC** en Supabase, porque ninguna migración la fija—.
+  Chile va 4 horas detrás en invierno y 3 en verano, así que **desde las 20:00
+  de Chile la base ya creía que era el día siguiente** y una tarea de MAÑANA le
+  parecía comprometida: registraba replanificaciones falsas, congelaba una
+  fecha original que nunca existió y bloqueaba desplanificar.
+- `hoy_chile()` concentra la respuesta a "qué día es hoy" con la zona por
+  **nombre** (`America/Santiago`), no un desfase fijo: el cambio de hora lo
+  resuelve sola (verificado: enero −3, julio −4). Las tres funciones vigentes
+  la usan; no se repite la conversión.
+- **Descartado a propósito**: cambiar la zona horaria de la base entera. Es
+  configuración del servidor, no viaja en las migraciones y un restablecimiento
+  del proyecto la deja atrás sin que nadie se entere.
+- **EXECUTE cerrado contra `public`**, no solo contra `anon` — es el error que
+  documenta #290 y que aquí no se repite: `hoy_chile()` y
+  `desplanificar_tarea()` quedan con grant explícito a `authenticated` y
+  `service_role`, y `registrar_replanificacion()` solo para su dueño.
+  `normalizar_fechas_tarea` NO es SECURITY DEFINER (corre con el rol que
+  escribe la tarea), por eso `authenticated` necesita el EXECUTE de
+  `hoy_chile()`.
+- La compuerta trae el caso de la ventana: mover una tarea de MAÑANA no
+  registra replanificación y su fecha original se rehace; mover una de HOY sí
+  registra; desplanificar una de mañana no da error.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.
