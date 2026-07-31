@@ -11,9 +11,20 @@
 -- registrado como replanificación. Un registro es falso si, **en hora de
 -- Chile**, la fecha anterior todavía era futura cuando se escribió.
 --
--- QUÉ HACER CON EL RESULTADO: nada todavía. El historial de
--- replanificaciones es el diferenciador del producto; qué se hace con los
--- registros falsos lo decide Josué con los números a la vista.
+-- RESULTADO CONTRA LA BASE REAL (31-jul-2026, con la migración 27 ya
+-- aplicada): **2 registros falsos sobre 16** en todo el historial.
+--
+-- DECISIÓN TOMADA: **no se corrige el histórico.** Basta con que la regla
+-- funcione de aquí en adelante, que es lo que asegura la migración 27.
+-- Los 2 registros quedan donde están; esta consulta se conserva por si
+-- alguna vez se quiere revisar cuáles son (consultas 2 y 3).
+--
+-- CONSECUENCIA QUE HAY QUE SABER: las 2 tareas afectadas arrastran además
+-- una FECHA ORIGINAL equivocada, y **no se va a arreglar sola**.
+-- `normalizar_fechas_tarea` solo rehace la fecha original mientras la
+-- tarea NO tenga replanificaciones; con un registro falso encima, ese
+-- camino queda cerrado para siempre. Esas 2 tareas van a mostrar un
+-- **atraso mayor al real** mientras existan. Son 2 de 16: se asumió.
 -- =====================================================================
 
 -- 1 · Cuántas son.

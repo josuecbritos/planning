@@ -76,6 +76,14 @@ Lo que se compara cambió; **cómo se guardan las fechas no**: siguen siendo dí
 sin hora, y la regla de que solo cuenta como replanificación mover una tarea
 comprometida queda entera — ahora se aplica bien.
 
+*Lo que quedó escrito antes de la corrección no se tocó:* medido el
+31-jul-2026, el historial tenía **2 replanificaciones falsas sobre 16**, y se
+decidió dejarlas. Consecuencia a tener presente: esas 2 tareas arrastran una
+fecha original que nunca fue un compromiso y por eso muestran un **atraso mayor
+al real**; no se corrige sola, porque la fecha original solo se rehace mientras
+la tarea no tenga replanificaciones. Cuáles son se puede volver a consultar con
+`docs/consulta-291-replanificaciones-falsas.sql`.
+
 **Eliminar un usuario es un borrado LÓGICO y va por RPC (#136/#286).** Eliminar
 marca `activo = false` y `eliminado = true`: la persona desaparece de la
 interfaz —eliminado es distinto de desactivado: no reaparece ni con "ver
