@@ -64,6 +64,18 @@ del principio: hace todo en cualquier proyecto.
 **Los permisos se hacen cumplir en la base de datos** (RLS + triggers), no solo
 en la interfaz. Ver `SEGURIDAD.md`.
 
+**"Hoy" es el día de Chile, para la aplicación y para la base (#291).** El
+navegador siempre usó la hora local; la base usaba `current_date`, que en
+Supabase es UTC, así que desde las 20:00 de Chile creía que era el día
+siguiente: una tarea de MAÑANA le parecía comprometida y su movimiento quedaba
+registrado como replanificación falsa —además de congelar una fecha original
+que nunca existió y de impedir desplanificarla—. Desde la migración 27 las
+cuatro comparaciones de la base pasan por `hoy_chile()`, un único lugar que usa
+la zona por **nombre** (`America/Santiago`) y resuelve solo el cambio de hora.
+Lo que se compara cambió; **cómo se guardan las fechas no**: siguen siendo días
+sin hora, y la regla de que solo cuenta como replanificación mover una tarea
+comprometida queda entera — ahora se aplica bien.
+
 **Eliminar un usuario es un borrado LÓGICO y va por RPC (#136/#286).** Eliminar
 marca `activo = false` y `eliminado = true`: la persona desaparece de la
 interfaz —eliminado es distinto de desactivado: no reaparece ni con "ver

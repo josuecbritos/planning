@@ -563,6 +563,99 @@ async function probarVistasGuardadas(admin) {
   }
 }
 
+// #291 — La base y la aplicación coinciden en qué día es hoy, y ese día es
+// el de Chile. Antes la base usaba `current_date` (UTC en Supabase), así que
+// desde las 20:00 de Chile ya creía que era el día siguiente y una tarea de
+// MAÑANA le parecía comprometida: registraba replanificaciones falsas.
+//
+// El caso corre a cualquier hora y es correcto siempre; dentro de la ventana
+// de la tarde es cuando de verdad muerde (sin la migración 27, ahí falla).
+// Se apoya en `hoy_chile()` para no depender de la hora de la máquina que
+// corre la compuerta.
+async function probarDiaDeChile(admin) {
+  const rotulo = 'fecha'
+  const { data: hoyChile, error: errHoy } = await admin.rpc('hoy_chile')
+  if (errHoy || !hoyChile) {
+    marca(false, rotulo, '#291 la base sabe qué día es hoy en Chile (hoy_chile)', errHoy?.message ?? 'sin dato')
+    return
+  }
+  const dia = (n) => {
+    const d = new Date(`${hoyChile}T12:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + n)
+    return d.toISOString().slice(0, 10)
+  }
+  // Informativo: ¿estamos dentro de la ventana? (la base en UTC ya cambió de
+  // día pero en Chile todavía no).
+  const { data: fila } = await admin.from('proyecto').select('id').limit(1)
+  void fila
+  marca(true, rotulo, `#291 hoy en Chile según la base: ${hoyChile}`, '')
+
+  const { data: proy, error: errProy } = await admin
+    .from('proyecto').insert({ nombre: `__prueba_rls_291_${Date.now()}` }).select().single()
+  if (errProy) {
+    marca(false, rotulo, 'preparación (proyecto de prueba)', errProy.message)
+    return
+  }
+  const { data: fr } = await admin
+    .from('frente').insert({ proyecto_id: proy.id, nombre: 'tz', orden: 0 }).select().single()
+  const { data: sf } = await admin
+    .from('sub_frente').insert({ frente_id: fr.id, nombre: 'tz', orden: 0 }).select().single()
+
+  // (1) Tarea de MAÑANA en Chile: moverla NO es replanificación.
+  const { data: tManana, error: errT1 } = await admin
+    .from('tarea')
+    .insert({ sub_frente_id: sf.id, titulo: 'tz manana', fecha_objetivo: dia(1), orden: 0 })
+    .select().single()
+  if (errT1) {
+    marca(false, rotulo, 'preparación (tarea de mañana)', errT1.message)
+    return
+  }
+  await admin.from('tarea').update({ fecha_objetivo: dia(7) }).eq('id', tManana.id)
+  const { data: hManana } = await admin.from('replanificacion').select('id').eq('tarea_id', tManana.id)
+  marca(
+    (hManana ?? []).length === 0,
+    rotulo,
+    '#291 mover una tarea de MAÑANA no registra replanificación (ventana de la tarde)',
+    (hManana ?? []).length ? `FALSO POSITIVO: ${hManana.length} registro(s)` : 'historial vacío',
+  )
+  // Y su fecha comprometida original se REHACE (no conserva un compromiso
+  // que nunca existió).
+  const { data: tRehecha } = await admin
+    .from('tarea').select('fecha_objetivo, fecha_original').eq('id', tManana.id).single()
+  marca(
+    tRehecha?.fecha_original === dia(7),
+    rotulo,
+    '#291 y su fecha original se rehace, no se congela una que no existió',
+    `original=${tRehecha?.fecha_original} objetivo=${tRehecha?.fecha_objetivo}`,
+  )
+
+  // (2) Control positivo: tarea de HOY en Chile → SÍ es replanificación.
+  const { data: tHoy } = await admin
+    .from('tarea')
+    .insert({ sub_frente_id: sf.id, titulo: 'tz hoy', fecha_objetivo: hoyChile, orden: 1 })
+    .select().single()
+  await admin.from('tarea').update({ fecha_objetivo: dia(7) }).eq('id', tHoy.id)
+  const { data: hHoy } = await admin.from('replanificacion').select('id').eq('tarea_id', tHoy.id)
+  marca(
+    (hHoy ?? []).length === 1,
+    rotulo,
+    '#291 mover una tarea de HOY sí queda registrada, como siempre',
+    `${(hHoy ?? []).length} registro(s)`,
+  )
+
+  // (3) Desplanificar una tarea de MAÑANA no da el error falso.
+  const { data: tDes } = await admin
+    .from('tarea')
+    .insert({ sub_frente_id: sf.id, titulo: 'tz desplan', fecha_objetivo: dia(1), orden: 2 })
+    .select().single()
+  const { error: errDes } = await admin.rpc('desplanificar_tarea', {
+    p_tarea: tDes.id,
+    p_actor: null,
+  })
+  marca(!errDes, rotulo, '#291 desplanificar una tarea de MAÑANA no da error', errDes?.message ?? '')
+  // (el barrido de proyectos de prueba se lleva todo esto)
+}
+
 async function limpiarProyectosDePrueba(admin) {
   if (!admin) return
   const { data: previos } = await admin.from('proyecto').select('id').like('nombre', '__prueba_rls_%')
@@ -866,6 +959,9 @@ async function main() {
 
   // ---------- #289: las vistas guardadas son privadas ----------
   await probarVistasGuardadas(admin)
+
+  // ---------- #291: la base y la app coinciden en qué día es hoy ----------
+  await probarDiaDeChile(admin)
 
   // ---------- #255: el canal de tiempo real ----------
   await probarCanalTiempoReal(admin)
