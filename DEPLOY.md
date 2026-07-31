@@ -168,9 +168,10 @@ orden** el contenido de:
     `desplanificar_tarea`) cambiando **únicamente** `current_date` por
     `hoy_chile()`. `EXECUTE` cerrado **contra `public`** (#290), con grant
     explícito a `authenticated` y `service_role`. El orden con el front es
-    indiferente: no hay cambios de front en esta entrega. **Correr la
-    compuerta después** (caso nuevo de la ventana de la tarde).
-    📋 Ya aplicada y verificada (31-jul-2026). Se corrió
+    indiferente: no hay cambios de front en esta entrega.
+    ✅ **Aplicada y con la compuerta corrida en verde** (31-jul-2026),
+    incluido el caso nuevo de la ventana de la tarde.
+    📋 Se corrió además
     `docs/consulta-291-replanificaciones-falsas.sql` en el SQL Editor —solo
     lectura, no borra nada—: **2 registros falsos sobre 16**. Se decidió **no
     corregir el histórico**; el detalle y su consecuencia (esas 2 tareas
