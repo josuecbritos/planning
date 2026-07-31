@@ -66,6 +66,18 @@ export interface FiltroGuardado {
   orden?: OrdenMulti
 }
 
+/**
+ * #289: la misma vista, tal como vive en la base — con su dueño y su
+ * contexto (id de proyecto, o 'mis-tareas'). Antes vivía en localStorage y
+ * esos dos datos estaban en la CLAVE; ahora son columnas. El front sigue
+ * trabajando con `FiltroGuardado` a secas: `usuarioId`/`contexto` solo
+ * sirven para elegir cuáles corresponden a la pantalla que se está viendo.
+ */
+export interface VistaGuardada extends FiltroGuardado {
+  usuarioId: string
+  contexto: string
+}
+
 export const FECHA_RELATIVA_LABEL: Record<FechaRelativa, string> = {
   hoy: 'Hoy',
   proxHabil: 'Próximo día hábil',

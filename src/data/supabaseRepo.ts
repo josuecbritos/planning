@@ -11,6 +11,7 @@ import type {
   Tarea,
   Usuario,
 } from '../types'
+import type { VistaGuardada } from '../lib/filtros'
 import { getClient } from './client'
 import { derivarIniciales } from './repo'
 import type {
@@ -22,6 +23,8 @@ import type {
   PatchProyecto,
   PatchTarea,
   PatchUsuario,
+  NuevaVista,
+  PatchVista,
   Repo,
 } from './repo'
 
@@ -86,6 +89,12 @@ const toReplan = (r: Row): Replanificacion => ({
   cambiadoPor: r.cambiado_por ?? '',
   timestamp: r.timestamp,
 })
+// #289: `filtro` y `orden` viajan como jsonb — es la forma que el front ya
+// serializaba en localStorage, así que no hay traducción que hacer.
+const toVista = (r: Row): VistaGuardada => ({
+  id: r.id, usuarioId: r.usuario_id, contexto: r.contexto, nombre: r.nombre,
+  filtro: r.filtro ?? {}, orden: r.orden ?? [],
+})
 const toNotificacion = (r: Row): Notificacion => ({
   id: r.id, usuarioId: r.usuario_id, tipo: r.tipo, tareaId: r.tarea_id,
   autorId: r.autor_id ?? undefined, dato: r.dato ?? undefined, leida: r.leida, creada: r.creada,
@@ -103,7 +112,7 @@ export class SupabaseRepo implements Repo {
   setActor(): void {}
 
   async loadState(): Promise<AppState> {
-    const [u, p, f, sf, t, h, a, c, n] = await Promise.all([
+    const [u, p, f, sf, t, h, a, c, n, v] = await Promise.all([
       // Vista con email/permisos enmascarados (seguridad §3): la tabla base ya
       // no permite SELECT directo desde el cliente.
       this.db.from('usuario_visible').select('*').order('nombre'),
@@ -116,6 +125,9 @@ export class SupabaseRepo implements Repo {
       this.db.from('comentario').select('*').order('timestamp'),
       // #137: RLS entrega solo las notificaciones del usuario actual.
       this.db.from('notificacion').select('*').order('creada', { ascending: false }),
+      // #289: idem para las vistas guardadas — la política es
+      // `usuario_id = usuario_actual_id()`, así que nunca llegan ajenas.
+      this.db.from('vista_guardada').select('*').order('creada', { ascending: true }),
     ])
     return {
       usuarios: unwrap(u).map(toUsuario),
@@ -127,6 +139,7 @@ export class SupabaseRepo implements Repo {
       accesos: unwrap(a).map(toAcceso),
       comentarios: unwrap(c).map(toComentario),
       notificaciones: unwrap(n).map(toNotificacion),
+      vistas: unwrap(v).map(toVista),
     }
   }
 
@@ -383,6 +396,38 @@ export class SupabaseRepo implements Repo {
       await this.db.from('comentario').update({ texto: texto.trim() }).eq('id', id).select().single(),
     )
     return toComentario(row)
+  }
+
+  // -- #289: vistas guardadas --
+  // El dueño NO viaja desde el cliente: la columna tiene por defecto
+  // `usuario_actual_id()` (migración 26) y la política `with check` comprueba
+  // que sea uno mismo. Mismo criterio que el autor del historial (#244) y de
+  // las notificaciones: sale de la sesión, nunca de la interfaz.
+  async createVista(input: NuevaVista): Promise<VistaGuardada> {
+    const row = unwrap(
+      await this.db
+        .from('vista_guardada')
+        .insert({
+          contexto: input.contexto,
+          nombre: input.nombre,
+          filtro: input.filtro,
+          orden: input.orden ?? [],
+        })
+        .select()
+        .single(),
+    )
+    return toVista(row)
+  }
+  async updateVista(id: string, patch: PatchVista): Promise<VistaGuardada> {
+    const upd: Row = {}
+    if ('nombre' in patch) upd.nombre = patch.nombre
+    if ('filtro' in patch) upd.filtro = patch.filtro
+    if ('orden' in patch) upd.orden = patch.orden ?? []
+    const row = unwrap(await this.db.from('vista_guardada').update(upd).eq('id', id).select().single())
+    return toVista(row)
+  }
+  async deleteVista(id: string): Promise<void> {
+    unwrap(await this.db.from('vista_guardada').delete().eq('id', id).select())
   }
 
   async marcarNotificacionesLeidas(usuarioId: string): Promise<string[]> {

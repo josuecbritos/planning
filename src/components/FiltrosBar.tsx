@@ -12,14 +12,14 @@ import {
   type FiltroGuardado,
 } from '../lib/filtros'
 import type { CampoOrden, CampoOrdenOpc, Direccion, OrdenMulti } from '../lib/orden'
-import { claveGuardados, coincideConVista, leerGuardados } from '../lib/vistas'
+import { coincideConVista } from '../lib/vistas'
 import { TextPromptModal } from './TextPromptModal'
 import { Avatar } from './RespPicker'
 
 // Barra de filtros + orden guardables (puntos 3 y 4): Fecha Objetivo,
 // Responsable y Estado con multi-seleccion, mas un menu "Ordenar" multinivel
 // (reglas campo + direccion). Filtro y orden se guardan juntos como una sola
-// "vista", privada por usuario y por proyecto (localStorage): se aplican desde
+// "vista", privada por usuario y por proyecto (en la base desde #289): se aplican desde
 // el desplegable y pueden actualizarse, renombrarse y eliminarse.
 
 const ESTADOS: Categoria[] = ['hecha', 'pendiente', 'pendiente_replan', 'atrasada', 'atrasada_replan']
@@ -33,16 +33,18 @@ const ESTADO_COLOR: Record<Categoria, string> = {
 // #279: "Próximo día hábil" va después de "Hoy", como pide el pedido.
 const RELATIVAS: FechaRelativa[] = ['hoy', 'proxHabil', 'semana', 'proxima', 'mes']
 
-function uid(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
-  return 'f-' + Math.floor(Math.random() * 1e9).toString(36)
-}
-
 interface Props {
   /** Contexto de guardado: el id del proyecto, o 'mis-tareas' (los filtros
    *  guardados son privados por usuario Y por contexto; no se mezclan). */
   contexto: string
-  usuarioId: string
+  /** #289: las vistas de ESTA pantalla, ya filtradas por usuario y contexto.
+   *  Vienen del estado cargado (base de datos), no de localStorage. */
+  guardados: FiltroGuardado[]
+  /** #289: guardar/renombrar/actualizar/eliminar pasan por el repositorio.
+   *  La barra ya no persiste nada por su cuenta. */
+  onCrearVista: (nombre: string, filtro: Filtro, orden: OrdenMulti) => Promise<string | null>
+  onGuardarVista: (id: string, patch: { nombre?: string; filtro?: Filtro; orden?: OrdenMulti }) => void
+  onEliminarVista: (id: string) => void
   /** Personas filtrables. Ausente = el campo Responsable no aplica. */
   candidatos?: Usuario[]
   /** Proyectos filtrables. Ausente = el campo Proyecto no aplica. */
@@ -68,7 +70,10 @@ interface Props {
 
 export function FiltrosBar({
   contexto,
-  usuarioId,
+  guardados,
+  onCrearVista,
+  onGuardarVista,
+  onEliminarVista,
   candidatos,
   proyectos,
   filtro,
@@ -82,22 +87,7 @@ export function FiltrosBar({
   stale = false,
   onActualizarVista,
 }: Props) {
-  const clave = claveGuardados(usuarioId, contexto)
-  const [guardados, setGuardados] = useState<FiltroGuardado[]>([])
   const [modal, setModal] = useState<{ tipo: 'guardar' } | { tipo: 'renombrar'; id: string; nombre: string } | null>(null)
-
-  useEffect(() => {
-    setGuardados(leerGuardados(usuarioId, contexto))
-  }, [usuarioId, contexto])
-
-  function persistir(lista: FiltroGuardado[]) {
-    setGuardados(lista)
-    try {
-      localStorage.setItem(clave, JSON.stringify(lista))
-    } catch {
-      /* sin storage: los guardados viven solo en esta sesion */
-    }
-  }
 
   const activo = !filtroVacio(filtro)
   const ordenActivo = orden.length > 0
@@ -483,7 +473,7 @@ export function FiltrosBar({
               data-tip="Actualizar con el filtro y orden actuales"
               aria-label={`Actualizar ${g.nombre}`}
               disabled={!activo && !ordenActivo}
-              onClick={() => persistir(guardados.map((x) => (x.id === g.id ? { ...x, filtro, orden } : x)))}
+              onClick={() => onGuardarVista(g.id, { filtro, orden })}
             >
               💾
             </button>
@@ -502,7 +492,7 @@ export function FiltrosBar({
               onClick={() => {
                 // #141: confirmar antes de borrar una vista guardada.
                 if (confirm(`¿Eliminar la vista guardada "${g.nombre}"?`)) {
-                  persistir(guardados.filter((x) => x.id !== g.id))
+                  onEliminarVista(g.id)
                   // #215: si se borra la que estaba activa, los filtros se
                   // quedan tal cual —nadie pidió cambiarlos— pero pasan a ser
                   // temporales: al salir y volver se entra limpio.
@@ -539,9 +529,11 @@ export function FiltrosBar({
             // #215: guardar una vista nueva te deja DENTRO de ella. Es el acto
             // deliberado de "esto quiero que quede"; quedar fuera de lo que
             // acabas de guardar sería desconcertante.
-            const nueva = { id: uid(), nombre, filtro, orden }
-            persistir([...guardados, nueva])
-            onVistaActiva?.(nueva.id)
+            // #289: el id lo asigna la base; se entra a la vista recién
+            // creada solo si el guardado salió bien.
+            void onCrearVista(nombre, filtro, orden).then((id) => {
+              if (id) onVistaActiva?.(id)
+            })
           }}
           onClose={() => setModal(null)}
         />
@@ -551,7 +543,7 @@ export function FiltrosBar({
           titulo="Renombrar filtro"
           label="Nuevo nombre"
           valorInicial={modal.nombre}
-          onSubmit={(nombre) => persistir(guardados.map((x) => (x.id === modal.id ? { ...x, nombre } : x)))}
+          onSubmit={(nombre) => onGuardarVista(modal.id, { nombre })}
           onClose={() => setModal(null)}
         />
       )}

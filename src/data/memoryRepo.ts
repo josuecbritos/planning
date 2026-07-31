@@ -1,4 +1,5 @@
 import type { Acceso, AppState, Comentario, Frente, PermisosTareas, Proyecto, Replanificacion, SubFrente, TipoNotificacion, Tarea, Usuario } from '../types'
+import type { VistaGuardada } from '../lib/filtros'
 import { hoyISO } from '../lib/dates'
 import { idsMencionados } from '../lib/menciones'
 import { DEFAULT_PERMISOS_PROYECTO, defaultPermisosTareas } from '../lib/permisos'
@@ -13,6 +14,8 @@ import type {
   PatchProyecto,
   PatchTarea,
   PatchUsuario,
+  NuevaVista,
+  PatchVista,
   Repo,
 } from './repo'
 
@@ -103,6 +106,8 @@ function migrarRoles(s: AppState) {
   }
   // #137: estados previos no traen la lista de notificaciones.
   if (!Array.isArray(s.notificaciones)) s.notificaciones = []
+  // #289: estados previos no traen las vistas guardadas.
+  if (!Array.isArray(s.vistas)) s.vistas = []
   // Consultor de demo + su proyecto propio (para ejercitar dueño vs invitado).
   if (!s.usuarios.some((u) => u.rol === 'consultor')) {
     const demo = initialState.usuarios.find((u) => u.id === 'u-consultor')
@@ -551,6 +556,35 @@ export class MemoryRepo implements Repo {
       this.state.proyectos.some((p) => p.id === f.proyectoId && p.duenoId === n.usuarioId) ||
       this.state.accesos.some((a) => a.usuarioId === n.usuarioId && a.proyectoId === f.proyectoId)
     )
+  }
+
+  // -- #289: vistas guardadas. El dueño sale del actor de la sesión, nunca
+  //    de la interfaz — mismo criterio que en Supabase, donde sale del JWT.
+  async createVista(input: NuevaVista): Promise<VistaGuardada> {
+    const v: VistaGuardada = {
+      id: uid(),
+      usuarioId: this.actorId ?? '',
+      contexto: input.contexto,
+      nombre: input.nombre,
+      filtro: input.filtro,
+      orden: input.orden ?? [],
+    }
+    this.state.vistas.push(v)
+    this.persist()
+    return clone(v)
+  }
+  async updateVista(id: string, patch: PatchVista): Promise<VistaGuardada> {
+    const v = this.state.vistas.find((x) => x.id === id)
+    if (!v) throw new Error('Vista no encontrada')
+    if ('nombre' in patch && patch.nombre !== undefined) v.nombre = patch.nombre
+    if ('filtro' in patch && patch.filtro !== undefined) v.filtro = patch.filtro
+    if ('orden' in patch && patch.orden !== undefined) v.orden = patch.orden
+    this.persist()
+    return clone(v)
+  }
+  async deleteVista(id: string): Promise<void> {
+    this.state.vistas = this.state.vistas.filter((x) => x.id !== id)
+    this.persist()
   }
 
   async marcarNotificacionesLeidas(usuarioId: string): Promise<string[]> {

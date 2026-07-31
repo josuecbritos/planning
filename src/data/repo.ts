@@ -1,3 +1,5 @@
+import type { Filtro, VistaGuardada } from '../lib/filtros'
+import type { OrdenMulti } from '../lib/orden'
 import type {
   Acceso,
   AppState,
@@ -72,6 +74,15 @@ export function derivarIniciales(nombre: string): string {
   return nombre.trim().split(/\s+/).filter(Boolean).map((p) => p[0]).join('').slice(0, 2).toUpperCase()
 }
 
+export interface NuevaVista {
+  /** id del proyecto, o 'mis-tareas'. */
+  contexto: string
+  nombre: string
+  filtro: Filtro
+  orden?: OrdenMulti
+}
+export type PatchVista = Partial<Pick<VistaGuardada, 'nombre' | 'filtro' | 'orden'>>
+
 export interface Repo {
   /** Nombre corto del backend activo, para mostrar en la UI. */
   readonly modo: 'memoria' | 'supabase'
@@ -144,6 +155,16 @@ export interface Repo {
    *  siendo un registro. La base marca la hora de edición y comprueba que
    *  quien edita sea el autor (RLS), no solo la interfaz. */
   editComentario(id: string, texto: string): Promise<Comentario>
+
+  // -- #289: vistas guardadas (viven en la base, atadas al usuario) --
+
+  /** Crea una vista para el usuario en sesión, en ese contexto (id de
+   *  proyecto o 'mis-tareas'). El dueño lo pone la capa de datos, nunca la
+   *  interfaz: en Supabase sale de la sesión. */
+  createVista(input: NuevaVista): Promise<VistaGuardada>
+  /** Renombra o actualiza el filtro/orden de una vista propia. */
+  updateVista(id: string, patch: PatchVista): Promise<VistaGuardada>
+  deleteVista(id: string): Promise<void>
 
   /** #137: marca como leídas TODAS las notificaciones del usuario actual.
    *  Devuelve los ids afectados (para reflejarlo en el estado local). */

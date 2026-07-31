@@ -127,7 +127,14 @@ completo con creación y edición **inline** (sin formularios).
   marca con un asterisco si tiene cambios sin guardar y sobrevive a recargar.
   Salir de la pantalla —y cambiar de proyecto lo es— descarta todo lo no
   guardado: la regla queda sin excepciones, lo que se guardó explícitamente
-  persiste y lo demás se descarta.
+  persiste y lo demás se descarta. **Las vistas viven en la base (#289)**,
+  atadas al usuario y al contexto (cada proyecto por su lado, Mis Tareas por
+  el suyo), y **siguen a la persona a cualquier computador**; cada quien ve
+  solo las suyas, ni siquiera un admin ve las ajenas. Viajan con el resto del
+  estado al abrir la aplicación, no se leen al abrir el desplegable. Lo que
+  SIGUE siendo de cada máquina, a propósito: **en qué vista estabas** —entrar
+  desde un computador nuevo abre limpio, con todas las vistas disponibles—,
+  el tema y el modo/ancho de la barra lateral.
 - **Gantt** (grilla tipo Excel): planificación por clics, horizonte configurable,
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
 

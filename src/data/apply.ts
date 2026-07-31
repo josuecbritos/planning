@@ -1,3 +1,4 @@
+import type { VistaGuardada } from '../lib/filtros'
 import type {
   Acceso,
   AppState,
@@ -45,6 +46,15 @@ export function removeUsuario(s: AppState, usuarioId: string): AppState {
 }
 
 /** #137: marca como leídas las notificaciones con los ids dados. */
+/** #289: alta o actualización de una vista guardada propia. */
+export function upsertVista(s: AppState, v: VistaGuardada): AppState {
+  const i = s.vistas.findIndex((x) => x.id === v.id)
+  return { ...s, vistas: i >= 0 ? s.vistas.map((x) => (x.id === v.id ? v : x)) : [...s.vistas, v] }
+}
+export function removeVista(s: AppState, id: string): AppState {
+  return { ...s, vistas: s.vistas.filter((v) => v.id !== id) }
+}
+
 export function marcarNotificacionesLeidas(s: AppState, ids: string[]): AppState {
   if (ids.length === 0) return s
   const set = new Set(ids)
