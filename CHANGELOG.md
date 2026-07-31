@@ -917,15 +917,18 @@ desplanificar una de AYER sigue prohibido, y la fecha original se rehace en vez
 de congelar un compromiso inexistente. Fuera de la ventana ambas fechas
 coinciden, así que de día no cambia nada.
 
-**Datos ya malos — listado pendiente de correr, nada borrado.**
+**Datos ya malos — medidos y asumidos.**
 `docs/consulta-291-replanificaciones-falsas.sql` identifica los registros
 falsos: aquellos en los que, **en hora de Chile**, la fecha anterior todavía era
 futura cuando se escribieron. Es **solo lectura**. Se validó contra datos
 sembrados (marca el registro del caso reportado e ignora uno legítimo del mismo
-día). **No se pudo correr contra la base real desde acá**: el servidor MCP de
-Supabase conectado a esta sesión apunta a otro proyecto. Hay que ejecutarla en
-el SQL Editor y decidir con los números a la vista — tocar el historial es
-tocar el diferenciador del producto, y esa decisión es de Josué.
+día). Corrida contra la base real el 31-jul-2026: **2 falsos sobre 16**.
+**Decisión: no se corrige el histórico** — basta con que la regla funcione de
+aquí en adelante. Queda anotado que esas 2 tareas arrastran además una fecha
+original equivocada que **no se arregla sola** (`normalizar_fechas_tarea` solo
+rehace la fecha original mientras la tarea no tenga replanificaciones, y el
+registro falso cierra ese camino), así que van a mostrar un atraso mayor al
+real mientras existan.
 
 **La compuerta suma el caso de la ventana**: mover una tarea de mañana no
 registra replanificación y su fecha original se rehace; mover una de hoy sí

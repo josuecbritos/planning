@@ -170,10 +170,11 @@ orden** el contenido de:
     explícito a `authenticated` y `service_role`. El orden con el front es
     indiferente: no hay cambios de front en esta entrega. **Correr la
     compuerta después** (caso nuevo de la ventana de la tarde).
-    📋 Después de aplicarla, correr
-    `docs/consulta-291-replanificaciones-falsas.sql` en el SQL Editor para
-    listar los registros falsos ya escritos. **Es solo lectura: no borra
-    nada.**
+    📋 Ya aplicada y verificada (31-jul-2026). Se corrió
+    `docs/consulta-291-replanificaciones-falsas.sql` en el SQL Editor —solo
+    lectura, no borra nada—: **2 registros falsos sobre 16**. Se decidió **no
+    corregir el histórico**; el detalle y su consecuencia (esas 2 tareas
+    muestran un atraso mayor al real) quedan en la cabecera de esa consulta.
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
