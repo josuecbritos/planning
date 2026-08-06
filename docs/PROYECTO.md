@@ -158,6 +158,28 @@ completo con creación y edición **inline** (sin formularios).
 - **Gantt** (grilla tipo Excel): planificación por clics, horizonte configurable,
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
 
+**Reordenar tareas arrastrándolas (#293).** En la Tabla y en la Gantt del
+proyecto —solo escritorio— cada fila de tarea tiene un **asa** que aparece al
+pasar el mouse, dentro de la celda del nombre, pegada a su borde izquierdo:
+mismo lugar y mismo aspecto en las dos vistas. Se arrastra desde el asa, no
+desde la fila (la fila está llena de controles, y en la Gantt el clic ya
+significa planificar). Dos movimientos con el mismo gesto: **reordenar dentro
+del sub frente** —lo puede hacer cualquier miembro del proyecto, la misma
+decisión que el orden de frentes y sub frentes— y **mover a otro sub frente**
+(incluso de otro frente, o uno vacío), que exige el permiso `editarTareas` con
+su alcance de siempre; sin él, el otro sub frente no es destino válido y la
+tarea vuelve a su lugar. Durante el arrastre una línea marca dónde va a caer.
+Mover **no cambia nada más** de la tarea —ni fecha, ni responsable, ni
+estado—, no escribe en el historial de replanificaciones y no genera
+notificación: el historial mide compromisos movidos y las notificaciones son
+de alta señal; un cambio de ubicación no es ninguna de las dos cosas. Con un
+orden por criterios o un filtro activo, el arrastre es una edición más sobre
+la **vista congelada**: la tarea queda donde se la soltó, el orden nuevo se
+guarda y se enciende "Actualizar vista" (al tocarlo, los criterios vuelven a
+mandar; el orden manual se ve al limpiarlos). En **Mis Tareas** y en mobile el
+gesto no existe. Las reglas están cerradas **en la base** (migración 28), no
+solo en la pantalla.
+
 **El filtro de fecha filtra y además fija el horizonte (#250).** Son dos efectos
 que van juntos, no uno u otro: deja **las tareas** que cumplen el criterio —con
 la misma regla que la tabla, así que ambas vistas muestran exactamente lo

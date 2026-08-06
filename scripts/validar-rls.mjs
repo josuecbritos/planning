@@ -656,6 +656,149 @@ async function probarDiaDeChile(admin) {
   // (el barrido de proyectos de prueba se lleva todo esto)
 }
 
+// #293 — Mover tareas arrastrando: las reglas del movimiento viven en la
+// base, no solo en la pantalla. Dos reglas distintas para el mismo gesto:
+//   · REORDENAR dentro del sub frente (solo `orden`) es de CUALQUIER
+//     miembro, incluso con el set de permisos VACÍO — la política
+//     tarea_update pasó a ser alcanzable para miembros (espejo de
+//     frente_update, migración 28) y el trigger valida campo a campo.
+//   · MOVER a otro sub frente (`sub_frente_id`) exige `editarTareas` con su
+//     alcance evaluado contra el responsable PREVIO, y solo DENTRO del
+//     mismo proyecto. Antes de la migración 28 el trigger no mencionaba
+//     `sub_frente_id`: cualquier permiso de edición bastaba por vía directa.
+// Además: mover no toca nada más de la tarea, no escribe en el historial de
+// replanificaciones y no genera notificación (sección 6 del pedido).
+async function probarMoverTarea(admin) {
+  const rotulo = 'mover'
+  const email = process.env.RLS_CLIENTE_EMAIL ?? process.env.RLS_CONSULTOR_B_EMAIL
+  const pass = process.env.RLS_CLIENTE_PASS ?? process.env.RLS_CONSULTOR_B_PASS
+  if (!email || !pass) {
+    console.log('  SKIP  [mover] hacen falta RLS_CLIENTE_* (o RLS_CONSULTOR_B_*) para #293')
+    return
+  }
+  const c = await sesion(email, pass)
+  try {
+    const yo = await perfilDe(c)
+    if (!yo) {
+      marca(false, rotulo, 'sesión de la prueba legible')
+      return
+    }
+
+    // Proyecto A (donde pasa todo) y proyecto B (para el rechazo cruzado).
+    const { data: proyA, error: e1 } = await admin
+      .from('proyecto').insert({ nombre: `__prueba_rls_293_${Date.now()}` }).select().single()
+    const { data: proyB, error: e2 } = await admin
+      .from('proyecto').insert({ nombre: `__prueba_rls_293b_${Date.now()}` }).select().single()
+    if (e1 || e2) {
+      marca(false, rotulo, 'preparación (proyectos de prueba)', (e1 ?? e2).message)
+      return
+    }
+    const { data: frA } = await admin
+      .from('frente').insert({ proyecto_id: proyA.id, nombre: 'm1', orden: 0 }).select().single()
+    const { data: sub1 } = await admin
+      .from('sub_frente').insert({ frente_id: frA.id, nombre: 's1', orden: 0 }).select().single()
+    const { data: sub2 } = await admin
+      .from('sub_frente').insert({ frente_id: frA.id, nombre: 's2', orden: 1 }).select().single()
+    const { data: frB } = await admin
+      .from('frente').insert({ proyecto_id: proyB.id, nombre: 'm2', orden: 0 }).select().single()
+    const { data: subAjeno } = await admin
+      .from('sub_frente').insert({ frente_id: frB.id, nombre: 's3', orden: 0 }).select().single()
+    // Miembro de los DOS proyectos; en A con el set de permisos VACÍO (el
+    // trigger de defaults le pone los de su rol al entrar: se pisan).
+    const { error: errAcc } = await admin.from('acceso_proyecto').insert([
+      { usuario_id: yo.id, proyecto_id: proyA.id },
+      { usuario_id: yo.id, proyecto_id: proyB.id },
+    ])
+    if (errAcc) {
+      marca(false, rotulo, 'preparación (membresías)', errAcc.message)
+      return
+    }
+    await admin.from('acceso_proyecto').update({ permisos: {} })
+      .eq('usuario_id', yo.id).eq('proyecto_id', proyA.id)
+
+    const { data: tMia } = await admin
+      .from('tarea')
+      .insert({ sub_frente_id: sub1.id, titulo: 'mia', responsable_id: yo.id, orden: 0 })
+      .select().single()
+    const { data: tAjena } = await admin
+      .from('tarea').insert({ sub_frente_id: sub1.id, titulo: 'ajena', orden: 1 }).select().single()
+
+    // 1 · Miembro con permisos VACÍOS reordena (solo `orden`), también ajenas.
+    const reord = await c.from('tarea').update({ orden: 5 }).eq('id', tAjena.id).select('orden')
+    marca(
+      !bloqueado(reord) && reord.data?.[0]?.orden === 5,
+      rotulo,
+      '#293 un miembro SIN permisos reordena dentro del sub frente',
+      reord.error?.message ?? '',
+    )
+
+    // 2 · ...pero NO mueve de sub frente sin editarTareas.
+    marca(
+      bloqueado(await c.from('tarea').update({ sub_frente_id: sub2.id }).eq('id', tAjena.id).select('id')),
+      rotulo,
+      '#293 sin editarTareas NO se mueve de sub frente',
+    )
+
+    // 3 · Con editarTareas en alcance "asignadas": mueve LO SUYO...
+    await admin.from('acceso_proyecto').update({ permisos: { editarTareas: 'asignadas' } })
+      .eq('usuario_id', yo.id).eq('proyecto_id', proyA.id)
+    const mueve = await c
+      .from('tarea')
+      .update({ sub_frente_id: sub2.id, orden: 0 })
+      .eq('id', tMia.id)
+      .select('sub_frente_id, fecha_objetivo, responsable_id, hecha')
+    marca(
+      !bloqueado(mueve) && mueve.data?.[0]?.sub_frente_id === sub2.id,
+      rotulo,
+      '#293 con editarTareas "asignadas" mueve una tarea PROPIA a otro sub frente',
+      mueve.error?.message ?? '',
+    )
+    // ...sin que el movimiento toque nada más de la tarea.
+    const fila = mueve.data?.[0]
+    marca(
+      !!fila && fila.responsable_id === yo.id && fila.hecha === false && fila.fecha_objetivo == null,
+      rotulo,
+      '#293 mover no cambia fecha, responsable ni estado',
+    )
+
+    // 4 · ...y NO lo ajeno: el alcance se evalúa contra el responsable previo.
+    marca(
+      bloqueado(await c.from('tarea').update({ sub_frente_id: sub2.id }).eq('id', tAjena.id).select('id')),
+      rotulo,
+      '#293 el alcance "asignadas" NO alcanza para mover tareas de otros',
+    )
+
+    // 5 · Ni con permiso se cruza de proyecto (regla nueva del trigger; la
+    //     interfaz solo ofrece el proyecto abierto, la base lo garantiza).
+    marca(
+      bloqueado(await c.from('tarea').update({ sub_frente_id: subAjeno.id }).eq('id', tMia.id).select('id')),
+      rotulo,
+      '#293 una tarea NO se mueve a un sub frente de OTRO proyecto',
+    )
+
+    // 6 · Mover no deja rastro: cero replanificaciones y cero notificaciones
+    //     nuevas (la única esperada es la de asignación del alta).
+    const { data: hist } = await admin.from('replanificacion').select('id').eq('tarea_id', tMia.id)
+    marca(
+      (hist ?? []).length === 0,
+      rotulo,
+      '#293 mover no escribe en el historial de replanificaciones',
+      `${hist?.length ?? 0} registro(s)`,
+    )
+    const { data: notifs } = await admin.from('notificacion').select('tipo').eq('tarea_id', tMia.id)
+    const inesperadas = (notifs ?? []).filter((n) => n.tipo !== 'asignacion')
+    marca(
+      inesperadas.length === 0,
+      rotulo,
+      '#293 mover no genera notificaciones',
+      inesperadas.length ? `aparecieron: ${inesperadas.map((n) => n.tipo).join(',')}` : 'solo la de asignación del alta',
+    )
+    // (el barrido de proyectos de prueba se lleva todo esto)
+  } finally {
+    await c.auth.signOut()
+  }
+}
+
 async function limpiarProyectosDePrueba(admin) {
   if (!admin) return
   const { data: previos } = await admin.from('proyecto').select('id').like('nombre', '__prueba_rls_%')
@@ -962,6 +1105,9 @@ async function main() {
 
   // ---------- #291: la base y la app coinciden en qué día es hoy ----------
   await probarDiaDeChile(admin)
+
+  // ---------- #293: mover tareas arrastrando ----------
+  await probarMoverTarea(admin)
 
   // ---------- #255: el canal de tiempo real ----------
   await probarCanalTiempoReal(admin)

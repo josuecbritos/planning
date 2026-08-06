@@ -15,7 +15,9 @@ import {
 } from '../lib/dates'
 import { colorTarea, fechaVigente, marcasDe } from '../lib/derive'
 import { filtraTareas, pasaFiltroCompleto, rangoDeFecha, type Filtro } from '../lib/filtros'
-import { useVistaCongelada } from '../lib/vistaCongelada'
+import { referenciaEnFoto, useVistaCongelada } from '../lib/vistaCongelada'
+import { enMitadSuperior, useArrastreTareas, type DndTareas } from '../lib/arrastre'
+import { planMoverTarea } from '../lib/mover'
 import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
 import { miembrosDeProyecto, puedeEditarFecha, responsableDeTarea, type Can } from '../lib/permisos'
 import { EmptyFrentes } from './EmptyFrentes'
@@ -90,6 +92,9 @@ interface Props {
   onAbrirTarea: (tareaId: string) => void
   /** #190: presente = Gantt de Mis Tareas (multi-proyecto, sin creación). */
   misTareas?: GanttMisTareas
+  /** #293: miembro del proyecto y en escritorio → asa de arrastre. En Mis
+   *  Tareas no aplica (el pedido lo excluye), venga lo que venga acá. */
+  puedeArrastrar?: boolean
 }
 
 type FilaGantt =
@@ -170,7 +175,7 @@ function ventanaHoy(hoy: ISODate): { desde: ISODate; hasta: ISODate } {
 // Referencia estable para el valor por defecto (ver TableView).
 const SIN_NUEVAS: string[] = []
 
-export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, onCambiarFiltro, snapshotNonce, onStale, actions, onAbrirTarea, misTareas, tareasNuevas = SIN_NUEVAS }: Props) {
+export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, onCambiarFiltro, snapshotNonce, onStale, actions, onAbrirTarea, misTareas, tareasNuevas = SIN_NUEVAS, puedeArrastrar = false }: Props) {
   // #190: en modo Mis Tareas la grilla es de lectura y replanificación —
   // ninguna afordancia de creación (una tarea creada aquí no sería del
   // usuario hasta asignársela, así que aparecería y desaparecería sola).
@@ -270,7 +275,20 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     orden,
     snapshotNonce,
   ])
-  const { congelada, visibleIds, indice, stale } = useVistaCongelada(frescoIds, existentesIds, activo, firma)
+  const { congelada, visibleIds, indice, stale, moverEnFoto } = useVistaCongelada(frescoIds, existentesIds, activo, firma)
+
+  // #293: arrastrar para reordenar / mover de sub frente — la MISMA pieza que
+  // la tabla (`useArrastreTareas`), con el asa en el mismo lugar respecto del
+  // nombre. En Mis Tareas no existe el gesto.
+  const dnd = useArrastreTareas({
+    habilitado: puedeArrastrar && !misTareas,
+    puedeRecibir: (t, subFrenteId) => subFrenteId === t.subFrenteId || can.editarTareas(t),
+    alSoltar: (t, destino) => {
+      if (planMoverTarea(state.tareas, t.id, destino.subFrenteId, destino.antesDeId).length === 0) return
+      if (congelada) moverEnFoto(t.id, referenciaEnFoto(state.tareas, visibleIds, indice, t.id, destino))
+      void actions.moverTarea(t.id, destino.subFrenteId, destino.antesDeId)
+    },
+  })
 
   // #253: aquí se puede crear CON filtro puesto (la tabla esconde su fila de
   // creación mientras se filtra; la grilla no), así que es donde el caso se ve
@@ -717,13 +735,15 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         </div>
       </div>
       <div className="gantt-wrap">
-        <div className="gantt-scroll" ref={scrollRef}>
+        {/* #293: el dragover que llega hasta acá (thead, filas de carga,
+            fondo) no es destino — se apaga el indicador. */}
+        <div className="gantt-scroll" ref={scrollRef} onDragOver={dnd ? dnd.fuera : undefined}>
           {/* 2.1: sin menu contextual del navegador sobre la grilla (el clic
               derecho es el gesto de marcar lista). */}
           {/* #190: `gantt--conproy` activa la columna de proyecto y desplaza
               los anclajes de las columnas congeladas (variable CSS). */}
           <table
-            className={`gantt${misTareas ? ' gantt--conproy' : ''}`}
+            className={`gantt${misTareas ? ' gantt--conproy' : ''}${dnd ? ' gantt--dnd' : ''}`}
             onContextMenu={(e) => e.preventDefault()}
           >
             <thead>
@@ -756,8 +776,26 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
               </tr>
             </thead>
             <tbody>
-              {filas.map((fila, i) => (
+              {filas.map((fila, i) => {
+                // #293: contexto de arrastre de ESTA fila. La hermana visible
+                // siguiente afina "soltar después"; la última del bloque porta
+                // el indicador de "al final".
+                const sig =
+                  fila.tipo === 'tarea' &&
+                  filas[i + 1]?.tipo === 'tarea' &&
+                  (filas[i + 1] as Extract<FilaGantt, { tipo: 'tarea' }>).sub.id === fila.sub.id
+                    ? (filas[i + 1] as Extract<FilaGantt, { tipo: 'tarea' }>).tarea.id
+                    : null
+                const destinoAca =
+                  fila.tipo === 'tarea' && dnd?.destino?.subFrenteId === fila.sub.id
+                    ? dnd.destino
+                    : null
+                return (
                 <FilaGanttRow
+                  dnd={dnd}
+                  dndSiguienteId={sig}
+                  dndDropAntes={fila.tipo === 'tarea' && destinoAca?.antesDeId === fila.tarea.id}
+                  dndDropDespues={fila.tipo === 'tarea' && !!destinoAca && destinoAca.antesDeId === null && sig === null}
                   key={
                     fila.tipo === 'tarea'
                       ? fila.tarea.id
@@ -794,7 +832,8 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                   onCerrarCrear={() => setCrearEn(null)}
                   mostrarAviso={mostrarAviso}
                 />
-              ))}
+                )
+              })}
 
               {/* §6.5 — Carga por persona + "Sin asignar" (puntos 3 y 4) */}
               {hayCarga && (
@@ -931,6 +970,10 @@ function CrearInput({
 }
 
 function FilaGanttRow({
+  dnd,
+  dndSiguienteId,
+  dndDropAntes,
+  dndDropDespues,
   fila,
   dias,
   state,
@@ -948,6 +991,13 @@ function FilaGanttRow({
   onCerrarCrear,
   mostrarAviso,
 }: {
+  /** #293: arrastre activo en la vista (undefined = sin asa ni destinos). */
+  dnd?: DndTareas
+  /** Hermana visible siguiente dentro del sub frente (soltar "después"). */
+  dndSiguienteId?: string | null
+  /** La tarea en vuelo caería ANTES / DESPUÉS de esta fila (indicador). */
+  dndDropAntes?: boolean
+  dndDropDespues?: boolean
   fila: FilaGantt
   dias: ISODate[]
   state: AppState
@@ -1121,8 +1171,14 @@ function FilaGanttRow({
 
   if (fila.tipo === 'vacio-sub') {
     const creandoAca = crearEn?.tipo === 'tarea' && crearEn.contenedorId === fila.sub.id && !crearEn.despuesDe
+    // #293: un sub frente sin tareas también recibe (criterio 8).
+    const subVacio = fila.sub
     return (
-      <tr className={fila.esPrimeraGlobal ? '' : 'sep-sf'}>
+      <tr
+        className={`${fila.esPrimeraGlobal ? '' : 'sep-sf'}${dnd?.destino?.subFrenteId === subVacio.id ? ' gfila--drop-vacio' : ''}`.trim()}
+        onDragOver={dnd ? (e) => dnd.sobre(e, subVacio.id, null) : undefined}
+        onDrop={dnd ? dnd.soltar : undefined}
+      >
         {fila.esInicioFrente && celdaFrente(fila.frente, fila.spanFrente)}
         {celdaSub(fila.frente, fila.sub, 1)}
         <td className={`fija fija--tarea gantt-vacio${creandoAca ? ' fija--input' : ''}`}>
@@ -1226,8 +1282,21 @@ function FilaGanttRow({
     }
   }
 
+  // #293: la fila entera (columnas fijas y grilla) es destino del arrastre.
+  const clasesDnd = dnd
+    ? `${dnd.activo?.id === tarea.id ? ' gfila--en-vuelo' : ''}${dndDropAntes ? ' gfila--drop-antes' : ''}${dndDropDespues ? ' gfila--drop-despues' : ''}`
+    : ''
+
   return (
-    <tr className={sep.trim()}>
+    <tr
+      className={`${sep.trim()}${clasesDnd}`.trim() || undefined}
+      onDragOver={
+        dnd
+          ? (e) => dnd.sobre(e, tarea.subFrenteId, enMitadSuperior(e) ? tarea.id : dndSiguienteId ?? null)
+          : undefined
+      }
+      onDrop={dnd ? dnd.soltar : undefined}
+    >
       {/* #190: la columna de proyecto solo existe en Mis Tareas, donde las
           únicas filas posibles son de tarea (no hay vacíos ni inputs). */}
       {conProyecto && fila.esInicioFrente && celdaProyecto(fila.spanFrente)}
@@ -1235,6 +1304,20 @@ function FilaGanttRow({
       {fila.esInicioSub && celdaSub(fila.frente, fila.sub, fila.spanSub)}
 
       <td className={`fija fija--tarea tarea-cell--${color}`}>
+        {/* #293: el asa vive DENTRO de la celda del nombre, pegada a su borde
+            izquierdo — mismo lugar y mismo aspecto que en la tabla. */}
+        {dnd && (
+          <button
+            type="button"
+            className="drag-asa"
+            aria-label={`Mover: ${tarea.titulo}`}
+            draggable
+            onDragStart={(e) => dnd.iniciar(e, tarea)}
+            onDragEnd={dnd.terminar}
+          >
+            ⋮⋮
+          </button>
+        )}
         <span className="con-mas">
           {can.editarTareas(tarea) ? (
             <InlineText

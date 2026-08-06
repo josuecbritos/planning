@@ -2334,3 +2334,46 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 /* En oscuro la opacidad sola no basta para separarlo del fondo: se compensa. */
 [data-tema='oscuro'] .avatar--apagado { opacity: .55; }
 [data-tema='oscuro'] .resp-badge--apagado { opacity: .55; }
+
+/* ====================== #293 — Arrastrar tareas ========================
+   El gesto existe SOLO en escritorio (en mobile competiría con el
+   desplazamiento táctil y la app ni siquiera arma el arrastre), así que
+   todas estas reglas van acotadas a min-width, según el patrón de fallas
+   de mobile ya conocido. Las clases *--dnd las pone la vista únicamente
+   cuando el arrastre está habilitado: sin él, nada de esto aplica. */
+@media (min-width: 769px) {
+  /* Aire permanente para el asa dentro de la celda del nombre: no es una
+     columna nueva ni cambia el ancho de ninguna columna. */
+  .tabla-wrap--dnd .tarea-cell { padding-left: 22px; }
+  .tabla-wrap--dnd .fila-nueva td:nth-child(2) { padding-left: 22px; }
+  .gantt--dnd td.fija--tarea { padding-left: 22px; }
+
+  /* El asa: aparece al pasar el mouse por la fila, pegada al borde
+     izquierdo de la celda del nombre — mismo lugar y aspecto en las dos
+     vistas. */
+  .drag-asa {
+    position: absolute; left: 4px; top: 50%; transform: translateY(-50%);
+    width: 15px; height: 22px; padding: 0; border: 0; background: none;
+    color: var(--gris-texto); font-size: 11px; line-height: 22px;
+    letter-spacing: -2px; text-indent: -1px;
+    cursor: grab; opacity: 0; transition: opacity .12s;
+  }
+  tr:hover > td > .drag-asa,
+  .drag-asa:focus-visible { opacity: 1; }
+  .drag-asa:active { cursor: grabbing; }
+
+  /* La fila en vuelo se atenúa mientras dura el arrastre. */
+  tr.fila--en-vuelo > td,
+  .gantt tr.gfila--en-vuelo > td { opacity: .45; }
+
+  /* Indicador de caída: la línea de acento marca DÓNDE va a caer. */
+  tr.fila--drop-antes > td,
+  .gantt tr.gfila--drop-antes > td { box-shadow: inset 0 2px 0 0 var(--naranja); }
+  tr.fila--drop-despues > td,
+  .gantt tr.gfila--drop-despues > td { box-shadow: inset 0 -2px 0 0 var(--naranja); }
+
+  /* El sub frente destino se enmarca entero — también cubre recibir en uno
+     sin tareas (tabla: contorno de su tabla; Gantt: su celda de nombre). */
+  table.tareas--drop { outline: 2px solid var(--naranja); outline-offset: -2px; }
+  .gantt tr.gfila--drop-vacio td.fija--tarea { box-shadow: inset 0 0 0 2px var(--naranja); }
+}

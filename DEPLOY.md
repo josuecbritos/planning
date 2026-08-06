@@ -176,6 +176,21 @@ orden** el contenido de:
     corregir el histórico**; el detalle y su consecuencia (esas 2 tareas
     muestran un atraso mayor al real) quedan en la cabecera de esa consulta.
 
+28. `supabase/migrations/20260707000028_mover_tarea.sql` — #293: reglas del
+    movimiento de tareas (arrastrar y soltar). Dos cosas: la política
+    `tarea_update` pasa a ser **alcanzable para todo miembro** del proyecto
+    —espejo exacto de `frente_update` (migración 12): el trigger valida campo
+    a campo, así que la ampliación solo libera el reordenamiento (`orden`)—;
+    y el trigger `validar_permisos_tarea` suma el caso de **`sub_frente_id`**:
+    moverse de sub frente exige `editarTareas` (alcance contra el responsable
+    previo) y solo **dentro del mismo proyecto**. Hasta esta migración el
+    trigger no mencionaba ese campo: cualquier invitado con cualquier permiso
+    de edición podía cambiarlo por petición directa. Va **junto con el front
+    de la misma entrega** (el front nuevo necesita la política ampliada para
+    que un miembro sin permisos pueda reordenar); el front viejo con la
+    migración funciona igual que siempre. **Correr la compuerta después**
+    (casos nuevos del movimiento).
+
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
 `supabase link --project-ref TU_REF && supabase db push`. Todo el esquema puede
