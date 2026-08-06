@@ -10,6 +10,7 @@ import { esDuenoDe, makeCan, miembrosDeProyecto, puedeCrearProyectos, usuariosVi
 import type { Filtro } from './lib/filtros'
 import { CAMPOS_PROYECTO, type OrdenMulti } from './lib/orden'
 import { escribirVistaActiva, estadoInicial, leerGuardados } from './lib/vistas'
+import { planMoverTarea } from './lib/mover'
 import * as apply from './data/apply'
 import { suscribirTabla } from './data/tiempoReal'
 import type {
@@ -68,6 +69,10 @@ export interface Actions {
   createTarea: (i: NuevaTarea) => Promise<void>
   updateTarea: (id: string, p: PatchTarea) => Promise<void>
   deleteTarea: (id: string) => Promise<void>
+  /** #293: deja la tarea ANTE `antesDeId` (null = al final) del sub frente
+   *  destino, renumerando a los hermanos. No toca fecha, responsable ni
+   *  estado; no escribe historial ni genera notificación. */
+  moverTarea: (tareaId: string, subFrenteId: string, antesDeId: string | null) => Promise<void>
   toggleHecha: (tareaId: string, hecha: boolean) => Promise<void>
   /** `nueva = null` desplanifica (borra la marca; queda "sin fecha"). */
   cambiarFechaObjetivo: (tareaId: string, nueva: string | null) => Promise<void>
@@ -791,6 +796,32 @@ export default function App({ repo }: { repo: Repo }) {
           setTareaDetalleId((cur) => (cur === id ? null : cur))
           return (s) => apply.removeTarea(s, id)
         }),
+      // #293 — mover arrastrando. El plan renumera el sub frente destino
+      // completo; acá solo se persiste lo que cambia. La tarea movida va
+      // PRIMERO y esperada: si la base rechaza el movimiento (permiso o
+      // proyecto), los hermanos no quedan renumerados a medias.
+      moverTarea: (tareaId, subFrenteId, antesDeId) =>
+        run(async () => {
+          const s = stateRef.current
+          if (!s) return (x) => x
+          const plan = planMoverTarea(s.tareas, tareaId, subFrenteId, antesDeId)
+          if (plan.length === 0) return (x) => x
+          const movida = plan.find((m) => m.id === tareaId)
+          const resto = plan.filter((m) => m.id !== tareaId)
+          const actualizadas: Tarea[] = []
+          if (movida) {
+            actualizadas.push(
+              await repo.updateTarea(
+                movida.id,
+                movida.subFrenteId
+                  ? { orden: movida.orden, subFrenteId: movida.subFrenteId }
+                  : { orden: movida.orden },
+              ),
+            )
+          }
+          actualizadas.push(...(await Promise.all(resto.map((m) => repo.updateTarea(m.id, { orden: m.orden })))))
+          return (s2) => actualizadas.reduce(apply.upsertTarea, s2)
+        }),
       toggleHecha: (tareaId, hecha) =>
         run(async () => {
           const patch: PatchTarea = hecha ? { hecha: true, fechaReal: HOY } : { hecha: false }
@@ -1175,6 +1206,13 @@ export default function App({ repo }: { repo: Repo }) {
   // #228: el filtro de Responsable ofrece los MIEMBROS del proyecto activo, la
   // misma lista que los selectores de la tabla, la Gantt y el panel.
   const candidatosFiltro = miembrosDeProyecto(state, proyecto?.id ?? null)
+  // #293: el asa de arrastre es para MIEMBROS del proyecto (o admin/dueño) y
+  // solo en escritorio. Un "peek" (#179) mira sin ser miembro: sin asa — la
+  // base le rechazaría el movimiento de todos modos.
+  const puedeArrastrar =
+    !esMovil &&
+    !!proyecto &&
+    (can.controlTotal || state.accesos.some((a) => a.usuarioId === sesion.id && a.proyectoId === proyecto.id))
   // Miembros (7): el admin y el dueño pueden abrir la lista del proyecto.
   const puedeVerMiembros = !!proyecto && (esAdmin || esDuenoDe(state, sesion, proyecto.id))
   // Módulo de Usuarios (§4): admin (todo) o consultor (acotado a sus proyectos:
@@ -1399,6 +1437,7 @@ export default function App({ repo }: { repo: Repo }) {
                   resaltarTareaId={tareaResaltada}
                   resaltarNonce={resaltadoNonce}
                   tareasNuevas={tareasNuevas}
+                  puedeArrastrar={puedeArrastrar}
                 />
               ) : (
                 <GanttView
@@ -1415,6 +1454,7 @@ export default function App({ repo }: { repo: Repo }) {
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                   tareasNuevas={tareasNuevas}
+                  puedeArrastrar={puedeArrastrar}
                 />
               )}
             </div>

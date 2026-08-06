@@ -933,3 +933,50 @@ real mientras existan.
 **La compuerta suma el caso de la ventana**: mover una tarea de mañana no
 registra replanificación y su fecha original se rehace; mover una de hoy sí
 registra; desplanificar una de mañana no da error.
+
+## #293 — Reordenar tareas arrastrándolas con el mouse
+
+El orden de las tareas solo se podía alterar creando (la nueva nace al final,
+o en posición con el "+" de "agregar debajo"); mover una ya creada no existía,
+y cambiarla de sub frente tampoco. Ahora se toma la tarea desde un **asa** —
+aparece al pasar el mouse, dentro de la celda del nombre, pegada a su borde
+izquierdo, igual en Tabla y en Gantt— y se suelta donde corresponda: entre sus
+hermanas, en otro sub frente (incluso de otro frente, o uno vacío). Durante el
+arrastre una línea marca dónde va a caer; soltar fuera de un destino válido no
+hace nada. Solo escritorio; en Mis Tareas y en mobile el gesto no existe.
+
+- **Dos permisos distintos, ninguno nuevo**: reordenar dentro del sub frente
+  es de **cualquier miembro** (la misma decisión del orden de frentes y sub
+  frentes, migración 12); mover a otro sub frente exige **`editarTareas`**
+  con sus tres alcances, evaluado contra el responsable previo. Sin él, el
+  otro sub frente no es destino válido en la pantalla — y la base lo rechaza
+  igual si la petición llega directa.
+- **Migración 28**: la política `tarea_update` pasa a ser alcanzable para
+  todo miembro (espejo de `frente_update`; el trigger valida campo a campo,
+  así que solo libera el `orden`), y `validar_permisos_tarea` suma el caso de
+  `sub_frente_id` — el trigger no lo mencionaba, así que cualquier invitado
+  con cualquier permiso de edición podía cambiarlo por vía directa. También
+  exige que el destino sea del **mismo proyecto**.
+- **Mover no cambia nada más**: ni fecha, ni responsable, ni estado, ni la
+  marca de hecha. **No escribe en el historial de replanificaciones** (el
+  historial mide compromisos movidos, no ubicaciones) y **no genera
+  notificación** (son deliberadamente pocas y de alta señal).
+- **Con orden o filtro activo** el arrastre es una edición más sobre la vista
+  congelada (#121): la tarea queda donde se la soltó —la foto manda—, el
+  orden nuevo se guarda y se enciende "Actualizar vista"; al tocarlo mandan
+  los criterios, y el orden manual se ve al limpiarlos.
+- **Capa de datos**: `moverTarea` renumera el sub frente destino completo
+  (0..n) — los `orden` reales traen huecos y empates, "correr en +1" no deja
+  la posición exacta—; la tarea movida se escribe primero, para que un
+  rechazo de la base no deje a los hermanos renumerados a medias. El cambio
+  viaja en vivo por el canal de `tarea` que ya existía (migración 21).
+
+**Verificado**: contra Postgres 16 con las migraciones 1→28 (7/7: miembro con
+permisos vacíos reordena, sin `editarTareas` no mueve, "asignadas" mueve lo
+suyo y no lo ajeno, sin cruce de proyecto, admin exento, sin
+historial/notificaciones) y e2e con Playwright en modo memoria (29/29: los
+criterios de aceptación del pedido, incluidos foto congelada, cliente sin
+permiso, mobile sin asa y el "+" de agregar debajo intacto).
+
+**La compuerta suma `probarMoverTarea`** con esos mismos casos contra la API
+real, rol por rol.

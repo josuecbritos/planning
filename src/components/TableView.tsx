@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
-import { useVistaCongelada } from '../lib/vistaCongelada'
+import { referenciaEnFoto, useVistaCongelada } from '../lib/vistaCongelada'
+import { enMitadSuperior, useArrastreTareas, type DndTareas } from '../lib/arrastre'
+import { planMoverTarea } from '../lib/mover'
 import type { AppState, Frente, SubFrente, Tarea, Usuario } from '../types'
 import type { Actions, FrenteSel } from '../App'
 import { MOTIVO_FECHA_HECHA, miembrosDeProyecto, puedeEditarFecha, responsableDeTarea, type Can } from '../lib/permisos'
@@ -46,13 +48,15 @@ interface Props {
    *  —o tocarla estando ya en ese proyecto— vuelva a resaltar y a centrar la
    *  fila. Sin él, React descarta la asignación del mismo id y no pasa nada. */
   resaltarNonce?: number
+  /** #293: miembro del proyecto y en escritorio → asa de arrastre. */
+  puedeArrastrar?: boolean
 }
 
 // Referencia estable para el valor por defecto: un `[]` nuevo en cada render
 // invalidaría los memos que dependen de él.
 const SIN_NUEVAS: string[] = []
 
-export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, snapshotNonce, onStale, actions, onAbrirTarea, resaltarTareaId, resaltarNonce = 0, tareasNuevas = SIN_NUEVAS }: Props) {
+export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, snapshotNonce, onStale, actions, onAbrirTarea, resaltarTareaId, resaltarNonce = 0, tareasNuevas = SIN_NUEVAS, puedeArrastrar = false }: Props) {
   const filtrando = !filtroVacio(filtro)
   // P1: la vista se congela cuando hay filtro y/u orden activo.
   const activo = filtrando || orden.length > 0
@@ -109,7 +113,22 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   }, [state, proyectoId, frenteSel, filtrando, filtro, orden, hoy])
 
   const firma = JSON.stringify([proyectoId, frenteSel, filtro, orden, snapshotNonce])
-  const { congelada, visibleIds, indice, stale } = useVistaCongelada(frescoIds, existentesIds, activo, firma)
+  const { congelada, visibleIds, indice, stale, moverEnFoto } = useVistaCongelada(frescoIds, existentesIds, activo, firma)
+
+  // #293: arrastrar para reordenar / mover de sub frente. Reordenar dentro
+  // del propio sub frente es de cualquier miembro; cruzar a otro exige
+  // `editarTareas` sobre la tarea (mismo permiso que el título). Con la
+  // vista congelada, la caída se refleja en la FOTO (la foto manda) y se
+  // enciende "Actualizar vista"; el orden nuevo se guarda igual.
+  const dnd = useArrastreTareas({
+    habilitado: puedeArrastrar,
+    puedeRecibir: (t, subFrenteId) => subFrenteId === t.subFrenteId || can.editarTareas(t),
+    alSoltar: (t, destino) => {
+      if (planMoverTarea(state.tareas, t.id, destino.subFrenteId, destino.antesDeId).length === 0) return
+      if (congelada) moverEnFoto(t.id, referenciaEnFoto(state.tareas, visibleIds, indice, t.id, destino))
+      void actions.moverTarea(t.id, destino.subFrenteId, destino.antesDeId)
+    },
+  })
 
   // #137/#253: tareas que quedan FUERA de la vista actual (por el filtro o por
   // la foto congelada) y que hay que mostrar igual. Son dos casos con el mismo
@@ -168,10 +187,13 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   const realceId = realceOn ? resaltarTareaId : null
 
   return (
-    <div className={`tabla-wrap${realceOn ? ' tabla-wrap--realce' : ''}`}>
+    // #293: el dragover que llega hasta acá no pasó por ningún destino
+    // válido — se apaga el indicador (soltar ahí no hace nada).
+    <div className={`tabla-wrap${realceOn ? ' tabla-wrap--realce' : ''}${dnd ? ' tabla-wrap--dnd' : ''}`} onDragOver={dnd ? dnd.fuera : undefined}>
       {frentes.map((f) => (
         <FrentePagina
           key={f.id}
+          dnd={dnd}
           frente={f}
           state={state}
           hoy={hoy}
@@ -202,6 +224,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
 }
 
 function FrentePagina({
+  dnd,
   frente,
   state,
   hoy,
@@ -223,6 +246,7 @@ function FrentePagina({
   actions,
   onAbrirTarea,
 }: {
+  dnd?: DndTareas
   frente: Frente
   state: AppState
   hoy: string
@@ -285,6 +309,7 @@ function FrentePagina({
           {subsVisibles.map((sf) => (
             <SubFrenteTabla
               key={sf.id}
+              dnd={dnd}
               sub={sf}
               state={state}
               hoy={hoy}
@@ -361,6 +386,7 @@ function NuevoSubFrenteInline({ frenteId, actions }: { frenteId: string; actions
 }
 
 function SubFrenteTabla({
+  dnd,
   sub,
   state,
   hoy,
@@ -379,6 +405,7 @@ function SubFrenteTabla({
   actions,
   onAbrirTarea,
 }: {
+  dnd?: DndTareas
   sub: SubFrente
   state: AppState
   hoy: string
@@ -461,7 +488,14 @@ function SubFrenteTabla({
         )}
       </div>
       {!colapsado && (
-      <table className="tareas">
+      // #293: la tabla entera es destino "al final del sub frente" (cubre el
+      // área bajo la última fila y los sub frentes sin tareas); las filas de
+      // tarea frenan la propagación y afinan la posición.
+      <table
+        className={`tareas${dnd?.destino?.subFrenteId === sub.id ? ' tareas--drop' : ''}`}
+        onDragOver={dnd ? (e) => dnd.sobre(e, sub.id, null) : undefined}
+        onDrop={dnd ? dnd.soltar : undefined}
+      >
         <thead>
           <tr>
             {/* Orden de columnas: primero COMO ESTA la tarea (Estado junto al
@@ -480,9 +514,17 @@ function SubFrenteTabla({
           </tr>
         </thead>
         <tbody>
-          {tareas.map((t) => (
+          {tareas.map((t, i) => (
             <TareaFila
               key={t.id}
+              dnd={dnd}
+              siguienteId={tareas[i + 1]?.id ?? null}
+              dropAntes={dnd?.destino?.subFrenteId === sub.id && dnd.destino.antesDeId === t.id}
+              dropDespues={
+                dnd?.destino?.subFrenteId === sub.id &&
+                dnd.destino.antesDeId === null &&
+                i === tareas.length - 1
+              }
               tarea={t}
               state={state}
               hoy={hoy}
@@ -665,6 +707,10 @@ function NuevaTareaFila({
 }
 
 function TareaFila({
+  dnd,
+  siguienteId,
+  dropAntes,
+  dropDespues,
   tarea,
   state,
   hoy,
@@ -674,6 +720,13 @@ function TareaFila({
   actions,
   onAbrirTarea,
 }: {
+  /** #293: arrastre activo en la vista (undefined = sin asa ni destinos). */
+  dnd?: DndTareas
+  /** Hermana visible siguiente (para "soltar después de esta fila"). */
+  siguienteId?: string | null
+  /** La tarea en vuelo caería ANTES / DESPUÉS de esta fila (indicador). */
+  dropAntes?: boolean
+  dropDespues?: boolean
   tarea: Tarea
   state: AppState
   hoy: string
@@ -704,8 +757,23 @@ function TareaFila({
   // (`resaltar` pasa de false a true en cada llegada gracias al nonce de #219,
   //  así que este efecto vuelve a centrar la fila también la segunda vez.)
 
+  // #293: cada fila de tarea es destino del arrastre — mitad superior deja la
+  // tarea en vuelo ANTES de esta, mitad inferior después.
+  const clasesDnd = dnd
+    ? `${dnd.activo?.id === tarea.id ? ' fila--en-vuelo' : ''}${dropAntes ? ' fila--drop-antes' : ''}${dropDespues ? ' fila--drop-despues' : ''}`
+    : ''
+
   return (
-    <tr ref={filaRef} className={`${color !== 'ninguno' ? `fila--${color}` : ''}${resaltar ? ' fila--resaltada' : ''}`.trim() || undefined}>
+    <tr
+      ref={filaRef}
+      className={`${color !== 'ninguno' ? `fila--${color}` : ''}${resaltar ? ' fila--resaltada' : ''}${clasesDnd}`.trim() || undefined}
+      onDragOver={
+        dnd
+          ? (e) => dnd.sobre(e, tarea.subFrenteId, enMitadSuperior(e) ? tarea.id : siguienteId ?? null)
+          : undefined
+      }
+      onDrop={dnd ? dnd.soltar : undefined}
+    >
       <td className="col-check">
         <CheckHecha
           hecha={tarea.hecha}
@@ -716,6 +784,21 @@ function TareaFila({
       </td>
 
       <td className="tarea-cell">
+        {/* #293: asa de arrastre — visible al pasar el mouse por la fila,
+            pegada al borde izquierdo de la celda del nombre. El arrastre nace
+            SOLO acá; la fila sigue siendo territorio de sus controles. */}
+        {dnd && (
+          <button
+            type="button"
+            className="drag-asa"
+            aria-label={`Mover: ${tarea.titulo}`}
+            draggable
+            onDragStart={(e) => dnd.iniciar(e, tarea)}
+            onDragEnd={dnd.terminar}
+          >
+            ⋮⋮
+          </button>
+        )}
         <span className="tarea-cell__row">
           {cat === 'hecha' && <span className="tarea-cell__mark mk-verde">✓</span>}
           {can.editarTareas(tarea) ? (

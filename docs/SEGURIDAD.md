@@ -231,6 +231,30 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   registra replanificación y su fecha original se rehace; mover una de HOY sí
   registra; desplanificar una de mañana no da error.
 
+**Migración 28 — `20260707000028_mover_tarea.sql` (#293)**
+- El gesto de arrastrar tareas trae dos reglas, y las dos viven en la base:
+  **reordenar** dentro del sub frente (solo `orden`) es de cualquier miembro
+  del proyecto; **mover** a otro sub frente (`sub_frente_id`) exige
+  `editarTareas`, con el alcance evaluado contra el responsable **previo** al
+  cambio, como el resto del trigger.
+- La política `tarea_update` se amplía a todo miembro
+  (`tiene_acceso_proyecto`), espejo exacto de `frente_update` (migración 12:
+  "los invitados solo mueven orden"). La ampliación es segura porque
+  `validar_permisos_tarea` valida **campo a campo** todo lo demás; antes un
+  miembro sin permisos no podía ni corregir el orden.
+- El hueco que se cierra: el trigger **no mencionaba `sub_frente_id`** —
+  cualquier invitado con cualquier permiso de edición podía cambiar el sub
+  frente de una tarea por petición directa. Ahora exige `editarTareas` y que
+  el destino sea un sub frente **del mismo proyecto** (la interfaz solo
+  ofrece el proyecto abierto; la base lo garantiza). Admin y dueño quedan
+  fuera de la restricción, como de todas las del trigger.
+- Las políticas se reemplazan con **drop + create** (lección de #281).
+- La compuerta trae los casos nuevos (`probarMoverTarea`): un miembro con el
+  set de permisos VACÍO reordena; sin `editarTareas` no se mueve de sub
+  frente; con alcance "asignadas" mueve lo suyo y no lo ajeno; nadie cruza de
+  proyecto; y mover no toca fecha/responsable/estado, no escribe historial de
+  replanificaciones ni genera notificaciones.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.

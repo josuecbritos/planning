@@ -50,7 +50,9 @@ export interface NuevaTarea {
   orden?: number
 }
 export type PatchTarea = Partial<
-  Pick<Tarea, 'titulo' | 'descripcion' | 'responsableId' | 'hecha' | 'fechaReal' | 'comentarios' | 'archivada' | 'orden'>
+  // #293: `subFrenteId` entra al patch — mover una tarea a otro sub frente.
+  // La base exige `editarTareas` para ese campo (trigger, migración 28).
+  Pick<Tarea, 'titulo' | 'descripcion' | 'responsableId' | 'hecha' | 'fechaReal' | 'comentarios' | 'archivada' | 'orden' | 'subFrenteId'>
 >
 
 export interface NuevoUsuario {

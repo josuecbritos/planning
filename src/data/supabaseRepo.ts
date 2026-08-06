@@ -246,6 +246,9 @@ export class SupabaseRepo implements Repo {
     if ('fechaReal' in patch) upd.fecha_real = patch.fechaReal ?? null
     if ('archivada' in patch) upd.archivada = patch.archivada ?? false
     if ('orden' in patch) upd.orden = patch.orden
+    // #293: mover de sub frente. Solo viaja si de verdad cambia (lo cuida la
+    // acción): así un reordenamiento no dispara la validación de ese campo.
+    if ('subFrenteId' in patch) upd.sub_frente_id = patch.subFrenteId
     const row = unwrap(await this.db.from('tarea').update(upd).eq('id', id).select().single())
     return toTarea(row)
   }
