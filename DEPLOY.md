@@ -207,6 +207,22 @@ orden** el contenido de:
     indiferente (en Supabase la regla vive entera en la base). **Correr la
     compuerta después** (casos nuevos del marcado).
 
+30. `supabase/migrations/20260707000030_execute_publico.sql` — #290: cierra el
+    permiso de ejecución que quedó abierto **a todos**. Las migraciones 15 y 22
+    revocaron `from anon, authenticated` y nunca `from public`, y en PostgreSQL
+    las funciones nacen con `EXECUTE` concedido a `PUBLIC`: el permiso siguió
+    abierto. Retira ese permiso universal de las **36** funciones del proyecto
+    que lo conservaban (las de extensiones **no** se tocan), dejando intacto
+    todo permiso explícito — el resultado por función es *su ACL de antes menos
+    la entrada universal*, sin altas ni bajas. Cierra en particular
+    `crear_notificacion` y `usuario_tiene_acceso`, que solo tenían el universal.
+    Crea además la vista `permiso_ejecucion_abierto` (solo lista infracciones;
+    cero filas en una base sana) para que la compuerta pueda vigilarlo, y
+    **falla sola** si algo quedara abierto. No cambia ninguna funcionalidad
+    visible: si algo del producto cambia de comportamiento, es un error de este
+    cambio. El orden con el front es indiferente (no hay cambios de front).
+    **Correr la compuerta después** (caso nuevo `probarExecutePublico`).
+
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
 `supabase link --project-ref TU_REF && supabase db push`. Todo el esquema puede
