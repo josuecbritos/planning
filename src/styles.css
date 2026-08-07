@@ -396,6 +396,17 @@ table.tareas th {
    (Con el prefijo table.tareas: la regla generica th/td de arriba
    pone text-align left con mayor especificidad y ganaba en Hecha.) */
 table.tareas .col-check, table.tareas .col-resp, table.tareas .col-fecha { text-align: center; }
+/* #298: el título de acciones se centra como el de las demás columnas de la
+   tabla del proyecto. El `text-align: center` que ya lleva `.col-acc` más
+   abajo no alcanza: pierde por especificidad contra la regla genérica th/td
+   — el mismo tropiezo que describe el comentario de arriba.
+   El `:not(.usuarios-tabla)` NO es adorno: las tablas de administración
+   llevan las DOS clases (`tareas usuarios-tabla`), y ahí todas las cabeceras
+   van a la izquierda, así que su "Acciones" ya estaba alineada con sus
+   vecinas y no hay que moverla.
+   Se centra SOLO el encabezado; los iconos de la celda se quedan donde
+   estaban. */
+table.tareas:not(.usuarios-tabla) thead th.col-acc { text-align: center; }
 
 /* Fila completa coloreada segun el estado de la tarea */
 tr.fila--verde > td { background: var(--verde-suave); }
