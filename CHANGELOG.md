@@ -1246,3 +1246,42 @@ vecinas, los iconos que no se movieron, las cabeceras de administración sin
 tocar, la tipografía compartida con las dos tablas de administración, el
 cliente sin permisos que sigue sin ver la columna, los anchos intactos y el
 mobile sin encabezado ni desborde.
+
+## #299 — Los enlaces de los comentarios se ven como enlaces
+
+En el hilo de comentarios de una tarea, una dirección web se veía como texto
+plano: había que seleccionarla y copiarla a mano. Ahora se pinta como enlace y
+se abre en una pestaña nueva, para no sacar a nadie de la herramienta a mitad
+de una tarea.
+
+- **Un tercer tipo de trozo**, en el recorrido que ya existía. `partirComentario`
+  (`lib/menciones.ts`) troceaba el texto en `texto` y `mencion`; ahora también
+  en `enlace`, y `TaskPanel` lo pinta según el tipo. Las menciones no cambian y
+  conviven con un enlace en el mismo comentario.
+- **Qué se reconoce:** lo que empieza por `http://` o `https://`, y `www.`
+  seguido de algo con otro punto (`www.andotek.cl`), al que se le antepone
+  `https://` al abrirlo. Una palabra suelta con punto —`andotek.cl`, o el punto
+  final de una frase— **no** se vuelve enlace.
+- **Retroactivo por construcción:** el reconocimiento ocurre al pintar, no al
+  guardar. Los comentarios ya escritos se ven con sus enlaces sin tocar un
+  solo dato.
+- **Seguridad (invariante 21 de `SEGURIDAD.md`).** El texto lo escriben también
+  los clientes invitados: es contenido de terceros. Solo `http` y `https`
+  llegan a ser enlace, y el protocolo se comprueba sobre la URL ya interpretada
+  con `URL`, no sobre el texto crudo — `javascript:`, `data:` y `ftp:` se
+  quedan como texto. Los trozos son DATOS, no marcado: se pintan como hijos de
+  un nodo, nunca como HTML construido con lo que escribió alguien. Y se abren
+  con `rel="noopener noreferrer"`, sin dar al destino referencia a la ventana
+  de origen.
+- **Bordes cuidados:** el punto final de la frase queda fuera del enlace, un
+  paréntesis que sí es parte de la dirección se conserva, y `https://` pegado a
+  otra palabra (`xhttps://…`) no dispara nada.
+- **No se tocó** el cuadro de escribir comentarios, ni la edición, ni el
+  historial, ni los permisos, ni nada fuera del hilo. **Sin migración**: el
+  diff toca solo el cliente.
+
+**Verificado** con `docs/prueba-299-enlaces-comentarios.mjs`: 24 comprobaciones
+en verde, los once criterios del pedido. Incluye el clic real que abre la
+pestaña en el destino correcto, el comentario preexistente que ahora se ve como
+enlace sin haberlo tocado, el enlace largo que no rompe el ancho del panel, y
+el caso de seguridad probado **también como cliente invitado**.

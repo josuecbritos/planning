@@ -469,6 +469,19 @@ reintroduce un hallazgo de la auditoría.
     servidor a propósito — la barrera es la RLS por membresía. Cualquier tabla
     futura entra igual: RLS validada, replica identity DEFAULT, eventos como
     avisos.
+21. **El texto que escriben los usuarios se pinta como TEXTO, y un enlace
+    derivado de él solo puede ser `http` o `https` (#299).** El comentario de
+    una tarea lo escribe cualquier miembro del proyecto, clientes invitados
+    incluidos: es contenido de terceros. `partirComentario`
+    (`lib/menciones.ts`) lo trocea al PINTAR y devuelve datos —qué se ve y a
+    dónde va—, nunca marcado; quien pinta pone esos trozos como hijos de un
+    nodo y jamás construye HTML con lo que escribió alguien. El destino de un
+    enlace se valida con `URL`, mirando el **protocolo ya interpretado** y no
+    el texto crudo: `javascript:`, `data:`, `ftp:` y cualquier otro esquema no
+    llegan a ser enlace, se quedan como texto. Los enlaces se abren con
+    `rel="noopener noreferrer"`, sin dar al destino referencia a la ventana de
+    origen. Cualquier reconocimiento futuro sobre texto de usuario —en
+    comentarios o donde sea— entra con estas tres reglas.
 
 ---
 
