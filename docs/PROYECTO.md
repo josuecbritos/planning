@@ -212,6 +212,14 @@ NO entra en el filtro — cada opción muestra su rango literal.
   el último proyecto visitado (decisión tomada). Llegar desde una notificación
   sigue abriendo la tarea, la expulsión por pérdida de acceso sigue llevando a
   Resumen, y la vista Tabla/Gantt se sigue recordando por proyecto.
+- **Entrar a un proyecto limpia la selección de frente** (#297). Los cuatro
+  caminos —elegir un proyecto, iniciar sesión, saltar a una tarea desde una
+  notificación y **crear un proyecto**— entran con "todos los frentes". Sin
+  eso, la selección de un proyecto viajaba al siguiente y la vista principal
+  filtraba por un frente que ese proyecto no tiene: mostraba "aún no tiene
+  frentes" aunque los tuviera. Crear un proyecto además lo **incorpora al
+  estado antes de navegar hacia él**: al revés, el efecto que corrige el
+  proyecto activo no lo encontraba entre los visibles y devolvía a Resumen.
 
 En la Tabla, frentes y sub frentes se **colapsan** con un chevron (▸/▾) para
 enfocar; el colapso es momentáneo (no se guarda).
@@ -523,4 +531,5 @@ valor por defecto del navegador, cae al inicial (un `border` así desaparece).
 | `auditoria-seguridad.md` | Informe de la auditoría (hallazgos por gravedad). |
 | `runbook-seguridad.md` | Pasos para aplicar las correcciones de seguridad. |
 | `diagnostico-mobile.md` | Estado de la vista mobile medido en 390×844, plan de mejoras y su resolución (#194–#203). |
+| `diagnostico-297-frente-al-crear.md` | Reproducción medida del frente que no aparecía al crear un proyecto, y propuesta abierta sobre proteger la vista de una selección imposible. |
 | `DEPLOY.md` | Despliegue (Supabase, Vercel, Resend, Edge Functions). |

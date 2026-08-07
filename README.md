@@ -204,6 +204,9 @@ docs/
   PROYECTO.md            Fuente de verdad del estado actual
   SEGURIDAD.md           Invariantes de seguridad (leer antes de tocar RLS/auth)
   runbook-seguridad.md / auditoria-seguridad.md
+  prueba-297-frente-al-crear.mjs  Prueba e2e del camino "crear proyecto → primer
+                         frente" (Tabla y Gantt), contra `vite preview`
+  diagnostico-297-frente-al-crear.md
   documento-funcional-v3.1.md  (histórico)
 ```
 
