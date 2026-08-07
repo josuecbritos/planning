@@ -2282,6 +2282,10 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .fecha-btn, .fecha-input { padding: 2px 1px; }
   /* acciones: queda solo ⓘ (acceso al detalle), compacto */
   .col-acc { width: 26px; }
+  /* #298: el título "Acciones" mide 40px y la columna 26 — se cortaba contra
+     el borde de la tabla. Acá la columna sigue sin encabezado, como estaba;
+     el título es de escritorio. No se toca el ancho ni el icono. */
+  table.tareas thead th.col-acc { font-size: 0; }
   table.tareas td.col-acc { padding-left: 1px; padding-right: 1px; }
   .col-acc .icon-btn[aria-label='Archivar'],
   .col-acc .icon-btn[aria-label='Eliminar'] { display: none; }
