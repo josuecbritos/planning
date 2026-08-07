@@ -191,6 +191,22 @@ orden** el contenido de:
     migración funciona igual que siempre. **Correr la compuerta después**
     (casos nuevos del movimiento).
 
+29. `supabase/migrations/20260707000029_hecha_sin_fecha.sql` — #294: la tarea
+    sin fecha que se marca hecha queda con la fecha del día del marcado (la
+    original igual: sin atraso), y al desmarcarla vuelve a quedar sin fecha;
+    una que ya tenía fecha la conserva en ambos sentidos. Columna nueva
+    `tarea.fecha_por_marcado` (interna, el cliente no la escribe) + redefine
+    `normalizar_fechas_tarea` y `validar_permisos_tarea` (con `marcarHechas`
+    alcanza: el valor lo fuerza el trigger). ⚠️ **Incluye una CORRECCIÓN DE
+    DATOS**: a las tareas ya hechas y sin fecha les graba su día de marcado
+    (`fecha_real`) como fecha; las que no lo tienen guardado no se tocan. El
+    `RAISE NOTICE` informa cuántas se corrigieron y cuántas quedaron —
+    **guardar esa salida**. Respaldo `pg_dump` previo obligatorio (es la
+    única red y esta migración modifica datos). El front de la misma entrega
+    replica la regla en modo Local; el orden con el despliegue del front es
+    indiferente (en Supabase la regla vive entera en la base). **Correr la
+    compuerta después** (casos nuevos del marcado).
+
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
 `supabase link --project-ref TU_REF && supabase db push`. Todo el esquema puede

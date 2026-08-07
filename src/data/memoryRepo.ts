@@ -288,9 +288,25 @@ export class MemoryRepo implements Repo {
     const t = this.state.tareas.find((x) => x.id === id)
     if (!t) throw new Error('Tarea no encontrada')
     const respPrevio = t.responsableId
+    // #294: el estado PREVIO al parche decide las reglas del marcado (espejo
+    // del trigger normalizar_fechas_tarea, migración 29).
+    const previo = { hecha: t.hecha, fecha: t.fechaObjetivo, porMarcado: t.fechaPorMarcado }
     Object.assign(t, patch)
     // Coherencia: si se desmarca hecha, se limpia fecha_real.
     if (patch.hecha === false) t.fechaReal = undefined
+    // #294 (a): marcar hecha una tarea SIN fecha → fecha del día del marcado
+    // (la fecha_real que el marcado ya trae), la original igual (sin atraso).
+    if (patch.hecha === true && !previo.hecha && !previo.fecha) {
+      t.fechaObjetivo = patch.fechaReal ?? hoyISO()
+      t.fechaOriginal = t.fechaObjetivo
+      t.fechaPorMarcado = true
+    }
+    // #294 (b): desmarcar una cuya fecha la puso el marcado → sin fecha.
+    if (patch.hecha === false && previo.hecha && previo.porMarcado) {
+      t.fechaObjetivo = undefined
+      t.fechaOriginal = undefined
+      t.fechaPorMarcado = false
+    }
     // #137: te asignaron una tarea (cambió el responsable).
     if ('responsableId' in patch && t.responsableId !== respPrevio) {
       this.notificar(t.responsableId, 'asignacion', t.id)
@@ -506,6 +522,9 @@ export class MemoryRepo implements Repo {
         this.persist()
       }
     } else if (nueva && nueva !== t.fechaObjetivo) {
+      // #294: un cambio de fecha por cualquier otra vía apaga la marca de
+      // "fecha puesta por el marcado" (espejo del trigger).
+      t.fechaPorMarcado = false
       const tieneHist = this.state.historial.some((h) => h.tareaId === id)
       // 1.2: solo es replanificacion si la fecha que se mueve vence hoy o ya
       // vencio. Mover una fecha futura (o poner la primera) es planificacion.
