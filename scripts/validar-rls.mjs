@@ -799,6 +799,146 @@ async function probarMoverTarea(admin) {
   }
 }
 
+// #294 — La tarea sin fecha que se marca hecha queda con fecha, y las
+// reglas viven en la base:
+//   · marcar hecha una tarea SIN fecha le graba el día del marcado como
+//     fecha objetivo (con la original igual: sin atraso), y con solo
+//     `marcarHechas` alcanza — el VALOR lo fuerza el trigger, no el cliente,
+//     así que la exención no abre `editarFechas` para nada más;
+//   · desmarcarla la devuelve a SIN fecha, sin error y sin rastro;
+//   · una tarea que YA tenía fecha la conserva al marcar y al desmarcar;
+//   · la marca `fecha_por_marcado` es interna: el cliente no la fabrica.
+async function probarHechaSinFecha(admin) {
+  const rotulo = 'hecha'
+  const email = process.env.RLS_CLIENTE_EMAIL ?? process.env.RLS_CONSULTOR_B_EMAIL
+  const pass = process.env.RLS_CLIENTE_PASS ?? process.env.RLS_CONSULTOR_B_PASS
+  if (!email || !pass) {
+    console.log('  SKIP  [hecha] hacen falta RLS_CLIENTE_* (o RLS_CONSULTOR_B_*) para #294')
+    return
+  }
+  const c = await sesion(email, pass)
+  try {
+    const yo = await perfilDe(c)
+    if (!yo) {
+      marca(false, rotulo, 'sesión de la prueba legible')
+      return
+    }
+    const { data: hoyChile } = await admin.rpc('hoy_chile')
+
+    const { data: proy, error: errProy } = await admin
+      .from('proyecto').insert({ nombre: `__prueba_rls_294_${Date.now()}` }).select().single()
+    if (errProy) {
+      marca(false, rotulo, 'preparación (proyecto de prueba)', errProy.message)
+      return
+    }
+    const { data: fr } = await admin
+      .from('frente').insert({ proyecto_id: proy.id, nombre: 'h', orden: 0 }).select().single()
+    const { data: sf } = await admin
+      .from('sub_frente').insert({ frente_id: fr.id, nombre: 'h', orden: 0 }).select().single()
+    // Miembro con SOLO marcarHechas (sin editarFechas): el caso del pedido.
+    await admin.from('acceso_proyecto').insert({ usuario_id: yo.id, proyecto_id: proy.id })
+    await admin.from('acceso_proyecto').update({ permisos: { marcarHechas: 'todas' } })
+      .eq('usuario_id', yo.id).eq('proyecto_id', proy.id)
+
+    const { data: tSin } = await admin
+      .from('tarea').insert({ sub_frente_id: sf.id, titulo: 'sin fecha', orden: 0 }).select().single()
+
+    // Control: ese usuario NO puede poner una fecha por la vía normal.
+    marca(
+      bloqueado(await c.from('tarea').update({ fecha_objetivo: hoyChile }).eq('id', tSin.id).select('id')),
+      rotulo,
+      '#294 sin editarFechas sigue sin poder poner fechas a mano',
+    )
+
+    // 1 · Marcar hecha SIN fecha, con solo marcarHechas: fecha del marcado.
+    const marcado = await c
+      .from('tarea')
+      .update({ hecha: true, fecha_real: hoyChile })
+      .eq('id', tSin.id)
+      .select('fecha_objetivo, fecha_original, fecha_por_marcado, hecha')
+    const f1 = marcado.data?.[0]
+    marca(
+      !bloqueado(marcado) && f1?.hecha === true && f1?.fecha_objetivo === hoyChile,
+      rotulo,
+      '#294 marcar hecha una tarea sin fecha le graba el día del marcado (solo marcarHechas)',
+      marcado.error?.message ?? `fecha=${f1?.fecha_objetivo}`,
+    )
+    marca(
+      f1?.fecha_original === f1?.fecha_objetivo && f1?.fecha_por_marcado === true,
+      rotulo,
+      '#294 la fecha original queda igual (sin atraso) y la marca interna puesta',
+      `original=${f1?.fecha_original} marca=${f1?.fecha_por_marcado}`,
+    )
+
+    // 2 · Desmarcar: vuelve a sin fecha, sin error.
+    const desmarcado = await c
+      .from('tarea')
+      .update({ hecha: false, fecha_real: null })
+      .eq('id', tSin.id)
+      .select('fecha_objetivo, fecha_original, fecha_por_marcado')
+    const f2 = desmarcado.data?.[0]
+    marca(
+      !bloqueado(desmarcado) && f2?.fecha_objetivo == null && f2?.fecha_original == null && f2?.fecha_por_marcado === false,
+      rotulo,
+      '#294 desmarcarla la devuelve a SIN fecha, sin error',
+      desmarcado.error?.message ?? `fecha=${f2?.fecha_objetivo}`,
+    )
+
+    // 3 · Sin rastro: cero historial y cero notificaciones para esa tarea.
+    const { data: hist } = await admin.from('replanificacion').select('id').eq('tarea_id', tSin.id)
+    const { data: notifs } = await admin.from('notificacion').select('id').eq('tarea_id', tSin.id)
+    marca(
+      (hist ?? []).length === 0 && (notifs ?? []).length === 0,
+      rotulo,
+      '#294 ni el marcado ni el desmarcado dejan historial o notificaciones',
+      `hist=${hist?.length ?? 0} notif=${notifs?.length ?? 0}`,
+    )
+
+    // 4 · Una tarea que YA tenía fecha (pasada) la conserva al marcar y al
+    //     desmarcar — la regla vigente no se toca.
+    const ayer = new Date(`${hoyChile}T12:00:00Z`)
+    ayer.setUTCDate(ayer.getUTCDate() - 1)
+    const fechaPasada = ayer.toISOString().slice(0, 10)
+    const { data: tCon } = await admin
+      .from('tarea')
+      .insert({ sub_frente_id: sf.id, titulo: 'con fecha', fecha_objetivo: fechaPasada, orden: 1 })
+      .select().single()
+    await c.from('tarea').update({ hecha: true, fecha_real: hoyChile }).eq('id', tCon.id)
+    const { data: tras } = await admin
+      .from('tarea').select('fecha_objetivo, fecha_por_marcado').eq('id', tCon.id).single()
+    marca(
+      tras?.fecha_objetivo === fechaPasada && tras?.fecha_por_marcado === false,
+      rotulo,
+      '#294 una tarea que YA tenía fecha la conserva al marcarse hecha',
+      `fecha=${tras?.fecha_objetivo}`,
+    )
+    await c.from('tarea').update({ hecha: false, fecha_real: null }).eq('id', tCon.id)
+    const { data: tras2 } = await admin
+      .from('tarea').select('fecha_objetivo').eq('id', tCon.id).single()
+    marca(
+      tras2?.fecha_objetivo === fechaPasada,
+      rotulo,
+      '#294 y también al desmarcarse (no queda sin fecha)',
+      `fecha=${tras2?.fecha_objetivo}`,
+    )
+
+    // 5 · La marca interna no se fabrica desde el cliente: forzarla no
+    //     surte efecto (y por lo tanto no permite robarle la fecha después).
+    await c.from('tarea').update({ fecha_por_marcado: true }).eq('id', tCon.id)
+    const { data: tras3 } = await admin
+      .from('tarea').select('fecha_por_marcado').eq('id', tCon.id).single()
+    marca(
+      tras3?.fecha_por_marcado === false,
+      rotulo,
+      '#294 nadie fabrica la marca interna por API',
+      `marca=${tras3?.fecha_por_marcado}`,
+    )
+    // (el barrido de proyectos de prueba se lleva todo esto)
+  } finally {
+    await c.auth.signOut()
+  }
+}
+
 async function limpiarProyectosDePrueba(admin) {
   if (!admin) return
   const { data: previos } = await admin.from('proyecto').select('id').like('nombre', '__prueba_rls_%')
@@ -1108,6 +1248,9 @@ async function main() {
 
   // ---------- #293: mover tareas arrastrando ----------
   await probarMoverTarea(admin)
+
+  // ---------- #294: la hecha sin fecha queda con fecha ----------
+  await probarHechaSinFecha(admin)
 
   // ---------- #255: el canal de tiempo real ----------
   await probarCanalTiempoReal(admin)

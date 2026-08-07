@@ -74,6 +74,8 @@ const toTarea = (r: Row): Tarea => ({
   responsableId: r.responsable_id ?? undefined,
   fechaObjetivo: r.fecha_objetivo ?? undefined,
   fechaOriginal: r.fecha_original ?? undefined,
+  // #294: solo lectura — la escribe el trigger de fechas, nunca el cliente.
+  fechaPorMarcado: r.fecha_por_marcado ?? undefined,
   hecha: r.hecha,
   fechaReal: r.fecha_real ?? undefined,
   comentarios: r.comentarios ?? undefined,

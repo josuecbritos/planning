@@ -253,6 +253,21 @@ cinco categorías excluyentes — Hecha (verde), Pendiente (sin color), Pendient
 replanificada (ámbar), Atrasada (rojo), Atrasada replanificada (morado). El
 usuario solo marca "hecha"; el resto sale de la fecha y del historial.
 
+**La tarea sin fecha que se marca hecha queda con fecha (#294).** Al marcarla,
+se le graba como fecha objetivo **el día del marcado** (con la fecha original
+igual: no gana atraso), así la Tabla, la Gantt y el filtro "Con fecha" cuentan
+lo mismo — antes la Gantt la dibujaba en el día del marcado y la Tabla la
+mostraba sin fecha. Vale desde cualquier lugar donde se marque (Tabla, Mis
+Tareas, panel de detalle) y con solo el permiso de marcar hechas: el valor lo
+pone la base, no el cliente. Al **desmarcar**, esa fecha se quita y la tarea
+vuelve a quedar **sin fecha**; una tarea que ya tenía fecha, en cambio, la
+conserva al marcar y al desmarcar (la fecha de cierre sigue siendo la última
+fecha planificada, no el día del clic). La distinción vive en la base
+(`fecha_por_marcado`, migración 29, marca interna que el cliente no puede
+fabricar); ni el marcado ni el desmarcado escriben historial de
+replanificaciones ni generan notificación. Los datos anteriores al cambio se
+corrigieron con la misma regla (la fecha grabada es su día de marcado).
+
 **La fecha de una tarea hecha no se edita (#245).** Vale en las **cuatro**
 vistas —tabla, Mis Tareas, Gantt y panel de detalle—: mover la fecha de algo ya
 cerrado reescribiría el registro de cuándo se comprometió, que es justamente el

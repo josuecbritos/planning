@@ -255,6 +255,32 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   proyecto; y mover no toca fecha/responsable/estado, no escribe historial de
   replanificaciones ni genera notificaciones.
 
+**Migración 29 — `20260707000029_hecha_sin_fecha.sql` (#294)**
+- Marcar hecha una tarea SIN fecha le graba como fecha objetivo el día del
+  marcado; desmarcarla la devuelve a sin fecha. La distinción ("¿esta fecha
+  la puso el marcado o una planificación?") vive en la columna
+  `tarea.fecha_por_marcado`, que es **interna**: `normalizar_fechas_tarea`
+  la fuerza al valor previo en todo UPDATE — el cliente no puede fabricarla,
+  así que nadie puede marcar una fecha planificada como "del marcado" para
+  después borrarla desmarcando (sería quitar fechas sin `editarFechas`).
+- **La exención de permisos es quirúrgica**: el relleno del marcado y el
+  quite del desmarcado no exigen `editarFechas` porque el VALOR lo decide el
+  trigger de fechas, que corre ANTES que el de permisos
+  (`trg_normalizar_fechas` < `trg_validar_permisos_tarea`, orden alfabético
+  de PostgreSQL). Cualquier otro cambio de fecha sigue exigiendo
+  `editarFechas` — la compuerta lo comprueba con el mismo usuario.
+- **La corrección de datos corre con los triggers de `tarea` desactivados**
+  (`alter table ... disable trigger user`): es una operación única del dueño
+  y así queda garantizado por construcción que no escribe historial, no
+  genera notificaciones y no dispara validaciones — lo que se escribe es
+  exactamente lo que dice el UPDATE. Solo toca hechas sin fecha CON día de
+  marcado guardado; el NOTICE informa cuántas corrigió y cuántas dejó.
+- La compuerta trae los casos nuevos (`probarHechaSinFecha`): con solo
+  `marcarHechas` se marca y la fecha aparece (y sin `editarFechas` sigue sin
+  poder ponerse fechas a mano); desmarcar devuelve a sin fecha sin error;
+  una con fecha la conserva en ambos sentidos; la marca interna no se
+  fabrica por API; cero historial y cero notificaciones.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.

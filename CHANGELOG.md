@@ -980,3 +980,56 @@ permiso, mobile sin asa y el "+" de agregar debajo intacto).
 
 **La compuerta suma `probarMoverTarea`** con esos mismos casos contra la API
 real, rol por rol.
+
+## #294 — La tarea sin fecha que se marca hecha queda con fecha
+
+Una tarea sin fecha objetivo marcada como hecha quedaba contada de dos
+maneras: la Gantt la dibujaba (y la sumaba en la carga) en el día del marcado
+—dibuja por "fecha vigente", que para una hecha cae en su fecha real—, la
+Tabla la mostraba con la Fecha Objetivo vacía, y el filtro "Con fecha" la
+hacía desaparecer de la Gantt donde se la estaba viendo puesta en un día
+concreto. Ahora **al marcarla se le graba como fecha objetivo el día del
+marcado**, con la fecha original igual (no gana atraso): las dos vistas
+muestran lo mismo y la tarea entra en "Con fecha".
+
+- **La parte de fondo: desmarcar distingue dos casos.** Si la fecha la puso
+  el propio marcado, desmarcar la quita y la tarea vuelve a quedar **sin
+  fecha**; si la tarea ya tenía fecha, la **conserva** — sin la distinción,
+  desmarcar borraría fechas que el usuario planificó. La memoria vive en la
+  columna nueva `tarea.fecha_por_marcado` (migración 29), **interna**: el
+  trigger la fuerza en todo UPDATE y el cliente no puede fabricarla (si
+  pudiera, marcar+desmarcar serviría para borrar fechas sin permiso).
+- **La regla vive en la base** (`normalizar_fechas_tarea`), así que vale
+  desde cualquier lugar donde se marque —Tabla, Mis Tareas, panel de
+  detalle— y **con solo `marcarHechas`**: la exención de `editarFechas` es
+  segura porque el valor lo fuerza el trigger de fechas, que corre antes que
+  el de permisos. El quite del desmarcado viaja EN el mismo UPDATE, así que
+  el bloqueo "No puedes eliminar tareas que ya pasaron" (que siempre excluyó
+  a las hechas) no lo alcanza. En modo Local, `memoryRepo` replica las dos
+  reglas.
+- **Sin rastro**: ni el marcado ni el desmarcado escriben en el historial de
+  replanificaciones (el trigger de historial exige que la fecha anterior
+  exista) ni generan notificación. Una tarea que YA tenía fecha no cambia en
+  nada: conserva su fecha planificada al marcar y al desmarcar (la fecha de
+  cierre sigue siendo la última fecha planificada).
+- **Corrección de datos**: a las tareas ya hechas y sin fecha se les graba su
+  día de marcado (`fecha_real`) como fecha objetivo, con la original igual y
+  la marca puesta (desmarcarlas también las devuelve a sin fecha). Corre con
+  los triggers de la tabla desactivados —operación única del dueño: cero
+  historial, cero notificaciones garantizados por construcción— y NO toca a
+  las que no tienen día de marcado guardado (no se inventa una fecha). El
+  `RAISE NOTICE` informa cuántas se corrigieron y cuántas quedaron.
+
+**Verificado contra Postgres 16 local** con las migraciones 1→29 aplicadas
+sobre datos sembrados "de producción" (12/12): la corrección corrige lo que
+promete y solo eso (2 corregidas, 1 sin día informada, la hecha normal
+intacta), con solo `marcarHechas` la fecha aparece y desaparece, sin
+`editarFechas` sigue sin poder ponerse fechas a mano, la marca interna no se
+fabrica por API, una con fecha pasada la conserva al marcar y desmarcar, y
+cero historial/notificaciones. **Y e2e con Playwright en memoria** (24/24):
+los criterios de aceptación del pedido — incluidos los tres lugares de
+marcado, el filtro "Con fecha" en ambas vistas, Atraso "—", la vencida que
+vuelve a verse atrasada, y los clics de la Gantt intactos.
+
+**La compuerta suma `probarHechaSinFecha`** con esos mismos casos contra la
+API real.

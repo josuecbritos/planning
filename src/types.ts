@@ -143,6 +143,14 @@ export interface Tarea {
   fechaObjetivo?: ISODate
   /** Compromiso inicial: la PRIMERA fecha asignada. Inmutable desde entonces. */
   fechaOriginal?: ISODate
+  /**
+   * #294: true si la fecha vigente LA PUSO EL MARCADO (la tarea no tenía
+   * fecha al marcarse hecha). Al desmarcar, esa fecha se quita y la tarea
+   * vuelve a quedar sin fecha; una fecha planificada, en cambio, se
+   * conserva. Marca interna: en Supabase la administra el trigger de
+   * fechas y el cliente nunca la escribe.
+   */
+  fechaPorMarcado?: boolean
   /** Unico estado que se marca a mano. Default false. */
   hecha: boolean
   /** Fecha real de termino; se registra al marcar hecha. Puede diferir de fechaObjetivo. */
