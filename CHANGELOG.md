@@ -1218,7 +1218,17 @@ proyectos sí la titulan **"Acciones"**. Ahora las tres dicen lo mismo.
 
 - **Una palabra**: el `<th className="col-acc">` de `TableView.tsx` deja de ir
   vacío. Misma palabra y misma clase que las otras dos tablas, así que hereda
-  su estilo (monoespaciada, mayúsculas, alineación) sin CSS nuevo.
+  su tipografía (monoespaciada, mayúsculas, peso) sin CSS nuevo.
+- **Centrado, como las demás columnas de esa tabla.** El `.col-acc` ya pedía
+  `text-align: center` desde siempre, pero nunca llegó a aplicarse: perdía por
+  especificidad contra la regla genérica `table.tareas th, td`, el mismo
+  tropiezo que el archivo ya documentaba para la columna "Hecha". Con el
+  encabezado vacío no se notaba; con texto, sí. Se centra **solo el
+  encabezado**: los iconos de la celda no se movieron ni un píxel.
+- **Las tablas de administración quedaron intactas.** Llevan las DOS clases
+  (`tareas usuarios-tabla`), así que una regla sin acotar las habría alcanzado.
+  Ahí todas las cabeceras van a la izquierda y "Acciones" ya estaba alineada
+  con sus vecinas, así que la regla lleva `:not(.usuarios-tabla)`.
 - **La columna sigue apareciendo solo con permiso sobre las tareas.** Quien
   solo mira no ve la columna ni su título, igual que antes.
 - **Ningún ancho cambió.** Medido en 1440×900 antes y después: las siete
@@ -1230,7 +1240,9 @@ proyectos sí la titulan **"Acciones"**. Ahora las tres dicen lo mismo.
   icono, ni ninguna otra cabecera.
 - **Sin migración.** El diff toca solo el cliente.
 
-**Verificado** con `docs/prueba-298-columna-acciones.mjs`: 12 comprobaciones en
-verde — el título en escritorio, la comparación de estilo contra las dos tablas
-de administración, el cliente sin permisos que sigue sin ver la columna, los
-anchos intactos y el mobile sin encabezado ni desborde.
+**Verificado** con `docs/prueba-298-columna-acciones.mjs`: 17 comprobaciones en
+verde — el título en escritorio, el centrado medido contra el de sus columnas
+vecinas, los iconos que no se movieron, las cabeceras de administración sin
+tocar, la tipografía compartida con las dos tablas de administración, el
+cliente sin permisos que sigue sin ver la columna, los anchos intactos y el
+mobile sin encabezado ni desborde.

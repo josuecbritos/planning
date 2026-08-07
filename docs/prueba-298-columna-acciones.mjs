@@ -107,20 +107,71 @@ await p.getByText('Admin Proyectos', { exact: true }).first().click().catch(asyn
 await esperar(900)
 const estiloAdminProy = await estiloTh('.usuarios-tabla thead th.col-acc')
 
+// Misma palabra y misma tipografía que las tablas de administración. La
+// ALINEACIÓN no entra acá a propósito: en la tabla del proyecto el título va
+// centrado, como el de sus columnas vecinas (se comprueba aparte, más abajo).
 const mismo = (a, b2) =>
   !!a && !!b2 && a.texto === b2.texto && a.mayusculas === b2.mayusculas &&
-  a.alineacion === b2.alineacion && a.transformacion === b2.transformacion &&
-  a.peso === b2.peso && a.familia === b2.familia
+  a.transformacion === b2.transformacion && a.peso === b2.peso && a.familia === b2.familia
 
 chk(estiloProyecto?.texto === 'Acciones' && estiloUsuarios?.texto === 'Acciones',
     'C2 misma palabra que administración de usuarios',
     `proyecto="${estiloProyecto?.texto}" usuarios="${estiloUsuarios?.texto}"`)
+// Las tablas de administración llevan las dos clases (`tareas usuarios-tabla`):
+// una regla sin acotar las alcanzaría también. Ahí TODAS las cabeceras van a la
+// izquierda, así que su "Acciones" no se toca.
+chk(estiloUsuarios?.alineacion === 'left' && estiloAdminProy?.alineacion === 'left',
+    'C2 las cabeceras de administración siguen a la izquierda, sin tocar',
+    `usuarios=${estiloUsuarios?.alineacion} adminProyectos=${estiloAdminProy?.alineacion}`)
 chk(mismo(estiloProyecto, estiloUsuarios),
-    'C2 mismo estilo y alineación que administración de usuarios',
+    'C2 misma tipografía que administración de usuarios',
     JSON.stringify({ proyecto: estiloProyecto, usuarios: estiloUsuarios }))
 chk(mismo(estiloProyecto, estiloAdminProy),
-    'C2 mismo estilo y alineación que administración de proyectos',
+    'C2 misma tipografía que administración de proyectos',
     JSON.stringify({ adminProyectos: estiloAdminProy }))
+
+// ── C2 · Alineación: centrado como las demás columnas de ESTA tabla ─────────
+// La columna "Tarea" queda fuera: es la de texto largo y va a la izquierda.
+await abrirProyecto('Plan PGP Arauco')
+const alineaciones = await p.evaluate(() => {
+  const t = document.querySelector('table.tareas')
+  return [...t.querySelectorAll('thead th')].map((th) => {
+    const r = document.createRange()
+    r.selectNodeContents(th)
+    const caja = r.getBoundingClientRect()
+    const celda = th.getBoundingClientRect()
+    return {
+      clase: th.className || '(Tarea)',
+      alineacion: getComputedStyle(th).textAlign,
+      // Cuánto se corre el centro del texto respecto del centro de la celda.
+      desvio: caja.width ? +(caja.left + caja.width / 2 - (celda.left + celda.width / 2)).toFixed(1) : null,
+    }
+  })
+})
+const centradas = alineaciones.filter((c) => c.clase !== '(Tarea)')
+chk(
+  centradas.every((c) => c.alineacion === 'center' && Math.abs(c.desvio) <= 1),
+  'C2 el título va centrado, igual que el de las demás columnas de la tabla',
+  JSON.stringify(centradas),
+)
+
+// Los iconos de la celda NO se movieron: el centrado es solo del encabezado.
+// Posiciones medidas antes del cambio, respecto del centro de la celda.
+const ICONOS_ESPERADOS = [-26.5, -6.8, 13]
+const iconos = await p.evaluate(() => {
+  const td = document.querySelector('table.tareas tbody td.col-acc')
+  const celda = td.getBoundingClientRect()
+  return [...td.querySelectorAll('button, a')].map((x) => {
+    const r = x.getBoundingClientRect()
+    return +(r.left + r.width / 2 - (celda.left + celda.width / 2)).toFixed(1)
+  })
+})
+chk(
+  iconos.length === ICONOS_ESPERADOS.length &&
+    iconos.every((v, i) => Math.abs(v - ICONOS_ESPERADOS[i]) <= 0.5),
+  'C2 los iconos de la celda no se movieron',
+  JSON.stringify(iconos),
+)
 
 // ── C4 · Ninguna cabecera cambió de texto ni de ancho ───────────────────────
 const textosEsperados = ['Hecha', 'Tarea', 'Resp.', 'Estado', 'Fecha Objetivo', 'Atraso', 'Acciones']
