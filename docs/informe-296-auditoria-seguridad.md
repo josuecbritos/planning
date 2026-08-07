@@ -57,7 +57,14 @@ La función ejecutó y la fila se insertó. **No hay guarda que lo impida a nive
 
 ### Lo que falta: la alcanzabilidad por REST
 
-Que `crear_notificacion` tenga el permiso **no basta** para que sea un problema: la capa REST de Supabase (PostgREST) tiene que **publicarla** como endpoint `/rpc/crear_notificacion`. Eso depende de la configuración de producción y **no se puede comprobar desde aquí**. Se entrega el script `docs/prueba-296-alcance-rpc.mjs`, que lo intenta de verdad desde una sesión de usuario normal y una sin sesión, y reporta por función: *no expuesta* / *rechazada por permiso* / *ejecutó*. Si `crear_notificacion` ejecuta, el script comprueba que la notificación falsa apareció y **la borra** con la sesión admin.
+Que `crear_notificacion` tenga el permiso **no basta** para que sea un problema: la capa REST de Supabase (PostgREST) tiene que **publicarla** como endpoint `/rpc/crear_notificacion`. Eso depende de la configuración de producción y **no se puede comprobar desde aquí**. Se entrega el script `docs/prueba-296-alcance-rpc.mjs`, que lo intenta de verdad desde una sesión de usuario normal (el consultor A de pruebas) y una sin sesión, y reporta por función: *no expuesta* / *rechazada por permiso* / *ejecutó*.
+
+**El script no toca ningún dato de clientes.** Corre contra producción, así que:
+
+- **Crea su propio terreno**: un proyecto `__prueba_296_...` con su frente, sub frente y una tarea. No usa la primera tarea que encuentre ni ningún proyecto real.
+- **La víctima es un usuario de prueba que él mismo crea** (`__prueba_296_destinatario_...@example.invalid`), nunca una persona real. Esto importa de verdad: **las notificaciones llegan en vivo**, así que un cliente real habría *visto* la notificación falsa en pantalla, y borrarla después no deshace que la haya visto.
+- **La limpieza borra solo lo que la prueba creó, por su id** —nunca por usuario+tarea, que se llevaría notificaciones legítimas ajenas— y elimina el proyecto y los usuarios de prueba al terminar, **aunque algo falle en el medio**.
+- **Si el terreno de prueba no se puede crear, el script no corre.** Mejor no probar que probar sobre datos de clientes.
 
 - **Si el script dice "no expuesta"** para `crear_notificacion` → #290 es teórico: el permiso está mal, pero PostgREST no deja llegar a la función. Conviene cerrarlo igual (defensa en profundidad), sin urgencia.
 - **Si dice "ejecutó"** → #290 es explotable en producción y conviene cerrarlo pronto.
@@ -128,10 +135,12 @@ Ambos son de solo lectura salvo la notificación de prueba, que el script borra.
    ```bash
    SUPABASE_URL=... SUPABASE_ANON_KEY=... \
    RLS_ADMIN_EMAIL=... RLS_ADMIN_PASS=... \
-   RLS_CLIENTE_EMAIL=... RLS_CLIENTE_PASS=... \
+   RLS_CONSULTOR_A_EMAIL=consultor.a@andotek.cl RLS_CONSULTOR_A_PASS=... \
    node docs/prueba-296-alcance-rpc.mjs
    ```
-   Leer el veredicto de `crear_notificacion`: *ejecutó* (explotable, cerrar pronto) vs *no expuesta*/*rechazada* (teórico, cerrar sin urgencia). El script limpia la notificación de prueba y lo dice.
+   El admin es obligatorio: crea el terreno de prueba y lo limpia. El consultor A es el "atacante" (un usuario normal); si falta, se prueba solo la vía anónima.
+
+   Leer el veredicto de `crear_notificacion`: *ejecutó* (explotable, cerrar pronto) vs *no expuesta*/*rechazada* (teórico, cerrar sin urgencia). Al final, el bloque `─── LIMPIEZA ───` declara qué borró: debe decir que el proyecto de prueba quedó **eliminado** y, si hubo notificación falsa, cuántas borró. Si algo dijera `⚠ QUEDÓ SIN BORRAR`, avisar.
 
 Con esos dos resultados, Josué tiene todo para decidir qué se corrige y en qué orden. **Este informe no corrige nada**, como pedía el encargo.
 
