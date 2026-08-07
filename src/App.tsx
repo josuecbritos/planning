@@ -735,6 +735,13 @@ export default function App({ repo }: { repo: Repo }) {
         run(async () => {
           const p = await repo.createProyecto({ ...i, creadoPor: sesion?.id })
           setProyectoActivoId(p.id)
+          // #297: entrar al proyecto nuevo con la selección de frente LIMPIA,
+          // igual que por cualquier otro camino de entrada. Sin esto se
+          // entraba filtrando por un frente de OTRO proyecto: la vista
+          // principal no encontraba nada y mostraba "aún no tiene frentes"
+          // incluso después de crear el primero (la barra lateral, que no
+          // filtra por frente, sí lo mostraba — de ahí lo desconcertante).
+          setFrenteSel('todos')
           setPantalla('proyectos')
           return (s) => apply.upsertProyecto(s, p)
         }),
