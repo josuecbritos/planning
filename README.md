@@ -207,6 +207,8 @@ docs/
   prueba-297-frente-al-crear.mjs  Prueba e2e del camino "crear proyecto → primer
                          frente" (Tabla y Gantt), contra `vite preview`
   diagnostico-297-frente-al-crear.md
+  prueba-298-columna-acciones.mjs  Prueba e2e de la cabecera "Acciones" de la
+                         tabla del proyecto, contra `vite preview`
   documento-funcional-v3.1.md  (histórico)
 ```
 

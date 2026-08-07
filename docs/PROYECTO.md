@@ -155,6 +155,11 @@ completo con creación y edición **inline** (sin formularios).
   SIGUE siendo de cada máquina, a propósito: **en qué vista estabas** —entrar
   desde un computador nuevo abre limpio, con todas las vistas disponibles—,
   el tema y el modo/ancho de la barra lateral.
+  La última columna, la de los iconos, se titula **"Acciones"** (#298), la misma
+  palabra que en administración de usuarios y de proyectos. Aparece solo si se
+  tiene algún permiso sobre las tareas: quien solo mira no ve la columna ni su
+  título. En mobile la columna mide 26px y lleva solo el ⓘ, así que ahí sigue
+  sin encabezado.
 - **Gantt** (grilla tipo Excel): planificación por clics, horizonte configurable,
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
 

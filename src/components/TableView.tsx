@@ -510,7 +510,11 @@ function SubFrenteTabla({
             {/* Atraso (días hábiles corridos hacia adelante). En mobile se
                 oculta (5 columnas), igual que hacía col-orig. */}
             <th className="col-desv">Atraso</th>
-            {can.algunoDeTareas && <th className="col-acc"></th>}
+            {/* #298: la columna de acciones se titula igual que en las tablas
+                de administración de usuarios y de proyectos. Sigue apareciendo
+                solo si hay algún permiso sobre las tareas: quien solo mira no
+                ve la columna ni su título. */}
+            {can.algunoDeTareas && <th className="col-acc">Acciones</th>}
           </tr>
         </thead>
         <tbody>

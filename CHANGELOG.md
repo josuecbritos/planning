@@ -1209,3 +1209,28 @@ Diagnóstico completo, propuesta incluida:
 principal ignore una selección de frente que no pertenece al proyecto que está
 mostrando, para que el mensaje "aún no tiene frentes" no pueda volver a decir
 algo falso por una vía nueva.
+
+## #298 — La columna de acciones de la tabla del proyecto ya tiene título
+
+En la vista Tabla de un proyecto, la columna de la derecha con los iconos de
+acción no tenía encabezado; las tablas de administración de usuarios y de
+proyectos sí la titulan **"Acciones"**. Ahora las tres dicen lo mismo.
+
+- **Una palabra**: el `<th className="col-acc">` de `TableView.tsx` deja de ir
+  vacío. Misma palabra y misma clase que las otras dos tablas, así que hereda
+  su estilo (monoespaciada, mayúsculas, alineación) sin CSS nuevo.
+- **La columna sigue apareciendo solo con permiso sobre las tareas.** Quien
+  solo mira no ve la columna ni su título, igual que antes.
+- **Ningún ancho cambió.** Medido en 1440×900 antes y después: las siete
+  cabeceras conservan su ancho al décimo de píxel.
+- **En mobile la columna sigue sin encabezado.** Ahí mide 26px y lleva solo el
+  ⓘ: "Acciones" necesita 40px y se cortaba contra el borde de la tabla.
+  Decisión del dueño, consultada: el título es de escritorio. Dos líneas de
+  CSS dentro del bloque de mobile que ya existía; no se tocó el ancho, ni el
+  icono, ni ninguna otra cabecera.
+- **Sin migración.** El diff toca solo el cliente.
+
+**Verificado** con `docs/prueba-298-columna-acciones.mjs`: 12 comprobaciones en
+verde — el título en escritorio, la comparación de estilo contra las dos tablas
+de administración, el cliente sin permisos que sigue sin ver la columna, los
+anchos intactos y el mobile sin encabezado ni desborde.
