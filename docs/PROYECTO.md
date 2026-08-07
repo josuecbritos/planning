@@ -466,7 +466,15 @@ admin — la barrera no es la interfaz sino un trigger en la base.
 **Comentarios:** hilo por tarea con menciones `@` acotadas a quienes tienen
 acceso al proyecto (una sola notificación por persona y comentario). El autor
 puede editar lo suyo, con marca de editado; nadie borra: el hilo acompaña al
-registro de replanificaciones.
+registro de replanificaciones. **Las direcciones web se ven como enlaces y se
+abren en pestaña nueva (#299):** lo que empieza por `http://`, `https://` o
+`www.` seguido de otro punto. Una palabra suelta con punto —`andotek.cl`, o el
+final de una frase— NO se vuelve enlace, para no convertir abreviaturas. El
+reconocimiento ocurre **al pintar**, en el mismo recorrido que las menciones,
+así que aplica igual a los comentarios ya escritos y no cambia ningún dato
+guardado. El texto de un comentario es contenido de terceros: solo `http` y
+`https` llegan a ser enlace, y se abren sin dar referencia a la ventana de
+origen (invariante 21 de `SEGURIDAD.md`).
 
 **Otros:** archivo de canceladas, tema claro/oscuro (sigue el sistema, con
 override manual persistente por usuario), diseño responsive (mobile prioriza

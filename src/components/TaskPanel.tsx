@@ -335,15 +335,34 @@ function Comentarios({
                 </div>
               ) : (
                 <p className="comentario__texto">
-                  {partirComentario(c.texto).map((parte, i) =>
-                    parte.tipo === 'texto' ? (
-                      <span key={i}>{parte.valor}</span>
-                    ) : (
-                      <span key={i} className="mencion">
-                        @{state.usuarios.find((u) => u.id === parte.usuarioId)?.nombre ?? 'alguien'}
-                      </span>
-                    ),
-                  )}
+                  {partirComentario(c.texto).map((parte, i) => {
+                    if (parte.tipo === 'mencion') {
+                      return (
+                        <span key={i} className="mencion">
+                          @{state.usuarios.find((u) => u.id === parte.usuarioId)?.nombre ?? 'alguien'}
+                        </span>
+                      )
+                    }
+                    // #299: el enlace se abre en pestaña nueva —para no sacar a
+                    // nadie de la herramienta a mitad de una tarea— y sin darle
+                    // al destino ninguna referencia a esta ventana. Lo que se
+                    // ve es el texto tal cual se escribió; el destino ya viene
+                    // validado como http/https desde `partirComentario`.
+                    if (parte.tipo === 'enlace') {
+                      return (
+                        <a
+                          key={i}
+                          className="comentario__enlace"
+                          href={parte.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {parte.valor}
+                        </a>
+                      )
+                    }
+                    return <span key={i}>{parte.valor}</span>
+                  })}
                 </p>
               )}
             </li>

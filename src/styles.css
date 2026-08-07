@@ -621,6 +621,10 @@ table.tareas .col-desv { text-align: center; }
 .comentario__meta .resp-badge { width: 22px; height: 22px; font-size: 10px; }
 .comentario__fecha { color: var(--gris-texto); margin-left: auto; font-size: 11px; }
 .comentario__texto { margin: 6px 0 0; font-size: 13px; white-space: pre-wrap; }
+/* #299: una dirección larga no tiene espacios donde cortar, y con `pre-wrap`
+   empujaría el ancho del panel. `anywhere` la deja partir donde haga falta;
+   solo afecta al enlace, no al resto del comentario. */
+.comentario__enlace { color: var(--primario); overflow-wrap: anywhere; }
 .comentario-nuevo { display: flex; flex-direction: column; gap: 8px; }
 .comentario-nuevo textarea {
   font: inherit; font-size: 13px; border: 1px solid var(--gris-borde);

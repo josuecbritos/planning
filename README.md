@@ -209,6 +209,8 @@ docs/
   diagnostico-297-frente-al-crear.md
   prueba-298-columna-acciones.mjs  Prueba e2e de la cabecera "Acciones" de la
                          tabla del proyecto, contra `vite preview`
+  prueba-299-enlaces-comentarios.mjs  Prueba e2e de los enlaces en el hilo de
+                         comentarios, contra `vite preview`
   documento-funcional-v3.1.md  (histórico)
 ```
 
