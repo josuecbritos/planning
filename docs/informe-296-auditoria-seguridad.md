@@ -149,3 +149,75 @@ Con esos dos resultados, Josué tiene todo para decidir qué se corrige y en qu�
 ## Nota de método
 
 Lo verificable con certeza (el ACL de las funciones, el impacto de cada una, la consistencia del repo) se comprobó ejecutándolo en un PostgreSQL 16 con las 29 migraciones aplicadas — no razonándolo. Lo que depende de la configuración de producción (alcance por REST) o del estado vivo (divergencia) no se pudo tocar desde aquí y se entrega como scripts de solo lectura para correr con las credenciales reales. No se escribió nada en ningún esquema; las escrituras de prueba fueron sobre la base local desechable, y la única que tocaría producción (la notificación falsa del script de Parte A) queda a cargo de ese script, que la borra.
+
+---
+
+# Cierre — qué pasó después (07-ago-2026)
+
+*Sección agregada al cerrar el trabajo. El informe de arriba queda tal como se
+escribió: es el registro de lo que se sabía en ese momento. Esto es lo que las
+corridas contra producción y el pedido #290 respondieron después.*
+
+## Las dos preguntas del dueño quedaron respondidas
+
+**¿La base desplegada es lo que dice el repo? SÍ.** Era la pregunta que arriba
+quedó abierta porque este entorno no alcanza producción. Josué corrió
+`docs/consulta-296-auditoria-base.sql` en el SQL Editor y el resultado fue
+**limpio**: las reglas de acceso de la base coinciden exactamente con el repo,
+las doce tablas tienen RLS activa, ninguna política concede acceso sin
+condición, y los triggers, la vista y las columnas calzan uno a uno. **No hay
+una segunda #281 escondida.** La referencia contra la que se comparó es la de
+la sección "Parte B" de este informe.
+
+**¿#290 era un problema real? SÍ, y ya está cerrado.** Se resolvió con la
+**migración 30** (`20260707000030_execute_publico.sql`), aplicada y verificada
+en producción el mismo día. Retiró el permiso universal de **36 funciones**,
+dejando intacto todo permiso explícito. Comprobado en la base real:
+
+```
+abiertas_a_todos      = 0
+crear_notificacion    = {postgres=X/postgres, service_role=X/postgres}
+usuario_tiene_acceso  = {postgres=X/postgres, service_role=X/postgres}
+es_admin              = {postgres=X/postgres, authenticated=X/postgres, service_role=X/postgres}
+```
+
+Las dos peligrosas quedaron solo para los roles internos; los ayudantes que usan
+las políticas de RLS conservaron su `authenticated`, que es lo que evitaba
+romperlas.
+
+## Lo que este informe no vio, y conviene decirlo
+
+**Se me pasó `usuario_tiene_acceso`.** Es `security definer` y responde si OTRO
+usuario tiene acceso a OTRO proyecto sin comprobar quién pregunta — no expone
+contenido, pero permite sondear quién trabaja en qué. Su permiso también venía
+solo de `PUBLIC`. Apareció al revisar la salida real de la auditoría, no en
+este informe. Quedó cerrada junto con `crear_notificacion` en la migración 30.
+
+La lección para la próxima auditoría: la clasificación de arriba ("~13
+ayudantes de permiso, inofensivos porque solo hablan del propio usuario") era
+correcta en general pero **se aplicó demasiado rápido a una función que sí
+recibe el usuario a consultar como parámetro**. Conviene mirar las firmas una
+por una en vez de agrupar por familia.
+
+## Lo que se decidió NO averiguar
+
+**Si `crear_notificacion` era alcanzable por la API REST quedó sin comprobar, a
+propósito.** El pedido #290 lo resolvió así: el resultado solo habría cambiado
+la urgencia, no la decisión de cerrarla. Por eso `docs/prueba-296-alcance-rpc.mjs`
+no llegó a correrse contra producción. **Se conserva en el repo** porque sigue
+siendo útil: responde la misma pregunta para cualquier función futura, y ya trae
+el resguardo de crear su propio terreno de prueba sin tocar datos de clientes.
+
+## Qué quedó vigilando esto de aquí en adelante
+
+La compuerta trae desde #290 el caso `probarExecutePublico`, que lee la vista
+`permiso_ejecucion_abierto` y **se pone en rojo por la sola presencia** del
+permiso universal en cualquier función — sin depender de que nadie intente
+explotarlo. Es lo que impide que este agujero, que estuvo abierto un mes sin que
+nadie lo notara, vuelva a pasar inadvertido.
+
+**Queda una decisión abierta, menor:** si conviene agregar
+`alter default privileges revoke execute on functions from public` (la variante
+global, la única que funciona) para que las funciones nuevas nazcan cerradas. Se
+recomendó **no** hacerlo: alcanza a cualquier esquema —incluidas extensiones
+futuras— y el beneficio ya lo da la compuerta. Detalle en el PR de #290.
