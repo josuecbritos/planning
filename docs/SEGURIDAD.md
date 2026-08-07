@@ -281,6 +281,35 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   una con fecha la conserva en ambos sentidos; la marca interna no se
   fabrica por API; cero historial y cero notificaciones.
 
+**Migración 30 — `20260707000030_execute_publico.sql` (#290)**
+- **El error que corrige, y que conviene no repetir:** en PostgreSQL las
+  funciones nacen con `EXECUTE` concedido a **`PUBLIC`**. Las migraciones 15 y
+  22 revocaron `from anon, authenticated` — que no toca lo que se tiene por
+  pertenecer a `PUBLIC` — así que el permiso siguió abierto a todos durante un
+  mes. **Para cerrar una función hay que revocar de `public`, no de los roles.**
+- Retira el permiso universal de las **36** funciones del proyecto que lo
+  conservaban, **conservando intacto todo permiso explícito**: por función, el
+  resultado es su ACL de antes *menos* la entrada universal, sin altas ni bajas
+  (verificado una por una, 41/41). Las funciones de **extensiones** (pgcrypto)
+  se excluyen por `pg_depend.deptype = 'e'`: no son del proyecto.
+- Quedan cerradas a todo el mundo salvo los roles internos las dos que
+  importaban: `crear_notificacion` (security definer que no comprueba quién la
+  llama) y `usuario_tiene_acceso`. **No rompe nada** porque las llaman
+  funciones `security definer`, que corren con los privilegios del definidor.
+- Los ayudantes que usan las **políticas de RLS** conservan su grant explícito
+  a `authenticated` —que viene de los *default privileges* de Supabase, no de
+  ninguna migración—, y eso es justamente lo que evita romper la RLS.
+- **Hallazgo anotado:** `alter default privileges IN SCHEMA public revoke
+  execute on functions from public` **no hace nada** (el ACL guardado se fusiona
+  con el default del motor, medido en PG 16). Solo funciona la variante global,
+  sin acotar esquema, que alcanza a más de lo que el pedido autoriza. Se dejó
+  fuera a propósito en vez de escribir un blindaje de mentira — que habría sido
+  el mismo error de origen. Lo que atrapa la reincidencia es la compuerta.
+- La compuerta trae el caso nuevo (`probarExecutePublico`): lee la vista
+  `permiso_ejecucion_abierto` y **se pone en rojo por la sola presencia** del
+  permiso universal, sin depender de que nadie intente explotarlo. Si la vista
+  no existe, la corrida se declara NO CONCLUYENTE (#295), no aprobada.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.

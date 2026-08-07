@@ -1014,6 +1014,44 @@ async function probarHechaSinFecha(admin) {
   }
 }
 
+// #290 — NINGUNA función del esquema conserva el permiso universal.
+//
+// Las funciones de PostgreSQL nacen con EXECUTE concedido a PUBLIC. Las
+// migraciones 15 y 22 quisieron cerrarlas pero revocaron `from anon,
+// authenticated`, que no toca lo que se tiene por pertenecer a PUBLIC: el
+// permiso siguió abierto a todos durante un mes sin que nadie lo notara.
+// La migración 30 lo cerró; este caso es lo que impide que VUELVA a pasar.
+//
+// Falla por la SOLA PRESENCIA del permiso —no hace falta que nadie intente
+// explotarlo— leyendo la vista `permiso_ejecucion_abierto`, que lista
+// exactamente las infracciones (cero filas en una base sana).
+async function probarExecutePublico(admin) {
+  const rotulo = 'execute'
+  const { data, error } = await admin.from('permiso_ejecucion_abierto').select('funcion, es_security_definer')
+
+  if (error) {
+    // Sin la vista no se puede comprobar. NO se aprueba por silencio
+    // (#295): se dice que no se pudo comprobar y la compuerta se detiene.
+    marcaNoConcluyente(
+      rotulo,
+      '#290 ninguna función conserva el permiso de ejecución universal',
+      `no se pudo leer la vista permiso_ejecucion_abierto (${error.code ?? ''} ${error.message}) — ¿migración 30 aplicada?`,
+    )
+    return
+  }
+
+  const abiertas = data ?? []
+  const definer = abiertas.filter((f) => f.es_security_definer)
+  marca(
+    abiertas.length === 0,
+    rotulo,
+    '#290 ninguna función conserva el permiso de ejecución universal',
+    abiertas.length
+      ? `ABIERTAS A TODOS: ${abiertas.length} (${definer.length} de ellas security definer) → ${abiertas.map((f) => f.funcion).slice(0, 5).join(', ')}${abiertas.length > 5 ? '…' : ''}`
+      : 'cero funciones con EXECUTE para PUBLIC',
+  )
+}
+
 async function limpiarProyectosDePrueba(admin) {
   if (!admin) return
   const { data: previos } = await admin.from('proyecto').select('id').like('nombre', '__prueba_rls_%')
@@ -1326,6 +1364,9 @@ async function main() {
 
   // ---------- #294: la hecha sin fecha queda con fecha ----------
   await probarHechaSinFecha(admin)
+
+  // ---------- #290: el permiso de ejecución universal quedó cerrado ----------
+  await probarExecutePublico(admin)
 
   // ---------- #255: el canal de tiempo real ----------
   await probarCanalTiempoReal(admin)

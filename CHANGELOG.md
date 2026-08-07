@@ -1087,3 +1087,59 @@ canal normal → 5 en verde y sale 0; canal mudo → 2 fallas + 3 no concluyente
 y sale 1; canal con fuga → las tres de aislamiento en rojo (no como no
 concluyentes) y sale 1. El mismo veredicto se obtiene con el interruptor
 `RLS_DEMO_SILENCIO=1`. **No se tocó el producto**: ni migraciones ni `src/`.
+
+## #290 — Cerrar el permiso de ejecución que quedó abierto a todos
+
+Las migraciones 15 y 22 quisieron cerrar las funciones internas, pero
+revocaron el permiso **`from anon, authenticated`** y nunca **`from public`**.
+En PostgreSQL las funciones **nacen con `EXECUTE` concedido a `PUBLIC`**, y
+quitarle el permiso a dos roles no toca lo que tienen por pertenecer a
+`PUBLIC`. Resultado: durante un mes, **36 funciones del proyecto quedaron
+ejecutables por cualquiera**, sin que nadie lo notara. Lo detectó la auditoría
+#296 mirando el ACL real (`=X/postgres` al inicio de la lista de permisos).
+
+- **El criterio fue deliberadamente conservador**: quitar el permiso universal
+  y **dejar todo lo demás exactamente igual**. Por función, el resultado es su
+  lista de permisos de antes *menos* la entrada universal — sin altas ni bajas
+  adicionales. Verificado una por una: **41/41**.
+- **Las dos que importaban** quedan cerradas a todo el mundo salvo los roles
+  internos: `crear_notificacion` (es `security definer` y su cuerpo no
+  comprueba quién la llama, así que permitía fabricarle notificaciones a otro
+  con el autor que se quisiera) y `usuario_tiene_acceso` (permitía sondear
+  quién trabaja en qué). Ambas tenían el permiso **solo** por `PUBLIC`.
+- **No rompe nada, y se comprobó en vez de suponerlo.** Las funciones de
+  trigger las ejecuta el motor; las que se llaman desde otra `security
+  definer` corren con los privilegios del definidor; y los ayudantes que usan
+  las políticas de RLS conservan su permiso explícito para el usuario con
+  sesión — que viene de los ajustes por defecto de Supabase, no de ninguna
+  migración, y es justamente lo que evita romper la RLS.
+- **Las funciones de extensiones (pgcrypto) no se tocan**: no son del proyecto.
+- **La migración se comprueba a sí misma**: si algo quedara abierto, falla en
+  vez de dejar el trabajo a medias.
+
+**Un hallazgo que conviene no perder.** Lo natural para blindar el futuro sería
+`alter default privileges in schema public revoke execute on functions from
+public`. **Esa línea no hace nada**: medido en PostgreSQL 16, el ACL guardado
+para un esquema se *fusiona* con el valor por defecto del motor en vez de
+reemplazarlo, así que la función nueva igual nace abierta. Es el mismo error
+que estamos corrigiendo —un revoke que parece correcto y no surte efecto—, así
+que se dejó fuera en lugar de escribir un blindaje de mentira. La única
+variante que funciona es la global, que alcanza a más de lo que el pedido
+autoriza, y queda como decisión aparte.
+
+**Lo que sí impide la reincidencia** es el caso nuevo de la compuerta
+(`probarExecutePublico`): lee la vista `permiso_ejecucion_abierto` —que lista
+solo las infracciones, cero filas en una base sana— y **se pone en rojo por la
+sola presencia** del permiso universal, sin depender de que nadie intente
+explotarlo. Si la vista no existe, la corrida se declara **no concluyente**
+(#295), no aprobada.
+
+**Verificado contra Postgres 16 con las migraciones 1→30** (9/9), sobre un rig
+corregido para reproducir los permisos por defecto de Supabase — sin esa
+corrección la prueba habría dado un falso "todo bien". Se comprobó que siguen
+funcionando: crear proyecto/frente/sub frente/tarea, **las notificaciones por
+trigger al asignar y al comentar** (el criterio crítico: la función cerrada es
+justo la que las crea), el historial de replanificaciones, el marcado de #294,
+la lectura por RLS y las RPC de la aplicación; y que `crear_notificacion` y
+`usuario_tiene_acceso` ya **no** se pueden invocar. La demostración de que el
+caso de la compuerta **es capaz de fallar** está en el PR.
