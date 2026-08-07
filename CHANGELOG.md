@@ -1165,3 +1165,47 @@ frente, sí lo mostraba — de ahí lo desconcertante del síntoma.
 **Verificado** en modo Local: elegir un frente concreto sigue funcionando, los
 tres caminos de entrada siguen entrando con "todos", y el filtro sigue sin
 arrastrarse entre proyectos (#221).
+
+## #297 (reapertura) — Reproducido, medido, y un segundo defecto de orden
+
+El síntoma seguía reportándose con el PR #70 en producción. Esta vez se
+**reprodujo antes de concluir**, con la aplicación corriendo e instrumentada.
+
+- **Qué valía el frente seleccionado:** el id del frente del proyecto
+  **anterior** (`f-lev`, "Levantamiento"). Lo puso el clic del paso 1
+  (`onSelectFrente`) y nadie lo tocó después. La vista principal filtra por ese
+  valor, así que daba cero frentes siempre; la barra lateral no filtra por
+  frente y por eso sí lo mostraba.
+- **Por qué el arreglo anterior no bastó:** sí bastaba. El experimento pareado
+  —mismo camino, misma latencia simulada, cambiando solo esa línea— reproduce
+  el síntoma exacto sin ella y no lo reproduce con ella. Lo que no llegó al
+  navegador fue el archivo nuevo: una pestaña abierta desde antes del
+  despliegue sigue ejecutando el código anterior hasta que se recarga.
+- **La observación de la barra lateral queda explicada:** en el estado del
+  síntoma hay **cero** frentes marcados como activos. La marca depende de que
+  la selección coincida con el frente, y la selección era de otro proyecto.
+- **Segundo defecto, corregido:** `createProyecto` navegaba al proyecto nuevo
+  **antes** de meterlo en el estado. En ese render intermedio el efecto de
+  corrección de proyecto activo (#260) no lo encontraba entre los visibles y
+  devolvía a Resumen. Solo se veía cuando la respuesta llegaba muy rápido —modo
+  Local siempre—; con latencia de red los dos cambios caen en el mismo lote y
+  no existe el render intermedio. Una línea: el proyecto entra al estado en el
+  mismo lote que la navegación.
+- **Los dos caminos de creación auditados:** el **+** de la barra lateral y
+  Administración → Proyectos. Los dos pasan por `createProyecto`. No hay
+  entrada alternativa que se saltee el reinicio.
+- **Sin migración** y sin tocar el filtro por frente, la creación de frentes ni
+  la barra lateral.
+
+**Verificado** con `docs/prueba-297-frente-al-crear.mjs`: 17 comprobaciones en
+verde, el camino completo de punta a punta **en Tabla y en Gantt**, más los
+otros caminos de entrada, elegir un frente concreto y el filtro que no se
+arrastra (#221). La prueba sabe fallar: quitando cualquiera de las dos
+correcciones se pone en rojo.
+
+Diagnóstico completo, propuesta incluida:
+[`docs/diagnostico-297-frente-al-crear.md`](docs/diagnostico-297-frente-al-crear.md).
+**Queda una decisión abierta** (propuesta, sin implementar): que la vista
+principal ignore una selección de frente que no pertenece al proyecto que está
+mostrando, para que el mensaje "aún no tiene frentes" no pueda volver a decir
+algo falso por una vía nueva.

@@ -734,6 +734,16 @@ export default function App({ repo }: { repo: Repo }) {
       createProyecto: (i) =>
         run(async () => {
           const p = await repo.createProyecto({ ...i, creadoPor: sesion?.id })
+          // #297: el proyecto entra al ESTADO antes de navegar hacia él, en el
+          // mismo lote que la navegación. `run` aplica el parche al terminar,
+          // pero eso cae en un render posterior: entremedio la pantalla
+          // apuntaba a un proyecto que el estado todavía no tenía, y el efecto
+          // que corrige el proyecto activo (#260) lo leía como "ya no
+          // accesible" y devolvía a Resumen. Se veía solo cuando la respuesta
+          // llegaba muy rápido —siempre en modo Local—; con la latencia de red
+          // los dos cambios caían en el mismo lote y no se notaba.
+          // `upsertProyecto` es idempotente: aplicarlo dos veces no cambia nada.
+          setState((s) => (s ? apply.upsertProyecto(s, p) : s))
           setProyectoActivoId(p.id)
           // #297: entrar al proyecto nuevo con la selección de frente LIMPIA,
           // igual que por cualquier otro camino de entrada. Sin esto se
