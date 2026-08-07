@@ -1143,3 +1143,25 @@ justo la que las crea), el historial de replanificaciones, el marcado de #294,
 la lectura por RLS y las RPC de la aplicación; y que `crear_notificacion` y
 `usuario_tiene_acceso` ya **no** se pueden invocar. La demostración de que el
 caso de la compuerta **es capaz de fallar** está en el PR.
+
+## #297 — Al crear un proyecto ya no se arrastra el frente que estabas mirando
+
+Estando dentro de un proyecto con **un frente concreto** elegido en la barra
+lateral, crear un proyecto nuevo entraba a él **sin reiniciar esa selección**.
+Se entraba filtrando por un frente que pertenece a OTRO proyecto: la vista
+principal no encontraba nada y mostraba "Este proyecto aún no tiene frentes."
+incluso después de crear el primero. La barra lateral, que no filtra por
+frente, sí lo mostraba — de ahí lo desconcertante del síntoma.
+
+- **Una línea**: `createProyecto` suma `setFrenteSel('todos')`, igual que los
+  otros tres caminos de entrada a un proyecto.
+- **Revisión de todas las entradas**, como pedía la solicitud: solo tres
+  lugares llevan a la pantalla de proyecto —elegir un proyecto, iniciar sesión
+  y saltar a una tarea desde una notificación—, y los tres ya reiniciaban la
+  selección. `createProyecto` era el único que quedaba fuera. No hay más.
+- **No se tocó nada más**: ni el filtro por frente, ni la pantalla de vacío, ni
+  la creación de frentes, ni la barra lateral. Sin migración.
+
+**Verificado** en modo Local: elegir un frente concreto sigue funcionando, los
+tres caminos de entrada siguen entrando con "todos", y el filtro sigue sin
+arrastrarse entre proyectos (#221).
