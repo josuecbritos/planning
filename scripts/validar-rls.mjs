@@ -22,9 +22,24 @@
 //
 // El script solo hace escrituras de PRUEBA que espera que la RLS rechace,
 // más un ciclo crear/eliminar proyecto con el consultor A (se limpia solo).
+//
+// TRES RESULTADOS, no dos (#295): PASS, FAIL y `? INCONCL`. Una prueba que
+// comprueba una AUSENCIA —"a este NO le llega"— solo vale si en la misma
+// corrida se vio la PRESENCIA correspondiente: que a quien sí correspondía,
+// le llegó. Sin ese control de vida, "no llegó nada" es indistinguible de
+// "el canal estaba mudo", así que la prueba se marca NO CONCLUYENTE y la
+// compuerta NO pasa. Antes salía en verde, dando por comprobado un
+// aislamiento que nadie había comprobado.
+//
+// Para verlo funcionar a voluntad:
+//   RLS_DEMO_SILENCIO=1 node scripts/validar-rls.mjs
+// deja fuera al suscriptor legítimo del canal y fuerza ese caso. El
+// interruptor solo puede QUITAR escuchas, jamás ablandar una aserción: con
+// él encendido el resultado siempre es peor, nunca mejor.
 // =====================================================================
 
 import { createClient } from '@supabase/supabase-js'
+import { pathToFileURL } from 'node:url'
 
 const URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
 const ANON = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY
@@ -33,10 +48,24 @@ if (!URL || !ANON) {
   process.exit(2)
 }
 
-const resultados = []
-function marca(ok, rol, prueba, detalle = '') {
+export const resultados = []
+export function marca(ok, rol, prueba, detalle = '') {
   resultados.push({ ok, rol, prueba, detalle })
   console.log(`${ok ? '  PASS' : '✗ FAIL'}  [${rol}] ${prueba}${detalle ? ` — ${detalle}` : ''}`)
+}
+
+/**
+ * #295 — Tercer estado: NO CONCLUYENTE. Una prueba que comprueba una AUSENCIA
+ * ("a este no le llega") solo significa algo si en la MISMA corrida se
+ * observó la presencia correspondiente ("a quien sí correspondía, le llegó").
+ * Sin ese control, "no llegó nada" es indistinguible de "el canal estaba
+ * mudo": la prueba no puede aprobar, pero tampoco es una falla del producto.
+ * Cuenta como NO PASA (la compuerta se detiene), y se informa aparte para no
+ * mandar a buscar una fuga donde lo que hubo fue silencio.
+ */
+export function marcaNoConcluyente(rol, prueba, motivo) {
+  resultados.push({ ok: false, noConcluyente: true, rol, prueba, detalle: motivo })
+  console.log(`? INCONCL  [${rol}] ${prueba} — ${motivo}`)
 }
 
 /** true si la operación fue BLOQUEADA por RLS: error, o 0 filas afectadas. */
@@ -127,7 +156,12 @@ async function compararTablaContraVista(c, rotulo) {
 // Todo se genera DE VERDAD: el admin crea un proyecto de prueba
 // (__prueba_rls_rt_*, el barrido de limpieza lo recoge), agrega a B como
 // miembro y asigna una tarea a B; los triggers hacen el resto.
-async function probarCanalTiempoReal(admin) {
+// `deps.sesion` existe SOLO para poder demostrar el veredicto de esta prueba
+// sin un proyecto Supabase real (ver `docs/demo-295-canal-mudo.mjs`): permite
+// inyectar clientes de mentira que no entregan eventos. En la compuerta de
+// verdad no se pasa nada y se usa la sesión real de arriba.
+export async function probarCanalTiempoReal(admin, deps = {}) {
+  const abrirSesion = deps.sesion ?? sesion
   const rotulo = 'canal'
   const emailB = process.env.RLS_CONSULTOR_A_EMAIL
   const passB = process.env.RLS_CONSULTOR_A_PASS
@@ -138,8 +172,8 @@ async function probarCanalTiempoReal(admin) {
     return
   }
 
-  const b = await sesion(emailB, passB)
-  const cAjeno = await sesion(emailC, passC)
+  const b = await abrirSesion(emailB, passB)
+  const cAjeno = await abrirSesion(emailC, passC)
   const yoB = await perfilDe(b)
   const yoC = await perfilDe(cAjeno)
   if (!yoB || !yoC) {
@@ -155,7 +189,23 @@ async function probarCanalTiempoReal(admin) {
 
   const eventos = { B: [], C: [], admin: [], 'B:tarea': [], 'C:tarea': [] }
   const canales = []
+  /**
+   * #295 — Interruptor de DEMOSTRACIÓN: `RLS_DEMO_SILENCIO=1` deja fuera a
+   * los suscriptores legítimos (B), que son los que aportan el control de
+   * vida. Sirve para comprobar a voluntad que, sin control, la compuerta NO
+   * aprueba y las tres pruebas de aislamiento salen como no concluyentes.
+   *
+   * Es seguro por construcción: SOLO puede QUITAR escuchas, nunca agregarlas
+   * ni ablandar una aserción. Encendido, el resultado siempre es peor (la
+   * compuerta se detiene); no existe forma de usarlo para volver verde una
+   * corrida roja.
+   */
+  const DEMO_SILENCIO = process.env.RLS_DEMO_SILENCIO === '1'
   function escuchar(cliente, nombre, filtro, tabla = 'notificacion') {
+    if (DEMO_SILENCIO && nombre.startsWith('B')) {
+      console.log(`  DEMO   [${rotulo}] ${nombre} NO se suscribe (RLS_DEMO_SILENCIO=1): se fuerza la falta de control de vida`)
+      return Promise.resolve(true)
+    }
     return new Promise((resolver) => {
       const canal = cliente
         .channel(`compuerta:${nombre}:${Date.now()}`)
@@ -184,7 +234,10 @@ async function probarCanalTiempoReal(admin) {
       escuchar(cAjeno, 'C:tarea', null, 'tarea'),
     ])
     if (!suscritos.every(Boolean)) {
-      marca(false, rotulo, 'el canal conecta', '¿Realtime activo y migración 20 aplicada?')
+      // #295: se informa QUÉ se observó (qué escuchas no llegaron a
+      // SUBSCRIBED), no una causa supuesta.
+      const fallaron = ['B', 'C', 'admin', 'B:tarea', 'C:tarea'].filter((_, i) => !suscritos[i])
+      marca(false, rotulo, 'el canal conecta', `no alcanzaron SUBSCRIBED: ${fallaron.join(', ')}`)
       return
     }
 
@@ -231,37 +284,59 @@ async function probarCanalTiempoReal(admin) {
     await new Promise((r) => setTimeout(r, 1_500))
 
     const conContenido = (lista) => lista.filter((t) => t === 'INSERT' || t === 'UPDATE')
+
+    // #295 — CONTROLES DE VIDA. Estas dos pruebas dejan de ser "una más":
+    // son la condición para que las tres de aislamiento signifiquen algo.
+    // Además son la comprobación FACTUAL de que la tabla está publicada en
+    // `supabase_realtime`: si el evento llegó, está; no hace falta suponerlo.
+    const controlNotif = eventos.B.includes('INSERT')
+    const controlTarea = eventos['B:tarea'].includes('INSERT')
+
     marca(
-      eventos.B.includes('INSERT'),
+      controlNotif,
       rotulo,
       'el destinatario SÍ recibe su notificación en vivo',
-      `eventos de B: ${eventos.B.join(',') || 'ninguno'}`,
+      controlNotif
+        ? `eventos de B: ${eventos.B.join(',')} — control vivo; \`notificacion\` está publicada`
+        : 'eventos de B: ninguno — sin control de vida, las pruebas de aislamiento sobre `notificacion` quedan sin valor',
     )
-    marca(
-      conContenido(eventos.C).length === 0,
-      rotulo,
-      'otro usuario (sin filtro) NO recibe la notificación ajena',
-      conContenido(eventos.C).length ? `FUGA: ${eventos.C.join(',')}` : 'cero INSERT/UPDATE',
-    )
-    marca(
-      conContenido(eventos.admin).length === 0,
-      rotulo,
-      'ni el admin recibe por el canal notificaciones que no son suyas',
-      conContenido(eventos.admin).length ? `FUGA: ${eventos.admin.join(',')}` : 'cero INSERT/UPDATE',
-    )
+    // Las dos de aislamiento sobre `notificacion` SOLO se juzgan si el
+    // control llegó (#295): sin él, "cero eventos" no prueba aislamiento.
+    for (const [clave, prueba] of [
+      ['C', 'otro usuario (sin filtro) NO recibe la notificación ajena'],
+      ['admin', 'ni el admin recibe por el canal notificaciones que no son suyas'],
+    ]) {
+      const fuga = conContenido(eventos[clave])
+      if (fuga.length) {
+        // Una FUGA es concluyente siempre: si llegó algo ajeno, llegó.
+        marca(false, rotulo, prueba, `FUGA: ${eventos[clave].join(',')}`)
+      } else if (!controlNotif) {
+        marcaNoConcluyente(rotulo, prueba, 'el canal no entregó NINGÚN evento en esta corrida (ni al destinatario legítimo): "cero eventos" no distingue aislamiento de silencio')
+      } else {
+        marca(true, rotulo, prueba, 'cero INSERT/UPDATE, con el control de vida recibido')
+      }
+    }
+
     // #260 — la familia de datos, con `tarea` de representante.
     marca(
-      eventos['B:tarea'].includes('INSERT'),
+      controlTarea,
       rotulo,
       'el MIEMBRO sí recibe la tarea nueva en vivo (#260)',
-      `eventos de B/tarea: ${eventos['B:tarea'].join(',') || 'ninguno'} — ¿migración 21 aplicada?`,
+      controlTarea
+        ? `eventos de B/tarea: ${eventos['B:tarea'].join(',')} — control vivo; \`tarea\` está publicada`
+        : 'eventos de B/tarea: ninguno — no se pudo comprobar la entrega ni, por lo tanto, el aislamiento sobre `tarea`',
     )
-    marca(
-      conContenido(eventos['C:tarea']).length === 0,
-      rotulo,
-      'el NO miembro no recibe tareas de un proyecto ajeno (#260)',
-      conContenido(eventos['C:tarea']).length ? `FUGA: ${eventos['C:tarea'].join(',')}` : 'cero INSERT/UPDATE',
-    )
+    {
+      const prueba = 'el NO miembro no recibe tareas de un proyecto ajeno (#260)'
+      const fuga = conContenido(eventos['C:tarea'])
+      if (fuga.length) {
+        marca(false, rotulo, prueba, `FUGA: ${eventos['C:tarea'].join(',')}`)
+      } else if (!controlTarea) {
+        marcaNoConcluyente(rotulo, prueba, 'el canal no entregó NINGÚN evento de `tarea` en esta corrida (ni al miembro legítimo): "cero eventos" no distingue aislamiento de silencio')
+      } else {
+        marca(true, rotulo, prueba, 'cero INSERT/UPDATE, con el control de vida recibido')
+      }
+    }
   } finally {
     // Cerrar ANTES de la limpieza: el borrado en cascada emite DELETEs (solo
     // clave primaria) que ensuciarían el conteo sin aportar nada.
@@ -1259,19 +1334,44 @@ async function main() {
     await limpiarProyectosDePrueba(admin)
   }
 
-  // ---------- resumen ----------
-  const fallas = resultados.filter((r) => !r.ok)
+  resumen()
+}
+
+/**
+ * #295: tres estados, no dos. Una NO CONCLUYENTE no acusa al producto —dice
+ * que esa comprobación no llegó a hacerse—, pero tampoco deja pasar: la
+ * compuerta solo aprueba cuando TODO se comprobó de verdad.
+ */
+export function resumen() {
+  const noConcluyentes = resultados.filter((r) => r.noConcluyente)
+  const fallas = resultados.filter((r) => !r.ok && !r.noConcluyente)
+  const ok = resultados.length - fallas.length - noConcluyentes.length
   console.log('\n────────────────────────────────────────')
-  console.log(`Pruebas: ${resultados.length} · OK: ${resultados.length - fallas.length} · FALLAS: ${fallas.length}`)
+  console.log(
+    `Pruebas: ${resultados.length} · OK: ${ok} · FALLAS: ${fallas.length} · NO CONCLUYENTES: ${noConcluyentes.length}`,
+  )
   if (fallas.length) {
     console.log('\n⛔ LA COMPUERTA NO PASA. No invitar usuarios reales hasta corregir:')
     for (const f of fallas) console.log(`   - [${f.rol}] ${f.prueba}${f.detalle ? ` — ${f.detalle}` : ''}`)
-    process.exit(1)
   }
+  if (noConcluyentes.length) {
+    console.log('\n⚠ CORRIDA NO CONCLUYENTE. Esto NO es una fuga detectada: es que estas')
+    console.log('  comprobaciones no se pudieron hacer, así que su resultado no vale.')
+    for (const f of noConcluyentes) console.log(`   - [${f.rol}] ${f.prueba} — ${f.detalle}`)
+    console.log('\n  Qué hacer: volver a correr la compuerta. Si se repite, el canal de')
+    console.log('  tiempo real no está entregando eventos a esta compuerta y hay que')
+    console.log('  averiguar por qué ANTES de dar por buena una corrida verde.')
+  }
+  if (fallas.length || noConcluyentes.length) process.exit(1)
   console.log('✅ Compuerta superada: la RLS impide el acceso indebido rol por rol.')
+  console.log('   (Las pruebas de aislamiento del canal se juzgaron con su control de vida recibido.)')
 }
 
-main().catch((e) => {
-  console.error('Error inesperado:', e.message)
-  process.exit(2)
-})
+// #295: solo arranca cuando se ejecuta como programa. Importarlo (para
+// demostrar el veredicto con clientes de mentira) no dispara la compuerta.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    console.error('Error inesperado:', e.message)
+    process.exit(2)
+  })
+}

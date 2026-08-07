@@ -489,6 +489,28 @@ funciones de permisos.**
   (representante de la familia de datos, que comparte los predicados de
   membresía): el miembro recibe el INSERT; el no miembro, suscrito sin filtro,
   cero. Requiere Realtime activo y las migraciones 20 y 21 aplicadas.
+- **Ninguna prueba de ausencia aprueba por silencio (#295).** Una prueba de
+  "a este NO le llega" solo significa algo si, en la MISMA corrida, llegó el
+  evento de **control de vida**: el que sí debía recibir, recibió. Si el canal
+  queda mudo, las tres pruebas de aislamiento del canal ya no salen en verde
+  —salían, informando "cero INSERT/UPDATE" cuando en realidad no había llegado
+  nada de nada—: se marcan **NO CONCLUYENTES** y la compuerta **no pasa**. Una
+  FUGA, en cambio, es concluyente siempre: si llegó algo ajeno, llegó.
+  - La compuerta tiene por eso **tres estados**: PASS, FAIL y `? INCONCL`. El
+    resumen los separa, porque "no se pudo comprobar" no es "hay una fuga" y
+    mandan a investigar cosas distintas.
+  - **La pertenencia a la publicación `supabase_realtime` se comprueba, no se
+    supone**: si el evento de control llegó, la tabla está publicada, y el
+    mensaje lo dice así. (No se puede leer `pg_publication_tables` desde el
+    cliente —PostgREST solo expone el esquema `public`— y exponerla sería un
+    cambio de producto; la comprobación por observación es además más fuerte:
+    prueba el camino entero, no solo una fila de catálogo.)
+  - Para comprobarlo a voluntad: `RLS_DEMO_SILENCIO=1 node scripts/validar-rls.mjs`
+    deja fuera al suscriptor legítimo y fuerza el caso. El interruptor solo
+    puede QUITAR escuchas, nunca ablandar una aserción: encendido el resultado
+    siempre es peor, así que no sirve para volver verde una corrida roja.
+    `docs/demo-295-canal-mudo.mjs` demuestra los tres veredictos (normal,
+    silencio y fuga) sin tocar producción, ejercitando el código real.
 - **Caso de #248**: `compararTablaContraVista` pide `usuario` (la tabla) y
   `usuario_visible` (la vista) con la misma sesión y exige que la tabla no
   devuelva ninguna fila que la vista no tenga. Si el grant acotado se revocara

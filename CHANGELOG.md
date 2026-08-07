@@ -1033,3 +1033,57 @@ vuelve a verse atrasada, y los clics de la Gantt intactos.
 
 **La compuerta suma `probarHechaSinFecha`** con esos mismos casos contra la
 API real.
+
+## #295 — La compuerta ya no puede aprobar sin haber comprobado nada
+
+El 06-ago-2026 la compuerta falló dos pruebas del canal de tiempo real y,
+minutos después y sin cambiar nada, salió toda en verde. Al leer el programa
+apareció un defecto que no depende de que ese episodio se repita: **las cinco
+pruebas del canal usan la misma escucha, y cuando el canal quedaba mudo, tres
+salían en VERDE** — las que comprueban que a un tercero, a un no miembro y al
+admin *no* les llegue lo ajeno. Informaban "cero INSERT/UPDATE" cuando en
+realidad no había llegado nada de nada. Si en ese momento hubiera existido una
+filtración real, la compuerta la habría dejado pasar.
+
+- **Ninguna prueba de ausencia aprueba por silencio.** Una prueba de "a este
+  NO le llega" solo vale si en la MISMA corrida llegó el **control de vida**:
+  el evento que sí debía recibir quien correspondía. Sin él, esas tres se
+  marcan **NO CONCLUYENTES** y la compuerta **no pasa**. Una FUGA sigue siendo
+  concluyente siempre: si llegó algo ajeno, llegó — y eso se reporta en rojo,
+  no como no concluyente.
+- **Tres estados, no dos**: PASS, FAIL y `? INCONCL`, separados en el resumen.
+  "No se pudo comprobar" no es "hay una fuga" y mandan a investigar cosas
+  distintas; la salida lo dice con todas sus letras y explica qué hacer.
+- **La publicación se comprueba, no se supone.** El mensaje conjetural
+  "¿migración 21 aplicada?" se reemplaza por el hecho: si el evento de control
+  llegó, la tabla está publicada, y así lo informa. Lo mismo con "el canal
+  conecta", que ahora dice qué escuchas no alcanzaron `SUBSCRIBED` en vez de
+  sugerir una causa.
+- **Se puede comprobar a voluntad**: `RLS_DEMO_SILENCIO=1` deja fuera al
+  suscriptor legítimo y fuerza el caso. Es seguro por construcción — solo
+  puede QUITAR escuchas, nunca ablandar una aserción—, así que con él
+  encendido el resultado siempre es peor, nunca mejor.
+
+**Sobre la causa del silencio: no se pudo reproducir, y no se inventó un
+arreglo.** Lo que sí quedó descartado, por lectura y por los hechos de las
+corridas: no es falta de tiempo (hay 10 s de espera activa y la aplicación
+recibe en menos de 1 s), no es que la suscripción falle (las cinco llegaron a
+`SUBSCRIBED` incluso en la corrida mala), no es la publicación ni las
+migraciones 20/21 (las mismas tablas entregan bien a la aplicación y minutos
+después la compuerta salió verde sin tocar nada), y no viene de #293 (sus ocho
+pruebas pasaron siempre). Comparada con la aplicación
+(`src/data/tiempoReal.ts`), la compuerta se diferencia en tres cosas: llama a
+`realtime.setAuth()` a mano, abre un cliente nuevo por sesión con dos canales
+cada uno, y **inserta milisegundos después de suscribirse** —la aplicación se
+suscribe al arrancar, mucho antes de cualquier cambio—. Eso deja como
+hipótesis no confirmada una carrera entre `SUBSCRIBED` y que el servidor
+tenga lista la entrega de esa tabla; **no se tocó nada por esa sospecha**,
+porque con el arreglo de arriba una causa sin identificar deja de ser
+peligrosa: la próxima vez que ocurra, la compuerta lo dirá en vez de aprobar.
+
+**Verificado** con `docs/demo-295-canal-mudo.mjs`, que ejercita el código real
+de la compuerta con clientes de mentira que deciden qué entrega el canal:
+canal normal → 5 en verde y sale 0; canal mudo → 2 fallas + 3 no concluyentes
+y sale 1; canal con fuga → las tres de aislamiento en rojo (no como no
+concluyentes) y sale 1. El mismo veredicto se obtiene con el interruptor
+`RLS_DEMO_SILENCIO=1`. **No se tocó el producto**: ni migraciones ni `src/`.
