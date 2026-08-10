@@ -222,6 +222,20 @@ orden** el contenido de:
     visible: si algo del producto cambia de comportamiento, es un error de este
     cambio. El orden con el front es indiferente (no hay cambios de front).
     **Correr la compuerta después** (caso nuevo `probarExecutePublico`).
+31. `supabase/migrations/20260707000031_perfiles_y_ciclo_vida.sql` — #300/#301:
+    el perfil de un usuario se cambia entre consultor y cliente con la RPC
+    `cambiar_rol_usuario` (admin, nunca el propio, nunca desde/hacia
+    administrador, y bloqueo con conteo si es dueño de proyectos), y un trigger
+    nuevo rechaza cualquier UPDATE directo de `rol` que llegue del cliente.
+    Redefine además `eliminar_usuario` —que ahora **suelta los accesos a
+    proyectos, vacía `permisos_proyecto` y pone `auth_id = null`**— y
+    `crear_o_reactivar_usuario`, que distingue reactivar un ARCHIVADO
+    (conserva todo) de dar de alta un correo ELIMINADO (alta nueva: toma el
+    perfil elegido, sin proyectos heredados).
+    **ORDEN OBLIGATORIO:** desplegar antes la Edge Function `eliminar-usuario`
+    (Paso 3), porque el front pasa a llamarla para eliminar; después aplicar
+    esta migración; después mergear el front. **Correr la compuerta después**
+    (casos nuevos `probarCambioDePerfil` y `probarEliminarCorta`).
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
@@ -343,7 +357,7 @@ se necesita nada extra (la app es una sola página, sin rutas de servidor).
 
 El alta de usuarios funciona por invitación: el admin crea el usuario y le envía
 un correo con un enlace que caduca en 7 días; el invitado define su contraseña.
-Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
+Requiere desplegar las Edge Functions y conectar un proveedor de correo:
 
 1. **Cuenta en [Resend](https://resend.com)** (capa gratuita: 100 correos/día):
    crea una API key y verifica tu dominio remitente (o usa `onboarding@resend.dev`
@@ -352,11 +366,19 @@ Requiere desplegar dos Edge Functions y conectar un proveedor de correo:
    `npm i -g supabase` si aún no la tienes):
    ```bash
    supabase functions deploy invitar-usuario
+   supabase functions deploy eliminar-usuario
    supabase functions deploy aceptar-invitacion --no-verify-jwt
    supabase functions deploy recuperar-contrasena --no-verify-jwt
    ```
    (`aceptar-invitacion` y `recuperar-contrasena` las invoca alguien **sin
    sesión** —por eso `--no-verify-jwt`—; ambas validan su propio token.)
+
+   > **`eliminar-usuario` (#301)** es la que revoca la cuenta de acceso al
+   > eliminar a alguien: el Admin API solo corre con `service_role`, que nunca
+   > llega al navegador. No lleva secretos propios —usa los que inyecta la
+   > plataforma— pero sí necesita `SITE_URL` para el CORS, como las otras.
+   > **Desplegarla ANTES de aplicar la migración 31 y de mergear el front**,
+   > porque desde ese momento eliminar pasa por ella.
 3. **Secrets**:
    ```bash
    supabase secrets set RESEND_API_KEY=re_xxx \

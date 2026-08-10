@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { AppState, PermisosTareas, Tarea, Usuario } from './types'
+import type { AppState, PermisosTareas, Rol, Tarea, Usuario } from './types'
 import { HOY_SIMULADO } from './data/hoy'
 import { MENSAJE_SALIDA, makeAuth, type MotivoSalida } from './auth'
 import { supabaseConfigured } from './data/client'
@@ -80,6 +80,8 @@ export interface Actions {
    *  en el mismo acto. `run` ya se encargó de mostrar el error si lo hubo. */
   createUsuario: (i: NuevoUsuario) => Promise<Usuario | null>
   updateUsuario: (id: string, p: PatchUsuario) => Promise<void>
+  /** #300: cambia el perfil entre consultor y cliente (solo admin). */
+  cambiarRolUsuario: (id: string, rol: Rol) => Promise<void>
   /** #136: eliminar = desactivar + invisible (no hard delete). */
   eliminarUsuario: (id: string) => Promise<void>
   asignarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>
@@ -864,10 +866,18 @@ export default function App({ repo }: { repo: Repo }) {
           const u = await repo.updateUsuario(id, p)
           return (s) => apply.upsertUsuario(s, u)
         }),
+      cambiarRolUsuario: (id, rol) =>
+        run(async () => {
+          const u = await repo.cambiarRolUsuario(id, rol, sesion?.id)
+          return (s) => apply.upsertUsuario(s, u)
+        }),
       eliminarUsuario: (id) =>
         run(async () => {
           await repo.eliminarUsuario(id)
           // #136: desaparece de la UI (la fila queda en la base, invisible).
+          // #301: sus accesos a proyectos se fueron con él, así que también
+          // salen del estado local — si no, la pantalla seguiría mostrándolo
+          // como miembro de proyectos de los que ya no lo es.
           return (s) => apply.removeUsuario(s, id)
         }),
       asignarAcceso: (usuarioId, proyectoId) =>

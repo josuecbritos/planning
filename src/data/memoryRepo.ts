@@ -1,4 +1,4 @@
-import type { Acceso, AppState, Comentario, Frente, PermisosTareas, Proyecto, Replanificacion, SubFrente, TipoNotificacion, Tarea, Usuario } from '../types'
+import type { Acceso, AppState, Comentario, Frente, PermisosTareas, Proyecto, Replanificacion, Rol, SubFrente, TipoNotificacion, Tarea, Usuario } from '../types'
 import type { VistaGuardada } from '../lib/filtros'
 import { hoyISO } from '../lib/dates'
 import { idsMencionados } from '../lib/menciones'
@@ -341,6 +341,17 @@ export class MemoryRepo implements Repo {
       if (!existente.eliminado && existente.activo) {
         throw new Error('Ya existe un usuario activo con ese email')
       }
+      // #301: dar de alta un correo ELIMINADO es un alta NUEVA sobre la misma
+      // fila —lo único que sobrevive es el registro (tareas, comentarios,
+      // historial)—: toma el perfil que se elige ahora, sin proyectos ni
+      // permisos heredados. Reactivar un ARCHIVADO, en cambio, lo conserva
+      // todo: archivar pausa y se deshace.
+      if (existente.eliminado) {
+        this.state.accesos = this.state.accesos.filter((a) => a.usuarioId !== existente.id)
+        existente.rol = input.rol
+        existente.permisosProyecto = undefined
+        existente.authId = undefined
+      }
       existente.eliminado = false
       existente.activo = true
       existente.nombre = input.nombre
@@ -383,12 +394,49 @@ export class MemoryRepo implements Repo {
   }
 
   async eliminarUsuario(id: string): Promise<void> {
-    // #136: desactivar + invisible. La fila y sus accesos quedan intactos.
+    // #136/#301: desactivar + invisible, y además CORTAR. La fila se conserva
+    // —sostiene el registro: tareas, comentarios e historial siguen mostrando
+    // su nombre—, pero deja de existir como identidad: se sueltan sus accesos
+    // a proyectos, se vacían los poderes de consultor y se suelta el vínculo
+    // con su cuenta de acceso. En Supabase, revocar esa cuenta lo hace la
+    // Edge Function `eliminar-usuario`; acá no hay cuentas que revocar.
     const u = this.state.usuarios.find((x) => x.id === id)
     if (!u) throw new Error('Usuario no encontrado')
+    this.state.accesos = this.state.accesos.filter((a) => a.usuarioId !== id)
     u.activo = false
     u.eliminado = true
+    u.authId = undefined
+    u.permisosProyecto = undefined
     this.persist()
+  }
+
+  async cambiarRolUsuario(id: string, rol: Rol, actorId?: string): Promise<Usuario> {
+    // #300: espejo de la RPC `cambiar_rol_usuario`. Las mismas cinco
+    // salvaguardas, y en el mismo orden, para que modo Local y Supabase
+    // fallen igual y con el mismo mensaje.
+    if (rol !== 'consultor' && rol !== 'cliente') {
+      throw new Error('El perfil solo se cambia entre consultor y cliente')
+    }
+    const u = this.state.usuarios.find((x) => x.id === id)
+    if (!u) throw new Error('El usuario no existe')
+    if (u.eliminado) throw new Error('El usuario fue eliminado')
+    if (actorId && u.id === actorId) throw new Error('No puedes cambiar tu propio perfil')
+    if (u.rol === 'admin') throw new Error('El perfil de administrador no se cambia desde aquí')
+    if (u.rol === rol) return clone(u)
+    if (rol === 'cliente') {
+      const propios = this.state.proyectos.filter((p) => p.duenoId === id).length
+      if (propios > 0) {
+        throw new Error(
+          `No se puede pasar a cliente: es dueño de ${propios} proyecto(s). Traspasa esos proyectos a otro consultor antes de cambiar el perfil.`,
+        )
+      }
+    }
+    u.rol = rol
+    // Espejo del trigger `trg_default_consultor`: a consultor se le aplican
+    // los permisos por defecto de su rol; a cliente se le vacían.
+    u.permisosProyecto = rol === 'consultor' ? { ...DEFAULT_PERMISOS_PROYECTO } : undefined
+    this.persist()
+    return clone(u)
   }
 
   async asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso> {
