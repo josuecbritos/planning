@@ -56,53 +56,61 @@ export type SidebarModo = 'fija' | 'escondida'
 export type Tema = 'claro' | 'oscuro'
 
 /** Acciones expuestas a los componentes. Todas persisten via Repo. */
+/**
+ * Acciones del producto. Devuelven si el cambio SE APLICÓ (`run` traduce el
+ * error a la barra de aviso y responde `false`): quien orquesta varios
+ * cambios —el formulario de editar usuario, #303— lo necesita para no dejar
+ * nada a medias. Quien solo dispara una acción puede ignorarlo.
+ */
 export interface Actions {
-  createProyecto: (i: NuevoProyecto) => Promise<void>
-  updateProyecto: (id: string, p: PatchProyecto) => Promise<void>
-  deleteProyecto: (id: string) => Promise<void>
-  createFrente: (i: NuevoFrente) => Promise<void>
-  updateFrente: (id: string, p: { nombre?: string; orden?: number }) => Promise<void>
-  deleteFrente: (id: string) => Promise<void>
-  createSubFrente: (i: NuevoSubFrente) => Promise<void>
-  updateSubFrente: (id: string, p: { nombre?: string; orden?: number }) => Promise<void>
-  deleteSubFrente: (id: string) => Promise<void>
-  createTarea: (i: NuevaTarea) => Promise<void>
-  updateTarea: (id: string, p: PatchTarea) => Promise<void>
-  deleteTarea: (id: string) => Promise<void>
+  createProyecto: (i: NuevoProyecto) => Promise<boolean>
+  updateProyecto: (id: string, p: PatchProyecto) => Promise<boolean>
+  deleteProyecto: (id: string) => Promise<boolean>
+  createFrente: (i: NuevoFrente) => Promise<boolean>
+  updateFrente: (id: string, p: { nombre?: string; orden?: number }) => Promise<boolean>
+  deleteFrente: (id: string) => Promise<boolean>
+  createSubFrente: (i: NuevoSubFrente) => Promise<boolean>
+  updateSubFrente: (id: string, p: { nombre?: string; orden?: number }) => Promise<boolean>
+  deleteSubFrente: (id: string) => Promise<boolean>
+  createTarea: (i: NuevaTarea) => Promise<boolean>
+  updateTarea: (id: string, p: PatchTarea) => Promise<boolean>
+  deleteTarea: (id: string) => Promise<boolean>
   /** #293: deja la tarea ANTE `antesDeId` (null = al final) del sub frente
    *  destino, renumerando a los hermanos. No toca fecha, responsable ni
    *  estado; no escribe historial ni genera notificación. */
-  moverTarea: (tareaId: string, subFrenteId: string, antesDeId: string | null) => Promise<void>
-  toggleHecha: (tareaId: string, hecha: boolean) => Promise<void>
+  moverTarea: (tareaId: string, subFrenteId: string, antesDeId: string | null) => Promise<boolean>
+  toggleHecha: (tareaId: string, hecha: boolean) => Promise<boolean>
   /** `nueva = null` desplanifica (borra la marca; queda "sin fecha"). */
-  cambiarFechaObjetivo: (tareaId: string, nueva: string | null) => Promise<void>
+  cambiarFechaObjetivo: (tareaId: string, nueva: string | null) => Promise<boolean>
   /** #257: devuelve el usuario creado (o null si falló) para poder invitarlo
    *  en el mismo acto. `run` ya se encargó de mostrar el error si lo hubo. */
   createUsuario: (i: NuevoUsuario) => Promise<Usuario | null>
-  updateUsuario: (id: string, p: PatchUsuario) => Promise<void>
-  /** #300: cambia el perfil entre consultor y cliente (solo admin). */
-  cambiarRolUsuario: (id: string, rol: Rol) => Promise<void>
+  updateUsuario: (id: string, p: PatchUsuario) => Promise<boolean>
+  /** #300: cambia el perfil entre consultor y cliente (solo admin).
+   *  #303: devuelve si SE APLICÓ — el formulario de editar usuario lo usa
+   *  para no guardar nada más cuando la base rechaza el cambio. */
+  cambiarRolUsuario: (id: string, rol: Rol) => Promise<boolean>
   /** #136: eliminar = desactivar + invisible (no hard delete). */
-  eliminarUsuario: (id: string) => Promise<void>
-  asignarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>
-  quitarAcceso: (usuarioId: string, proyectoId: string) => Promise<void>
+  eliminarUsuario: (id: string) => Promise<boolean>
+  asignarAcceso: (usuarioId: string, proyectoId: string) => Promise<boolean>
+  quitarAcceso: (usuarioId: string, proyectoId: string) => Promise<boolean>
   /** Configura el set de ocho DE UN ACCESO (usuario × proyecto). */
-  updateAccesoPermisos: (usuarioId: string, proyectoId: string, permisos: PermisosTareas) => Promise<void>
-  addComentario: (tareaId: string, texto: string) => Promise<void>
+  updateAccesoPermisos: (usuarioId: string, proyectoId: string, permisos: PermisosTareas) => Promise<boolean>
+  addComentario: (tareaId: string, texto: string) => Promise<boolean>
   /** #209: edita el texto del propio comentario (la RLS comprueba la autoría). */
-  editComentario: (id: string, texto: string) => Promise<void>
+  editComentario: (id: string, texto: string) => Promise<boolean>
   /** #207: cambios en MI propia ficha (nombre e iniciales). A diferencia del
    *  resto, propaga el error en vez de mandarlo al aviso global: la pantalla
    *  de Configuración necesita decir en el sitio si se guardó o no. */
   actualizarPerfil: (patch: PatchUsuario) => Promise<void>
   /** #137: marca todas las notificaciones del usuario actual como leídas. */
-  marcarNotificacionesLeidas: () => Promise<void>
+  marcarNotificacionesLeidas: () => Promise<boolean>
   /** #289: vistas guardadas, ahora en la base. `crearVista` devuelve el id
    *  que asignó la base (o null si falló), para poder entrar a la recién
    *  creada como antes. */
   crearVista: (contexto: string, nombre: string, filtro: Filtro, orden: OrdenMulti) => Promise<string | null>
-  guardarVista: (id: string, patch: { nombre?: string; filtro?: Filtro; orden?: OrdenMulti }) => Promise<void>
-  eliminarVista: (id: string) => Promise<void>
+  guardarVista: (id: string, patch: { nombre?: string; filtro?: Filtro; orden?: OrdenMulti }) => Promise<boolean>
+  eliminarVista: (id: string) => Promise<boolean>
 }
 
 /** Vista de la pantalla de proyecto (punto 3/4): filtro, orden y la vista
@@ -711,11 +719,18 @@ export default function App({ repo }: { repo: Repo }) {
     [auth, salirPorSesion],
   )
 
+  /**
+   * Ejecuta una acción y aplica su parche al estado. Devuelve si SE APLICÓ:
+   * #303 lo necesita para ordenar un formulario cuyos cambios no viajan por
+   * el mismo camino —si el cambio de perfil se rechaza, no se aplica ningún
+   * otro— sin tener que duplicar el manejo de errores de acá.
+   */
   const run = useCallback(
-    async (fn: () => Promise<(s: AppState) => AppState>) => {
+    async (fn: () => Promise<(s: AppState) => AppState>): Promise<boolean> => {
       try {
         const patch = await fn()
         setState((s) => (s ? patch(s) : s))
+        return true
       } catch (e) {
         // #244: antes de mostrar nada, se comprueba si el problema es que la
         // sesión dejó de servir. Si lo es, se sale al login con el motivo en
@@ -723,9 +738,10 @@ export default function App({ repo }: { repo: Repo }) {
         const motivo = await auth.diagnosticar().catch(() => null)
         if (motivo) {
           salirPorSesion(motivo)
-          return
+          return false
         }
         setError(mensajeError(e)) // #210
+        return false
       }
     },
     [auth, salirPorSesion],

@@ -134,6 +134,39 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
   const puedeCrearUsuario =
     esAdminActor || gestionables.some((p) => puedeInvitarClientesEn(state, usuarioActual, p.id))
 
+  /**
+   * #303 — Guardar el formulario de editar usuario. Los cambios NO viajan por
+   * el mismo camino: el nombre y las iniciales son una modificación normal de
+   * la ficha, y el perfil tiene que pasar por `cambiar_rol_usuario`, que es
+   * donde viven las cinco salvaguardas (y hay un trigger que rechaza
+   * cambiarlo por fuera).
+   *
+   * Por eso el ORDEN importa: primero el perfil. Si la base lo rechaza —un
+   * consultor con proyectos propios que se intenta pasar a cliente— se corta
+   * ahí y **no se aplica ningún otro cambio**; el motivo ya quedó en la barra
+   * de aviso y el formulario sigue abierto con lo escrito. Nada a medias.
+   *
+   * Devuelve si se aplicó, que es lo que el formulario usa para cerrarse.
+   */
+  async function guardarUsuario(
+    usuario: Usuario,
+    d: { nombre: string; iniciales?: string; rol: Rol },
+  ): Promise<boolean> {
+    const cambiaPerfil =
+      esAdminActor && usuario.id !== usuarioActual.id && usuario.rol !== 'admin' && d.rol !== usuario.rol
+    if (cambiaPerfil) {
+      // La confirmación aparece AL GUARDAR, con los mismos textos de antes.
+      const aviso =
+        d.rol === 'consultor'
+          ? `¿Pasar a "${usuario.nombre}" a consultor? Conserva los proyectos a los que está invitado, con los mismos permisos, y suma los de consultor (crear proyectos, invitar clientes).`
+          : `¿Pasar a "${usuario.nombre}" a cliente? Pierde los permisos de consultor. Conserva los proyectos a los que está invitado.`
+      if (!confirm(aviso)) return false
+      const ok = await actions.cambiarRolUsuario(usuario.id, d.rol)
+      if (!ok) return false
+    }
+    return actions.updateUsuario(usuario.id, { nombre: d.nombre, iniciales: d.iniciales })
+  }
+
   return (
     <div className="usuarios-wrap">
       <div className="usuarios-cabecera">
@@ -217,7 +250,14 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
       {modal?.tipo === 'editar' && (
         <UsuarioModal
           usuario={modal.usuario}
-          onSubmit={(d) => actions.updateUsuario(modal.usuario.id, { nombre: d.nombre, iniciales: d.iniciales })}
+          /* #303/#300: el perfil se cambia SOLO entre consultor y cliente,
+             solo un admin, nunca el propio y nunca sobre un administrador.
+             Esto decide si el formulario ofrece el campo; la barrera de
+             verdad son las cinco salvaguardas de `cambiar_rol_usuario`. */
+          puedeCambiarPerfil={
+            esAdminActor && modal.usuario.id !== usuarioActual.id && modal.usuario.rol !== 'admin'
+          }
+          onSubmit={(d) => guardarUsuario(modal.usuario, d)}
           onClose={() => setModal(null)}
         />
       )}
@@ -272,11 +312,6 @@ function UsuarioFila({
   // proyecto, activar/desactivar, eliminar): SOLO el admin. El consultor no
   // edita cuentas.
   const puedeAdministrarCuenta = esAdminActor
-  // #300: el perfil se cambia SOLO entre consultor y cliente. Administrador
-  // queda fuera en los dos sentidos —no se promueve ni se degrada desde
-  // aquí—, y nadie cambia el suyo propio, ni un admin.
-  const puedeCambiarPerfil =
-    esAdminActor && !esYo && usuario.activo && usuario.rol !== 'admin'
   // Invitación por correo: admin a cualquiera; consultor a los clientes que
   // puede invitar en alguno de sus proyectos (la Edge Function reconfirma).
   const puedeInvitarCorreo =
@@ -296,35 +331,10 @@ function UsuarioFila({
       </td>
       <td>{usuario.email}</td>
       <td>
-        {/* #300: el perfil se corrige acá mismo. Solo un admin, nunca el
-            propio, nunca sobre un administrador y solo entre consultor y
-            cliente: el resto de las filas siguen mostrando el chip de
-            siempre. La barrera no es esto — es `cambiar_rol_usuario` en la
-            base, que repite las cinco salvaguardas y rechaza cualquier
-            petición directa. */}
-        {puedeCambiarPerfil ? (
-          <select
-            className={`chip-rol chip-rol--${usuario.rol} select-rol`}
-            aria-label={`Perfil de ${usuario.nombre}`}
-            value={usuario.rol}
-            onChange={(e) => {
-              const nuevo = e.target.value as Rol
-              if (nuevo === usuario.rol) return
-              // Cambiar el perfil suma o quita poderes: se confirma, igual
-              // que desactivar y eliminar (#155).
-              const aviso =
-                nuevo === 'consultor'
-                  ? `¿Pasar a "${usuario.nombre}" a consultor? Conserva los proyectos a los que está invitado, con los mismos permisos, y suma los de consultor (crear proyectos, invitar clientes).`
-                  : `¿Pasar a "${usuario.nombre}" a cliente? Pierde los permisos de consultor. Conserva los proyectos a los que está invitado.`
-              if (confirm(aviso)) actions.cambiarRolUsuario(usuario.id, nuevo)
-            }}
-          >
-            <option value="consultor">{ROL_LABEL.consultor}</option>
-            <option value="cliente">{ROL_LABEL.cliente}</option>
-          </select>
-        ) : (
-          <span className={`chip-rol chip-rol--${usuario.rol}`}>{ROL_LABEL[usuario.rol]}</span>
-        )}
+        {/* #303: el perfil se cambia SOLO desde el formulario de editar
+            usuario, que es donde se lo fue a buscar. Acá vuelve a ser el chip
+            de siempre: un dato, no un control. */}
+        <span className={`chip-rol chip-rol--${usuario.rol}`}>{ROL_LABEL[usuario.rol]}</span>
       </td>
       <td>{usuario.activo ? 'Activo' : 'Inactivo'}</td>
       <td className="col-proy">

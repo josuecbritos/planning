@@ -1046,21 +1046,29 @@ async function probarCambioDePerfil(admin) {
   }
 
   const sello = Date.now()
-  const correo = `__prueba_300_${sello}@example.invalid`
+  const correo = `__prueba_rls_300_${sello}@example.invalid`
   let sujeto = null
 
+  // El terreno se crea por el MISMO camino que usa el producto —la RPC
+  // `crear_o_reactivar_usuario`, como hace #286— y no con un `insert` sobre
+  // `usuario`: `authenticated` no tiene ese privilegio de tabla, así que el
+  // insert directo moría con "permission denied" y dejaba la corrida sin
+  // comprobar. La limpieza sigue el mismo criterio: se elimina con la RPC del
+  // producto, que lo deja invisible y recuperable — no hay borrado físico de
+  // usuarios en este modelo (#136).
   const limpiar = async () => {
-    if (sujeto) await admin.from('usuario').delete().eq('id', sujeto)
+    if (sujeto) await admin.rpc('eliminar_usuario', { p_usuario: sujeto })
   }
 
   try {
-    const { data: nuevo, error: errAlta } = await admin
-      .from('usuario')
-      .insert({ nombre: `__prueba_300_${sello}`, iniciales: 'PP', email: correo, rol: 'cliente' })
-      .select()
-      .single()
-    if (errAlta) {
-      marcaNoConcluyente(rotulo, 'terreno de prueba', `no se pudo crear el usuario de prueba: ${errAlta.message}`)
+    const { data: nuevo, error: errAlta } = await admin.rpc('crear_o_reactivar_usuario', {
+      p_nombre: `__prueba_rls_300_${sello}`,
+      p_iniciales: 'PP',
+      p_email: correo,
+      p_rol: 'cliente',
+    })
+    if (errAlta || !nuevo) {
+      marcaNoConcluyente(rotulo, 'terreno de prueba', `no se pudo crear el usuario de prueba: ${errAlta?.message ?? 'sin fila'}`)
       return
     }
     sujeto = nuevo.id
@@ -1092,9 +1100,14 @@ async function probarCambioDePerfil(admin) {
     marca(Boolean(errAAdmin), rotulo, 'no se puede promover a administrador',
           errAAdmin ? '' : 'la RPC aceptó `admin` como destino')
 
-    // 4) Y tampoco se puede degradar a un administrador.
+    // 4) Y tampoco se puede degradar a un administrador. Se busca uno que NO
+    // sea quien corre la compuerta: sobre uno mismo el rechazo vendría de la
+    // regla del perfil propio, y la prueba aprobaría por el motivo equivocado.
+    const yo = await perfilDe(admin)
     const { data: unAdmin } = await admin
-      .from('usuario_visible').select('id').eq('rol', 'admin').limit(1).maybeSingle()
+      .from('usuario_visible').select('id').eq('rol', 'admin')
+      .neq('id', yo?.id ?? '00000000-0000-0000-0000-000000000000')
+      .limit(1).maybeSingle()
     if (unAdmin) {
       const { error: errDesdeAdmin } = await admin.rpc('cambiar_rol_usuario', {
         p_usuario: unAdmin.id, p_rol: 'consultor',
@@ -1102,7 +1115,8 @@ async function probarCambioDePerfil(admin) {
       marca(Boolean(errDesdeAdmin), rotulo, 'no se puede degradar a un administrador',
             errDesdeAdmin ? '' : 'la RPC degradó a un administrador')
     } else {
-      marcaNoConcluyente(rotulo, 'no se puede degradar a un administrador', 'no se encontró ningún admin visible')
+      marcaNoConcluyente(rotulo, 'no se puede degradar a un administrador',
+                         'no hay otro administrador además de quien corre la compuerta, y sobre uno mismo el rechazo vendría de otra regla')
     }
   } catch (e) {
     marcaNoConcluyente(rotulo, 'cambio de perfil', e.message)
@@ -1123,21 +1137,27 @@ async function probarEliminarCorta(admin) {
   let sujeto = null
   let proyecto = null
 
+  // Mismo criterio que arriba: el terreno se crea por el camino del producto.
+  // El proyecto lleva el prefijo `__prueba_rls_` para que lo barra la limpieza
+  // general del final; al usuario lo deja eliminado la propia prueba, y si
+  // ésta se cortara antes, esta limpieza lo termina.
   const limpiar = async () => {
-    if (proyecto) await admin.from('proyecto').delete().eq('id', proyecto)
-    if (sujeto) await admin.from('usuario').delete().eq('id', sujeto)
+    if (proyecto) {
+      await admin.from('proyecto').update({ estado: 'archivado' }).eq('id', proyecto)
+      await admin.from('proyecto').delete().eq('id', proyecto)
+    }
+    if (sujeto) await admin.rpc('eliminar_usuario', { p_usuario: sujeto })
   }
 
   try {
-    const { data: nuevo, error: errAlta } = await admin
-      .from('usuario')
-      .insert({
-        nombre: `__prueba_301_${sello}`, iniciales: 'PE',
-        email: `__prueba_301_${sello}@example.invalid`, rol: 'consultor',
-      })
-      .select().single()
-    if (errAlta) {
-      marcaNoConcluyente(rotulo, 'terreno de prueba', `no se pudo crear el usuario: ${errAlta.message}`)
+    const { data: nuevo, error: errAlta } = await admin.rpc('crear_o_reactivar_usuario', {
+      p_nombre: `__prueba_rls_301_${sello}`,
+      p_iniciales: 'PE',
+      p_email: `__prueba_rls_301_${sello}@example.invalid`,
+      p_rol: 'consultor',
+    })
+    if (errAlta || !nuevo) {
+      marcaNoConcluyente(rotulo, 'terreno de prueba', `no se pudo crear el usuario: ${errAlta?.message ?? 'sin fila'}`)
       return
     }
     sujeto = nuevo.id
@@ -1554,9 +1574,22 @@ export function resumen() {
     console.log('\n⚠ CORRIDA NO CONCLUYENTE. Esto NO es una fuga detectada: es que estas')
     console.log('  comprobaciones no se pudieron hacer, así que su resultado no vale.')
     for (const f of noConcluyentes) console.log(`   - [${f.rol}] ${f.prueba} — ${f.detalle}`)
-    console.log('\n  Qué hacer: volver a correr la compuerta. Si se repite, el canal de')
-    console.log('  tiempo real no está entregando eventos a esta compuerta y hay que')
-    console.log('  averiguar por qué ANTES de dar por buena una corrida verde.')
+    // El texto anterior daba por sentado que TODA corrida no concluyente venía
+    // del canal de tiempo real, y mandaba a investigar donde no estaba el
+    // problema. Ahora se describe lo que consta —qué no se pudo comprobar y
+    // por qué, arriba— y la pista del canal solo aparece si alguna de las no
+    // concluyentes es efectivamente del canal.
+    const delCanal = noConcluyentes.filter((f) => f.rol === 'canal')
+    console.log('\n  Cada línea de arriba dice QUÉ no se pudo comprobar y POR QUÉ. Una')
+    console.log('  comprobación que no se pudo hacer no es una comprobación aprobada.')
+    console.log('  Qué hacer: resolver esas causas y volver a correr la compuerta ANTES')
+    console.log('  de dar por buena una corrida verde.')
+    if (delCanal.length) {
+      console.log(`\n  ${delCanal.length} de ellas son del canal de tiempo real. Si se repiten,`)
+      console.log('  el canal no está entregando eventos a esta compuerta y hay que averiguar')
+      console.log('  por qué: sin evento de control, "cero eventos" no distingue aislamiento')
+      console.log('  de silencio (#295).')
+    }
   }
   if (fallas.length || noConcluyentes.length) process.exit(1)
   console.log('✅ Compuerta superada: la RLS impide el acceso indebido rol por rol.')
