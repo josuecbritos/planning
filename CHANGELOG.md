@@ -932,7 +932,8 @@ real mientras existan.
 
 **La compuerta suma el caso de la ventana**: mover una tarea de mañana no
 registra replanificación y su fecha original se rehace; mover una de hoy sí
-registra; desplanificar una de mañana no da error.
+registra; desplanificar una de mañana no da error. Corrida contra el proyecto
+real el 31-jul-2026 con la migración 27 aplicada: **verde**.
 
 ## #293 — Reordenar tareas arrastrándolas con el mouse
 
