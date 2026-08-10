@@ -1530,18 +1530,9 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .chip-rol--admin { background: var(--verde-suave); color: var(--verde-check); }
 .chip-rol--consultor { background: var(--ambar-suave); color: var(--ambar-texto); }
 .chip-rol--cliente { background: #e3f2fd; color: #1565c0; }
-/* #300: el chip de perfil, cuando un admin puede cambiarlo, es un selector.
-   Se ve igual que el chip —hereda su color y su forma— y solo suma el
-   cursor y el borde al pasar el mouse, para que se note que es tocable. */
-.select-rol {
-  font: inherit; font-size: 11.5px; font-weight: 700; line-height: inherit;
-  border: 1px solid transparent; cursor: pointer;
-  appearance: none; -webkit-appearance: none;
-}
-.select-rol:hover, .select-rol:focus-visible { border-color: currentColor; }
-/* Las opciones se pintan con el sistema: sin esto, en tema oscuro heredarían
-   el color del chip y quedarían ilegibles sobre el fondo del desplegable. */
-.select-rol option { background: var(--superficie); color: var(--texto); font-weight: 600; }
+/* #303: en el formulario, un valor que se muestra pero no se edita ocupa el
+   lugar del campo sin parecer uno. */
+.campo__dato { margin: 0; padding: 2px 0; }
 /* Dueño de proyecto (roles): control total, sin permisos que configurar. */
 .chip-dueno {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;

@@ -1359,9 +1359,65 @@ vuelve es alguien nuevo con el mismo correo.**
 `eliminar-usuario` ANTES de mergear el front**, porque la eliminación pasa a
 llamarla.
 
-**Verificado** con `docs/prueba-300-301-perfiles-y-ciclo-vida.mjs`: 35
+**Verificado** con `docs/prueba-300-301-perfiles-y-ciclo-vida.mjs`: 43
 comprobaciones en verde en modo Local, y las suites de #297, #298 y #299
 siguen en verde. Lo que solo vive en la base —que un
 consultor no pueda llamar la RPC, que un UPDATE directo de `rol` sea rechazado,
 que no se pueda llegar ni salir de administrador, y que eliminar suelte los
 accesos— entra a la compuerta `scripts/validar-rls.mjs` con dos casos nuevos.
+
+
+## #303 — El perfil se cambia desde editar usuario (y el cierre de #300/#301)
+
+Dos cosas de distinto tipo, en la misma entrega.
+
+### El perfil se busca donde se busca
+
+El desplegable vivía en la **columna Rol** de la lista. Funcionaba, pero nadie
+lo encontraba: el dueño lo buscó en el formulario de editar usuario y concluyó
+que la función no existía. Ahora está ahí, junto al nombre y las iniciales, y
+**la columna vuelve a mostrar el chip fijo de siempre** — un solo lugar.
+
+- **Todo se aplica al Guardar**, nada al tocarlo. **Cancelar descarta todo**,
+  incluido el cambio de perfil.
+- **El botón ordena los cambios**, porque no viajan por el mismo camino: el
+  perfil tiene que pasar por `cambiar_rol_usuario` —donde viven las cinco
+  salvaguardas— y el nombre es una modificación normal de la ficha. Va primero
+  el perfil: **si la base lo rechaza, no se aplica ningún otro cambio**, se
+  muestra el motivo y el formulario queda abierto con lo escrito. Nada a
+  medias.
+- Para eso, `run` pasó a informar **si el cambio se aplicó**. Quien solo
+  dispara una acción puede ignorarlo; quien orquesta varias, no.
+- **El campo aparece solo cuando el cambio es posible** (admin, sobre alguien
+  que no es él mismo y que no es administrador). En el resto de los casos el
+  perfil se muestra como **dato**, con la razón debajo.
+- **No se tocó** ninguna de las cinco salvaguardas ni el trigger que rechaza
+  cambiar el perfil por fuera de la función. **Sin migración.**
+
+### El cierre de #300 y #301: la compuerta no pasaba
+
+La corrida del 10-ago-2026 dio 118 en verde y **2 no concluyentes**, así que no
+valía. Las dos eran las pruebas nuevas de este mismo trabajo:
+
+- **La causa:** creaban su usuario de prueba con un `insert` directo sobre
+  `usuario`, y `authenticated` no tiene ese privilegio de tabla. Ahora lo crean
+  **por el camino que usa el producto** —la RPC `crear_o_reactivar_usuario`,
+  como hace #286— y lo limpian con `eliminar_usuario`, coherente con que en
+  este modelo no hay borrado físico de usuarios. El proyecto de prueba lleva el
+  prefijo `__prueba_rls_` para que lo barra la limpieza del final.
+- **De paso, una prueba que aprobaba por el motivo equivocado:** la de "no se
+  puede degradar a un administrador" podía elegir como sujeto a quien corre la
+  compuerta, y entonces el rechazo venía de la regla del perfil PROPIO. Ahora
+  se busca otro administrador y, si no lo hay, se dice que no se pudo
+  comprobar.
+- **El mensaje final ya no atribuye una causa que no consta.** Decía que el
+  canal de tiempo real no estaba entregando eventos, en una corrida donde el
+  canal funcionó perfecto. Ahora describe qué no se pudo comprobar —cada línea
+  lo dice— y **solo menciona el canal si alguna de las no concluyentes es del
+  canal**.
+- **Ninguna aserción se relajó.**
+
+**Verificado** en modo Local: 43 comprobaciones en verde, incluidos los siete
+criterios nuevos del formulario. **La compuerta no la pude correr yo** (necesita
+credenciales de producción): queda para la corrida del dueño, tres veces
+seguidas, como pide el criterio de cierre.

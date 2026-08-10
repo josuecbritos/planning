@@ -101,9 +101,14 @@ se conserva. *Consecuencia aceptada: un correo eliminado que vuelve reutiliza
 esa fila y recupera sus tareas si se le devuelve el acceso al proyecto.*
 
 **El perfil se corrige entre consultor y cliente (#300).** Un admin lo cambia
-desde administración de usuarios; nadie cambia el suyo, y el de administrador
-queda fuera en los dos sentidos (no se promueve ni se degrada desde ahí, para
-no poder quedarse sin ningún administrador). A consultor conserva sus accesos
+**desde el formulario de editar usuario** (#303), junto al nombre y las
+iniciales — la columna Rol solo lo muestra. Todo se aplica al Guardar y
+Cancelar descarta todo; como el perfil y el nombre no viajan por el mismo
+camino, el guardado va primero por el perfil: si la base lo rechaza no se
+aplica ningún otro cambio. El campo aparece solo cuando el cambio es posible;
+si no, el perfil se muestra como dato — porque **nadie cambia el suyo** y el de
+administrador **queda fuera en los dos sentidos** (no se promueve ni se degrada
+desde ahí, para no poder quedarse sin ningún administrador). A consultor conserva sus accesos
 con los mismos permisos y suma los de consultor por defecto; a cliente los
 pierde, y **si es dueño de algún proyecto el cambio se bloquea** diciendo
 cuántos — el traspaso de proyectos no existe todavía (#302). La restricción

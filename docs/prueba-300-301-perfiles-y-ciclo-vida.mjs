@@ -57,10 +57,30 @@ async function forzarPersistencia(nombre) {
   await esperar(600)
 }
 
-/** Cambia el perfil desde el selector de la fila. */
-async function cambiarPerfil(nombre, rol) {
-  await filaDe(nombre).locator('select.select-rol').selectOption(rol)
-  await esperar(700)
+// #303: el perfil se cambia DENTRO del formulario de editar usuario, y todo
+// se aplica al guardar. `accion` decide si se guarda o se cancela.
+async function abrirEdicion(nombre) {
+  await filaDe(nombre).locator('.icon-btn[data-tip="Editar"]').click()
+  await esperar(500)
+}
+const selectorPerfil = () => p.locator('form .campo select')
+
+async function cambiarPerfil(nombre, rol, accion = 'guardar', nombreNuevo) {
+  await abrirEdicion(nombre)
+  if (nombreNuevo !== undefined) await p.locator('form .campo input').first().fill(nombreNuevo)
+  await selectorPerfil().selectOption(rol)
+  await esperar(200)
+  if (accion === 'cancelar') {
+    await p.locator('form button', { hasText: 'Cancelar' }).click()
+  } else {
+    await p.locator('form button[type="submit"]').first().click()
+  }
+  await esperar(900)
+  // Si la base rechazó, el formulario queda abierto: se cierra para seguir.
+  if (await p.locator('form button', { hasText: 'Cancelar' }).count()) {
+    await p.locator('form button', { hasText: 'Cancelar' }).click()
+    await esperar(300)
+  }
 }
 
 await p.goto(URL_APP)
@@ -146,9 +166,12 @@ await irAUsuarios()
 const carla = await usuarioDe('Carla Soto')
 const propios = (await estado()).proyectos.filter((x) => x.duenoId === carla.id).length
 chk(propios > 0, 'preparación: la consultora tiene proyectos propios', `${propios}`)
-await cambiarPerfil('Carla Soto', 'cliente')
+await cambiarPerfil('Carla Soto', 'cliente', 'guardar', 'Carla Soto Renombrada')
 const carlaDespues = await usuarioDe('Carla Soto')
 chk(carlaDespues?.rol === 'consultor', 'C6 el cambio se BLOQUEA: sigue siendo consultora', `rol=${carlaDespues?.rol}`)
+chk(carlaDespues?.nombre === 'Carla Soto',
+    'C9 rechazado el perfil, el nombre del mismo formulario TAMPOCO se aplicó',
+    carlaDespues?.nombre)
 const textoError = await p.locator('.error-banner, .banner-error, .error').first().innerText().catch(() => '')
 chk(
   textoError.includes(String(propios)) && /due/i.test(textoError),
@@ -158,31 +181,82 @@ chk(
 await p.locator('.error-banner button, .banner-error button, .error button').first().click().catch(() => {})
 await esperar(300)
 
-// ── C7 · Un administrador no puede cambiar su PROPIO perfil ────────────────
+// ── C10 · La columna Rol ya no tiene desplegable ───────────────────────────
 chk(
-  (await filaDe('Daniela Vera').locator('select.select-rol').count()) === 0,
-  'C7 en la fila propia no hay selector de perfil',
+  (await p.locator('.usuarios-tabla select').count()) === 0,
+  'C10 la columna Rol ya no tiene desplegable: muestra el chip de siempre',
+)
+chk(
+  (await filaDe('Cliente Arauco').locator('.chip-rol').count()) === 1,
+  'C10 la columna Rol muestra el chip',
 )
 
-// ── C9 · Administrador queda fuera en los dos sentidos ─────────────────────
-chk(
-  (await filaDe('Josue Britos').locator('select.select-rol').count()) === 0,
-  'C9 sobre un administrador no se ofrece cambiar el perfil',
-)
-const opciones = await filaDe('Cliente Arauco').locator('select.select-rol option').allInnerTexts()
+// ── C11 · Sobre uno mismo, el perfil es dato, no campo ─────────────────────
+await abrirEdicion('Daniela Vera')
+chk((await selectorPerfil().count()) === 0, 'C11 sobre uno mismo el perfil no es editable')
+chk((await p.locator('form .campo__dato .chip-rol').count()) === 1, 'C11 se muestra como dato')
+await p.locator('form button', { hasText: 'Cancelar' }).click()
+await esperar(300)
+
+// ── C12 · Sobre otro administrador, igual ──────────────────────────────────
+await abrirEdicion('Josue Britos')
+chk((await selectorPerfil().count()) === 0, 'C12 sobre otro administrador el perfil no es editable')
+await p.locator('form button', { hasText: 'Cancelar' }).click()
+await esperar(300)
+
+// ── C9 · Administrador queda fuera del selector al editar ──────────────────
+await abrirEdicion('Cliente Arauco')
+const opciones = await selectorPerfil().locator('option').allInnerTexts()
 chk(
   opciones.length === 2 && !opciones.join().toLowerCase().includes('admin'),
-  'C9 el selector solo ofrece consultor y cliente',
+  'C9 al editar, el perfil solo ofrece consultor y cliente',
   JSON.stringify(opciones),
 )
+await p.locator('form button', { hasText: 'Cancelar' }).click()
+await esperar(300)
 
-// ── C8 · Un consultor no ve la opción ──────────────────────────────────────
+// ── C6bis · Cancelar descarta TODO, incluido el perfil ─────────────────────
+const antesDeCancelar = await usuarioDe('Cliente Arauco')
+await cambiarPerfil('Cliente Arauco', 'consultor', 'cancelar', 'Nombre Descartado')
+const trasCancelar = await usuarioDe('Cliente Arauco')
+chk(trasCancelar?.rol === antesDeCancelar.rol, 'C6 Cancelar no cambia el perfil', `rol=${trasCancelar?.rol}`)
+chk(trasCancelar?.nombre === antesDeCancelar.nombre, 'C6 Cancelar tampoco cambia el nombre', trasCancelar?.nombre)
+
+// ── C8 · Nombre y perfil a la vez, los dos aplicados ───────────────────────
+await cambiarPerfil('Cliente Arauco', 'consultor', 'guardar', 'Cliente Arauco Dos')
+const ambos = (await estado()).usuarios.find((u) => u.id === antesDeCancelar.id)
+chk(ambos?.rol === 'consultor' && ambos?.nombre === 'Cliente Arauco Dos',
+    'C8 nombre y perfil cambiados a la vez quedan los DOS aplicados',
+    `${ambos?.nombre} / ${ambos?.rol}`)
+// Se deja como estaba para el resto de la prueba.
+await abrirEdicion('Cliente Arauco Dos')
+await p.locator('form .campo input').first().fill('Cliente Arauco')
+await selectorPerfil().selectOption('cliente')
+await p.locator('form button[type="submit"]').first().click()
+await esperar(900)
+
+// ── C14 · Editar solo nombre e iniciales sigue funcionando igual ───────────
+await abrirEdicion('Cliente Arauco')
+await p.locator('form .campo input').first().fill('Cliente Arauco X')
+await p.locator('form .campo input').nth(1).fill('CX')
+await p.locator('form button[type="submit"]').first().click()
+await esperar(800)
+const soloNombre = (await estado()).usuarios.find((u) => u.id === antesDeCancelar.id)
+chk(
+  soloNombre?.nombre === 'Cliente Arauco X' && soloNombre?.iniciales === 'CX' && soloNombre?.rol === 'cliente',
+  'C14 editar solo nombre e iniciales sigue funcionando, sin tocar el perfil',
+  `${soloNombre?.nombre} / ${soloNombre?.iniciales} / ${soloNombre?.rol}`,
+)
+await abrirEdicion('Cliente Arauco X')
+await p.locator('form .campo input').first().fill('Cliente Arauco')
+await p.locator('form .campo input').nth(1).fill('CA')
+await p.locator('form button[type="submit"]').first().click()
+await esperar(800)
+
+// ── C13 · Un consultor no ve nada de esto ──────────────────────────────────
 await entrarComo('Carla Soto')
 await irAUsuarios()
-chk(
-  (await p.locator('.usuarios-tabla select.select-rol').count()) === 0,
-  'C8 un consultor no ve ningún selector de perfil',
-)
+chk((await p.locator('.usuarios-tabla select').count()) === 0, 'C13 un consultor no ve desplegables de perfil')
 
 // ── C10 · Archivar (desactivar) conserva y apaga ───────────────────────────
 // Se parte de un estado LIMPIO: el bloque anterior le retiró el acceso al
