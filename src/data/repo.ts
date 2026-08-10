@@ -140,6 +140,15 @@ export interface Repo {
   /** #136: eliminar = desactivar + invisible. No hay hard delete: la fila y su
    *  historial quedan intactos; reactivable dando de alta el mismo correo. */
   eliminarUsuario(id: string): Promise<void>
+  /**
+   * #300: cambia el perfil de un usuario entre consultor y cliente. Solo un
+   * admin, nunca el propio, y nunca desde/hacia administrador; pasar a
+   * cliente se bloquea si es dueño de algún proyecto. Las salvaguardas viven
+   * en la BASE (`cambiar_rol_usuario`) — esto es el camino, no la barrera.
+   * `actorId` es quien lo pide: en Supabase lo deduce la sesión de la base;
+   * en modo Local hay que decírselo.
+   */
+  cambiarRolUsuario(id: string, rol: Rol, actorId?: string): Promise<Usuario>
   /** Asigna un proyecto a un usuario (cliente o consultor). El acceso nace
    *  con los permisos por DEFECTO del rol del usuario (4). */
   asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso>

@@ -7,6 +7,7 @@ import type {
   Notificacion,
   Proyecto,
   Replanificacion,
+  Rol,
   SubFrente,
   Tarea,
   Usuario,
@@ -320,12 +321,38 @@ export class SupabaseRepo implements Repo {
     // `crear_o_reactivar_usuario`, la operación inversa, y por la misma razón—
     // y replica la autorización adentro: no amplía quién puede modificar la
     // tabla. Migración 25.
-    const { error } = await this.db.rpc('eliminar_usuario', { p_usuario: id })
+    //
+    // #301: eliminar CORTA, y cortar incluye revocar la cuenta de acceso. Eso
+    // toca el sistema de autenticación, no la tabla `usuario`, así que la
+    // operación pasó a la Edge Function `eliminar-usuario`: ahí vive el Admin
+    // API, con `service_role`, que nunca llega al navegador. La función llama
+    // a la MISMA RPC con el JWT de quien pide —la autorización sigue siendo
+    // `es_admin()` dentro de la base— y después revoca la cuenta.
+    const { data: res, error } = await getClient().functions.invoke('eliminar-usuario', {
+      body: { usuarioId: id },
+    })
+    // #210/#249: el cuerpo trae el mensaje en español; el error de invoke, no.
+    const mensaje = (res as { error?: string } | null)?.error
+    if (mensaje) throw new Error(mensaje)
     if (error) throw new Error(error.message)
     // Se conserva la comprobación por la vista (#248): si sigue visible, algo
     // impidió el borrado y no se puede dar por hecho.
     const { data } = await this.db.from('usuario_visible').select('id').eq('id', id).maybeSingle()
     if (data) throw new Error('No se pudo eliminar el usuario. Revisa que tengas permiso para hacerlo.')
+  }
+
+  async cambiarRolUsuario(id: string, rol: Rol): Promise<Usuario> {
+    // #300: por RPC, no por UPDATE. Las cinco salvaguardas viven adentro
+    // (admin, solo consultor↔cliente, nunca el propio, nunca administrador,
+    // y bloqueo si es dueño de proyectos con el conteo en el mensaje), y el
+    // trigger `trg_validar_cambio_rol` rechaza cualquier UPDATE directo de
+    // `rol` que llegue desde el cliente: la restricción está en la base, no
+    // solo en la pantalla.
+    const row = unwrap(await this.db.rpc('cambiar_rol_usuario', { p_usuario: id, p_rol: rol }).single())
+    // Se relee por la vista para traer email/permisos desenmascarados; la
+    // fila que devuelve la RPC viene de la tabla base.
+    const visible = unwrap(await this.db.from('usuario_visible').select('*').eq('id', row.id).single())
+    return toUsuario(visible)
   }
 
   async updateUsuario(id: string, patch: PatchUsuario): Promise<Usuario> {

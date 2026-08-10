@@ -482,6 +482,25 @@ reintroduce un hallazgo de la auditoría.
     `rel="noopener noreferrer"`, sin dar al destino referencia a la ventana de
     origen. Cualquier reconocimiento futuro sobre texto de usuario —en
     comentarios o donde sea— entra con estas tres reglas.
+22. **El perfil de un usuario se cambia SOLO por `cambiar_rol_usuario`, y el
+    de administrador no se cambia (#300).** El trigger
+    `trg_validar_cambio_rol` rechaza cualquier UPDATE de `rol` que llegue como
+    `authenticated`: la pantalla es el camino, no la barrera. La RPC exige
+    admin, prohíbe el propio perfil, admite solo `consultor` ↔ `cliente` —a
+    `admin` no se llega ni se sale desde aquí, para no poder quedarse sin
+    ningún administrador— y bloquea el paso a cliente de quien es dueño de
+    algún proyecto. No relajar el `es_cliente(usuario_id)` de las políticas de
+    `acceso_proyecto`: vive en la rama del DUEÑO-consultor y es lo que impide
+    que un consultor meta consultores en sus proyectos; el admin ya pasa por
+    `es_admin()`.
+23. **Eliminar un usuario revoca su cuenta de acceso, y eso se hace con el
+    Admin API (#301).** La revocación vive en la Edge Function
+    `eliminar-usuario` (`service_role`), nunca por SQL contra el esquema
+    `auth`: tocar `auth.users` a mano es saltarse el sistema de
+    autenticación. El orden es base primero, revocación después — al revés
+    quedaría una cuenta muerta con un usuario que la interfaz muestra activo.
+    La autorización NO se replica en TypeScript: la función llama a la RPC con
+    el JWT de quien pide y la barrera sigue siendo `es_admin()` en la base.
 
 ---
 

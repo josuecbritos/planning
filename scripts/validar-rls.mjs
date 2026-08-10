@@ -1025,6 +1025,155 @@ async function probarHechaSinFecha(admin) {
 // Falla por la SOLA PRESENCIA del permiso —no hace falta que nadie intente
 // explotarlo— leyendo la vista `permiso_ejecucion_abierto`, que lista
 // exactamente las infracciones (cero filas en una base sana).
+// #300/#301 — El perfil se cambia SOLO por la RPC, y solo un admin.
+//
+// Tres cosas que no se pueden ver desde la aplicación y por eso viven acá:
+//   1. Un CONSULTOR llamando a `cambiar_rol_usuario` es rechazado.
+//   2. Un UPDATE DIRECTO de `rol` sobre `usuario` es rechazado por el trigger
+//      `trg_validar_cambio_rol`, incluso hecho por un admin — así la
+//      restricción no depende de que la pantalla se porte bien.
+//   3. Ningún camino permite llegar a `admin` ni salir de `admin`.
+//
+// Terreno propio, como #296: usuario `__prueba_300_...` creado y borrado por
+// esta prueba. No toca a nadie real.
+async function probarCambioDePerfil(admin) {
+  const rotulo = 'perfil'
+  const email = process.env.RLS_CONSULTOR_EMAIL ?? process.env.RLS_CONSULTOR_B_EMAIL
+  const pass = process.env.RLS_CONSULTOR_PASS ?? process.env.RLS_CONSULTOR_B_PASS
+  if (!email || !pass) {
+    console.log('  SKIP  [perfil] hacen falta RLS_CONSULTOR_* para #300')
+    return
+  }
+
+  const sello = Date.now()
+  const correo = `__prueba_300_${sello}@example.invalid`
+  let sujeto = null
+
+  const limpiar = async () => {
+    if (sujeto) await admin.from('usuario').delete().eq('id', sujeto)
+  }
+
+  try {
+    const { data: nuevo, error: errAlta } = await admin
+      .from('usuario')
+      .insert({ nombre: `__prueba_300_${sello}`, iniciales: 'PP', email: correo, rol: 'cliente' })
+      .select()
+      .single()
+    if (errAlta) {
+      marcaNoConcluyente(rotulo, 'terreno de prueba', `no se pudo crear el usuario de prueba: ${errAlta.message}`)
+      return
+    }
+    sujeto = nuevo.id
+
+    // 1) Un consultor no cambia perfiles.
+    const c = await sesion(email, pass)
+    const { error: errConsultor } = await c.rpc('cambiar_rol_usuario', {
+      p_usuario: sujeto, p_rol: 'consultor',
+    })
+    marca(Boolean(errConsultor), rotulo, 'un consultor NO puede cambiar el perfil de nadie',
+          errConsultor ? '' : 'la RPC lo dejó pasar')
+
+    // 2) Un UPDATE directo de `rol` es rechazado, aunque lo haga un admin.
+    //    (`admin` acá es la sesión del ADMIN de la compuerta, no service_role.)
+    const { error: errDirecto } = await admin
+      .from('usuario').update({ rol: 'consultor' }).eq('id', sujeto)
+    marca(Boolean(errDirecto), rotulo, 'un UPDATE directo de `rol` es rechazado por el trigger',
+          errDirecto ? '' : 'el update directo pasó: la restricción no está en la base')
+
+    // 3) La RPC del admin sí funciona, y no admite `admin` como destino.
+    const { error: errOk } = await admin.rpc('cambiar_rol_usuario', {
+      p_usuario: sujeto, p_rol: 'consultor',
+    })
+    marca(!errOk, rotulo, 'un admin SÍ puede cambiar el perfil por la RPC', errOk?.message ?? '')
+
+    const { error: errAAdmin } = await admin.rpc('cambiar_rol_usuario', {
+      p_usuario: sujeto, p_rol: 'admin',
+    })
+    marca(Boolean(errAAdmin), rotulo, 'no se puede promover a administrador',
+          errAAdmin ? '' : 'la RPC aceptó `admin` como destino')
+
+    // 4) Y tampoco se puede degradar a un administrador.
+    const { data: unAdmin } = await admin
+      .from('usuario_visible').select('id').eq('rol', 'admin').limit(1).maybeSingle()
+    if (unAdmin) {
+      const { error: errDesdeAdmin } = await admin.rpc('cambiar_rol_usuario', {
+        p_usuario: unAdmin.id, p_rol: 'consultor',
+      })
+      marca(Boolean(errDesdeAdmin), rotulo, 'no se puede degradar a un administrador',
+            errDesdeAdmin ? '' : 'la RPC degradó a un administrador')
+    } else {
+      marcaNoConcluyente(rotulo, 'no se puede degradar a un administrador', 'no se encontró ningún admin visible')
+    }
+  } catch (e) {
+    marcaNoConcluyente(rotulo, 'cambio de perfil', e.message)
+  } finally {
+    await limpiar()
+  }
+}
+
+// #301 — Eliminar CORTA: suelta los accesos y el vínculo con la cuenta.
+//
+// Lo que se comprueba es el efecto en la BASE. La revocación de la cuenta de
+// Auth la hace la Edge Function `eliminar-usuario` y no se ejercita acá: esta
+// prueba llama a la RPC directamente, que es justo la parte que la función
+// invoca primero.
+async function probarEliminarCorta(admin) {
+  const rotulo = 'eliminar'
+  const sello = Date.now()
+  let sujeto = null
+  let proyecto = null
+
+  const limpiar = async () => {
+    if (proyecto) await admin.from('proyecto').delete().eq('id', proyecto)
+    if (sujeto) await admin.from('usuario').delete().eq('id', sujeto)
+  }
+
+  try {
+    const { data: nuevo, error: errAlta } = await admin
+      .from('usuario')
+      .insert({
+        nombre: `__prueba_301_${sello}`, iniciales: 'PE',
+        email: `__prueba_301_${sello}@example.invalid`, rol: 'consultor',
+      })
+      .select().single()
+    if (errAlta) {
+      marcaNoConcluyente(rotulo, 'terreno de prueba', `no se pudo crear el usuario: ${errAlta.message}`)
+      return
+    }
+    sujeto = nuevo.id
+
+    const { data: proy, error: errProy } = await admin
+      .from('proyecto').insert({ nombre: `__prueba_rls_301_${sello}` }).select().single()
+    if (errProy) {
+      marcaNoConcluyente(rotulo, 'terreno de prueba', `no se pudo crear el proyecto: ${errProy.message}`)
+      return
+    }
+    proyecto = proy.id
+    await admin.from('acceso_proyecto').insert({ usuario_id: sujeto, proyecto_id: proyecto })
+
+    const { error: errRpc } = await admin.rpc('eliminar_usuario', { p_usuario: sujeto })
+    if (errRpc) {
+      marca(false, rotulo, 'un admin puede eliminar', errRpc.message)
+      return
+    }
+
+    const { data: accesos } = await admin
+      .from('acceso_proyecto').select('usuario_id').eq('usuario_id', sujeto)
+    marca((accesos ?? []).length === 0, rotulo, 'eliminar SUELTA los accesos a proyectos',
+          `quedaron ${(accesos ?? []).length}`)
+
+    // La fila se conserva —sostiene el registro— pero deja de ser visible:
+    // `usuario_select` exige `not eliminado` (invariante de #248).
+    const { data: visible } = await admin
+      .from('usuario_visible').select('id').eq('id', sujeto).maybeSingle()
+    marca(!visible, rotulo, 'el eliminado desaparece de `usuario_visible`')
+  } catch (e) {
+    marcaNoConcluyente(rotulo, 'eliminar corta', e.message)
+  } finally {
+    await limpiar()
+  }
+}
+
 async function probarExecutePublico(admin) {
   const rotulo = 'execute'
   const { data, error } = await admin.from('permiso_ejecucion_abierto').select('funcion, es_security_definer')
@@ -1364,6 +1513,12 @@ async function main() {
 
   // ---------- #294: la hecha sin fecha queda con fecha ----------
   await probarHechaSinFecha(admin)
+
+  // ---------- #300: el perfil se cambia solo por la RPC, y solo un admin ----
+  await probarCambioDePerfil(admin)
+
+  // ---------- #301: eliminar suelta accesos e identidad ----------
+  await probarEliminarCorta(admin)
 
   // ---------- #290: el permiso de ejecución universal quedó cerrado ----------
   await probarExecutePublico(admin)

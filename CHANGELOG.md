@@ -1285,3 +1285,82 @@ en verde, los once criterios del pedido. Incluye el clic real que abre la
 pestaña en el destino correcto, el comentario preexistente que ahora se ve como
 enlace sin haberlo tocado, el enlace largo que no rompe el ancho del panel, y
 el caso de seguridad probado **también como cliente invitado**.
+
+## #300 y #301 — Cambiar el perfil de un usuario, y qué significan archivar y eliminar
+
+El dueño creó un usuario con el perfil equivocado y descubrió que no había
+forma de corregirlo. El rodeo —eliminarlo y volver a crearlo— destapó lo de
+fondo: **archivar y eliminar significaban casi lo mismo**. Volvía con el perfil
+anterior y sin correo de invitación, porque conservaba su cuenta de acceso.
+
+**La regla que queda: archivar PAUSA y se deshace; eliminar CORTA, y lo que
+vuelve es alguien nuevo con el mismo correo.**
+
+### #300 — Cambiar el perfil entre consultor y cliente
+
+- **Un selector en la columna Perfil** de administración de usuarios. Solo un
+  admin, nunca el propio, nunca sobre un administrador, y solo entre consultor
+  y cliente. El perfil de administrador queda fuera en los dos sentidos.
+- **La barrera está en la base, no en la pantalla:** la RPC
+  `cambiar_rol_usuario` repite las cinco salvaguardas, y el trigger
+  `trg_validar_cambio_rol` **rechaza cualquier UPDATE directo de `rol`** que
+  llegue del cliente. Una petición que intente saltarse la pantalla no pasa.
+- **A consultor:** conserva sus accesos a proyectos con los mismos permisos —el
+  acceso no depende del perfil— y recibe los permisos por defecto de consultor.
+  No se le suben los permisos de los proyectos ajenos donde es invitado.
+- **A cliente:** pierde los poderes de consultor. **Si es dueño de algún
+  proyecto se bloquea**, y el mensaje dice cuántos. El traspaso de proyectos no
+  existe todavía (#302).
+- **Las políticas de `acceso_proyecto` NO se tocaron.** Su `es_cliente(
+  usuario_id)` vive en la rama del dueño-consultor, no en la del admin: un
+  administrador ya podía retirar el acceso de un consultor, que es lo que pide
+  el criterio 3. Y ese `es_cliente` es la regla que impide que un consultor
+  meta consultores en sus proyectos (migración 12, deliberado). *Consecuencia
+  asumida: el dueño de un proyecto no puede retirarle el acceso a un invitado
+  que pasó a consultor; lo hace un administrador.*
+
+### #301 — Archivar y eliminar dejan de significar lo mismo
+
+| | Archivado | Eliminado |
+|---|---|---|
+| ¿Puede iniciar sesión? | No | No |
+| ¿Su cuenta de acceso existe? | Sí, suspendida | **No, se revoca** |
+| ¿Conserva accesos a proyectos? | Sí | **No, se sueltan** |
+| ¿Conserva su perfil? | Sí | **No** |
+| ¿Conserva sus tareas asignadas? | Sí, iniciales apagadas | Sí, iniciales apagadas |
+| ¿Se puede revertir? | Sí, con su misma contraseña | No |
+
+- **Eliminar revoca la cuenta de acceso.** Eso toca el sistema de
+  autenticación, no la tabla de usuarios, así que vive donde corresponde: la
+  **Edge Function nueva `eliminar-usuario`**, con el Admin API y `service_role`.
+  Llama primero a la RPC con el JWT de quien pide —la autorización sigue siendo
+  `es_admin()` dentro de la base— y después revoca. Si la revocación fallara, la
+  persona ya no puede entrar igual (el login exige perfil activo) y se
+  reintenta: el modo de fallo es seguro.
+- **Eliminar suelta los accesos y vacía los permisos de consultor**, y suelta el
+  vínculo `auth_id`. Eso último es lo que hace que un alta posterior del mismo
+  correo **sí reciba invitación**: `invitar-usuario` rechaza a quien ya tiene
+  cuenta, y ese era el síntoma reportado.
+- **Dar de alta un correo eliminado es un alta nueva:** toma el perfil que se
+  elige, sin proyectos ni permisos heredados. Reactivar un archivado, en
+  cambio, lo conserva todo.
+- **El bloqueo de inicio de sesión de un archivado YA existía** y no hizo falta
+  tocarlo: `auth/supabaseAuth.ts` exige un perfil activo después de autenticar
+  y cierra la sesión con el mensaje de #244. Un ELIMINADO, con su cuenta ya
+  revocada, verá "Correo o contraseña incorrectos" — el texto de #252, elegido
+  para no revelar qué correos existen.
+- **No se tocó** el historial, los comentarios, ni la regla #229 de las
+  iniciales apagadas. La fila del usuario se conserva justamente para
+  sostenerlos. *Consecuencia aceptada: un correo eliminado que vuelve reutiliza
+  esa fila, así que recupera sus tareas si se le devuelve el acceso.*
+
+**Migración 31**, aditiva. **Requiere desplegar la Edge Function
+`eliminar-usuario` ANTES de mergear el front**, porque la eliminación pasa a
+llamarla.
+
+**Verificado** con `docs/prueba-300-301-perfiles-y-ciclo-vida.mjs`: 35
+comprobaciones en verde en modo Local, y las suites de #297, #298 y #299
+siguen en verde. Lo que solo vive en la base —que un
+consultor no pueda llamar la RPC, que un UPDATE directo de `rol` sea rechazado,
+que no se pueda llegar ni salir de administrador, y que eliminar suelte los
+accesos— entra a la compuerta `scripts/validar-rls.mjs` con dos casos nuevos.

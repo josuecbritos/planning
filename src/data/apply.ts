@@ -42,7 +42,15 @@ export function upsertUsuario(s: AppState, u: Usuario): AppState {
 /** #136: eliminar = sacar de la UI. La fila sigue en la base; localmente se
  *  quita del estado (queda invisible en el módulo y en todos los selectores). */
 export function removeUsuario(s: AppState, usuarioId: string): AppState {
-  return { ...s, usuarios: s.usuarios.filter((u) => u.id !== usuarioId) }
+  // #301: eliminar SUELTA los accesos a proyectos. Se van con el usuario, si
+  // no la pantalla seguiría contándolo como miembro de proyectos de los que
+  // ya no lo es. Sus TAREAS no se tocan: siguen mostrando sus iniciales,
+  // apagadas (regla #229).
+  return {
+    ...s,
+    usuarios: s.usuarios.filter((u) => u.id !== usuarioId),
+    accesos: s.accesos.filter((a) => a.usuarioId !== usuarioId),
+  }
 }
 
 /** #137: marca como leídas las notificaciones con los ids dados. */

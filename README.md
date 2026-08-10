@@ -52,7 +52,7 @@ Sin `.env`, arranca en modo Local con datos semilla del Plan PGP Arauco.
 ## Conectar Supabase
 
 1. Crea un proyecto en [supabase.com](https://supabase.com) (capa gratuita).
-2. Aplica el esquema **completo**, las 30 migraciones en orden:
+2. Aplica el esquema **completo**, las 31 migraciones en orden:
    ```bash
    supabase link --project-ref TU_REF
    supabase db push          # aplica supabase/migrations/ en orden
@@ -194,9 +194,9 @@ src/
     CampoPassword, Modal, TextPromptModal, …
     Iconos.tsx           Iconos de acción como SVG de trazo (#203)
 supabase/
-  migrations/            30 migraciones (1→30). Lista ordenada en DEPLOY.md.
+  migrations/            31 migraciones (1→31). Lista ordenada en DEPLOY.md.
   functions/             Edge Functions (Deno): invitar-usuario, aceptar-invitacion,
-                         recuperar-contrasena
+                         recuperar-contrasena, eliminar-usuario
   seed.sql               Datos de arranque (opcional)
 scripts/
   validar-rls.mjs        Compuerta de RLS (rol por rol contra la API)
@@ -211,6 +211,8 @@ docs/
                          tabla del proyecto, contra `vite preview`
   prueba-299-enlaces-comentarios.mjs  Prueba e2e de los enlaces en el hilo de
                          comentarios, contra `vite preview`
+  prueba-300-301-perfiles-y-ciclo-vida.mjs  Prueba e2e del cambio de perfil y
+                         de archivar/eliminar, contra `vite preview`
   documento-funcional-v3.1.md  (histórico)
 ```
 

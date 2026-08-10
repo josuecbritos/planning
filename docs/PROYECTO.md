@@ -84,17 +84,45 @@ al real**; no se corrige sola, porque la fecha original solo se rehace mientras
 la tarea no tenga replanificaciones. Cuáles son se puede volver a consultar con
 `docs/consulta-291-replanificaciones-falsas.sql`.
 
+**Archivar PAUSA y se deshace; eliminar CORTA (#301).** Eran casi lo mismo:
+eliminar solo marcaba la fila, así que la persona conservaba cuenta de acceso,
+perfil y proyectos —y al dar de alta ese correo otra vez volvía con el perfil
+anterior y sin invitación—. Ahora **archivar** conserva todo y se revierte (al
+reactivar entra con su misma contraseña, su mismo perfil y sus mismos
+proyectos), y **eliminar** revoca la cuenta de acceso, suelta los accesos a
+proyectos y vacía el perfil: dar de alta ese correo otra vez es un **alta
+nueva**, con el perfil que se elija, sin proyectos heredados y con su
+invitación. La revocación de la cuenta la hace la Edge Function
+`eliminar-usuario` (Admin API): tocar `auth.users` por SQL sería saltarse el
+sistema de autenticación. Lo que NO cambia: las tareas asignadas se conservan
+en los dos casos con las iniciales apagadas (#229), y el nombre en comentarios
+e historial no se toca nunca — eso es registro, y por eso la fila del usuario
+se conserva. *Consecuencia aceptada: un correo eliminado que vuelve reutiliza
+esa fila y recupera sus tareas si se le devuelve el acceso al proyecto.*
+
+**El perfil se corrige entre consultor y cliente (#300).** Un admin lo cambia
+desde administración de usuarios; nadie cambia el suyo, y el de administrador
+queda fuera en los dos sentidos (no se promueve ni se degrada desde ahí, para
+no poder quedarse sin ningún administrador). A consultor conserva sus accesos
+con los mismos permisos y suma los de consultor por defecto; a cliente los
+pierde, y **si es dueño de algún proyecto el cambio se bloquea** diciendo
+cuántos — el traspaso de proyectos no existe todavía (#302). La restricción
+vive en la base: la RPC `cambiar_rol_usuario` y un trigger que rechaza
+cualquier UPDATE directo de `rol`.
+
 **Eliminar un usuario es un borrado LÓGICO y va por RPC (#136/#286).** Eliminar
 marca `activo = false` y `eliminado = true`: la persona desaparece de la
 interfaz —eliminado es distinto de desactivado: no reaparece ni con "ver
-desactivados"— y se recupera dando de alta el mismo correo, con sus accesos.
+desactivados"—. Desde #301 marca además `auth_id = null`, suelta los accesos y
+vacía `permisos_proyecto`: dar de alta ese correo otra vez es un alta nueva,
+no una recuperación (ver arriba).
 Va por la RPC `eliminar_usuario` (admin, comprobado en la base) y no por un
 UPDATE directo, porque PostgreSQL aplica las políticas de SELECT como WITH
 CHECK sobre la fila nueva de un UPDATE: como la política exige `not
 eliminado`, marcar la fila como eliminada se rechazaba a sí misma. Es el mismo
 patrón que la operación inversa, `crear_o_reactivar_usuario`. El borrado
 DEFINITIVO (#258) sigue sin definirse: tareas, comentarios, historial y
-accesos de la persona se conservan.
+accesos de la persona se conservan (los accesos, desde #301, ya no).
 
 **Los permisos son del proyecto de la tarea, no del que esté abierto (#243).**
 El panel de detalle se abre también desde Mis Tareas y desde una notificación,

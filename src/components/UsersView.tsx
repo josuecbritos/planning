@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AppState, Proyecto, Usuario } from '../types'
+import type { AppState, Proyecto, Rol, Usuario } from '../types'
 import type { Actions } from '../App'
 import { puedeInvitarClientesEn, usuariosVisiblesPara } from '../lib/permisos'
 import { UsuarioModal } from './UsuarioModal'
@@ -272,6 +272,11 @@ function UsuarioFila({
   // proyecto, activar/desactivar, eliminar): SOLO el admin. El consultor no
   // edita cuentas.
   const puedeAdministrarCuenta = esAdminActor
+  // #300: el perfil se cambia SOLO entre consultor y cliente. Administrador
+  // queda fuera en los dos sentidos —no se promueve ni se degrada desde
+  // aquí—, y nadie cambia el suyo propio, ni un admin.
+  const puedeCambiarPerfil =
+    esAdminActor && !esYo && usuario.activo && usuario.rol !== 'admin'
   // Invitación por correo: admin a cualquiera; consultor a los clientes que
   // puede invitar en alguno de sus proyectos (la Edge Function reconfirma).
   const puedeInvitarCorreo =
@@ -291,7 +296,35 @@ function UsuarioFila({
       </td>
       <td>{usuario.email}</td>
       <td>
-        <span className={`chip-rol chip-rol--${usuario.rol}`}>{ROL_LABEL[usuario.rol]}</span>
+        {/* #300: el perfil se corrige acá mismo. Solo un admin, nunca el
+            propio, nunca sobre un administrador y solo entre consultor y
+            cliente: el resto de las filas siguen mostrando el chip de
+            siempre. La barrera no es esto — es `cambiar_rol_usuario` en la
+            base, que repite las cinco salvaguardas y rechaza cualquier
+            petición directa. */}
+        {puedeCambiarPerfil ? (
+          <select
+            className={`chip-rol chip-rol--${usuario.rol} select-rol`}
+            aria-label={`Perfil de ${usuario.nombre}`}
+            value={usuario.rol}
+            onChange={(e) => {
+              const nuevo = e.target.value as Rol
+              if (nuevo === usuario.rol) return
+              // Cambiar el perfil suma o quita poderes: se confirma, igual
+              // que desactivar y eliminar (#155).
+              const aviso =
+                nuevo === 'consultor'
+                  ? `¿Pasar a "${usuario.nombre}" a consultor? Conserva los proyectos a los que está invitado, con los mismos permisos, y suma los de consultor (crear proyectos, invitar clientes).`
+                  : `¿Pasar a "${usuario.nombre}" a cliente? Pierde los permisos de consultor. Conserva los proyectos a los que está invitado.`
+              if (confirm(aviso)) actions.cambiarRolUsuario(usuario.id, nuevo)
+            }}
+          >
+            <option value="consultor">{ROL_LABEL.consultor}</option>
+            <option value="cliente">{ROL_LABEL.cliente}</option>
+          </select>
+        ) : (
+          <span className={`chip-rol chip-rol--${usuario.rol}`}>{ROL_LABEL[usuario.rol]}</span>
+        )}
       </td>
       <td>{usuario.activo ? 'Activo' : 'Inactivo'}</td>
       <td className="col-proy">
@@ -333,7 +366,10 @@ function UsuarioFila({
             {usuario.activo ? <IconoEncendido /> : <IconoReactivar />}
           </button>
         )}
-        {/* #136: eliminar = desactivar + invisible (no hay borrado físico). */}
+        {/* #136/#301: eliminar = desactivar + invisible (no hay borrado físico),
+            y además CORTAR: se revoca la cuenta de acceso, se sueltan los
+            proyectos y se pierde el perfil. El aviso lo dice, porque ya no es
+            lo mismo que archivar: archivar pausa y se deshace. */}
         {puedeAdministrarCuenta && !esYo && (
           <button
             className="icon-btn"
@@ -341,8 +377,10 @@ function UsuarioFila({
             onClick={() => {
               if (
                 confirm(
-                  `¿Eliminar a "${usuario.nombre}"? Perderá el acceso y desaparecerá de la lista. ` +
-                    'Podrás recuperarlo dándole de alta con el mismo correo.',
+                  `¿Eliminar a "${usuario.nombre}"? Se revoca su cuenta de acceso y pierde sus proyectos. ` +
+                    'Sus tareas y sus comentarios se conservan. Si vuelves a dar de alta ese correo será un ' +
+                    'alta nueva: eliges el perfil, no hereda proyectos y recibe una invitación. ' +
+                    'Si solo quieres pausarlo, desactívalo.',
                 )
               ) {
                 actions.eliminarUsuario(usuario.id)
