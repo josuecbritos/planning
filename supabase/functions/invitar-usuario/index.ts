@@ -136,7 +136,11 @@ Deno.serve(async (req) => {
     }
 
     // 4) Correo con el enlace.
-    const enlace = `${Deno.env.get('SITE_URL')}/#invitacion=${inv.token}`
+    // #304: la dirección de la herramienta sale del MISMO valor configurado
+    // con el que se arma el enlace. Si el dominio cambia, el correo lo sigue
+    // solo — escribirla fija dejaría el texto apuntando a una dirección muerta.
+    const sitio = Deno.env.get('SITE_URL')
+    const enlace = `${sitio}/#invitacion=${inv.token}`
     const correo = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -150,9 +154,16 @@ Deno.serve(async (req) => {
         html: `
           <p>Hola ${usuario.nombre},</p>
           <p>Te invitaron a <b>Andotek Planning</b>. Para activar tu cuenta,
-          define tu contraseña en el siguiente enlace:</p>
+          crea tu contraseña en el siguiente enlace:</p>
           <p><a href="${enlace}">${enlace}</a></p>
           <p>El enlace caduca en 7 días. Si expira, pide que te reenvíen la invitación.</p>
+          <!-- #304: el enlace de arriba caduca y sirve UNA vez. Sin esta frase,
+               quien lo usó se queda sin ninguna referencia escrita de dónde
+               volver a entrar. La dirección se muestra completa, con https://,
+               para que sirva también leída en papel o copiada a mano. -->
+          <p>Una vez activada tu cuenta, entra en
+          <a href="${sitio}">${sitio}</a> con este mismo correo y la contraseña
+          que acabas de crear.</p>
         `,
       }),
     })

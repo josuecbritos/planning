@@ -242,7 +242,11 @@ Deno.serve(async (req) => {
       return responder(500, { error: ERROR_INTERNO })
     }
 
-    const enlace = `${Deno.env.get('SITE_URL')}/#recuperar=${token}`
+    // #304: la dirección de la herramienta sale del MISMO valor configurado
+    // con el que se arma el enlace. Si el dominio cambia, el correo lo sigue
+    // solo — escribirla fija dejaría el texto apuntando a una dirección muerta.
+    const sitio = Deno.env.get('SITE_URL')
+    const enlace = `${sitio}/#recuperar=${token}`
     const correo = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -256,12 +260,18 @@ Deno.serve(async (req) => {
         html: `
           <p>Hola ${usuario.nombre},</p>
           <p>Pediste restablecer tu contraseña de <b>Andotek Planning</b>.
-          Elige una nueva en el siguiente enlace:</p>
+          Crea una nueva en el siguiente enlace:</p>
           <p><a href="${enlace}">${enlace}</a></p>
           <p>El enlace caduca en 1 hora y sirve una sola vez. Al cambiarla se
           cerrarán todas tus sesiones abiertas.</p>
-          <p>Si no fuiste tú, puedes ignorar este correo: tu contraseña actual
-          sigue funcionando.</p>
+          <!-- #304: este correo llega SIEMPRE a alguien que quedó fuera —el
+               cambio con la sesión abierta no manda correo—, así que es justo
+               donde más falta hace decir dónde entrar. Va ANTES del aviso de
+               seguridad: ese sigue siendo el último párrafo. -->
+          <p>Una vez guardada, entra en <a href="${sitio}">${sitio}</a> con este
+          mismo correo y tu contraseña nueva.</p>
+          <p>Si no solicitaste el cambio, puedes ignorar este correo: tu
+          contraseña actual sigue funcionando.</p>
         `,
       }),
     })

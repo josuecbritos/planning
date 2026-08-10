@@ -1421,3 +1421,44 @@ valía. Las dos eran las pruebas nuevas de este mismo trabajo:
 criterios nuevos del formulario. **La compuerta no la pude correr yo** (necesita
 credenciales de producción): queda para la corrida del dueño, tres veces
 seguidas, como pide el criterio de cierre.
+
+## #304 — Los correos de la plataforma ahora dicen dónde entrar
+
+Los dos correos que envía el producto —la invitación y el de restablecer
+contraseña— entregaban su enlace de un solo uso y nada más. Como esos enlaces
+caducan y sirven una vez, **quien lo usó se quedaba sin ninguna referencia
+escrita de dónde volver a entrar**, ni con qué correo.
+
+- **Una frase al final de cada uno**, con la dirección de la herramienta como
+  enlace y **a la vista, con `https://` incluido** — para que sirva también
+  leída en papel o copiada a mano.
+  - *Invitación:* después del aviso de caducidad.
+  - *Restablecer:* justo antes del aviso de seguridad, que **sigue siendo el
+    último párrafo**.
+- **La dirección no se escribe fija:** sale del mismo `SITE_URL` con el que ya
+  se arma el enlace de cada correo. Si el dominio cambia, los dos correos lo
+  siguen solos. Escribirla a mano habría dejado el texto apuntando a una
+  dirección muerta el día que cambie.
+- **Tres retoques de redacción**, los que pidió el dueño: "define tu contraseña"
+  → **"crea tu contraseña"**; "Elige una nueva" → **"Crea una nueva"**; "Si no
+  fuiste tú" → **"Si no solicitaste el cambio"**.
+- **No se tocó** el asunto, el remitente, los plazos de caducidad ni el resto de
+  los párrafos. Tampoco se sumó quién invitó ni una descripción de la
+  herramienta: se evaluó y quedó fuera para no alargar el correo.
+- **Sin migración** y sin tocar la base: es texto.
+
+*Por qué importa más en el de restablecer:* ese correo llega SIEMPRE a alguien
+que quedó fuera — cambiar la contraseña con la sesión abierta, desde
+Configuración, no manda ningún correo.
+
+**Verificado** con `docs/prueba-304-correos.mjs`: 17 comprobaciones en verde.
+La prueba no tiene copia del texto — **extrae la plantilla del propio
+`index.ts` de cada función y la arma con valores de mentira**, así que si
+alguien edita un correo, lo ve. Comprueba además que el dominio real no aparezca
+escrito en el código y que, cambiando la configuración, el texto la siga.
+
+**Despliegue:** las dos funciones viven solo en producción y no tienen versión
+de prueba, así que **apenas se despliegan el texto nuevo sale para todos**.
+Conviene avisar antes. Los criterios 1 a 5 del pedido —que el correo llegue y
+que el enlace funcione de punta a punta— se comprueban con correos reales
+después de desplegar; eso no se puede simular desde el repo.
