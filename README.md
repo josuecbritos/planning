@@ -213,6 +213,8 @@ docs/
                          comentarios, contra `vite preview`
   prueba-300-301-perfiles-y-ciclo-vida.mjs  Prueba e2e del cambio de perfil y
                          de archivar/eliminar, contra `vite preview`
+  prueba-304-correos.mjs  Arma el cuerpo real de los dos correos y comprueba su
+                         texto (no necesita navegador ni base)
   documento-funcional-v3.1.md  (histórico)
 ```
 

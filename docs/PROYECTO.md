@@ -540,12 +540,19 @@ valor por defecto del navegador, cae al inicial (un `border` así desaparece).
     DEFINER, triggers de validación campo a campo, RPC).
 - **Auth:** Supabase Auth (email + contraseña); el admin crea el `usuario` con su
   email y, al activarse por el enlace de invitación, un trigger enlaza ambos.
-- **Edge Functions (Deno):** `invitar-usuario`, `aceptar-invitacion` y
-  `recuperar-contrasena` (correo via Resend). Secretos solo server-side. CORS
+- **Edge Functions (Deno):** `invitar-usuario`, `aceptar-invitacion`,
+  `recuperar-contrasena` (correo via Resend) y `eliminar-usuario` (#301, revoca
+  la cuenta de acceso con el Admin API). Secretos solo server-side. CORS
   por lista de orígenes: si no hay ninguno configurado la función **rechaza** la
   petición en vez de abrirse a cualquiera. Los errores internos se registran en
   el servidor y al cliente le llega un mensaje genérico en español (#249). Se
   despliegan a mano desde el dashboard (no hay CLI en este proyecto).
+  Los **dos correos que envía el producto** —la invitación y el de restablecer
+  contraseña— cierran diciendo **dónde entrar** (#304): la dirección de la
+  herramienta, como enlace y a la vista con `https://`. Sale del mismo
+  `SITE_URL` con el que se arma cada enlace, así que sigue sola un cambio de
+  dominio. Hacía falta porque esos enlaces caducan y sirven una vez: quien lo
+  usaba se quedaba sin ninguna referencia escrita para volver.
 - **Tiempo real:** Supabase Realtime sobre la publicación `supabase_realtime`
   (`notificacion` desde #255 y las siete tablas de datos desde #260; `usuario`
   queda fuera a sabiendas). Una sola cañería en el cliente
