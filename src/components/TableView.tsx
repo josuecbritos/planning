@@ -68,6 +68,9 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   // vista "Todos" colapsan ambos niveles; en una vista de un solo frente solo
   // colapsan los sub frentes. El encabezado se mantiene: solo se ocultan el
   // chevron y las tareas debajo.
+  // #311: el recuerdo sigue siendo uno solo y momentáneo —no se guarda por
+  // vista ni sobrevive a recargar—; lo que cambia es que solo SE APLICA donde
+  // hay chevron para deshacerlo (ver `colapsado` más abajo).
   const [frentesCol, setFrentesCol] = useState<Set<string>>(new Set())
   const [subsCol, setSubsCol] = useState<Set<string>>(new Set())
   const frenteColapsable = frenteSel === 'todos'
@@ -207,7 +210,16 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           indice={indice}
           forzarIds={forzarIds}
           realceId={realceId}
-          colapsado={frentesCol.has(f.id)}
+          /* #311: si el frente NO se puede plegar, tampoco puede estar
+             plegado. El recuerdo de lo plegado es UNO SOLO y sobrevive al
+             cambio de vista, pero el chevron solo se dibuja en "todos los
+             frentes": al entrar a la vista de un frente que había quedado
+             plegado, su contenido no se dibujaba y el control para abrirlo
+             tampoco — la pantalla quedaba vacía y sin salida.
+             El conjunto NO se toca, así que al volver a "todos" el frente
+             sigue plegado como estaba: entrar y salir de su vista no cambia
+             cómo se ve en la vista completa. */
+          colapsado={frenteColapsable && frentesCol.has(f.id)}
           colapsable={frenteColapsable}
           onToggleColapso={() => toggleFrente(f.id)}
           subsCol={subsCol}
