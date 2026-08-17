@@ -215,6 +215,8 @@ docs/
                          de archivar/eliminar, contra `vite preview`
   prueba-304-correos.mjs  Arma el cuerpo real de los dos correos y comprueba su
                          texto (no necesita navegador ni base)
+  prueba-311-frente-plegado.mjs  Prueba e2e del frente plegado al entrar a su
+                         vista, contra `vite preview`
   documento-funcional-v3.1.md  (histórico)
 ```
 

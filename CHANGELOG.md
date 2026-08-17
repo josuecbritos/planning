@@ -1462,3 +1462,34 @@ de prueba, así que **apenas se despliegan el texto nuevo sale para todos**.
 Conviene avisar antes. Los criterios 1 a 5 del pedido —que el correo llegue y
 que el enlace funcione de punta a punta— se comprueban con correos reales
 después de desplegar; eso no se puede simular desde el repo.
+
+## #311 — Un frente plegado ya no queda inalcanzable al entrar a ese frente
+
+Plegar un frente en "todos los frentes" y después entrar a ese mismo frente
+desde la barra lateral dejaba **la pantalla vacía y sin salida**: el título y
+nada más, sin tareas, sin sub frentes y **sin flecha para desplegarlo**.
+
+Eran dos comportamientos correctos por separado: el recuerdo de lo plegado es
+**uno solo** y sobrevive al cambio de vista, y la flecha del frente **solo se
+dibuja en la vista de todos** —plegar lo único que se está mirando no tiene
+sentido—. Juntos, el frente seguía marcado como plegado y el control para
+abrirlo ya no existía.
+
+- **La regla que lo cierra: si el frente no se puede plegar, tampoco puede
+  estar plegado.** El estado de plegado solo SE APLICA donde hay flecha para
+  deshacerlo.
+- **El recuerdo no se toca:** sigue siendo uno solo, momentáneo y no
+  persistente. Al volver a "todos los frentes" el frente sigue plegado como
+  estaba — entrar y salir de su vista no cambia cómo se ve en la vista
+  completa.
+- **Los sub frentes no cambian:** su flecha se dibuja en las dos vistas, así
+  que nunca tuvieron el problema y siguen igual.
+- Que el frente no tenga flecha en su propia vista **se mantiene**: es
+  correcto.
+- **Sin migración**, es pantalla.
+
+**Verificado** con `docs/prueba-311-frente-plegado.mjs`: 14 comprobaciones en
+verde, los cinco criterios — incluido llegar a una tarea desde una
+**notificación real** con su frente plegado. La prueba sabe fallar: con el
+código anterior, C1 reproduce el síntoma exacto (cero sub frentes, cero tareas,
+sin flecha).
