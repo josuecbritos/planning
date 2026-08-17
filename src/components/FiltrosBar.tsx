@@ -552,6 +552,27 @@ export function FiltrosBar({
 }
 
 /** Boton + panel desplegable con cierre por click afuera o Escape. */
+// #310 — Colocación de los menús flotantes de la barra de filtros.
+//
+// `MARGEN` es el aire mínimo contra cualquier borde de la pantalla: era el
+// valor que los menús anclados por la derecha usaban contra SU propio borde, y
+// ahora rige los cuatro. Ninguno de los dos anclajes miraba el borde opuesto:
+// los de la izquierda se salían por la derecha, y los de la derecha por la
+// izquierda en cuanto la pantalla se angostaba. `ANCHO_MINIMO` es el del CSS (`.filtro-menu`), y solo se usa
+// como suposición en la primera colocación, antes de poder medir el menú real.
+// `ALTO_MINIMO` evita que un botón muy abajo deje el menú aplastado a cero.
+const MARGEN = 8
+const ANCHO_MINIMO = 244
+const ALTO_MINIMO = 120
+
+interface Posicion {
+  top: number
+  left?: number
+  right?: number
+  anchoMaximo: number
+  altoMaximo: number
+}
+
 function Desplegable({
   etiqueta,
   activo,
@@ -569,23 +590,89 @@ function Desplegable({
   // P3: el menú se renderiza en un PORTAL con position: fixed anclado al botón,
   // para que NUNCA lo recorte el overflow del contenedor (p. ej. la tabla corta
   // de Mis Tareas). Se reposiciona al hacer scroll o resize mientras está abierto.
-  const [pos, setPos] = useState<{ top: number; left?: number; right?: number } | null>(null)
+  const [pos, setPos] = useState<Posicion | null>(null)
+  // #310: `false` mientras el menú no se haya medido. Gobierna la primera
+  // pasada —la que solo sirve para medir— y evita que la segunda se repita.
+  const medido = useRef(false)
 
   const recolocar = () => {
     const b = btnRef.current
     if (!b) return
     const r = b.getBoundingClientRect()
-    setPos(
-      alDerecha
-        ? { top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) }
-        : { top: r.bottom + 6, left: r.left },
-    )
+    const top = r.bottom + 6
+    // #310 · A LO ALTO: el alto disponible se mide DESDE donde queda el menú
+    // hasta el borde inferior. El tope anterior era una fracción de la pantalla
+    // COMPLETA y no descontaba lo que el botón ya había bajado: con la barra de
+    // filtros en la mitad de abajo, el menú se pasaba por el borde inferior.
+    const altoMaximo = Math.max(ALTO_MINIMO, window.innerHeight - top - MARGEN)
+    // #310 · A LO ANCHO: si ni corriéndose entra, que se angoste.
+    const anchoMaximo = window.innerWidth - MARGEN * 2
+
+    // #310 — Por qué hay DOS pasadas y por qué la primera no coloca de verdad.
+    //
+    // El menú no tiene ancho fijo: se ajusta a su contenido, acotado por el
+    // espacio que le queda desde su anclaje hasta el borde de la pantalla. Eso
+    // significa que su ancho DEPENDE de dónde se lo coloque — y para colocarlo
+    // bien hace falta saber su ancho. Medirlo después de colocarlo se muerde
+    // la cola: la primera versión de este arreglo lo hacía así y "Vistas"
+    // quedaba pegado al borde, sin margen.
+    //
+    // Se corta midiendo en un sitio que NO le recorta el ancho: contra el
+    // borde izquierdo, donde el espacio disponible siempre supera el ancho
+    // máximo. Lo que se mide ahí es el ancho natural, y ya no cambia al
+    // llevarlo a su lugar — porque las dos ramas de abajo dejan siempre al
+    // menos `ancho` de espacio.
+    //
+    // Las dos pasadas ocurren antes de pintar (`useLayoutEffect`), así que no
+    // se ve ningún salto.
+    if (!medido.current) {
+      setPos({ top, left: MARGEN, anchoMaximo, altoMaximo })
+      return
+    }
+    const ancho = Math.min(menuRef.current?.offsetWidth || ANCHO_MINIMO, anchoMaximo)
+
+    if (alDerecha) {
+      // #310: este lado respetaba el borde DERECHO —el de su propio anclaje—,
+      // nunca el izquierdo. Con la pantalla angosta el menú se pasaba por la
+      // izquierda: medido, "Vistas" a 320px quedaba en -163.7.
+      //
+      // La distancia al borde derecho no puede ser tan grande que el borde
+      // izquierdo se salga: ese es el tope de abajo.
+      const distanciaMaxima = Math.max(MARGEN, window.innerWidth - MARGEN - ancho)
+      const right = Math.min(Math.max(MARGEN, window.innerWidth - r.right), distanciaMaxima)
+      setPos({ top, right, anchoMaximo, altoMaximo })
+      return
+    }
+    // #310: los anclados por la IZQUIERDA copiaban el borde del botón sin
+    // comprobar nada, así que cualquier botón pasada la mitad de la pantalla
+    // empujaba el menú fuera.
+    //
+    // Con espacio de sobra el `Math.min` devuelve `r.left`, así que en
+    // escritorio el menú queda exactamente donde quedaba.
+    const left = Math.max(MARGEN, Math.min(r.left, window.innerWidth - MARGEN - ancho))
+    setPos({ top, left, anchoMaximo, altoMaximo })
   }
 
   useLayoutEffect(() => {
-    if (abierto) recolocar()
+    if (abierto) {
+      medido.current = false
+      recolocar()
+    } else {
+      setPos(null)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abierto])
+
+  // Segunda pasada, una sola vez por apertura: el menú ya está montado y en el
+  // sitio donde nada le recorta el ancho, así que ahora se mide y se coloca
+  // definitivamente. La bandera corta la cadena — sin ella cada `setPos`
+  // volvería a disparar este efecto.
+  useLayoutEffect(() => {
+    if (!abierto || !pos || medido.current) return
+    medido.current = true
+    recolocar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abierto, pos])
 
   useEffect(() => {
     if (!abierto) return
@@ -626,7 +713,14 @@ function Desplegable({
           <div
             ref={menuRef}
             className={`filtro-menu filtro-menu--portal${alDerecha ? ' filtro-menu--derecha' : ''}`}
-            style={{ position: 'fixed', top: pos.top, left: pos.left, right: pos.right }}
+            style={{
+              position: 'fixed',
+              top: pos.top,
+              left: pos.left,
+              right: pos.right,
+              maxWidth: pos.anchoMaximo,
+              maxHeight: pos.altoMaximo,
+            }}
           >
             {children}
           </div>,

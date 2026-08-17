@@ -1493,3 +1493,51 @@ verde, los cinco criterios — incluido llegar a una tarea desde una
 **notificación real** con su frente plegado. La prueba sabe fallar: con el
 código anterior, C1 reproduce el síntoma exacto (cero sub frentes, cero tareas,
 sin flecha).
+## #310 — Los menús de filtro ya no se salen de la pantalla en mobile
+
+En un teléfono, los menús de la barra de filtros se salían por el borde derecho
+y sus opciones quedaban fuera de alcance. **La protección ya estaba escrita en
+el producto y solo se había aplicado a un lado:** los menús anclados por la
+derecha —"Vistas"— calculaban su distancia al borde con un tope de 8; los
+anclados por la izquierda —Fecha, Responsable, Estado, Proyecto y Ordenar—
+copiaban el borde del botón sin comprobar nada.
+
+- **A lo ancho, los dos anclajes.** Ninguno miraba el borde OPUESTO: los
+  anclados por la izquierda se salían por la derecha, y el anclado por la
+  derecha —"Vistas"— se salía por la izquierda en cuanto la pantalla se
+  angostaba (medido: **-163.7 a 320px**). Ahora los dos respetan los dos
+  bordes con el mismo margen de 8. Si no cabe donde le tocaría **se corre**;
+  si aun así no cabe, **se angosta**. Con espacio de sobra el cálculo devuelve
+  el borde del botón, así que **en escritorio quedan exactamente donde
+  quedaban**.
+- **El ancho del menú dependía de dónde se lo colocaba**, y para colocarlo bien
+  hay que saber su ancho: medirlo después de colocarlo se muerde la cola. Se
+  corta midiendo en un sitio que no le recorta el ancho —contra el borde
+  izquierdo— y llevándolo después a su lugar. Las dos pasadas ocurren antes de
+  pintar, así que no se ve ningún salto.
+- **A lo alto:** el tope se mide **desde donde queda el menú hasta el borde
+  inferior**, no como una fracción de la pantalla completa. El tope anterior
+  —80% de la pantalla— no descontaba lo que el botón ya había bajado, así que
+  con la barra de filtros en la mitad inferior el menú se pasaba por abajo. Sale
+  del CSS y pasa a calcularse contra el espacio real.
+- **Se mide el ancho real del menú**, no el mínimo: la primera colocación asume
+  el mínimo del CSS y una segunda pasada —una sola, con bandera— recoloca ya con
+  la medida buena.
+- **No se tocó** el ancho mínimo de 244, ni el contenido de los menús, ni su
+  comportamiento en escritorio.
+- **Sin migración**, es pantalla.
+
+**Verificado** con `docs/prueba-310-menus-filtro.mjs`: 68 comprobaciones en
+verde. Mide la **caja real** de cada menú abierto contra la ventana, barriendo
+**cinco anchos de teléfono** (320, 360, 390, 412 y 430), más 390×420 (barra en
+la mitad inferior) y 1440×900, en la pantalla de proyecto y en Mis Tareas,
+además del desplazamiento con un menú abierto. Comprueba la REGLA del alto y no
+solo el caso favorable: el tope vale `ventana − menú − 8` (261) donde el cálculo
+viejo habría dado 336.
+
+*Nota de método:* la primera versión de esta prueba **dejó pasar el defecto del
+borde izquierdo**. Medía un solo ancho —390, donde "Vistas" caía justo en
+`izq=0`— y se conformaba con "que no se salga" en vez de exigir el margen. De
+ahí las dos correcciones: el barrido de anchos, y exigir los 8 píxeles en los
+cuatro bordes. Con esos dos cambios, la prueba falla con el código anterior en
+los dos casos.

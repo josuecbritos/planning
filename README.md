@@ -217,6 +217,8 @@ docs/
                          texto (no necesita navegador ni base)
   prueba-311-frente-plegado.mjs  Prueba e2e del frente plegado al entrar a su
                          vista, contra `vite preview`
+  prueba-310-menus-filtro.mjs  Mide los menús de filtro contra la ventana en
+                         teléfono y escritorio, contra `vite preview`
   documento-funcional-v3.1.md  (histórico)
 ```
 
