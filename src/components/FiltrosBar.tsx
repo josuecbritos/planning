@@ -586,11 +586,20 @@ export function FiltrosBar({
                   {/* #160/#175: tooltip rápido (data-tip, misma inmediatez que el
                       resto de la app). El menú de Vistas no recorta el globo porque
                       usa overflow visible (.filtro-menu--derecha). */}
+                  {/* #305c: se habilita SOLO en la vista activa y solo cuando
+                      está modificada. La condición miraba únicamente si había
+                      algún filtro u orden puesto, que es la misma para todas,
+                      así que con cinco vistas guardadas las cinco quedaban
+                      disponibles para ser sobrescritas. Es la condición que ya
+                      usa el asterisco: las dos señales dicen lo mismo.
+                      Ojo: "Guardar vista", arriba de este menú, SÍ sigue
+                      mirando solo si hay filtro u orden — crea una vista nueva,
+                      no sobrescribe ninguna. */}
                   <button
                     className="icon-btn"
                     data-tip="Actualizar con el filtro y orden actuales"
                     aria-label={`Actualizar ${g.nombre}`}
-                    disabled={!activo && !ordenActivo}
+                    disabled={!esActiva || !modificada}
                     onClick={() => onGuardarVista(g.id, { filtro, orden })}
                   >
                     💾
@@ -681,7 +690,10 @@ function OpcionesFecha({
 }) {
   return (
     <>
-      <div className="filtro-menu__grupo">Relativas</div>
+      {/* #305c: acá había un título "Relativas" pegado al del campo ("FECHA"),
+          dos títulos seguidos que gastaban alto sin agregar nada. Las cinco
+          relativas van directo bajo el nombre del campo. "Rango fijo" sí se
+          queda: ese separa algo distinto —los dos calendarios—. */}
       {RELATIVAS.map((r) => (
         <button
           key={r}

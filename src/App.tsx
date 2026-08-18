@@ -1426,6 +1426,7 @@ export default function App({ repo }: { repo: Repo }) {
             actions={actions}
             onAbrirTarea={abrirDetalle}
             esMovil={esMovil}
+            modo={repo.modo}
           />
         ) : pantalla === 'configuracion' ? (
           /* #207: la propia cuenta. No depende de rol: todos la tienen. */
@@ -1444,7 +1445,8 @@ export default function App({ repo }: { repo: Repo }) {
         ) : proyecto && contadores ? (
           <>
             <Header
-              proyecto={proyecto}
+              titulo={proyecto.nombre}
+              cuenta={`${contadores.total} tareas`}
               modo={repo.modo}
               // #305: la franja de contadores cambia de muestras según la
               // vista que se está VIENDO — en mobile siempre es la tabla.
@@ -1455,7 +1457,16 @@ export default function App({ repo }: { repo: Repo }) {
               hoy={HOY}
               onMiembros={puedeVerMiembros ? () => setMiembrosAbierto(true) : undefined}
             />
-            <div className="content" ref={contentRef}>
+            {/* #321: en Gantt la pantalla no se desplaza. La grilla ocupa lo
+                que sobra bajo el encabezado y es lo único con scroll, así que
+                los controles quedan siempre a la vista y no puede volver a
+                sobrar ni faltar alto: no hay número escrito a mano que
+                desalinear. En tabla se conserva el scroll de pantalla, que es
+                lo que corresponde a una lista larga. */}
+            <div
+              className={`content${vistaEfectiva === 'gantt' ? ' content--gantt' : ''}`}
+              ref={contentRef}
+            >
               <FiltrosBar
                 contexto={proyecto.id}
                 guardados={vistasDeProyecto}

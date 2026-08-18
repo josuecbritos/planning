@@ -1,4 +1,3 @@
-import type { Proyecto } from '../types'
 import type { Vista } from '../App'
 import type { Contadores } from '../lib/derive'
 import { formatoFecha } from '../lib/dates'
@@ -7,6 +6,13 @@ import { Marca } from './Marca'
 // Encabezado del proyecto (7.2): contadores por estado derivado + toggle de
 // vista. La sesion vive en el pie del sidebar.
 //
+// #324 — El mismo encabezado sirve a la pantalla de proyecto y a Mis Tareas.
+// Antes Mis Tareas usaba el de administración (título a 18, cuenta en una línea
+// aparte) y NO tenía fila de contadores: cuando #305 quitó la leyenda de la
+// Gantt y le pasó ese trabajo a los contadores, en Mis Tareas se quedó sin
+// nada que explicara las marcas de la grilla. Compartir el componente es lo que
+// asegura que los dos encabezados no vuelvan a separarse.
+//
 // #305 — Franjas 1 y 2 de las tres que hay sobre la grilla. La franja 2
 // absorbió la leyenda de la Gantt: eran las mismas cinco categorías, en el
 // mismo orden y con los mismos colores, a dos filas de distancia. Lo único que
@@ -14,7 +20,10 @@ import { Marca } from './Marca'
 // sin número: no es un estado, es el rastro de dónde estaba la tarea.
 
 interface Props {
-  proyecto: Proyecto
+  /** Nombre de la pantalla: el del proyecto, o "Mis Tareas". */
+  titulo: string
+  /** Texto gris al lado del título: "27 tareas", "164 tareas en 4 proyectos". */
+  cuenta: string
   modo: 'memoria' | 'supabase'
   vista: Vista
   onVista: (v: Vista) => void
@@ -23,11 +32,13 @@ interface Props {
   contadores: Contadores
   hoy: string
   /** Miembros del proyecto (roles punto 7): presente si el usuario puede
-   *  verlos (admin o dueño). */
+   *  verlos (admin o dueño). #324: en Mis Tareas no aplica —cruza varios
+   *  proyectos y no hay un grupo de miembros que mostrar—, así que es la única
+   *  pieza que no se homologa. */
   onMiembros?: () => void
 }
 
-export function Header({ proyecto, modo, vista, onVista, mostrarToggle, contadores, hoy, onMiembros }: Props) {
+export function Header({ titulo, cuenta, modo, vista, onVista, mostrarToggle, contadores, hoy, onMiembros }: Props) {
   const c = contadores
   // #305: en Gantt las muestras de los contadores son las marcas REALES de la
   // grilla (el check verde, la equis, los cuadrados de color) para que la fila
@@ -38,8 +49,8 @@ export function Header({ proyecto, modo, vista, onVista, mostrarToggle, contador
     <header className="topbar">
       <div className="topbar__row">
         <h1 className="topbar__title">
-          {proyecto.nombre}
-          <small>{c.total} tareas</small>
+          {titulo}
+          <small>{cuenta}</small>
         </h1>
         <div className="topbar__row" style={{ gap: 12 }}>
           {onMiembros && (

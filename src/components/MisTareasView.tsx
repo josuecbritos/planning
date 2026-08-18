@@ -7,6 +7,7 @@ import {
   CATEGORIA_LABEL,
   categoriaDe,
   colorTarea,
+  contar,
   esAtrasada,
   nReplanificaciones,
   textoAtraso,
@@ -16,6 +17,7 @@ import { CAMPOS_MIS_TAREAS, GRAVEDAD, ordenarMulti, valorOrden, type OrdenMulti 
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import { escribirVistaActiva, estadoInicial, leerGuardados } from '../lib/vistas'
 import { FiltrosBar } from './FiltrosBar'
+import { Header } from './Header'
 import { GanttView, type ModoHorizonte } from './GanttView'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
@@ -38,6 +40,8 @@ interface Props {
   onAbrirTarea: (tareaId: string) => void
   /** P5: en mobile no hay Gantt (la grilla no funciona en pantalla angosta). */
   esMovil: boolean
+  /** #324: el encabezado avisa cuando la fecha de hoy es simulada. */
+  modo: 'memoria' | 'supabase'
 }
 
 interface FilaMisTareas {
@@ -46,7 +50,7 @@ interface FilaMisTareas {
   ruta: string
 }
 
-export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrirTarea, esMovil }: Props) {
+export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrirTarea, esMovil, modo }: Props) {
   // Los permisos dependen del PROYECTO de cada tarea (dueño vs invitado):
   // se resuelve un Can por proyecto visible.
   const canPorProyecto = useMemo(
@@ -160,10 +164,19 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
     [congelada, visibleIds, indice, misFilas, filtradas],
   )
 
-  const atrasadas = misFilas.filter(({ tarea }) => esAtrasada(categoriaDe(state, tarea, hoy))).length
   // #139: proyectos DISTINTOS realmente presentes en mis filas (no todos los
   // visibles): si no tengo tareas en un proyecto, no cuenta.
   const nProyectos = useMemo(() => new Set(misFilas.map((f) => f.proyecto.id)).size, [misFilas])
+  // #324: la fila de contadores del encabezado, sobre las tareas a cargo del
+  // usuario cruzando todos sus proyectos — el mismo universo que ya muestra la
+  // pantalla. A diferencia de la de proyecto, que los recibe ya calculados
+  // desde afuera, acá hay que calcularlos. El aviso de atrasadas en texto
+  // desaparece: la caja roja dice el mismo número, en color y en el mismo
+  // lugar que en un proyecto.
+  const contadores = useMemo(
+    () => contar(state, misFilas.map((f) => f.tarea), hoy),
+    [state, misFilas, hoy],
+  )
 
   // #163: mide la barra de filtros (sticky) y publica --filtros-h para que el
   // thead de la tabla se congele JUSTO debajo, sin taparse — igual que en la
@@ -182,31 +195,30 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
   }, [])
 
   return (
-    <div className="usuarios-wrap" ref={wrapRef}>
-      <div className="usuarios-cabecera">
-        <div>
-          <h2>Mis Tareas</h2>
-          <p className="usuarios-sub">
-            {misFilas.length} tareas a mi cargo en {nProyectos} proyecto{nProyectos === 1 ? '' : 's'}
-            {atrasadas > 0 && (
-              <span className="mipanel-alerta"> · {atrasadas} atrasada{atrasadas === 1 ? '' : 's'} — asignar nueva fecha</span>
-            )}
-          </p>
-        </div>
-        {/* #190: mismo conmutador que dentro de un proyecto. En mobile no hay
-            Gantt (la grilla no funciona en pantalla angosta). */}
-        {!esMovil && (
-          <div className="toggle">
-            <button className={vista === 'tabla' ? 'activo' : ''} onClick={() => setVista('tabla')}>
-              Tabla
-            </button>
-            <button className={vista === 'gantt' ? 'activo' : ''} onClick={() => setVista('gantt')}>
-              Gantt
-            </button>
-          </div>
-        )}
-      </div>
-
+    <>
+      {/* #324: el MISMO encabezado que la pantalla de proyecto — título con la
+          cuenta al lado, chip de fecha, conmutador y fila de contadores. Lo
+          único que no lleva es Miembros: Mis Tareas cruza varios proyectos y
+          no hay un grupo de miembros que mostrar. */}
+      <Header
+        titulo="Mis Tareas"
+        cuenta={`${misFilas.length} tareas en ${nProyectos} proyecto${nProyectos === 1 ? '' : 's'}`}
+        modo={modo}
+        vista={vistaEfectiva}
+        onVista={setVista}
+        // #190/P5: en mobile no hay Gantt (la grilla no funciona en pantalla
+        // angosta), así que el conmutador se oculta.
+        mostrarToggle={!esMovil}
+        contadores={contadores}
+        hoy={hoy}
+      />
+      <div
+        // #321: en Gantt la pantalla no se desplaza — la grilla ocupa lo que
+        // sobra y es lo único con scroll. Misma estructura que la pantalla de
+        // proyecto (#324).
+        className={`content${vistaEfectiva === 'gantt' ? ' content--gantt' : ''}`}
+        ref={wrapRef}
+      >
       {/* Filtros del sistema comun, con Proyecto en vez de Responsable.
           Los guardados viven en el contexto 'mis-tareas' (no por proyecto). */}
       <FiltrosBar
@@ -267,6 +279,8 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
           onOcultasFinde={setGanttOcultas}
         />
       ) : (
+      // #324: la tabla pasa al mismo envoltorio que la de un proyecto.
+      <div className="tabla-wrap">
       <table className="tareas mistareas">
         <thead>
           <tr>
@@ -300,8 +314,10 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
           )}
         </tbody>
       </table>
+      </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }
 
