@@ -23,7 +23,6 @@ import { miembrosDeProyecto, puedeEditarFecha, responsableDeTarea, type Can } fr
 import { EmptyFrentes } from './EmptyFrentes'
 import { Marca } from './Marca'
 import { Avatar, RespPicker } from './RespPicker'
-import { Legend } from './Legend'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
 import { InlineText } from './InlineText'
@@ -47,8 +46,12 @@ import { InlineText } from './InlineText'
  * pide con el filtro de fechas (rango fijo), que ademas de filtrar las tareas
  * se traduce al horizonte (#250) — mientras hay filtro de fecha, el modo no se
  * elige.
+ *
+ * #305: el modo y el toggle de días hábiles se ELIGEN en el control "Rango" de
+ * la barra de controles, así que su estado vive en la pantalla (arriba) y llega
+ * acá por props. La grilla los usa; ya no los guarda.
  */
-type ModoHorizonte = 'hoy' | 'todo'
+export type ModoHorizonte = 'hoy' | 'todo'
 
 /**
  * #190 — Modo "Mis Tareas": la misma Gantt, pero sobre las tareas del usuario
@@ -95,6 +98,14 @@ interface Props {
   /** #293: miembro del proyecto y en escritorio → asa de arrastre. En Mis
    *  Tareas no aplica (el pedido lo excluye), venga lo que venga acá. */
   puedeArrastrar?: boolean
+  /** #305: horizonte elegido en el control "Rango" de la barra. */
+  modoHorizonte: ModoHorizonte
+  /** #305: §6.3.19 — lunes a viernes o los siete días, elegido en "Rango". */
+  soloHabiles: boolean
+  /** #305: §6.3.20 — cuántas tareas esconde el modo "días hábiles". Lo informa
+   *  la grilla porque solo ella sabe qué filas quedaron; el control "Rango" lo
+   *  muestra como círculo y lo detalla dentro de su menú. */
+  onOcultasFinde: (n: number) => void
 }
 
 type FilaGantt =
@@ -175,15 +186,11 @@ function ventanaHoy(hoy: ISODate): { desde: ISODate; hasta: ISODate } {
 // Referencia estable para el valor por defecto (ver TableView).
 const SIN_NUEVAS: string[] = []
 
-export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, onCambiarFiltro, snapshotNonce, onStale, actions, onAbrirTarea, misTareas, tareasNuevas = SIN_NUEVAS, puedeArrastrar = false }: Props) {
+export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, onCambiarFiltro, snapshotNonce, onStale, actions, onAbrirTarea, misTareas, tareasNuevas = SIN_NUEVAS, puedeArrastrar = false, modoHorizonte: modo, soloHabiles, onOcultasFinde }: Props) {
   // #190: en modo Mis Tareas la grilla es de lectura y replanificación —
   // ninguna afordancia de creación (una tarea creada aquí no sería del
   // usuario hasta asignársela, así que aparecería y desaparecería sola).
   const permiteCrear = !misTareas
-  // Horizonte: por defecto "Alrededor de hoy"; no se persiste.
-  const [modo, setModo] = useState<ModoHorizonte>('hoy')
-  // §6.3.19: solo dias habiles (default) o semana completa de 7 dias.
-  const [soloHabiles, setSoloHabiles] = useState(true)
   const [crearEn, setCrearEn] = useState<CrearEn | null>(null)
   const [aviso, setAviso] = useState<Aviso | null>(null)
   const avisoTimer = useRef<number | undefined>(undefined)
@@ -505,6 +512,15 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     }).length
   }, [filasTarea, soloHabiles])
 
+  // #305: el aviso dejó de ser una franja propia sobre la grilla —aparecía y
+  // desaparecía según el proyecto, moviendo todo lo de abajo— y pasó al control
+  // "Rango". La cuenta se sigue calculando acá, que es donde se sabe.
+  useEffect(() => {
+    onOcultasFinde(ocultasFinde)
+  }, [ocultasFinde, onOcultasFinde])
+  // Al salir de la Gantt no queda nada escondido: el círculo debe apagarse.
+  useEffect(() => () => onOcultasFinde(0), [onOcultasFinde])
+
   // -- Agrupacion por semana para el encabezado de dos niveles --
   const semanas = useMemo(() => {
     const grupos: { lunes: ISODate; dias: ISODate[] }[] = []
@@ -685,55 +701,11 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
 
   return (
     <div>
-      <div className="gantt-toolbar">
-        <Legend />
-        {/* La leyenda de instrucciones se elimino (punto 1): cada celda
-            explica SOLO lo que aplica ahi via tooltip contextual (punto 2).
-            El aviso de tareas de fin de semana ocultas se mantiene. */}
-        <div className="horizonte">
-          {ocultasFinde > 0 && (
-            <span className="aviso-finde">
-              {ocultasFinde} tarea{ocultasFinde === 1 ? '' : 's'} con fecha de fin de semana no se{' '}
-              {ocultasFinde === 1 ? 'muestra' : 'muestran'} ·{' '}
-              <button className="link-btn" onClick={() => setSoloHabiles(false)}>Ver semana completa</button>
-            </span>
-          )}
-          <div className="toggle">
-            <button className={soloHabiles ? 'activo' : ''} onClick={() => setSoloHabiles(true)} title="Lunes a viernes">
-              Días hábiles
-            </button>
-            <button className={!soloHabiles ? 'activo' : ''} onClick={() => setSoloHabiles(false)} title="7 días">
-              Semana completa
-            </button>
-          </div>
-          {/* El filtro de fecha define el horizonte además de filtrar las
-              tareas (#250), así que mientras esté puesto el modo no se elige.
-              "En horizonte visible" es la excepción: NO fija el horizonte —al
-              revés, deriva su rango de él—, así que deja el toggle disponible. */}
-          {filtro.fecha && filtro.fecha.tipo !== 'horizonte' ? (
-            <span className="horizonte-filtro" title="Quita el filtro de fecha para volver a elegir el horizonte">
-              Horizonte definido por el filtro de fecha
-            </span>
-          ) : (
-            <div className="toggle">
-              <button className={modo === 'hoy' ? 'activo' : ''} onClick={() => setModo('hoy')} title="2 semanas atrás + semana actual + 2 adelante, fijo">
-                Alrededor de hoy
-              </button>
-              <button
-                className={modo === 'todo' ? 'activo' : ''}
-                onClick={() => setModo('todo')}
-                title={
-                  hayFiltroTareas
-                    ? 'De la primera a la última tarea de las que quedaron con el filtro'
-                    : 'De la primera a la última tarea'
-                }
-              >
-                {misTareas ? 'Todas mis tareas' : 'Todo el proyecto'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* #305: sobre la grilla ya no hay franjas propias de la Gantt. La
+          leyenda la absorbieron los contadores del encabezado, y el horizonte
+          —con su aviso de fin de semana— es el control "Rango" de la barra.
+          La altura sobre la grilla no cambia nunca: ni al filtrar, ni al
+          ordenar, ni según el proyecto. */}
       <div className="gantt-wrap">
         {/* #293: el dragover que llega hasta acá (thead, filas de carga,
             fondo) no es destino — se apaga el indicador. */}

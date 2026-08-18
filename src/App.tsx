@@ -27,7 +27,7 @@ import type {
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
 import { TableView } from './components/TableView'
-import { GanttView } from './components/GanttView'
+import { GanttView, type ModoHorizonte } from './components/GanttView'
 import { LoginPage } from './components/LoginPage'
 import { UsersView } from './components/UsersView'
 import { TaskPanel } from './components/TaskPanel'
@@ -229,6 +229,14 @@ export default function App({ repo }: { repo: Repo }) {
   // "Actualizar vista"; `vistaStale` lo reporta la vista activa (tabla/Gantt).
   const [snapshotNonce, setSnapshotNonce] = useState(0)
   const [vistaStale, setVistaStale] = useState(false)
+  // #305: el horizonte de la Gantt se elige en el control "Rango" de la barra
+  // de controles y lo usa la grilla, así que su estado vive acá, entre las dos.
+  // No se persiste: cada entrada a un proyecto arranca en "Alrededor de hoy".
+  const [ganttModo, setGanttModo] = useState<ModoHorizonte>('hoy')
+  const [ganttHabiles, setGanttHabiles] = useState(true)
+  // §6.3.20: tareas con fecha de fin de semana que el modo hábil esconde. Lo
+  // informa la grilla; "Rango" lo muestra como círculo.
+  const [ganttOcultas, setGanttOcultas] = useState(0)
   // Punto 6: modo de la sidebar. Primera preferencia persistente de la app
   // (por usuario, sobrevive a recargas y sesiones posteriores).
   const [sidebarModo, setSidebarModo] = useState<SidebarModo>('fija')
@@ -1144,7 +1152,7 @@ export default function App({ repo }: { repo: Repo }) {
   useEffect(() => {
     const content = contentRef.current
     if (!content) return
-    const bar = content.querySelector<HTMLElement>('.filtros-bar')
+    const bar = content.querySelector<HTMLElement>('.controles-bar')
     if (!bar) {
       content.style.removeProperty('--filtros-h')
       return
@@ -1438,7 +1446,9 @@ export default function App({ repo }: { repo: Repo }) {
             <Header
               proyecto={proyecto}
               modo={repo.modo}
-              vista={vista}
+              // #305: la franja de contadores cambia de muestras según la
+              // vista que se está VIENDO — en mobile siempre es la tabla.
+              vista={vistaEfectiva}
               onVista={cambiarVista}
               mostrarToggle={!esMovil}
               contadores={contadores}
@@ -1459,6 +1469,20 @@ export default function App({ repo }: { repo: Repo }) {
                 onCambiarOrden={setOrden}
                 camposOrden={CAMPOS_PROYECTO}
                 vistaGantt={vistaEfectiva === 'gantt'}
+                // #305: "Rango" solo existe en Gantt; en tabla la barra tiene
+                // tres controles.
+                rango={
+                  vistaEfectiva === 'gantt'
+                    ? {
+                        soloHabiles: ganttHabiles,
+                        onSoloHabiles: setGanttHabiles,
+                        modo: ganttModo,
+                        onModo: setGanttModo,
+                        ocultasFinde: ganttOcultas,
+                        etiquetaTodo: 'Todo el proyecto',
+                      }
+                    : undefined
+                }
                 vistaActivaId={vistaActiva.vistaActivaId}
                 onVistaActiva={setVistaGuardada}
                 stale={vistaStale}
@@ -1498,6 +1522,9 @@ export default function App({ repo }: { repo: Repo }) {
                   onAbrirTarea={abrirDetalle}
                   tareasNuevas={tareasNuevas}
                   puedeArrastrar={puedeArrastrar}
+                  modoHorizonte={ganttModo}
+                  soloHabiles={ganttHabiles}
+                  onOcultasFinde={setGanttOcultas}
                 />
               )}
             </div>

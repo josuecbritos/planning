@@ -5,7 +5,8 @@ import { CATEGORIA_LABEL, type Categoria } from '../lib/derive'
 import {
   FECHA_RELATIVA_LABEL,
   RESP_SIN_ASIGNAR,
-  etiquetaFecha,
+  cuentaFiltro,
+  etiquetaCampoFecha,
   filtroVacio,
   type FechaRelativa,
   type Filtro,
@@ -16,11 +17,21 @@ import { coincideConVista } from '../lib/vistas'
 import { TextPromptModal } from './TextPromptModal'
 import { Avatar } from './RespPicker'
 
-// Barra de filtros + orden guardables (puntos 3 y 4): Fecha Objetivo,
-// Responsable y Estado con multi-seleccion, mas un menu "Ordenar" multinivel
-// (reglas campo + direccion). Filtro y orden se guardan juntos como una sola
-// "vista", privada por usuario y por proyecto (en la base desde #289): se aplican desde
-// el desplegable y pueden actualizarse, renombrarse y eliminarse.
+// Barra de controles (#305). Cuatro controles, siempre los mismos y siempre en
+// el mismo lugar: `Filtrar · Ordenar · Rango` a la izquierda y `Vistas` a la
+// derecha, más "Actualizar vista" pegado al extremo derecho — el único que
+// aparece y desaparece, a propósito.
+//
+// Antes eran diez elementos sueltos (un botón por campo de filtro, otro por
+// "limpiar" de cada cosa, "Guardar vista") que crecían y partían la barra en
+// dos líneas. Ahora los campos de filtro viven DENTRO de "Filtrar", a dos
+// niveles; los "limpiar" son la × de cada control; y "Guardar vista" se mudó
+// adentro del menú de Vistas. El horizonte de la Gantt —que era una franja
+// propia sobre la grilla, con el aviso de fin de semana que aparecía y
+// desaparecía— es ahora el control "Rango".
+//
+// Filtro y orden se guardan juntos como una sola "vista", privada por usuario
+// y por proyecto (en la base desde #289).
 
 const ESTADOS: Categoria[] = ['hecha', 'pendiente', 'pendiente_replan', 'atrasada', 'atrasada_replan']
 const ESTADO_COLOR: Record<Categoria, string> = {
@@ -32,6 +43,26 @@ const ESTADO_COLOR: Record<Categoria, string> = {
 }
 // #279: "Próximo día hábil" va después de "Hoy", como pide el pedido.
 const RELATIVAS: FechaRelativa[] = ['hoy', 'proxHabil', 'semana', 'proxima', 'mes']
+
+/** Campos que viven dentro del panel de "Filtrar". */
+type CampoFiltro = 'fecha' | 'responsable' | 'proyecto' | 'estado'
+
+/**
+ * #305 — El control "Rango": los días y el horizonte de la Gantt. El estado
+ * vive arriba (en la pantalla) porque lo comparten la barra, que lo elige, y
+ * la grilla, que lo usa. Ausente = vista tabla, donde este control no existe.
+ */
+export interface RangoProps {
+  /** §6.3.19: lunes a viernes (por defecto) o los siete días. */
+  soloHabiles: boolean
+  onSoloHabiles: (v: boolean) => void
+  modo: 'hoy' | 'todo'
+  onModo: (m: 'hoy' | 'todo') => void
+  /** §6.3.20: tareas con fecha de fin de semana que "días hábiles" esconde. */
+  ocultasFinde: number
+  /** "Todo el proyecto" o, en Mis Tareas, "Todas mis tareas". */
+  etiquetaTodo: string
+}
 
 interface Props {
   /** Contexto de guardado: el id del proyecto, o 'mis-tareas' (los filtros
@@ -58,6 +89,8 @@ interface Props {
   camposOrden: CampoOrdenOpc[]
   /** P4: ¿estamos en la Gantt? Solo ahí se puede ACTIVAR "En horizonte visible". */
   vistaGantt?: boolean
+  /** #305: presente solo en Gantt — agrega el control "Rango". */
+  rango?: RangoProps
   /** #215: id de la vista guardada en la que se está, o null. */
   vistaActivaId?: string | null
   /** #215: entrar o salir de una vista. Solo lo dispara este desplegable. */
@@ -82,38 +115,53 @@ export function FiltrosBar({
   onCambiarOrden,
   camposOrden,
   vistaGantt = false,
+  rango,
   vistaActivaId = null,
   onVistaActiva,
   stale = false,
   onActualizarVista,
 }: Props) {
   const [modal, setModal] = useState<{ tipo: 'guardar' } | { tipo: 'renombrar'; id: string; nombre: string } | null>(null)
+  // #305: en qué campo está parado el panel de Filtrar. `null` = primer nivel
+  // (fichas de lo aplicado + lista de campos). Se reinicia al cerrar el menú:
+  // volver a abrirlo siempre empieza por el principio.
+  const [campo, setCampo] = useState<CampoFiltro | null>(null)
 
   const activo = !filtroVacio(filtro)
   const ordenActivo = orden.length > 0
+  const cuenta = cuentaFiltro(filtro)
   // #215: la vista en la que se está y si tiene cambios sin guardar. El
   // asterisco aparece en cuanto filtro u orden dejan de coincidir con lo
   // guardado — cambiarlo y limpiarlo cuentan igual, sin excepciones.
   const vistaActiva = guardados.find((g) => g.id === vistaActivaId)
   const modificada = !!vistaActiva && !coincideConVista(vistaActiva, filtro, orden)
-  const etiquetaVistas = vistaActiva
-    ? `Vistas · ${vistaActiva.nombre}${modificada ? ' *' : ''}`
-    : `Vistas${guardados.length ? ` (${guardados.length})` : ''}`
-  const nResp = filtro.responsables?.length ?? 0
-  const nEst = filtro.estados?.length ?? 0
-  const nProy = filtro.proyectos?.length ?? 0
+  // #305: el nombre del control no cambia nunca ("Vistas"); lo que varía es el
+  // sufijo, con las mismas cuatro formas de siempre.
+  const sufijoVistas = vistaActiva
+    ? ` · ${vistaActiva.nombre}${modificada ? ' *' : ''}`
+    : guardados.length
+      ? ` (${guardados.length})`
+      : ''
+
+  // #215: salir de la vista activa deja todo limpio. Es lo mismo que hace
+  // tocar la vista marcada dentro del menú; la × solo lo pone a la vista.
+  const salirDeVista = () => {
+    onCambiar({})
+    onCambiarOrden([])
+    onVistaActiva?.(null)
+  }
 
   // Punto 4 (#111): activación directa. La prioridad = posición en `orden`
   // (0 = prioridad 1). Tocar una dirección activa el campo como PRIORIDAD 1
   // (al frente, el último activado manda); tocar la dirección ya activa lo
   // desactiva y los demás se renumeran solos.
-  const prioridadDe = (campo: CampoOrden) => orden.findIndex((r) => r.campo === campo)
-  const toggleOrden = (campo: CampoOrden, dir: Direccion) => {
-    const actual = orden.find((r) => r.campo === campo)
+  const prioridadDe = (c: CampoOrden) => orden.findIndex((r) => r.campo === c)
+  const toggleOrden = (c: CampoOrden, dir: Direccion) => {
+    const actual = orden.find((r) => r.campo === c)
     if (actual && actual.dir === dir) {
-      onCambiarOrden(orden.filter((r) => r.campo !== campo))
+      onCambiarOrden(orden.filter((r) => r.campo !== c))
     } else {
-      onCambiarOrden([{ campo, dir }, ...orden.filter((r) => r.campo !== campo)])
+      onCambiarOrden([{ campo: c, dir }, ...orden.filter((r) => r.campo !== c)])
     }
   }
 
@@ -149,243 +197,200 @@ export function FiltrosBar({
     onCambiar({ ...filtro, proyectos: set.size ? [...set] : undefined })
   }
 
+  const limpiarFecha = () => onCambiar({ ...filtro, fecha: undefined, sinFecha: undefined, conFecha: undefined })
+
+  // #305 — Campos del panel de Filtrar. Cada uno sabe cuántos valores tiene y
+  // cómo limpiarse entero: eso es exactamente lo que necesita su ficha.
+  const campos: { clave: CampoFiltro; nombre: string; n: number; texto: string; limpiar: () => void }[] = [
+    { clave: 'fecha', nombre: 'Fecha', n: cuenta.fecha, texto: etiquetaCampoFecha(filtro), limpiar: limpiarFecha },
+    ...(candidatos
+      ? [
+          {
+            clave: 'responsable' as const,
+            nombre: 'Responsable',
+            n: cuenta.responsables,
+            texto: String(cuenta.responsables),
+            limpiar: () => onCambiar({ ...filtro, responsables: undefined }),
+          },
+        ]
+      : []),
+    ...(proyectos
+      ? [
+          {
+            clave: 'proyecto' as const,
+            nombre: 'Proyecto',
+            n: cuenta.proyectos,
+            texto: String(cuenta.proyectos),
+            limpiar: () => onCambiar({ ...filtro, proyectos: undefined }),
+          },
+        ]
+      : []),
+    {
+      clave: 'estado',
+      nombre: 'Estado',
+      n: cuenta.estados,
+      texto: String(cuenta.estados),
+      limpiar: () => onCambiar({ ...filtro, estados: undefined }),
+    },
+  ]
+  const campoActual = campos.find((c) => c.clave === campo) ?? null
+
+  // #305: el horizonte tiene un tercer estado que no se elige, se impone —
+  // mientras hay filtro de fecha, ese filtro define el horizonte (#250). "En
+  // horizonte visible" es la excepción: DERIVA su rango del horizonte, así que
+  // deja el grupo elegible.
+  const horizonteImpuesto = !!filtro.fecha && filtro.fecha.tipo !== 'horizonte'
+
   return (
-    <div className="filtros-bar">
-      <span className="filtros-bar__label">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path
-            d="M4 5h16l-6.5 8v5.2L10.5 20v-7L4 5z"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-        </svg>
-        Filtrar
-      </span>
-
-      <Desplegable
-        etiqueta={
-          filtro.fecha
-            ? `Fecha: ${etiquetaFecha(filtro.fecha)}${filtro.sinFecha ? ' + sin fecha' : ''}`
-            : filtro.conFecha
-              ? 'Fecha: Con fecha'
-              : filtro.sinFecha
-                ? 'Fecha: Sin fecha'
-                : 'Fecha'
-        }
-        activo={!!filtro.fecha || !!filtro.sinFecha || !!filtro.conFecha}
+    <div className="controles-bar">
+      <Control
+        nombre="Filtrar"
+        icono={<IconoFiltrar />}
+        contador={cuenta.total}
+        onLimpiar={activo ? () => onCambiar({}) : undefined}
+        tituloLimpiar="Limpiar todos los filtros"
+        onAbierto={(v) => { if (!v) setCampo(null) }}
+        medirClave={campo}
       >
-        <div className="filtro-menu__grupo">Relativas (se recalculan)</div>
-        {RELATIVAS.map((r) => (
-          <button
-            key={r}
-            className={`filtro-op${filtro.fecha?.tipo === 'relativa' && filtro.fecha.valor === r ? ' filtro-op--on' : ''}`}
-            onClick={() =>
-              onCambiar({
-                ...filtro,
-                // #223: elegir cualquier otra opción de fecha apaga "Con fecha".
-                conFecha: undefined,
-                fecha:
-                  filtro.fecha?.tipo === 'relativa' && filtro.fecha.valor === r
-                    ? undefined
-                    : { tipo: 'relativa', valor: r },
-              })
-            }
-          >
-            {FECHA_RELATIVA_LABEL[r]}
-          </button>
-        ))}
-        <div className="filtro-menu__grupo">Rango fijo</div>
-        <div className="filtro-rango">
-          <input
-            type="date"
-            className="fecha-input"
-            aria-label="Filtro desde"
-            value={filtro.fecha?.tipo === 'rango' ? filtro.fecha.desde ?? '' : ''}
-            onChange={(e) => {
-              const hasta = filtro.fecha?.tipo === 'rango' ? filtro.fecha.hasta : undefined
-              const desde = e.target.value || undefined
-              onCambiar({ ...filtro, conFecha: undefined, fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined })
-            }}
-          />
-          –
-          <input
-            type="date"
-            className="fecha-input"
-            aria-label="Filtro hasta"
-            value={filtro.fecha?.tipo === 'rango' ? filtro.fecha.hasta ?? '' : ''}
-            onChange={(e) => {
-              const desde = filtro.fecha?.tipo === 'rango' ? filtro.fecha.desde : undefined
-              const hasta = e.target.value || undefined
-              onCambiar({ ...filtro, conFecha: undefined, fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined })
-            }}
-          />
-        </div>
-        {/* #223: "Con fecha" — todas las tareas que tienen fecha objetivo, sea
-            cual sea. EXCLUYENTE con el resto del campo: se apaga al elegir
-            cualquier otra opción de fecha, y al activarla las apaga. */}
-        <button
-          className={`filtro-op${filtro.conFecha ? ' filtro-op--on' : ''}`}
-          onClick={() =>
-            onCambiar({
-              ...filtro,
-              fecha: undefined,
-              sinFecha: undefined,
-              conFecha: filtro.conFecha ? undefined : true,
-            })
-          }
-        >
-          Con fecha
-        </button>
-        {/* Mismo formato que las demas opciones del campo (punto 1). */}
-        <button
-          className={`filtro-op${filtro.sinFecha ? ' filtro-op--on' : ''}`}
-          onClick={() =>
-            onCambiar({ ...filtro, conFecha: undefined, sinFecha: filtro.sinFecha ? undefined : true })
-          }
-        >
-          Sin fecha
-        </button>
-        {/* P4: "En horizonte visible (Gantt)" — solo en contexto de proyecto
-            (no en Mis Tareas, que cruza proyectos y no tiene un horizonte único).
-            Solo se ACTIVA desde la Gantt; desde la tabla puede desactivarse si ya
-            está activa. Excluyente: reemplaza cualquier otra selección de fecha. */}
-        {contexto !== 'mis-tareas' && (
-          <button
-            className={`filtro-op${filtro.fecha?.tipo === 'horizonte' ? ' filtro-op--on' : ''}`}
-            disabled={!vistaGantt && filtro.fecha?.tipo !== 'horizonte'}
-            title={
-              !vistaGantt && filtro.fecha?.tipo !== 'horizonte'
-                ? 'Se activa desde la Gantt'
-                : 'Tareas con fecha dentro del horizonte visible de la Gantt, más las sin fecha'
-            }
-            onClick={() =>
-              onCambiar({
-                ...filtro,
-                sinFecha: undefined,
-                conFecha: undefined,
-                fecha: filtro.fecha?.tipo === 'horizonte' ? undefined : { tipo: 'horizonte' },
-              })
-            }
-          >
-            En horizonte visible (Gantt)
-          </button>
-        )}
-        {(filtro.fecha || filtro.sinFecha || filtro.conFecha) && (
-          <button
-            className="filtro-op filtro-op--quitar"
-            onClick={() => onCambiar({ ...filtro, fecha: undefined, sinFecha: undefined, conFecha: undefined })}
-          >
-            Limpiar filtro
-          </button>
-        )}
-      </Desplegable>
-
-      {candidatos && (
-      <Desplegable etiqueta={nResp ? `Responsable (${nResp})` : 'Responsable'} activo={nResp > 0}>
-        {candidatos.map((u) => (
-          <label key={u.id} className="filtro-op filtro-op--check">
-            <input type="checkbox" checked={filtro.responsables?.includes(u.id) ?? false} onChange={() => toggleResp(u.id)} />
-            <Avatar usuario={u} />
-            <span>{u.nombre}</span>
-          </label>
-        ))}
-        <label className="filtro-op filtro-op--check">
-          <input
-            type="checkbox"
-            checked={filtro.responsables?.includes(RESP_SIN_ASIGNAR) ?? false}
-            onChange={() => toggleResp(RESP_SIN_ASIGNAR)}
-          />
-          <span className="avatar avatar--sin">?</span>
-          <span>Sin asignar</span>
-        </label>
-        {candidatos.length === 0 && <div className="filtro-menu__vacio">Sin personas en este proyecto.</div>}
-        {/* Punto 5: marcar/desmarcar todas las opciones de una vez. */}
-        <button className="filtro-op filtro-op--todos" onClick={toggleTodosResp}>
-          {allResp ? 'Deseleccionar todos' : 'Seleccionar todos'}
-        </button>
-        {nResp > 0 && (
-          <button
-            className="filtro-op filtro-op--quitar"
-            onClick={() => onCambiar({ ...filtro, responsables: undefined })}
-          >
-            Limpiar filtro
-          </button>
-        )}
-      </Desplegable>
-      )}
-
-      {proyectos && (
-        <Desplegable etiqueta={nProy ? `Proyecto (${nProy})` : 'Proyecto'} activo={nProy > 0}>
-          {proyectos.map((p) => (
-            <label key={p.id} className="filtro-op filtro-op--check">
-              <input
-                type="checkbox"
-                checked={filtro.proyectos?.includes(p.id) ?? false}
-                onChange={() => toggleProyecto(p.id)}
-              />
-              <span className="filtro-dot" style={{ background: p.color ?? '#607d8b' }} />
-              <span>{p.nombre}</span>
-            </label>
-          ))}
-          {proyectos.length === 0 && <div className="filtro-menu__vacio">Sin proyectos.</div>}
-          {/* #220: mismo control, mismo aspecto y mismo lugar que en los otros. */}
-          <button className="filtro-op filtro-op--todos" onClick={toggleTodosProy}>
-            {allProy ? 'Deseleccionar todos' : 'Seleccionar todos'}
-          </button>
-          {nProy > 0 && (
-            <button
-              className="filtro-op filtro-op--quitar"
-              onClick={() => onCambiar({ ...filtro, proyectos: undefined })}
-            >
-              Limpiar filtro
+        {campoActual ? (
+          <>
+            {/* Segundo nivel: las opciones del campo, con la vuelta arriba. */}
+            <button className="filtro-volver" onClick={() => setCampo(null)}>
+              ‹ Filtrar
             </button>
-          )}
-        </Desplegable>
-      )}
-
-      <Desplegable etiqueta={nEst ? `Estado (${nEst})` : 'Estado'} activo={nEst > 0}>
-        {ESTADOS.map((c) => (
-          <label key={c} className="filtro-op filtro-op--check">
-            <input type="checkbox" checked={filtro.estados?.includes(c) ?? false} onChange={() => toggleEstado(c)} />
-            <span className="filtro-dot" style={{ background: ESTADO_COLOR[c] }} />
-            <span>{CATEGORIA_LABEL[c]}</span>
-          </label>
-        ))}
-        {/* Punto 5: marcar/desmarcar todos los estados de una vez. */}
-        <button className="filtro-op filtro-op--todos" onClick={toggleTodosEstados}>
-          {allEstados ? 'Deseleccionar todos' : 'Seleccionar todos'}
-        </button>
-        {nEst > 0 && (
-          <button
-            className="filtro-op filtro-op--quitar"
-            onClick={() => onCambiar({ ...filtro, estados: undefined })}
-          >
-            Limpiar filtro
-          </button>
+            <div className="filtro-menu__grupo">{campoActual.nombre}</div>
+            {campo === 'fecha' && <OpcionesFecha
+              contexto={contexto}
+              filtro={filtro}
+              onCambiar={onCambiar}
+              vistaGantt={vistaGantt}
+            />}
+            {campo === 'responsable' && candidatos && (
+              <>
+                {candidatos.map((u) => (
+                  <label key={u.id} className="filtro-op filtro-op--check">
+                    <input
+                      type="checkbox"
+                      checked={filtro.responsables?.includes(u.id) ?? false}
+                      onChange={() => toggleResp(u.id)}
+                    />
+                    <Avatar usuario={u} />
+                    <span>{u.nombre}</span>
+                  </label>
+                ))}
+                <label className="filtro-op filtro-op--check">
+                  <input
+                    type="checkbox"
+                    checked={filtro.responsables?.includes(RESP_SIN_ASIGNAR) ?? false}
+                    onChange={() => toggleResp(RESP_SIN_ASIGNAR)}
+                  />
+                  <span className="avatar avatar--sin">?</span>
+                  <span>Sin asignar</span>
+                </label>
+                {candidatos.length === 0 && <div className="filtro-menu__vacio">Sin personas en este proyecto.</div>}
+                {/* Punto 5: marcar/desmarcar todas las opciones de una vez. */}
+                <button className="filtro-op filtro-op--todos" onClick={toggleTodosResp}>
+                  {allResp ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                </button>
+              </>
+            )}
+            {campo === 'proyecto' && proyectos && (
+              <>
+                {proyectos.map((p) => (
+                  <label key={p.id} className="filtro-op filtro-op--check">
+                    <input
+                      type="checkbox"
+                      checked={filtro.proyectos?.includes(p.id) ?? false}
+                      onChange={() => toggleProyecto(p.id)}
+                    />
+                    <span className="filtro-dot" style={{ background: p.color ?? '#607d8b' }} />
+                    <span>{p.nombre}</span>
+                  </label>
+                ))}
+                {proyectos.length === 0 && <div className="filtro-menu__vacio">Sin proyectos.</div>}
+                {/* #220: mismo control, mismo aspecto y mismo lugar que en los otros. */}
+                <button className="filtro-op filtro-op--todos" onClick={toggleTodosProy}>
+                  {allProy ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                </button>
+              </>
+            )}
+            {campo === 'estado' && (
+              <>
+                {ESTADOS.map((c) => (
+                  <label key={c} className="filtro-op filtro-op--check">
+                    <input
+                      type="checkbox"
+                      checked={filtro.estados?.includes(c) ?? false}
+                      onChange={() => toggleEstado(c)}
+                    />
+                    <span className="filtro-dot" style={{ background: ESTADO_COLOR[c] }} />
+                    <span>{CATEGORIA_LABEL[c]}</span>
+                  </label>
+                ))}
+                {/* Punto 5: marcar/desmarcar todos los estados de una vez. */}
+                <button className="filtro-op filtro-op--todos" onClick={toggleTodosEstados}>
+                  {allEstados ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                </button>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            {/* #305: primer nivel. Lo aplicado se ve como FICHAS: una por campo,
+                no por valor — con cuatro estados elegidos hay una sola ficha,
+                "Estado: 4", y su × borra los cuatro. Para sacar un valor suelto
+                se entra al campo y se destilda. Esa × reemplaza a los "Limpiar
+                filtro" que antes vivían dentro de cada campo. */}
+            {cuenta.total > 0 && (
+              <>
+                <div className="filtro-menu__grupo">Aplicado</div>
+                <div className="filtro-fichas">
+                  {campos
+                    .filter((c) => c.n > 0)
+                    .map((c) => (
+                      <span key={c.clave} className="filtro-ficha">
+                        <button
+                          className="filtro-ficha__ir"
+                          title={`Ver las opciones de ${c.nombre}`}
+                          onClick={() => setCampo(c.clave)}
+                        >
+                          {c.nombre}: {c.texto}
+                        </button>
+                        <button
+                          className="filtro-ficha__x"
+                          aria-label={`Limpiar ${c.nombre}`}
+                          title={`Limpiar ${c.nombre}`}
+                          onClick={c.limpiar}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                </div>
+              </>
+            )}
+            <div className="filtro-menu__grupo">Campos</div>
+            {campos.map((c) => (
+              <button key={c.clave} className="filtro-op filtro-op--campo" onClick={() => setCampo(c.clave)}>
+                <span className="filtro-op__nombre">{c.nombre}</span>
+                {c.n > 0 && <span className="filtro-op__n">{c.n}</span>}
+                <span className="filtro-op__flecha" aria-hidden="true">›</span>
+              </button>
+            ))}
+          </>
         )}
-      </Desplegable>
+      </Control>
 
-      {activo && (
-        <button className="link-btn filtros-bar__limpiar" onClick={() => onCambiar({})}>
-          Limpiar filtros
-        </button>
-      )}
-
-      <span className="filtros-bar__sep" />
-
-      {/* Punto 4 (#111): menu "Ordenar" junto a Filtrar. Los campos estan a la
-          vista; tocar una direccion (↑/↓) activa/desactiva ese campo. El
-          numero muestra su prioridad (el ultimo activado manda). */}
-      <span className="filtros-bar__label">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M7 4v16M7 20l-3-3M7 4l3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M13 6h7M13 11h5M13 16h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-        Ordenar
-      </span>
-
-      <Desplegable etiqueta={ordenActivo ? `Orden (${orden.length})` : 'Ordenar'} activo={ordenActivo}>
+      {/* Punto 4 (#111): los campos estan a la vista; tocar una direccion (↑/↓)
+          activa/desactiva ese campo. El numero muestra su prioridad (el ultimo
+          activado manda). #305: la × reemplaza al "Limpiar orden" suelto. */}
+      <Control
+        nombre="Ordenar"
+        icono={<IconoOrdenar />}
+        contador={orden.length}
+        onLimpiar={ordenActivo ? () => onCambiarOrden([]) : undefined}
+        tituloLimpiar="Limpiar el orden"
+      >
         {camposOrden.map((c) => {
           const prio = prioridadDe(c.campo)
           const regla = prio >= 0 ? orden[prio] : null
@@ -414,111 +419,186 @@ export function FiltrosBar({
             </div>
           )
         })}
-      </Desplegable>
+      </Control>
 
-      {/* "Limpiar orden" vive FUERA del menu (junto al boton), como el de filtros. */}
-      {ordenActivo && (
-        <button className="link-btn filtros-bar__limpiar" onClick={() => onCambiarOrden([])}>
-          Limpiar orden
-        </button>
+      {/* #305 — "Rango": los días de la grilla y su horizonte. Sin contador ni
+          ×: sus opciones siempre tienen valor, no hay nada que contar ni que
+          quitar. Solo existe en Gantt. */}
+      {rango && (
+        <Control
+          nombre="Rango"
+          icono={<IconoRango />}
+          punto={rango.ocultasFinde > 0}
+          tituloPunto={`${rango.ocultasFinde} tarea${rango.ocultasFinde === 1 ? '' : 's'} escondida${rango.ocultasFinde === 1 ? '' : 's'}`}
+          medirClave={`${rango.soloHabiles}|${horizonteImpuesto}|${rango.ocultasFinde}`}
+        >
+          <div className="filtro-menu__grupo">Días</div>
+          <button
+            className={`filtro-op${rango.soloHabiles ? ' filtro-op--on' : ''}`}
+            onClick={() => rango.onSoloHabiles(true)}
+          >
+            Días hábiles
+          </button>
+          <button
+            className={`filtro-op${!rango.soloHabiles ? ' filtro-op--on' : ''}`}
+            onClick={() => rango.onSoloHabiles(false)}
+          >
+            Semana completa
+          </button>
+          {/* §6.3.20: el detalle del aviso. Antes era una franja entera sobre la
+              grilla que aparecía y desaparecía según el proyecto, moviendo todo
+              lo de abajo; ahora vive acá y afuera solo queda el círculo. */}
+          {rango.ocultasFinde > 0 && (
+            <div className="filtro-menu__nota filtro-menu__nota--aviso">
+              <span className="controles-punto" aria-hidden="true" />
+              {rango.ocultasFinde} tarea{rango.ocultasFinde === 1 ? '' : 's'} con fecha de fin de semana no se{' '}
+              {rango.ocultasFinde === 1 ? 'muestra' : 'muestran'}.
+            </div>
+          )}
+
+          <div className="filtro-menu__grupo">Horizonte</div>
+          <button
+            className={`filtro-op${!horizonteImpuesto && rango.modo === 'hoy' ? ' filtro-op--on' : ''}`}
+            disabled={horizonteImpuesto}
+            title="2 semanas atrás + semana actual + 2 adelante, fijo"
+            onClick={() => rango.onModo('hoy')}
+          >
+            Alrededor de hoy
+          </button>
+          <button
+            className={`filtro-op${!horizonteImpuesto && rango.modo === 'todo' ? ' filtro-op--on' : ''}`}
+            disabled={horizonteImpuesto}
+            title="De la primera a la última tarea"
+            onClick={() => rango.onModo('todo')}
+          >
+            {rango.etiquetaTodo}
+          </button>
+          {horizonteImpuesto && (
+            <div className="filtro-menu__nota">
+              Definido por el filtro de fecha. Quítalo para volver a elegir el horizonte.
+            </div>
+          )}
+        </Control>
       )}
 
-      <span className="filtros-bar__sep" />
+      <span className="controles-bar__sep" />
+
+      <Control
+        nombre="Vistas"
+        sufijo={sufijoVistas}
+        icono={<IconoVistas />}
+        onLimpiar={vistaActiva ? salirDeVista : undefined}
+        tituloLimpiar="Salir de esta vista (queda todo limpio)"
+        alDerecha
+        clase="controles-ctrl--vistas"
+        medirClave={guardados.length}
+      >
+        {(cerrar) => (
+          <>
+            {/* #305: "Guardar vista" dejó de ser un botón permanente en la
+                barra y vive acá, con el mismo aviso cuando no hay nada que
+                guardar. */}
+            <button
+              className="filtro-op filtro-op--guardar"
+              disabled={!activo && !ordenActivo}
+              title={
+                activo || ordenActivo
+                  ? 'Guardar la vista actual (filtro + orden) con un nombre'
+                  : 'Arma un filtro u orden para poder guardar la vista'
+              }
+              onClick={() => {
+                cerrar()
+                setModal({ tipo: 'guardar' })
+              }}
+            >
+              + Guardar vista
+            </button>
+            <div className="filtro-menu__grupo">Guardadas</div>
+            {guardados.length === 0 && <div className="filtro-menu__vacio">Aún no guardas vistas en este proyecto.</div>}
+            {guardados.map((g) => {
+              const esActiva = g.id === vistaActivaId
+              return (
+                <div key={g.id} className={`filtro-guardado${esActiva ? ' filtro-guardado--activa' : ''}`}>
+                  <button
+                    className="filtro-guardado__aplicar"
+                    // #215: la activa se ve marcada, y tocarla la DESMARCA — es la
+                    // forma de quedar sin vista. Entrar y salir de una vista pasa
+                    // por aquí y por la × del botón.
+                    title={esActiva ? 'Salir de esta vista (queda todo limpio)' : 'Aplicar esta vista (filtro + orden)'}
+                    onClick={() => {
+                      if (esActiva) {
+                        salirDeVista()
+                      } else {
+                        onCambiar(g.filtro)
+                        onCambiarOrden(g.orden ?? [])
+                        onVistaActiva?.(g.id)
+                      }
+                    }}
+                  >
+                    <span className="filtro-guardado__marca" aria-hidden="true">{esActiva ? '✓' : ''}</span>
+                    {g.nombre}
+                    {esActiva && modificada && <span className="filtro-guardado__mod" title="Con cambios sin guardar"> *</span>}
+                  </button>
+                  {/* #160/#175: tooltip rápido (data-tip, misma inmediatez que el
+                      resto de la app). El menú de Vistas no recorta el globo porque
+                      usa overflow visible (.filtro-menu--derecha). */}
+                  <button
+                    className="icon-btn"
+                    data-tip="Actualizar con el filtro y orden actuales"
+                    aria-label={`Actualizar ${g.nombre}`}
+                    disabled={!activo && !ordenActivo}
+                    onClick={() => onGuardarVista(g.id, { filtro, orden })}
+                  >
+                    💾
+                  </button>
+                  <button
+                    className="icon-btn"
+                    data-tip="Renombrar"
+                    aria-label={`Renombrar ${g.nombre}`}
+                    onClick={() => {
+                      cerrar()
+                      setModal({ tipo: 'renombrar', id: g.id, nombre: g.nombre })
+                    }}
+                  >
+                    ✎
+                  </button>
+                  <button
+                    className="icon-btn"
+                    data-tip="Eliminar"
+                    aria-label={`Eliminar ${g.nombre}`}
+                    onClick={() => {
+                      // #141: confirmar antes de borrar una vista guardada.
+                      if (confirm(`¿Eliminar la vista guardada "${g.nombre}"?`)) {
+                        onEliminarVista(g.id)
+                        // #215: si se borra la que estaba activa, los filtros se
+                        // quedan tal cual —nadie pidió cambiarlos— pero pasan a ser
+                        // temporales: al salir y volver se entra limpio.
+                        if (esActiva) onVistaActiva?.(null)
+                      }
+                    }}
+                  >
+                    🗑
+                  </button>
+                </div>
+              )
+            })}
+          </>
+        )}
+      </Control>
 
       {/* P1: aparece solo cuando la foto quedó desactualizada por una edición;
-          recalcula la vista (saca lo que ya no calza, reordena) y desaparece. */}
+          recalcula la vista (saca lo que ya no calza, reordena) y desaparece.
+          #305: es el ÚNICO elemento de la barra que aparece y desaparece, y va
+          pegado al extremo derecho — avisa de algo que acaba de pasar. */}
       {stale && onActualizarVista && (
         <button
-          className="filtro-btn filtro-btn--actualizar"
+          className="controles-btn controles-btn--actualizar"
           title="La vista quedó desactualizada por una edición: recalcular filtro y orden"
           onClick={onActualizarVista}
         >
-          ↻ Actualizar vista
+          ↻ <span className="controles-btn__nombre">Actualizar vista</span>
         </button>
       )}
-
-      <Desplegable etiqueta={etiquetaVistas} activo={!!vistaActiva} alDerecha>
-        {guardados.length === 0 && <div className="filtro-menu__vacio">Aún no guardas vistas en este proyecto.</div>}
-        {guardados.map((g) => {
-          const esActiva = g.id === vistaActivaId
-          return (
-          <div key={g.id} className={`filtro-guardado${esActiva ? ' filtro-guardado--activa' : ''}`}>
-            <button
-              className="filtro-guardado__aplicar"
-              // #215: la activa se ve marcada, y tocarla la DESMARCA — es la
-              // forma de quedar sin vista. Entrar y salir de una vista pasa
-              // solo por aquí.
-              title={esActiva ? 'Salir de esta vista (queda todo limpio)' : 'Aplicar esta vista (filtro + orden)'}
-              onClick={() => {
-                if (esActiva) {
-                  onCambiar({})
-                  onCambiarOrden([])
-                  onVistaActiva?.(null)
-                } else {
-                  onCambiar(g.filtro)
-                  onCambiarOrden(g.orden ?? [])
-                  onVistaActiva?.(g.id)
-                }
-              }}
-            >
-              <span className="filtro-guardado__marca" aria-hidden="true">{esActiva ? '✓' : ''}</span>
-              {g.nombre}
-              {esActiva && modificada && <span className="filtro-guardado__mod" title="Con cambios sin guardar"> *</span>}
-            </button>
-            {/* #160/#175: tooltip rápido (data-tip, misma inmediatez que el
-                resto de la app). El menú de Vistas no recorta el globo porque
-                usa overflow visible (.filtro-menu--derecha). */}
-            <button
-              className="icon-btn"
-              data-tip="Actualizar con el filtro y orden actuales"
-              aria-label={`Actualizar ${g.nombre}`}
-              disabled={!activo && !ordenActivo}
-              onClick={() => onGuardarVista(g.id, { filtro, orden })}
-            >
-              💾
-            </button>
-            <button
-              className="icon-btn"
-              data-tip="Renombrar"
-              aria-label={`Renombrar ${g.nombre}`}
-              onClick={() => setModal({ tipo: 'renombrar', id: g.id, nombre: g.nombre })}
-            >
-              ✎
-            </button>
-            <button
-              className="icon-btn"
-              data-tip="Eliminar"
-              aria-label={`Eliminar ${g.nombre}`}
-              onClick={() => {
-                // #141: confirmar antes de borrar una vista guardada.
-                if (confirm(`¿Eliminar la vista guardada "${g.nombre}"?`)) {
-                  onEliminarVista(g.id)
-                  // #215: si se borra la que estaba activa, los filtros se
-                  // quedan tal cual —nadie pidió cambiarlos— pero pasan a ser
-                  // temporales: al salir y volver se entra limpio.
-                  if (esActiva) onVistaActiva?.(null)
-                }
-              }}
-            >
-              🗑
-            </button>
-          </div>
-          )
-        })}
-      </Desplegable>
-
-      <button
-        className="filtro-btn filtro-btn--guardar"
-        disabled={!activo && !ordenActivo}
-        title={
-          activo || ordenActivo
-            ? 'Guardar la vista actual (filtro + orden) con un nombre'
-            : 'Arma un filtro u orden para poder guardar la vista'
-        }
-        onClick={() => setModal({ tipo: 'guardar' })}
-      >
-        + Guardar vista
-      </button>
 
       {modal?.tipo === 'guardar' && (
         <TextPromptModal
@@ -551,16 +631,138 @@ export function FiltrosBar({
   )
 }
 
-/** Boton + panel desplegable con cierre por click afuera o Escape. */
-// #310 — Colocación de los menús flotantes de la barra de filtros.
+/**
+ * El campo Fecha, el más profundo del panel: relativas, rango fijo con dos
+ * calendarios, "Con fecha", "Sin fecha" y "En horizonte visible (Gantt)".
+ * #305 lo bajó un nivel (vive dentro de Filtrar) SIN tocar ninguna de sus
+ * opciones ni sus reglas de exclusión entre sí.
+ */
+function OpcionesFecha({
+  contexto,
+  filtro,
+  onCambiar,
+  vistaGantt,
+}: {
+  contexto: string
+  filtro: Filtro
+  onCambiar: (f: Filtro) => void
+  vistaGantt: boolean
+}) {
+  return (
+    <>
+      <div className="filtro-menu__grupo">Relativas (se recalculan)</div>
+      {RELATIVAS.map((r) => (
+        <button
+          key={r}
+          className={`filtro-op${filtro.fecha?.tipo === 'relativa' && filtro.fecha.valor === r ? ' filtro-op--on' : ''}`}
+          onClick={() =>
+            onCambiar({
+              ...filtro,
+              // #223: elegir cualquier otra opción de fecha apaga "Con fecha".
+              conFecha: undefined,
+              fecha:
+                filtro.fecha?.tipo === 'relativa' && filtro.fecha.valor === r
+                  ? undefined
+                  : { tipo: 'relativa', valor: r },
+            })
+          }
+        >
+          {FECHA_RELATIVA_LABEL[r]}
+        </button>
+      ))}
+      <div className="filtro-menu__grupo">Rango fijo</div>
+      <div className="filtro-rango">
+        <input
+          type="date"
+          className="fecha-input"
+          aria-label="Filtro desde"
+          value={filtro.fecha?.tipo === 'rango' ? filtro.fecha.desde ?? '' : ''}
+          onChange={(e) => {
+            const hasta = filtro.fecha?.tipo === 'rango' ? filtro.fecha.hasta : undefined
+            const desde = e.target.value || undefined
+            onCambiar({ ...filtro, conFecha: undefined, fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined })
+          }}
+        />
+        –
+        <input
+          type="date"
+          className="fecha-input"
+          aria-label="Filtro hasta"
+          value={filtro.fecha?.tipo === 'rango' ? filtro.fecha.hasta ?? '' : ''}
+          onChange={(e) => {
+            const desde = filtro.fecha?.tipo === 'rango' ? filtro.fecha.desde : undefined
+            const hasta = e.target.value || undefined
+            onCambiar({ ...filtro, conFecha: undefined, fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined })
+          }}
+        />
+      </div>
+      {/* #223: "Con fecha" — todas las tareas que tienen fecha objetivo, sea
+          cual sea. EXCLUYENTE con el resto del campo: se apaga al elegir
+          cualquier otra opción de fecha, y al activarla las apaga. */}
+      <button
+        className={`filtro-op${filtro.conFecha ? ' filtro-op--on' : ''}`}
+        onClick={() =>
+          onCambiar({
+            ...filtro,
+            fecha: undefined,
+            sinFecha: undefined,
+            conFecha: filtro.conFecha ? undefined : true,
+          })
+        }
+      >
+        Con fecha
+      </button>
+      {/* Mismo formato que las demas opciones del campo (punto 1). */}
+      <button
+        className={`filtro-op${filtro.sinFecha ? ' filtro-op--on' : ''}`}
+        onClick={() => onCambiar({ ...filtro, conFecha: undefined, sinFecha: filtro.sinFecha ? undefined : true })}
+      >
+        Sin fecha
+      </button>
+      {/* P4: "En horizonte visible (Gantt)" — solo en contexto de proyecto
+          (no en Mis Tareas, que cruza proyectos y no tiene un horizonte único).
+          Solo se ACTIVA desde la Gantt; desde la tabla puede desactivarse si ya
+          está activa. Excluyente: reemplaza cualquier otra selección de fecha. */}
+      {contexto !== 'mis-tareas' && (
+        <button
+          className={`filtro-op${filtro.fecha?.tipo === 'horizonte' ? ' filtro-op--on' : ''}`}
+          disabled={!vistaGantt && filtro.fecha?.tipo !== 'horizonte'}
+          title={
+            !vistaGantt && filtro.fecha?.tipo !== 'horizonte'
+              ? 'Se activa desde la Gantt'
+              : 'Tareas con fecha dentro del horizonte visible de la Gantt, más las sin fecha'
+          }
+          onClick={() =>
+            onCambiar({
+              ...filtro,
+              sinFecha: undefined,
+              conFecha: undefined,
+              fecha: filtro.fecha?.tipo === 'horizonte' ? undefined : { tipo: 'horizonte' },
+            })
+          }
+        >
+          En horizonte visible (Gantt)
+        </button>
+      )}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Control de la barra: pastilla (ícono + nombre + contador o círculo) + su ×
+// opcional + el panel desplegable.
+// ---------------------------------------------------------------------------
+
+// #310 — Colocación de los menús flotantes.
 //
 // `MARGEN` es el aire mínimo contra cualquier borde de la pantalla: era el
 // valor que los menús anclados por la derecha usaban contra SU propio borde, y
 // ahora rige los cuatro. Ninguno de los dos anclajes miraba el borde opuesto:
 // los de la izquierda se salían por la derecha, y los de la derecha por la
-// izquierda en cuanto la pantalla se angostaba. `ANCHO_MINIMO` es el del CSS (`.filtro-menu`), y solo se usa
-// como suposición en la primera colocación, antes de poder medir el menú real.
-// `ALTO_MINIMO` evita que un botón muy abajo deje el menú aplastado a cero.
+// izquierda en cuanto la pantalla se angostaba. `ANCHO_MINIMO` es el del CSS
+// (`.filtro-menu`), y solo se usa como suposición en la primera colocación,
+// antes de poder medir el menú real. `ALTO_MINIMO` evita que un botón muy abajo
+// deje el menú aplastado a cero.
 const MARGEN = 8
 const ANCHO_MINIMO = 244
 const ALTO_MINIMO = 120
@@ -573,16 +775,45 @@ interface Posicion {
   altoMaximo: number
 }
 
-function Desplegable({
-  etiqueta,
-  activo,
+function Control({
+  nombre,
+  sufijo = '',
+  icono,
+  contador,
+  onLimpiar,
+  tituloLimpiar,
+  punto,
+  tituloPunto,
   alDerecha,
+  clase = '',
+  medirClave,
+  onAbierto,
   children,
 }: {
-  etiqueta: string
-  activo: boolean
+  nombre: string
+  /** Texto variable a la derecha del nombre (Vistas: " · Atrasadas *"). */
+  sufijo?: string
+  icono: ReactNode
+  /** Cantidad de valores puestos. `undefined` = este control no cuenta nada. */
+  contador?: number
+  /** Presente = el control muestra su ×, que limpia lo suyo. */
+  onLimpiar?: () => void
+  tituloLimpiar?: string
+  /**
+   * #305 — El círculo significa UNA sola cosa: hay tareas ocultas. No debe
+   * reutilizarse para ningún otro aviso, ni en Rango ni en otro control: si
+   * dice dos cosas deja de decir "hay tareas escondidas" y pasa a decir "mira
+   * acá", que es mucho menos.
+   */
+  punto?: boolean
+  tituloPunto?: string
   alDerecha?: boolean
-  children: ReactNode
+  clase?: string
+  /** Cambia cuando el CONTENIDO del menú cambia de tamaño: re-mide y recoloca. */
+  medirClave?: unknown
+  /** Se abrió o se cerró el menú (Filtrar lo usa para volver al primer nivel). */
+  onAbierto?: (abierto: boolean) => void
+  children: ReactNode | ((cerrar: () => void) => ReactNode)
 }) {
   const [abierto, setAbierto] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -660,10 +891,22 @@ function Desplegable({
     } else {
       setPos(null)
     }
+    onAbierto?.(abierto)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abierto])
 
-  // Segunda pasada, una sola vez por apertura: el menú ya está montado y en el
+  // #305: los menús ahora cambian de contenido sin cerrarse (Filtrar entra y
+  // sale de un campo; Rango cambia de aviso). Un contenido nuevo tiene otro
+  // ancho, así que hay que volver a medir desde cero: si no, se recolocaría con
+  // el ancho viejo y podría quedar fuera de la pantalla.
+  useLayoutEffect(() => {
+    if (!abierto) return
+    medido.current = false
+    recolocar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medirClave])
+
+  // Segunda pasada, una sola vez por medición: el menú ya está montado y en el
   // sitio donde nada le recorta el ancho, así que ahora se mide y se coloca
   // definitivamente. La bandera corta la cadena — sin ella cada `setPos`
   // volvería a disparar este efecto.
@@ -697,16 +940,34 @@ function Desplegable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abierto])
 
+  const hayContador = contador !== undefined && contador > 0
+  // La pastilla se ve encendida cuando tiene algo puesto, que es exactamente
+  // cuando ofrece su × para quitarlo. "Rango" nunca se enciende: sus opciones
+  // siempre tienen valor, y su único aviso es el círculo.
+  const encendido = !!onLimpiar
+
   return (
-    <div className="filtro-desplegable">
+    <div className={`controles-ctrl${onLimpiar ? ' controles-ctrl--conx' : ''} ${clase}`.trimEnd()}>
       <button
         ref={btnRef}
-        className={`filtro-btn${activo ? ' filtro-btn--activo' : ''}${abierto ? ' filtro-btn--abierto' : ''}`}
+        className={`controles-btn${encendido ? ' controles-btn--activo' : ''}${abierto ? ' controles-btn--abierto' : ''}`}
         aria-expanded={abierto}
         onClick={() => setAbierto((v) => !v)}
       >
-        {etiqueta} <span className="filtro-btn__caret">▾</span>
+        <span className="controles-btn__icono" aria-hidden="true">{icono}</span>
+        <span className="controles-btn__nombre">
+          {nombre}
+          {sufijo}
+        </span>
+        {hayContador && <span className="controles-btn__n">{contador}</span>}
+        {punto && <span className="controles-punto" title={tituloPunto} aria-label={tituloPunto} />}
+        <span className="controles-btn__caret" aria-hidden="true">▾</span>
       </button>
+      {onLimpiar && (
+        <button className="controles-x" aria-label={tituloLimpiar ?? `Limpiar ${nombre}`} title={tituloLimpiar} onClick={onLimpiar}>
+          ✕
+        </button>
+      )}
       {abierto &&
         pos &&
         createPortal(
@@ -722,10 +983,46 @@ function Desplegable({
               maxHeight: pos.altoMaximo,
             }}
           >
-            {children}
+            {typeof children === 'function' ? children(() => setAbierto(false)) : children}
           </div>,
           document.body,
         )}
     </div>
+  )
+}
+
+// -- Íconos de los cuatro controles (todos con el mismo peso visual) --------
+
+function IconoFiltrar() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+      <path d="M4 5h16l-6.5 8v5.2L10.5 20v-7L4 5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconoOrdenar() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+      <path d="M7 4v16M7 20l-3-3M7 4l3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13 6h7M13 11h5M13 16h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconoRango() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconoVistas() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+      <path d="M6 4h12v16l-6-4-6 4V4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
   )
 }

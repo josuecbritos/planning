@@ -1,7 +1,12 @@
-// #310 — Los menús de la barra de filtros no se salen de la pantalla.
+// #310 — Los menús de la barra de controles no se salen de la pantalla.
 //
 // Se mide la caja REAL de cada menú abierto contra la ventana: ningún borde
 // puede quedar fuera, ni por los lados ni por abajo.
+//
+// #305 reordenó la barra: los campos de filtro dejaron de ser botones sueltos y
+// viven dentro del control "Filtrar", a dos niveles. Los dos niveles se miden,
+// porque el segundo trae contenido NUEVO —y por tanto un ancho nuevo— sin
+// cerrar el menú: si no se volviera a medir, se recolocaría con el ancho viejo.
 //
 // Controles negativos comprobados:
 //   · Con `left: r.left` sin tope y el alto al 80% de la pantalla —el cálculo
@@ -11,6 +16,8 @@
 //     es el que una versión anterior de ESTA prueba dejaba pasar, por medir un
 //     solo ancho y por conformarse con "que no se salga" en vez de exigir el
 //     margen. De ahí el barrido de anchos y el criterio de `dentro()`.
+//   · Sin la re-medición al cambiar de nivel (#305), el segundo nivel de
+//     "Filtrar" hereda la colocación del primero y se sale por la derecha.
 //
 // Cómo correrla:
 //   npm run build && npx vite preview --port 4173 &
@@ -28,16 +35,9 @@ const chk = (ok, m, extra = '') => {
 
 const b = await chromium.launch({ executablePath: EXE })
 
-/** Abre un menú por su etiqueta y devuelve su caja medida contra la ventana. */
-async function medirMenu(p, etiqueta) {
-  // No todas las pantallas tienen todos los menús (Mis Tareas ya filtra por
-  // responsable, así que ese no está): si el botón no existe, no hay nada que
-  // medir y se informa como salteado, no como falla.
-  const btn = p.locator('.filtro-btn', { hasText: etiqueta }).first()
-  if (!(await btn.count())) return null
-  await btn.click()
-  await p.waitForTimeout(400)
-  const caja = await p.evaluate(() => {
+/** Caja del menú abierto, medida contra la ventana. */
+const cajaMenu = (p) =>
+  p.evaluate(() => {
     const m = document.querySelector('.filtro-menu--portal')
     if (!m) return null
     const r = m.getBoundingClientRect()
@@ -60,6 +60,34 @@ async function medirMenu(p, etiqueta) {
       topeAlto: Math.round(parseFloat(getComputedStyle(m).maxHeight)),
     }
   })
+
+/** Abre un control por su nombre y devuelve su caja. `null` si no está. */
+async function medirControl(p, nombre) {
+  const btn = p.locator('.controles-btn', { hasText: nombre }).first()
+  if (!(await btn.count())) return null
+  await btn.click()
+  await p.waitForTimeout(400)
+  const caja = await cajaMenu(p)
+  await p.keyboard.press('Escape')
+  await p.waitForTimeout(250)
+  return caja
+}
+
+/** Abre "Filtrar" y baja a uno de sus campos; devuelve la caja del 2º nivel. */
+async function medirCampo(p, campo) {
+  const btn = p.locator('.controles-btn', { hasText: 'Filtrar' }).first()
+  if (!(await btn.count())) return null
+  await btn.click()
+  await p.waitForTimeout(400)
+  const op = p.locator('.filtro-menu--portal .filtro-op--campo', { hasText: campo })
+  if (!(await op.count())) {
+    await p.keyboard.press('Escape')
+    await p.waitForTimeout(250)
+    return null
+  }
+  await op.click()
+  await p.waitForTimeout(450)
+  const caja = await cajaMenu(p)
   await p.keyboard.press('Escape')
   await p.waitForTimeout(250)
   return caja
@@ -114,21 +142,31 @@ for (const W of ANCHOS) {
   console.log(`\n── Teléfono ${W}×844 · pantalla de proyecto ──`)
   const p = await sesion(W, 844)
   await abrirProyecto(p)
-  for (const etiqueta of ['Fecha', 'Responsable', 'Estado', 'Ordenar', 'Vistas']) {
-    const c = await medirMenu(p, etiqueta)
+  for (const nombre of ['Filtrar', 'Ordenar', 'Vistas']) {
+    const c = await medirControl(p, nombre)
     if (!c) {
-      console.log(`SKIP  "${etiqueta}" no está en esta pantalla`)
+      console.log(`SKIP  "${nombre}" no está en esta pantalla`)
       continue
     }
     // "Vistas" es el anclado por la DERECHA: su criterio es el mismo (C3).
-    const criterio = etiqueta === 'Vistas' ? 'C3' : 'C1'
-    chk(dentro(c), `${criterio} ${W}px · "${etiqueta}" queda dentro, con margen a los dos lados`,
+    const criterio = nombre === 'Vistas' ? 'C3' : 'C1'
+    chk(dentro(c), `${criterio} ${W}px · "${nombre}" queda dentro, con margen a los dos lados`,
         `izq=${c.izq} der=${c.der}/${c.ventanaW}`)
     chk(
       c.opciones > 0 || c.texto > 0,
-      `${criterio} ${W}px · "${etiqueta}" muestra su contenido`,
+      `${criterio} ${W}px · "${nombre}" muestra su contenido`,
       `${c.opciones} opciones, ${c.texto} caracteres`,
     )
+  }
+  // #305: el segundo nivel de Filtrar es contenido nuevo con otro ancho.
+  for (const campo of ['Fecha', 'Responsable', 'Estado']) {
+    const c = await medirCampo(p, campo)
+    if (!c) {
+      console.log(`SKIP  campo "${campo}" no está en esta pantalla`)
+      continue
+    }
+    chk(dentro(c), `C1 ${W}px · el campo "${campo}" (2º nivel) queda dentro`,
+        `izq=${c.izq} der=${c.der}/${c.ventanaW}`)
   }
   if (W === 390) movil = p
   else await p.context().close()
@@ -138,10 +176,10 @@ for (const W of ANCHOS) {
 console.log('\n── Teléfono bajo 390×420 · la barra queda en la mitad de abajo ──')
 const bajo = await sesion(390, 420)
 await abrirProyecto(bajo)
-for (const etiqueta of ['Responsable', 'Fecha', 'Estado']) {
-  const c = await medirMenu(bajo, etiqueta)
+for (const campo of ['Responsable', 'Fecha', 'Estado']) {
+  const c = await medirCampo(bajo, campo)
   if (!c) continue
-  chk(dentro(c), `C4 con poco alto, "${etiqueta}" no se pasa por abajo`,
+  chk(dentro(c), `C4 con poco alto, el campo "${campo}" no se pasa por abajo`,
       `arriba=${c.arriba} abajo=${c.abajo}/${c.ventanaH}`)
   // La REGLA, no solo el caso: el tope de alto es el espacio que queda DESDE
   // el menú hasta el borde inferior, no una fracción de la pantalla completa.
@@ -150,55 +188,66 @@ for (const etiqueta of ['Responsable', 'Fecha', 'Estado']) {
   const esperado = Math.round(c.ventanaH - c.arriba - MARGEN)
   chk(
     Math.abs(c.topeAlto - esperado) <= 1,
-    `C4 "${etiqueta}": el tope de alto se mide desde el menú hasta el borde inferior`,
+    `C4 "${campo}": el tope de alto se mide desde el menú hasta el borde inferior`,
     `tope=${c.topeAlto} esperado=${esperado} (80% de la pantalla habría sido ${Math.round(c.ventanaH * 0.8)})`,
   )
   chk(
     !c.desplazable || c.abajo <= c.ventanaH + 0.5,
-    `C4 "${etiqueta}": si no cabe entero, se recorre por dentro`,
+    `C4 "${campo}": si no cabe entero, se recorre por dentro`,
     `desplazable=${c.desplazable}`,
   )
 }
 
-// ── C2 · Mis Tareas, donde además está el menú Proyecto ────────────────────
+// ── C2 · Mis Tareas, donde además está el campo Proyecto ───────────────────
 console.log('\n── Teléfono 390×844 · Mis Tareas ──')
 await abrirBarra(movil)
 await movil.getByText('Mis Tareas', { exact: true }).first().click()
 await movil.waitForTimeout(900)
-for (const etiqueta of ['Proyecto', 'Fecha', 'Responsable', 'Estado']) {
-  const c = await medirMenu(movil, etiqueta)
+for (const nombre of ['Filtrar', 'Ordenar', 'Vistas']) {
+  const c = await medirControl(movil, nombre)
+  if (!c) continue
+  chk(dentro(c), `C2 "${nombre}" en Mis Tareas queda dentro`, `der=${c.der}/${c.ventanaW} abajo=${c.abajo}/${c.ventanaH}`)
+}
+for (const campo of ['Proyecto', 'Fecha', 'Estado']) {
+  const c = await medirCampo(movil, campo)
   if (!c) {
-    console.log(`SKIP  C2 "${etiqueta}" no está en Mis Tareas`)
+    console.log(`SKIP  C2 campo "${campo}" no está en Mis Tareas`)
     continue
   }
-  chk(dentro(c), `C2 "${etiqueta}" en Mis Tareas queda dentro`, `der=${c.der}/${c.ventanaW} abajo=${c.abajo}/${c.ventanaH}`)
+  chk(dentro(c), `C2 el campo "${campo}" en Mis Tareas queda dentro`, `der=${c.der}/${c.ventanaW}`)
 }
 
 // ── C5 · En escritorio no se mueven: siguen pegados al borde del botón ─────
 console.log('\n── Escritorio 1440×900 ──')
 const escritorio = await sesion(1440, 900)
 await abrirProyecto(escritorio)
-for (const etiqueta of ['Fecha', 'Responsable', 'Estado', 'Ordenar']) {
+for (const nombre of ['Filtrar', 'Ordenar']) {
   const bordeBoton = await escritorio.evaluate((t) => {
-    const btn = [...document.querySelectorAll('.filtro-btn')].find((b) => b.textContent.includes(t))
+    const btn = [...document.querySelectorAll('.controles-btn')].find((b) => b.textContent.includes(t))
     return btn ? +btn.getBoundingClientRect().left.toFixed(1) : null
-  }, etiqueta)
-  const c = await medirMenu(escritorio, etiqueta)
+  }, nombre)
+  const c = await medirControl(escritorio, nombre)
   chk(
     c && bordeBoton !== null && Math.abs(c.izq - bordeBoton) <= 0.5,
-    `C5 "${etiqueta}" sigue pegado al borde izquierdo de su botón`,
+    `C5 "${nombre}" sigue pegado al borde izquierdo de su botón`,
     `menú=${c?.izq} botón=${bordeBoton}`,
   )
 }
+// #305: "Rango" solo existe en Gantt, y es el control más a la derecha de los
+// anclados por la izquierda.
+await escritorio.getByRole('button', { name: 'Gantt', exact: true }).first().click()
+await escritorio.waitForTimeout(900)
+const cr = await medirControl(escritorio, 'Rango')
+chk(dentro(cr), 'C5 "Rango" (solo en Gantt) queda dentro', `izq=${cr?.izq} der=${cr?.der}/${cr?.ventanaW}`)
 
 // ── C6 · Con el menú abierto, desplazar: sigue anclado y sin salirse ───────
 console.log('\n── Desplazar con el menú abierto ──')
 await abrirProyecto(movil)
-await movil.locator('.filtro-btn', { hasText: 'Responsable' }).first().click()
+await movil.locator('.controles-btn', { hasText: 'Filtrar' }).first().click()
 await movil.waitForTimeout(400)
 const antes = await movil.evaluate(() => {
   const m = document.querySelector('.filtro-menu--portal')
-  const btn = [...document.querySelectorAll('.filtro-btn')].find((b) => b.textContent.includes('Responsable'))
+  const btn = [...document.querySelectorAll('.controles-btn')].find((b) => b.textContent.includes('Filtrar'))
   return { menuTop: m.getBoundingClientRect().top, btnBottom: btn.getBoundingClientRect().bottom }
 })
 await movil.mouse.wheel(0, 200)
@@ -206,7 +255,7 @@ await movil.waitForTimeout(500)
 const despues = await movil.evaluate(() => {
   const m = document.querySelector('.filtro-menu--portal')
   if (!m) return null
-  const btn = [...document.querySelectorAll('.filtro-btn')].find((b) => b.textContent.includes('Responsable'))
+  const btn = [...document.querySelectorAll('.controles-btn')].find((b) => b.textContent.includes('Filtrar'))
   const r = m.getBoundingClientRect()
   return {
     menuTop: r.top,
@@ -228,4 +277,4 @@ if (despues) {
 }
 
 await b.close()
-console.log(process.exitCode ? '\n⛔ HAY FALLAS' : '\n✅ #310 — los menús de filtro no se salen de la pantalla')
+console.log(process.exitCode ? '\n⛔ HAY FALLAS' : '\n✅ #310 — los menús de la barra de controles no se salen de la pantalla')
