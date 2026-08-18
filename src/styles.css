@@ -836,8 +836,13 @@ table.tareas .col-desv { text-align: center; }
 }
 .filtro-menu--derecha { left: auto; right: 0; }
 /* P3: en portal (position:fixed anclado al botón) va por encima del contenido
-   y de los botones flotantes de mobile, sin recorte del contenedor. */
-.filtro-menu--portal { z-index: 2400; max-height: 80vh; overflow-y: auto; }
+   y de los botones flotantes de mobile, sin recorte del contenedor.
+   #310: el alto máximo YA NO se fija acá. Era `80vh` —una fracción de la
+   pantalla completa, sin descontar lo que el botón había bajado—, así que con
+   la barra de filtros en la mitad inferior el menú se pasaba por abajo. Ahora
+   lo calcula el componente contra el espacio que realmente queda, y llega
+   como estilo en línea junto al ancho máximo. */
+.filtro-menu--portal { z-index: 2400; overflow-y: auto; }
 .filtro-menu__grupo {
   font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
   color: var(--gris-texto); padding: 8px 10px 3px;
