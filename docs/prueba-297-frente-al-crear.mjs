@@ -161,15 +161,19 @@ chk(
 )
 
 // ── C6 · El filtro no se arrastra entre proyectos (#221) ────────────────────
-await p.locator('.filtro-btn', { hasText: 'Estado' }).first().click()
+// #305: los campos de filtro ya no son botones sueltos de la barra; se entra
+// por el control "Filtrar" y desde ahí al campo.
+await p.locator('.controles-btn', { hasText: 'Filtrar' }).first().click()
+await esperar(300)
+await p.locator('.filtro-menu--portal .filtro-op--campo', { hasText: 'Estado' }).click()
 await esperar(300)
 await p.locator('.filtro-op', { hasText: /^Atrasada$/ }).first().click()
 await esperar(300)
 await p.keyboard.press('Escape')
 await esperar(300)
-const conFiltro = await p.locator('.filtro-btn.activo, .filtro-btn--activo').count()
+const conFiltro = await p.locator('.controles-btn--activo').count()
 await entrarA('P297 Tabla')
-const trasCambiar = await p.locator('.filtro-btn.activo, .filtro-btn--activo').count()
+const trasCambiar = await p.locator('.controles-btn--activo').count()
 chk(trasCambiar === 0, 'C6 el filtro no se arrastra al cambiar de proyecto', `antes=${conFiltro} después=${trasCambiar}`)
 
 await b.close()

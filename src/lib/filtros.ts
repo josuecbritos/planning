@@ -113,6 +113,44 @@ export function filtraTareas(f: Filtro): boolean {
 }
 
 /**
+ * #305 — Cuántos VALORES tiene puesto cada campo del filtro.
+ *
+ * Lo usa el control "Filtrar": el número del botón es el total, y el del panel
+ * es el de cada campo (una ficha por campo, no por valor). El campo fecha
+ * cuenta sus tres componentes por separado porque son elegibles por separado:
+ * "Hoy" y "Sin fecha" pueden convivir, así que ahí el campo vale dos.
+ * `proyectos` cuenta como cualquier otro campo: solo existe en Mis Tareas.
+ */
+export interface CuentaFiltro {
+  fecha: number
+  responsables: number
+  estados: number
+  proyectos: number
+  total: number
+}
+
+export function cuentaFiltro(f: Filtro): CuentaFiltro {
+  const fecha = (f.fecha ? 1 : 0) + (f.sinFecha ? 1 : 0) + (f.conFecha ? 1 : 0)
+  const responsables = f.responsables?.length ?? 0
+  const estados = f.estados?.length ?? 0
+  const proyectos = f.proyectos?.length ?? 0
+  return { fecha, responsables, estados, proyectos, total: fecha + responsables + estados + proyectos }
+}
+
+/**
+ * #305 — Texto del campo fecha para su ficha. A diferencia de los demás
+ * campos, acá el valor se nombra en vez de contarse: "Fecha: 1" no dice nada,
+ * "Fecha: Esta semana" sí. Con dos componentes puestos se nombran los dos.
+ */
+export function etiquetaCampoFecha(f: Filtro): string {
+  const partes: string[] = []
+  if (f.fecha) partes.push(etiquetaFecha(f.fecha))
+  if (f.conFecha) partes.push('Con fecha')
+  if (f.sinFecha) partes.push('Sin fecha')
+  return partes.join(' + ')
+}
+
+/**
  * Rango [desde, hasta] (inclusive) que representa el componente de fecha.
  * Las relativas se recalculan con `hoy` en cada aplicacion.
  */

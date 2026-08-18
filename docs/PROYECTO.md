@@ -197,6 +197,83 @@ completo con creación y edición **inline** (sin formularios).
 - **Gantt** (grilla tipo Excel): planificación por clics, horizonte configurable,
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
 
+**Tres franjas sobre la grilla, siempre las mismas (#305).** En tabla y en
+Gantt, y la altura sobre el contenido **no cambia nunca**: ni al filtrar, ni al
+ordenar, ni según el proyecto. Antes eran cinco —título, filtros, leyenda, aviso
+de fin de semana y selectores de horizonte—, y tres de ellas aparecían y
+desaparecían solas.
+
+1. **Título:** nombre, total de tareas, Miembros, la fecha y el conmutador
+   Tabla/Gantt. El chip de fecha **muestra solo la fecha**; la palabra que queda
+   es el aviso de fecha simulada, que es donde trabaja.
+2. **Contadores, que absorbieron la leyenda.** Los cinco de siempre con sus
+   nombres completos y, **en Gantt**, una sexta caja **"Fecha anterior" sin
+   número** —no es un estado sino el rastro de dónde estaba la tarea— y las
+   muestras pasan a ser **las marcas reales de la grilla** (check verde, equis,
+   cuadrados de color, y la de fecha anterior más chica). En tabla siguen siendo
+   muestras de color. La leyenda **ya no existe como fila**: decía lo mismo que
+   los contadores a dos filas de distancia.
+3. **Barra de controles:** `Filtrar · Ordenar · Rango` a la izquierda y
+   `Vistas` fijo en el extremo derecho, con **"Actualizar vista" justo a su
+   izquierda** — el único elemento que aparece y desaparece, a propósito: avisa
+   de algo que acaba de pasar, y va ahí para que Vistas no se mueva al
+   aparecer. **Rango solo existe en Gantt.**
+
+Los cuatro menús **abren con la misma caja**, de ancho fijo, para que no cambie
+de tamaño al pasar de un control a otro; Vistas queda fuera de esa regla porque
+se ancla a la derecha y los nombres guardados pueden ser largos.
+
+**Los cuatro controles.** Cada uno con ícono y nombre fijos:
+
+- **Filtrar** reemplaza a los tres botones sueltos (Fecha, Responsable y Estado
+  en un proyecto; Fecha, Proyecto y Estado en Mis Tareas), que ahora viven
+  **dentro, a dos niveles**. El botón muestra el **total de valores** elegidos
+  sumando todos los campos y una **×** que los limpia todos. Dentro, lo aplicado
+  se ve como **fichas: una por campo, no por valor** —con cuatro estados
+  elegidos hay una sola ficha, "Estado: 4", y su × borra los cuatro—; para sacar
+  un valor suelto se entra al campo y se destilda. Se conservan "Seleccionar
+  todos" y "Deseleccionar todos"; **desaparecen los "Limpiar filtro"** de dentro
+  de cada campo, que es el trabajo que hace la × de la ficha. El campo Fecha
+  conserva **todas** sus opciones y sus exclusiones sin cambios. El campo
+  **Estado sigue la misma regla que los contadores**: las marcas reales de la
+  grilla cuando se está en Gantt, los puntos de color cuando se está en tabla —
+  dos representaciones del mismo modelo a la vez es justo lo que se eliminó.
+- **Ordenar** conserva su menú íntegro y suma contador y **×**, que reemplaza al
+  "Limpiar orden" que estaba suelto en la barra.
+- **Rango** es el antiguo horizonte de la Gantt. **No lleva contador ni ×:** sus
+  opciones siempre tienen valor. Dos grupos con título: **Días** (hábiles o
+  semana completa) y **Horizonte** (alrededor de hoy, o todo el proyecto — en
+  Mis Tareas, "todas mis tareas"). El **tercer estado del grupo Horizonte no se
+  elige, se impone**: con un filtro de fecha puesto las dos opciones quedan
+  apagadas y aparece "Horizonte definido por el filtro de fecha"; "En horizonte
+  visible"
+  es la excepción que lo deja elegible, porque deriva su rango del horizonte en
+  vez de definirlo. El aviso de tareas de fin de semana **dejó de ser una
+  franja**: cuando hay tareas escondidas, Rango muestra **un círculo** junto al
+  nombre y el detalle con el número vive al final del grupo Días.
+  **El círculo significa una sola cosa: hay tareas ocultas.** No debe
+  reutilizarse para ningún otro aviso, ni en Rango ni en otro control: si dice
+  dos cosas deja de decir "hay tareas escondidas" y pasa a decir "mira acá".
+- **Vistas** conserva todo lo que decía —"Vistas", "Vistas (3)", "Vistas ·
+  Atrasadas" y el asterisco de modificada— y suma una **×** que aparece solo con
+  una vista activa: sale de ella y deja todo limpio, **sin confirmación**.
+  **"Guardar vista" se mudó adentro del menú** (apagado, con su aviso, cuando no
+  hay nada que guardar) y ya no es un botón permanente de la barra. Los tres
+  iconos de cada vista guardada —actualizar, renombrar, eliminar— están
+  **siempre visibles**: estaban en invisible hasta pasar el mouse, lo que dejaba
+  la fila despareja y los volvía inalcanzables en pantalla táctil. El de
+  actualizar, cuando no hay nada que guardar, se ve en el tono apagado del
+  producto y no responde, conservando su aviso.
+
+*El asterisco de Vistas y "Actualizar vista" son señales distintas y conviven:*
+el asterisco dice que te alejaste de lo guardado; el botón dice que la foto
+quedó vieja por una edición, y puede aparecer sin ninguna vista guardada activa.
+
+El estado del horizonte (modo y días hábiles) **vive en la pantalla**, no en la
+grilla: lo elige la barra y lo usa la Gantt. La cuenta de tareas escondidas va
+al revés —la calcula la grilla, que es la única que sabe qué filas quedaron, y
+la muestra el control.
+
 **Reordenar tareas arrastrándolas (#293).** En la Tabla y en la Gantt del
 proyecto —solo escritorio— cada fila de tarea tiene un **asa** que aparece al
 pasar el mouse, dentro de la celda del nombre, pegada a su borde izquierdo:

@@ -16,7 +16,7 @@ import { CAMPOS_MIS_TAREAS, GRAVEDAD, ordenarMulti, valorOrden, type OrdenMulti 
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import { escribirVistaActiva, estadoInicial, leerGuardados } from '../lib/vistas'
 import { FiltrosBar } from './FiltrosBar'
-import { GanttView } from './GanttView'
+import { GanttView, type ModoHorizonte } from './GanttView'
 import { HoverCard } from './HoverCard'
 import { TaskDetail } from './TaskDetail'
 import { CheckHecha } from './CheckHecha'
@@ -94,6 +94,11 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
   const [snapNonce, setSnapNonce] = useState(0)
   // P1: la Gantt reporta su propia foto desactualizada (tiene su recorrido).
   const [ganttStale, setGanttStale] = useState(false)
+  // #305: el horizonte de la Gantt se elige en el control "Rango" de la barra,
+  // igual que dentro de un proyecto; su estado vive acá, entre las dos.
+  const [ganttModo, setGanttModo] = useState<ModoHorizonte>('hoy')
+  const [ganttHabiles, setGanttHabiles] = useState(true)
+  const [ganttOcultas, setGanttOcultas] = useState(0)
 
   // Todas mis tareas activas, de todos los proyectos visibles.
   const misFilas = useMemo<FilaMisTareas[]>(() => {
@@ -167,7 +172,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
   useEffect(() => {
     const wrap = wrapRef.current
     if (!wrap) return
-    const bar = wrap.querySelector<HTMLElement>('.filtros-bar')
+    const bar = wrap.querySelector<HTMLElement>('.controles-bar')
     if (!bar) return
     const update = () => wrap.style.setProperty('--filtros-h', `${bar.offsetHeight}px`)
     update()
@@ -216,6 +221,25 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
         orden={orden}
         onCambiarOrden={setOrden}
         camposOrden={CAMPOS_MIS_TAREAS}
+        // #305b: el filtro de Estado usa las marcas de la grilla en Gantt y
+        // los puntos de color en tabla, igual que en un proyecto. ("En
+        // horizonte visible" no existe acá: lo excluye el contexto.)
+        vistaGantt={vistaEfectiva === 'gantt'}
+        // #305: mismo control "Rango" que en un proyecto, solo en Gantt. El
+        // horizonte completo acá son todas las tareas del usuario, no un
+        // proyecto.
+        rango={
+          vistaEfectiva === 'gantt'
+            ? {
+                soloHabiles: ganttHabiles,
+                onSoloHabiles: setGanttHabiles,
+                modo: ganttModo,
+                onModo: setGanttModo,
+                ocultasFinde: ganttOcultas,
+                etiquetaTodo: 'Todas mis tareas',
+              }
+            : undefined
+        }
         vistaActivaId={vistaActivaId}
         onVistaActiva={cambiarVistaActiva}
         stale={vistaEfectiva === 'tabla' ? stale : ganttStale}
@@ -238,6 +262,9 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
           actions={actions}
           onAbrirTarea={onAbrirTarea}
           misTareas={{ usuarioId: usuario.id, proyectos, canDe }}
+          modoHorizonte={ganttModo}
+          soloHabiles={ganttHabiles}
+          onOcultasFinde={setGanttOcultas}
         />
       ) : (
       <table className="tareas mistareas">

@@ -1541,3 +1541,196 @@ borde izquierdo**. Medía un solo ancho —390, donde "Vistas" caía justo en
 ahí las dos correcciones: el barrido de anchos, y exigir los 8 píxeles en los
 cuatro bordes. Con esos dos cambios, la prueba falla con el código anterior en
 los dos casos.
+
+### #305 — Tres franjas sobre la grilla y una barra de cuatro controles
+
+*Primera mitad de #305. La segunda —columnas de la Gantt, alto de la grilla y
+scrolls— queda abierta.*
+
+Sobre la grilla de la Gantt había **cinco franjas apiladas** y la grilla
+empezaba a media pantalla. Dos problemas de fondo: **los contadores y la leyenda
+decían lo mismo** —mismas cinco categorías, mismo orden, mismos colores, a dos
+filas de distancia; lo único que la leyenda agregaba era la marca de "fecha
+anterior"—, y **la fila de controles crecía y se partía**: diez elementos fijos,
+tres que aparecían solos (limpiar filtros, limpiar orden, actualizar vista) y el
+aviso de fin de semana como franja entera que aparecía o no según el proyecto,
+moviendo todo lo de abajo.
+
+**Ahora son tres franjas, siempre las mismas, en tabla y en Gantt.** La altura
+sobre la grilla no cambia nunca: ni al filtrar, ni al ordenar, ni según el
+proyecto.
+
+- **Franja 1, título:** sin cambios salvo que **el chip de fecha pierde la
+  etiqueta "Hoy:"** y muestra solo la fecha. En modo simulado se mantiene el
+  aviso de que la fecha está trucada, que es donde esa palabra sí trabaja.
+- **Franja 2, los contadores absorben la leyenda.** Los cinco de siempre con sus
+  nombres completos; **en Gantt** se les suma una **sexta caja, "Fecha
+  anterior", sin número** —no es un estado sino el rastro de dónde estaba la
+  tarea— y **las muestras pasan a ser las marcas reales de la grilla**: el check
+  verde, la equis, los cuadrados de ámbar, rojo y morado, y la de fecha anterior
+  más chica que las otras. En tabla siguen siendo muestras de color. **La
+  leyenda desaparece como fila propia.**
+- **Franja 3, la barra de controles:** `Filtrar · Ordenar · Rango` a la
+  izquierda, `Vistas` a la derecha. **Rango solo existe en Gantt**, así que en
+  tabla la barra tiene tres controles.
+
+**Filtrar** reemplaza a los tres botones sueltos —Fecha, Responsable y Estado en
+un proyecto; Fecha, Proyecto y Estado en Mis Tareas—, que pasan a estar dentro,
+a dos niveles. El botón muestra **el total de valores elegidos y una ×** que los
+limpia todos. Dentro, lo aplicado se ve como **fichas: una por campo, no por
+valor** —"Estado: 4" es una sola ficha, y su × borra los cuatro—; para sacar un
+valor suelto se entra al campo y se destilda. Se conservan "Seleccionar todos" y
+"Deseleccionar todos"; **se eliminan los "Limpiar filtro"** de dentro de cada
+campo, porque ese trabajo lo hace la × de la ficha, que está a la vista al abrir
+el panel. El menú de Fecha —el más profundo— conserva **todas** sus opciones y
+sus exclusiones entre sí, incluido que "En horizonte visible" solo se activa
+desde la Gantt, aparece apagado desde la tabla con su aviso, y no existe en Mis
+Tareas.
+
+**Ordenar** suma contador y **×** —que reemplaza al "Limpiar orden" suelto— y
+conserva su menú íntegro: prioridades, flechas, y agregar un criterio sin borrar
+los anteriores.
+
+**Rango** es el antiguo horizonte. **No lleva contador ni ×:** sus opciones
+siempre tienen valor, no hay nada que contar ni que quitar. Dos grupos con
+título, **Días** y **Horizonte**. El tercer estado del grupo Horizonte **no se
+elige, se impone**: con un filtro de fecha puesto, las dos opciones quedan
+apagadas y aparece "Definido por el filtro de fecha"; "En horizonte visible" es
+la excepción que lo deja elegible, porque **deriva** su rango del horizonte en
+vez de definirlo. **El aviso de fin de semana deja de ser una franja:** cuando
+hay tareas escondidas, Rango muestra **un círculo** junto al nombre, y el
+detalle con el número vive al final del grupo Días.
+
+> **El círculo significa una sola cosa: hay tareas ocultas.** No debe
+> reutilizarse para ningún otro aviso, ni en Rango ni en otro control. Si se usa
+> para dos cosas deja de decir "hay tareas escondidas" y pasa a decir "mira
+> acá", que es mucho menos.
+
+**Vistas** conserva todo lo que decía —"Vistas", "Vistas (3)", "Vistas ·
+Atrasadas" y el asterisco de modificada— y suma una **×** que aparece solo con
+vista activa: sale de ella y deja todo limpio, sin confirmación. **"Guardar
+vista" se muda a dentro del menú** y deja de ser un botón permanente en la
+barra; se conserva apagado, con su aviso, cuando no hay filtro ni orden que
+guardar. Actualizar, renombrar y eliminar siguen donde estaban, con su
+confirmación al borrar.
+
+**"Actualizar vista"** se mantiene como botón visible y se **pega al extremo
+derecho**. Es el único elemento que aparece y desaparece, y es deliberado: avisa
+de algo que acaba de pasar. Convive con el asterisco de Vistas porque dicen
+cosas distintas —el asterisco, que te alejaste de lo guardado; el botón, que la
+foto quedó vieja por una edición— y puede aparecer sin ninguna vista guardada
+activa.
+
+Notas de implementación:
+
+- **La barra no se envuelve.** `flex-wrap: nowrap` es la regla, no un adorno:
+  antes la barra crecía hacia abajo y la altura sobre la grilla cambiaba. En
+  pantalla angosta los nombres se acortan con puntos suspensivos, pero la barra
+  sigue en una sola línea.
+- **Alto de línea fijo en la pastilla.** El contador y el círculo aparecen y
+  desaparecen; sin fijarlo, el más alto de los tres mandaba y la pastilla —y con
+  ella la barra— crecía dos píxeles al filtrar. La × copia el alto de su
+  pastilla (`align-self: stretch`, sin padding vertical) en vez de imponerlo.
+- **Los menús se vuelven a medir al cambiar de nivel.** Ahora cambian de
+  contenido sin cerrarse (Filtrar entra y sale de un campo, Rango cambia de
+  aviso); un contenido nuevo tiene otro ancho, así que se repite la medición en
+  dos pasadas de #310. Sin eso el segundo nivel se recolocaría con el ancho
+  viejo y podría salirse de la pantalla.
+- **El estado del horizonte subió de la grilla a la pantalla:** lo elige la
+  barra y lo usa la Gantt. La cuenta de tareas escondidas va al revés — la
+  calcula la grilla, que es la única que sabe qué filas quedaron.
+- Se elimina el componente `Legend`, que ya no tiene dónde vivir.
+- **Sin migración:** es pantalla.
+
+**Verificado** con `docs/prueba-305-franjas-y-controles.mjs`: 103 comprobaciones
+en verde, una por cada uno de los 17 criterios de aceptación. Mide las franjas
+reales sobre la grilla, el tamaño de las marcas de los contadores, la altura de
+la barra antes y después de filtrar, el recorrido completo de los cuatro menús,
+y barre cinco anchos (320, 360, 390, 768 y 1024) comprobando que la barra queda
+en **una sola línea** y que ningún control se sale. El círculo se comprueba
+creando el terreno: se planifica una tarea en sábado con la semana completa a la
+vista y se vuelve a días hábiles.
+
+`docs/prueba-310-menus-filtro.mjs` se actualizó a la barra nueva y suma la
+medición del **segundo nivel** de Filtrar: 65 comprobaciones en verde.
+
+### #305b — Ajustes al encabezado y la barra de controles
+
+Correcciones sobre #305, antes de fusionar. Todo de pantalla: **no toca la base
+y no lleva migración**.
+
+**Los menús no se veían parejos entre sí.** Al abrir uno tras otro, la caja
+cambiaba de tamaño y las filas no calzaban. Tres causas:
+
+- **Ordenar estaba desalineado respecto de todos los demás.** Sus filas usaban
+  un relleno de 5 por 8 contra 8 por 10 del resto, y cada fila llevaba delante
+  el círculo de prioridad de 18 de ancho, **que ocupaba su lugar aunque
+  estuviera vacío**: ese era el hueco grande de la izquierda. Ahora las filas
+  tienen **el mismo alto y la misma sangría** que las de los otros menús, y el
+  círculo —que se conserva, es lo que numera el orden— pasó **después** del
+  nombre y solo se dibuja cuando la fila tiene prioridad. Al ir después de un
+  nombre elástico, activar un criterio no mueve nada de sitio.
+  *Precisión sobre el diagnóstico del pedido:* el relleno no las hacía más
+  bajas sino más altas, y **igualarlo a 8 por 10 las habría dejado en 42 contra
+  32 de las demás**, porque acá el alto no lo pone el texto sino los botones de
+  dirección. Se llegó a los 32 por el otro lado: botones de 24 y relleno
+  vertical de 4, con el lateral en 10 como el del resto —que es lo que gobierna
+  la sangría, que era el punto—.
+- **Ordenar era el único sin título de sección.** Ahora tiene "Criterios".
+- **Los menús no compartían ancho:** todos partían de un mínimo de 244 y crecían
+  con su contenido, así que Rango quedaba bastante más ancho que la lista de
+  campos. Ahora tienen **ancho fijo de 280**, que es lo que necesita el más
+  ancho. **Vistas queda fuera de la regla**: se ancla a la derecha y sus nombres
+  guardados pueden ser largos. El tope de #310 sigue mandando en pantalla
+  angosta.
+
+**Textos que no cabían o sobraban:**
+
+- "Relativas (se recalculan)" se partía en dos líneas en el menú de Fecha. Queda
+  **"Relativas"**.
+- La nota del horizonte impuesto queda **"Horizonte definido por el filtro de
+  fecha"**. La palabra "horizonte" se conserva a propósito: la nota va después
+  de las dos opciones, no pegada al título del grupo, así que sin ella no se
+  entiende de qué habla.
+- El aviso de fin de semana **ya no termina en punto**, como ningún otro texto
+  de menú.
+
+**Los tres iconos de cada vista guardada están siempre visibles.** Estaban en
+invisible hasta pasar el mouse: eso dejaba la fila despareja —el de actualizar,
+cuando estaba apagado, sí se veía— y los volvía inalcanzables en pantalla
+táctil, donde no hay mouse que pasar. El de actualizar, sin nada que guardar, se
+ve en **el tono apagado estándar del producto** y no responde, conservando su
+aviso. (Antes usaba un `.25` propio, que solo existía porque el icono partía
+invisible.)
+
+**El filtro de Estado sigue la misma regla que los contadores:** las marcas
+reales de la grilla cuando se está en Gantt, los puntos de color cuando se está
+en tabla. Con #305 los contadores habían pasado a las marcas y el filtro seguía
+con los puntos, así que quedaron dos representaciones del mismo modelo — que es
+justo lo que #305 vino a eliminar. Las marcas se achican dentro del menú para
+que estas filas no queden más altas que las demás.
+
+**"Actualizar vista" pasa a la izquierda de Vistas.** Estaba pegado al extremo
+derecho, después de Vistas, así que al aparecer lo empujaba. Ahora **Vistas
+queda fijo en el extremo derecho y no se mueve nunca**, y "Actualizar vista"
+sigue siendo el único elemento que aparece y desaparece.
+
+Lo que **no** se tocó, por decisión del dueño: "Seleccionar todos" tal como
+está; las tres formas de marcar lo elegido (fondo con negrita para una sola
+opción, casilla para varias, check para las vistas guardadas), porque
+corresponden a tres tipos distintos de elección; el mecanismo de Ordenar; y todo
+lo definido en #305.
+
+**Verificado** en `docs/prueba-305-franjas-y-controles.mjs`, que pasa a cubrir
+los dos pedidos: **130 comprobaciones en verde**, las 17 de #305 más las 10 de
+#305b. Mide el ancho real de los tres menús de ancho fijo (280 los tres, y el
+segundo nivel de Filtrar también), el alto y la sangría de las filas de Ordenar
+contra las de Filtrar, la opacidad calculada de los tres iconos, el texto exacto
+de las dos notas, y las posiciones de "Actualizar vista" y Vistas antes y
+después de que la foto quede vieja.
+
+*Nota de método:* dos aserciones de #305 dejaron de valer con estos ajustes y se
+actualizaron, no se relajaron — la posición de "Actualizar vista" (C14) y el
+texto de la nota del horizonte (C10). Y la búsqueda de una opción de Estado pasó
+a ser por nombre exacto: con las marcas, el texto de la fila incluye el glifo
+("✓Hecha"), así que buscarla por el texto completo dejó de encontrarla.
