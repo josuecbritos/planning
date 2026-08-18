@@ -220,8 +220,8 @@ docs/
   prueba-310-menus-filtro.mjs  Mide los menús de la barra de controles contra
                          la ventana en teléfono y escritorio, contra `vite preview`
   prueba-305-franjas-y-controles.mjs  Prueba e2e de las tres franjas sobre la
-                         grilla y de los cuatro controles de la barra, contra
-                         `vite preview`
+                         grilla y de los cuatro controles de la barra (#305 y
+                         sus ajustes #305b), contra `vite preview`
   documento-funcional-v3.1.md  (histórico)
 ```
 

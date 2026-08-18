@@ -1653,3 +1653,84 @@ vista y se vuelve a días hábiles.
 
 `docs/prueba-310-menus-filtro.mjs` se actualizó a la barra nueva y suma la
 medición del **segundo nivel** de Filtrar: 65 comprobaciones en verde.
+
+### #305b — Ajustes al encabezado y la barra de controles
+
+Correcciones sobre #305, antes de fusionar. Todo de pantalla: **no toca la base
+y no lleva migración**.
+
+**Los menús no se veían parejos entre sí.** Al abrir uno tras otro, la caja
+cambiaba de tamaño y las filas no calzaban. Tres causas:
+
+- **Ordenar estaba desalineado respecto de todos los demás.** Sus filas usaban
+  un relleno de 5 por 8 contra 8 por 10 del resto, y cada fila llevaba delante
+  el círculo de prioridad de 18 de ancho, **que ocupaba su lugar aunque
+  estuviera vacío**: ese era el hueco grande de la izquierda. Ahora las filas
+  tienen **el mismo alto y la misma sangría** que las de los otros menús, y el
+  círculo —que se conserva, es lo que numera el orden— pasó **después** del
+  nombre y solo se dibuja cuando la fila tiene prioridad. Al ir después de un
+  nombre elástico, activar un criterio no mueve nada de sitio.
+  *Precisión sobre el diagnóstico del pedido:* el relleno no las hacía más
+  bajas sino más altas, y **igualarlo a 8 por 10 las habría dejado en 42 contra
+  32 de las demás**, porque acá el alto no lo pone el texto sino los botones de
+  dirección. Se llegó a los 32 por el otro lado: botones de 24 y relleno
+  vertical de 4, con el lateral en 10 como el del resto —que es lo que gobierna
+  la sangría, que era el punto—.
+- **Ordenar era el único sin título de sección.** Ahora tiene "Criterios".
+- **Los menús no compartían ancho:** todos partían de un mínimo de 244 y crecían
+  con su contenido, así que Rango quedaba bastante más ancho que la lista de
+  campos. Ahora tienen **ancho fijo de 280**, que es lo que necesita el más
+  ancho. **Vistas queda fuera de la regla**: se ancla a la derecha y sus nombres
+  guardados pueden ser largos. El tope de #310 sigue mandando en pantalla
+  angosta.
+
+**Textos que no cabían o sobraban:**
+
+- "Relativas (se recalculan)" se partía en dos líneas en el menú de Fecha. Queda
+  **"Relativas"**.
+- La nota del horizonte impuesto queda **"Horizonte definido por el filtro de
+  fecha"**. La palabra "horizonte" se conserva a propósito: la nota va después
+  de las dos opciones, no pegada al título del grupo, así que sin ella no se
+  entiende de qué habla.
+- El aviso de fin de semana **ya no termina en punto**, como ningún otro texto
+  de menú.
+
+**Los tres iconos de cada vista guardada están siempre visibles.** Estaban en
+invisible hasta pasar el mouse: eso dejaba la fila despareja —el de actualizar,
+cuando estaba apagado, sí se veía— y los volvía inalcanzables en pantalla
+táctil, donde no hay mouse que pasar. El de actualizar, sin nada que guardar, se
+ve en **el tono apagado estándar del producto** y no responde, conservando su
+aviso. (Antes usaba un `.25` propio, que solo existía porque el icono partía
+invisible.)
+
+**El filtro de Estado sigue la misma regla que los contadores:** las marcas
+reales de la grilla cuando se está en Gantt, los puntos de color cuando se está
+en tabla. Con #305 los contadores habían pasado a las marcas y el filtro seguía
+con los puntos, así que quedaron dos representaciones del mismo modelo — que es
+justo lo que #305 vino a eliminar. Las marcas se achican dentro del menú para
+que estas filas no queden más altas que las demás.
+
+**"Actualizar vista" pasa a la izquierda de Vistas.** Estaba pegado al extremo
+derecho, después de Vistas, así que al aparecer lo empujaba. Ahora **Vistas
+queda fijo en el extremo derecho y no se mueve nunca**, y "Actualizar vista"
+sigue siendo el único elemento que aparece y desaparece.
+
+Lo que **no** se tocó, por decisión del dueño: "Seleccionar todos" tal como
+está; las tres formas de marcar lo elegido (fondo con negrita para una sola
+opción, casilla para varias, check para las vistas guardadas), porque
+corresponden a tres tipos distintos de elección; el mecanismo de Ordenar; y todo
+lo definido en #305.
+
+**Verificado** en `docs/prueba-305-franjas-y-controles.mjs`, que pasa a cubrir
+los dos pedidos: **130 comprobaciones en verde**, las 17 de #305 más las 10 de
+#305b. Mide el ancho real de los tres menús de ancho fijo (280 los tres, y el
+segundo nivel de Filtrar también), el alto y la sangría de las filas de Ordenar
+contra las de Filtrar, la opacidad calculada de los tres iconos, el texto exacto
+de las dos notas, y las posiciones de "Actualizar vista" y Vistas antes y
+después de que la foto quede vieja.
+
+*Nota de método:* dos aserciones de #305 dejaron de valer con estos ajustes y se
+actualizaron, no se relajaron — la posición de "Actualizar vista" (C14) y el
+texto de la nota del horizonte (C10). Y la búsqueda de una opción de Estado pasó
+a ser por nombre exacto: con las marcas, el texto de la fila incluye el glifo
+("✓Hecha"), así que buscarla por el texto completo dejó de encontrarla.

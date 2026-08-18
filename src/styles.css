@@ -876,6 +876,15 @@ table.tareas .col-desv { text-align: center; }
    lo calcula el componente contra el espacio que realmente queda, y llega
    como estilo en línea junto al ancho máximo. */
 .filtro-menu--portal { z-index: 2400; overflow-y: auto; }
+/* #305b — Ancho FIJO para los menús de la barra, para que la caja no cambie de
+   tamaño al pasar de un control a otro. Antes todos partían del mínimo de 244 y
+   crecían con su contenido, así que Rango quedaba bastante más ancho que la
+   lista de campos. 280 es lo que necesita el más ancho, que es Rango con su
+   nota del horizonte. El tope inline de #310 sigue mandando en pantalla
+   angosta: `max-width` gana sobre `width`.
+   "Vistas" queda fuera a propósito: se ancla a la derecha y los nombres
+   guardados pueden ser largos. */
+.filtro-menu--fijo { width: 280px; }
 .filtro-menu__grupo {
   font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
   color: var(--gris-texto); padding: 8px 10px 3px;
@@ -893,6 +902,11 @@ table.tareas .col-desv { text-align: center; }
 .filtro-op--on { background: var(--velo-fuerte); font-weight: 700; }
 .filtro-op--check input[type='checkbox'] { width: 15px; height: 15px; accent-color: var(--primario); flex: none; cursor: pointer; }
 .filtro-dot { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+/* #305b: en Gantt el filtro de Estado muestra las marcas REALES de la grilla,
+   igual que los contadores. Se achican al tamaño de la fila para que estas
+   filas no queden más altas que las de los demás menús. */
+.filtro-menu .mark { width: 14px; height: 14px; font-size: 10px; border-radius: 3px; }
+.filtro-menu .mark--pendiente { height: auto; background: none; font-size: 12px; }
 
 /* #305 — Panel de "Filtrar", primer nivel: la lista de campos por los que se
    entra, cada uno con cuántos valores tiene puestos. */
@@ -953,32 +967,47 @@ table.tareas .col-desv { text-align: center; }
   border: none; background: none; padding: 8px 10px; cursor: pointer; color: var(--texto);
   border-radius: 9px;
 }
-.filtro-guardado .icon-btn { opacity: 0; }
-.filtro-guardado:hover .icon-btn { opacity: 1; }
+/* #305b: los tres iconos —actualizar, renombrar, eliminar— están SIEMPRE
+   visibles. Estaban en invisible hasta pasar el mouse, y eso dejaba la fila
+   despareja (el de actualizar, apagado, sí se veía) y los volvía inalcanzables
+   en pantalla táctil, donde no hay mouse que pasar. */
 /* #215: la vista en la que se está, marcada dentro del desplegable. La marca
    ocupa su sitio siempre (aunque esté vacía) para que los nombres no bailen
    al entrar y salir de una vista. */
 .filtro-guardado__marca { display: inline-block; width: 12px; color: var(--primario); }
 .filtro-guardado--activa .filtro-guardado__aplicar { font-weight: 700; }
 .filtro-guardado__mod { color: var(--ambar); font-weight: 700; }
-.filtro-guardado .icon-btn:disabled { opacity: .25; cursor: default; }
+/* #305b: apagado en el tono estándar del producto (`.icon-btn:disabled`, .35).
+   El .25 de antes existía porque el icono partía invisible; ahora que se ve
+   siempre, no hay razón para que se apague más que el resto. */
 
-/* Menu "Ordenar" (punto 4 / #111): lista directa de campos con ↑↓. */
-.orden-campo { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 9px; }
+/* Menu "Ordenar" (punto 4 / #111): lista directa de campos con ↑↓.
+   #305b: misma sangría y mismo ALTO DE FILA que `.filtro-op`, que es lo que se
+   pidió. El relleno lateral sí pasa a 10 como el del resto; el vertical no
+   puede pasar a 8, porque acá el alto no lo pone el texto sino los botones de
+   dirección: con 8 la fila mediría 42 contra 32 de las demás. Se llega a los
+   32 por el otro lado — botones de 24 y relleno de 4. */
+.orden-campo { display: flex; align-items: center; gap: 9px; padding: 4px 10px; border-radius: 9px; }
 .orden-campo:hover { background: var(--velo); }
 /* #224: el contenido sobre fondo --primario usa --sobre-primario, el mismo
    mecanismo que .btn--primary, .controles-btn--activo y .seg__btn--on. Con #fff
    fijo, en modo oscuro quedaba blanco sobre un fondo casi blanco (invisible).
    En modo claro --sobre-primario es #ffffff: el resultado no cambia. */
+/* #305b: el círculo se conserva —es lo que numera el orden— pero pasó DESPUÉS
+   del nombre y solo se dibuja cuando la fila tiene prioridad. Antes iba
+   delante y reservaba 18 píxeles en todas las filas, tuvieran número o no: ese
+   era el hueco grande de la izquierda, y dejaba los nombres de este menú más
+   adentro que los de todos los demás. Al ir después de un nombre elástico,
+   activar un criterio no mueve nada de sitio. */
 .orden-campo__prio {
   flex: none; width: 18px; height: 18px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-size: 11px; font-weight: 700; color: var(--sobre-primario);
+  background: var(--primario);
 }
-.orden-campo--activo .orden-campo__prio { background: var(--primario); }
 .orden-campo__label { flex: 1; min-width: 0; font-size: 13px; color: var(--texto); }
 .orden-campo__dir {
-  flex: none; width: 26px; height: 26px; font-size: 14px; font-weight: 700;
+  flex: none; width: 24px; height: 24px; font-size: 13px; font-weight: 700;
   border: 1px solid var(--gris-borde); background: var(--superficie); color: var(--gris-texto);
   border-radius: 6px; cursor: pointer; opacity: .55; transition: all .1s ease;
 }

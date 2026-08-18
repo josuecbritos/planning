@@ -1,4 +1,4 @@
-// #305 — Tres franjas sobre la grilla y una barra de cuatro controles.
+// #305 y #305b — Tres franjas sobre la grilla y una barra de cuatro controles.
 //
 // Lo que se comprueba de verdad, criterio por criterio del pedido: que sobre la
 // grilla no queden cinco franjas sino tres, que la altura sobre el contenido no
@@ -11,6 +11,15 @@
 //   · C4 falla: cada campo era un botón suelto, sin contador total ni ×.
 //   · C13 falla: "Guardar vista" era un botón permanente de la barra.
 //   · C16 falla: con `flex-wrap: wrap` la barra se partía en dos líneas.
+//
+// Los criterios de #305b (los ajustes previos a fusionar) van al final, con
+// prefijo B. Sus controles negativos, contra la rama antes del ajuste:
+//   · B1 falla: los menús partían del mínimo de 244 y crecían con su contenido
+//     (Filtrar 244, Rango 280).
+//   · B2 falla: las filas de Ordenar medían 5 por 8 contra 8 por 10 del resto,
+//     y el círculo de prioridad reservaba 18px aunque estuviera vacío.
+//   · B7 falla: los tres iconos estaban en `opacity: 0` hasta pasar el mouse.
+//   · B9 falla: "Actualizar vista" iba después de Vistas y lo empujaba.
 //
 // Cómo correrla:
 //   npm run build && npx vite preview --port 4173 &
@@ -68,6 +77,12 @@ async function cerrarMenu(p) {
   await p.keyboard.press('Escape')
   await p.waitForTimeout(250)
 }
+// #305b: en Gantt las muestras del filtro de Estado son las marcas de la
+// grilla, y el ✓ y la ✕ son texto. Por eso la fila NO se busca por el texto
+// completo —"✓Hecha" no calza con /^Hecha$/— sino por su nombre exacto.
+const opcion = (pg, nombre) =>
+  menu(pg).locator('.filtro-op--check').filter({ has: pg.locator(`span:text-is("${nombre}")`) })
+
 async function verVista(p, cual) {
   await p.getByRole('button', { name: cual, exact: true }).first().click()
   await p.waitForTimeout(900)
@@ -172,7 +187,7 @@ await abrirCtrl(p, 'Filtrar')
 await menu(p).locator('.filtro-op--campo', { hasText: 'Estado' }).click()
 await p.waitForTimeout(300)
 for (const est of ['Atrasada', 'Atrasada replanificada']) {
-  await menu(p).locator('.filtro-op--check', { hasText: new RegExp(`^${est}$`) }).click()
+  await opcion(p, est).click()
   await p.waitForTimeout(200)
 }
 await menu(p).locator('.filtro-volver').click()
@@ -289,7 +304,7 @@ await p.waitForTimeout(600)
 await cerrarMenu(p)
 await abrirCtrl(p, 'Rango')
 let rangoTxt = await menu(p).innerText()
-chk(!rangoTxt.includes('Definido por el filtro de fecha'), 'C11 con "En horizonte visible" el grupo Horizonte sigue elegible')
+chk(!rangoTxt.includes('Horizonte definido por el filtro'), 'C11 con "En horizonte visible" el grupo Horizonte sigue elegible')
 chk(
   !(await menu(p).locator('.filtro-op', { hasText: 'Alrededor de hoy' }).isDisabled()),
   'C11 y sus dos opciones se pueden tocar',
@@ -305,7 +320,7 @@ await p.waitForTimeout(500)
 await cerrarMenu(p)
 await abrirCtrl(p, 'Rango')
 rangoTxt = await menu(p).innerText()
-chk(rangoTxt.includes('Definido por el filtro de fecha'), 'C10 con filtro de fecha el grupo Horizonte muestra su aviso')
+chk(rangoTxt.includes('Horizonte definido por el filtro de fecha'), 'C10 con filtro de fecha el grupo Horizonte muestra su aviso')
 chk(
   (await menu(p).locator('.filtro-op', { hasText: 'Alrededor de hoy' }).isDisabled()) &&
     (await menu(p).locator('.filtro-op', { hasText: 'Todo el proyecto' }).isDisabled()),
@@ -420,7 +435,7 @@ await cerrarMenu(p)
 await abrirCtrl(p, 'Filtrar')
 await menu(p).locator('.filtro-op--campo', { hasText: 'Estado' }).click()
 await p.waitForTimeout(300)
-await menu(p).locator('.filtro-op--check', { hasText: /^Atrasada$/ }).click()
+await opcion(p, 'Atrasada').click()
 await p.waitForTimeout(300)
 await cerrarMenu(p)
 await abrirCtrl(p, 'Vistas')
@@ -444,7 +459,7 @@ chk(
 await abrirCtrl(p, 'Filtrar')
 await menu(p).locator('.filtro-op--campo', { hasText: 'Estado' }).click()
 await p.waitForTimeout(300)
-await menu(p).locator('.filtro-op--check', { hasText: /^Hecha$/ }).click()
+await opcion(p, 'Hecha').click()
 await p.waitForTimeout(350)
 await cerrarMenu(p)
 chk((await ctrl(p, 'Vistas').innerText()).includes('*'), 'C12 al modificarla aparece el asterisco')
@@ -470,7 +485,7 @@ await verVista(p, 'Tabla')
 await abrirCtrl(p, 'Filtrar')
 await menu(p).locator('.filtro-op--campo', { hasText: 'Estado' }).click()
 await p.waitForTimeout(300)
-await menu(p).locator('.filtro-op--check', { hasText: /^Pendiente$/ }).click()
+await opcion(p, 'Pendiente').click()
 await p.waitForTimeout(350)
 await cerrarMenu(p)
 // Una edición que saca la tarea del filtro deja la foto vieja.
@@ -479,16 +494,20 @@ await check.click()
 await p.waitForTimeout(900)
 const actualizar = p.locator('.controles-btn--actualizar')
 if (await actualizar.count()) {
+  // #305b: pasó a la IZQUIERDA de Vistas, para que Vistas no se mueva al
+  // aparecer. Sigue siendo el único elemento que aparece y desaparece.
   const pegado = await p.evaluate(() => {
     const barra = document.querySelector('.controles-bar')
     const btn = document.querySelector('.controles-btn--actualizar')
+    const vistas = document.querySelector('.controles-ctrl--vistas')
     const rb = barra.getBoundingClientRect()
-    const rt = btn.getBoundingClientRect()
-    const ultimo = barra.lastElementChild === btn || barra.lastElementChild.contains(btn)
-    return { hueco: Math.round(rb.right - rt.right), ultimo }
+    return {
+      hueco: Math.round(rb.right - vistas.getBoundingClientRect().right),
+      antesDeVistas: Math.round(btn.getBoundingClientRect().right) <= Math.round(vistas.getBoundingClientRect().left),
+    }
   })
-  chk(pegado.ultimo, 'C14 "Actualizar vista" es el último elemento de la barra')
-  chk(pegado.hueco <= 24, 'C14 y queda pegado al extremo derecho', `hueco=${pegado.hueco}px`)
+  chk(pegado.antesDeVistas, 'C14 "Actualizar vista" va justo a la izquierda de Vistas')
+  chk(pegado.hueco <= 24, 'C14 y Vistas queda pegado al extremo derecho', `hueco=${pegado.hueco}px`)
   chk(
     (await p.locator('.controles-ctrl--vistas .controles-x').count()) === 0,
     'C14 aparece sin ninguna vista guardada activa: basta un filtro puesto',
@@ -601,5 +620,259 @@ chk(
 )
 await cerrarMenu(mt)
 
+// ═══════════════════════════════════════════════════════════════════════════
+// #305b — Ajustes previos a fusionar
+// ═══════════════════════════════════════════════════════════════════════════
+
+const q = await sesion()
+await abrirProyecto(q)
+await verVista(q, 'Gantt')
+
+// ── B1 · Los menús no cambian de ancho entre sí ────────────────────────────
+console.log('\n── B1 · Ancho fijo de los menús de la barra ──')
+const anchos = {}
+for (const nombre of ['Filtrar', 'Ordenar', 'Rango']) {
+  await abrirCtrl(q, nombre)
+  anchos[nombre] = await menu(q).evaluate((e) => Math.round(e.getBoundingClientRect().width))
+  await cerrarMenu(q)
+}
+const distintos = [...new Set(Object.values(anchos))]
+chk(
+  distintos.length === 1 && distintos[0] === 280,
+  'B1 Filtrar, Ordenar y Rango abren con la MISMA caja, de 280',
+  Object.entries(anchos).map(([k, v]) => `${k}=${v}`).join(' '),
+)
+// El segundo nivel de Filtrar tampoco cambia el ancho.
+await abrirCtrl(q, 'Filtrar')
+await menu(q).locator('.filtro-op--campo', { hasText: 'Fecha' }).click()
+await q.waitForTimeout(400)
+const anchoNivel2 = await menu(q).evaluate((e) => Math.round(e.getBoundingClientRect().width))
+chk(anchoNivel2 === 280, 'B1 el segundo nivel de Filtrar mantiene el ancho', `${anchoNivel2}`)
+
+// ── B4 · "Relativas", en una sola línea ────────────────────────────────────
+// El primer título del segundo nivel es el nombre del campo ("Fecha"); el de
+// las relativas viene después.
+const relativas = await menu(q).evaluate((m) => {
+  const titulos = [...m.querySelectorAll('.filtro-menu__grupo')].map((e) => ({
+    texto: e.textContent.trim(),
+    alto: Math.round(e.getBoundingClientRect().height),
+  }))
+  return { titulos, hayRecalculan: m.innerText.includes('se recalculan') }
+})
+const tRel = relativas.titulos.find((t) => t.texto.toLowerCase() === 'relativas')
+chk(!!tRel, 'B4 en Fecha el título dice "Relativas"', relativas.titulos.map((t) => t.texto).join(' | '))
+chk(!relativas.hayRecalculan, 'B4 y ya no lleva el paréntesis "(se recalculan)"')
+chk(!!tRel && tRel.alto <= 26, 'B4 y ocupa una sola línea', `alto=${tRel?.alto}px`)
+await cerrarMenu(q)
+
+// ── B2 · Ordenar: título, mismo alto de fila y misma sangría ───────────────
+console.log('\n── B2 y B3 · El menú Ordenar ──')
+await abrirCtrl(q, 'Filtrar')
+const refFiltrar = await menu(q).evaluate((m) => {
+  const fila = m.querySelector('.filtro-op--campo')
+  const nombre = fila.querySelector('.filtro-op__nombre')
+  return {
+    alto: Math.round(fila.getBoundingClientRect().height),
+    sangria: Math.round(nombre.getBoundingClientRect().left - m.getBoundingClientRect().left),
+  }
+})
+await cerrarMenu(q)
+await abrirCtrl(q, 'Ordenar')
+const titulosOrden = (await menu(q).locator('.filtro-menu__grupo').allInnerTexts()).map((t) => t.trim())
+chk(titulosOrden.length >= 1 && titulosOrden[0].length > 0, 'B2 el menú Ordenar tiene título de sección', titulosOrden.join(' | '))
+const refOrden = await menu(q).evaluate((m) => {
+  const fila = m.querySelector('.orden-campo')
+  const label = fila.querySelector('.orden-campo__label')
+  return {
+    alto: Math.round(fila.getBoundingClientRect().height),
+    sangria: Math.round(label.getBoundingClientRect().left - m.getBoundingClientRect().left),
+  }
+})
+chk(
+  refOrden.alto === refFiltrar.alto,
+  'B2 sus filas tienen el mismo alto que las de Filtrar',
+  `ordenar=${refOrden.alto} filtrar=${refFiltrar.alto}`,
+)
+chk(
+  refOrden.sangria === refFiltrar.sangria,
+  'B2 y la misma sangría: el círculo ya no empuja el nombre',
+  `ordenar=${refOrden.sangria} filtrar=${refFiltrar.sangria}`,
+)
+
+// ── B3 · Las prioridades siguen apareciendo y renumerándose ────────────────
+const filasOrden = menu(q).locator('.orden-campo')
+await filasOrden.nth(0).locator('.orden-campo__dir').first().click()
+await q.waitForTimeout(250)
+await filasOrden.nth(1).locator('.orden-campo__dir').first().click()
+await q.waitForTimeout(350)
+const priosB = await menu(q).locator('.orden-campo__prio').allInnerTexts()
+chk(priosB.length === 2, 'B3 con dos criterios hay dos números de prioridad', priosB.join(','))
+chk(
+  priosB.map((t) => t.trim()).sort().join(',') === '1,2',
+  'B3 y el último activado manda: las prioridades se renumeran',
+  priosB.join(','),
+)
+// El nombre no se movió al activar el criterio.
+const sangriaTrasActivar = await menu(q).evaluate((m) => {
+  const label = m.querySelector('.orden-campo__label')
+  return Math.round(label.getBoundingClientRect().left - m.getBoundingClientRect().left)
+})
+chk(
+  sangriaTrasActivar === refOrden.sangria,
+  'B3 activar un criterio no corre el nombre de sitio',
+  `antes=${refOrden.sangria} después=${sangriaTrasActivar}`,
+)
+await cerrarMenu(q)
+await q.locator('.controles-ctrl--conx', { hasText: 'Ordenar' }).locator('.controles-x').click()
+await q.waitForTimeout(350)
+
+// ── B5 y B6 · Los dos textos de Rango ──────────────────────────────────────
+console.log('\n── B5 y B6 · Los textos de Rango ──')
+await abrirCtrl(q, 'Filtrar')
+await menu(q).locator('.filtro-op--campo', { hasText: 'Fecha' }).click()
+await q.waitForTimeout(300)
+await menu(q).locator('.filtro-op', { hasText: /^Este mes$/ }).click()
+await q.waitForTimeout(500)
+await cerrarMenu(q)
+await abrirCtrl(q, 'Rango')
+const nota = (await menu(q).locator('.filtro-menu__nota').innerText()).trim()
+chk(nota === 'Horizonte definido por el filtro de fecha', 'B5 la nota del horizonte impuesto es la corta', nota)
+await cerrarMenu(q)
+await q.locator('.controles-ctrl--conx', { hasText: 'Filtrar' }).locator('.controles-x').click()
+await q.waitForTimeout(500)
+
+// Terreno para el aviso: una tarea en sábado, y de vuelta a días hábiles.
+await abrirCtrl(q, 'Rango')
+await menu(q).locator('.filtro-op', { hasText: 'Semana completa' }).click()
+await q.waitForTimeout(700)
+await cerrarMenu(q)
+const celdaB = q.locator('td.celda.finde.celda--planificable').first()
+await celdaB.scrollIntoViewIfNeeded()
+await celdaB.click()
+await q.waitForTimeout(800)
+await abrirCtrl(q, 'Rango')
+await menu(q).locator('.filtro-op', { hasText: 'Días hábiles' }).click()
+await q.waitForTimeout(700)
+const aviso = (await menu(q).locator('.filtro-menu__nota--aviso').innerText()).trim()
+chk(!aviso.endsWith('.'), 'B6 el aviso de fin de semana no termina en punto', JSON.stringify(aviso))
+await cerrarMenu(q)
+
+// ── B8 · El filtro de Estado sigue la regla de los contadores ──────────────
+console.log('\n── B8 · Las dos representaciones del estado ──')
+const leerEstado = async (pg) => {
+  await abrirCtrl(pg, 'Filtrar')
+  await menu(pg).locator('.filtro-op--campo', { hasText: 'Estado' }).click()
+  await pg.waitForTimeout(400)
+  const r = await menu(pg).evaluate((m) => ({
+    marcas: m.querySelectorAll('.mark').length,
+    puntos: m.querySelectorAll('.filtro-dot').length,
+    nombres: [...m.querySelectorAll('.filtro-op--check span:last-child')].map((e) => e.textContent.trim()),
+    altoFila: Math.round(m.querySelector('.filtro-op--check').getBoundingClientRect().height),
+  }))
+  await cerrarMenu(pg)
+  return r
+}
+const ORDEN_ESTADOS = 'Hecha,Pendiente,Pendiente replanificada,Atrasada,Atrasada replanificada'
+const enGantt = await leerEstado(q)
+chk(enGantt.marcas === 5 && enGantt.puntos === 0, 'B8 en Gantt el filtro de Estado muestra las marcas de la grilla',
+    `${enGantt.marcas} marcas, ${enGantt.puntos} puntos`)
+chk(enGantt.nombres.join(',') === ORDEN_ESTADOS, 'B8 con los cinco estados en el orden de siempre', enGantt.nombres.join(','))
+await verVista(q, 'Tabla')
+const enTabla = await leerEstado(q)
+chk(enTabla.puntos === 5 && enTabla.marcas === 0, 'B8 en tabla vuelven los puntos de color',
+    `${enTabla.marcas} marcas, ${enTabla.puntos} puntos`)
+chk(enTabla.nombres.join(',') === ORDEN_ESTADOS, 'B8 y los cinco estados en el mismo orden', enTabla.nombres.join(','))
+chk(
+  Math.abs(enGantt.altoFila - enTabla.altoFila) <= 1,
+  'B8 las marcas no hacen más alta la fila que los puntos',
+  `gantt=${enGantt.altoFila} tabla=${enTabla.altoFila}`,
+)
+
+// ── B7 · Los tres iconos de cada vista guardada, siempre visibles ──────────
+console.log('\n── B7 · Los iconos de las vistas guardadas ──')
+await abrirCtrl(q, 'Filtrar')
+await menu(q).locator('.filtro-op--campo', { hasText: 'Estado' }).click()
+await q.waitForTimeout(300)
+await opcion(q, 'Atrasada').click()
+await q.waitForTimeout(300)
+await cerrarMenu(q)
+await abrirCtrl(q, 'Vistas')
+await menu(q).locator('.filtro-op--guardar').click()
+await q.waitForTimeout(400)
+await q.locator('.modal-card input').first().fill('Vista B7')
+await q.getByRole('button', { name: 'Guardar', exact: true }).click()
+await q.waitForTimeout(800)
+// Sin cambios que guardar: se sale de la vista para dejar filtro y orden limpios.
+await q.locator('.controles-ctrl--vistas .controles-x').click()
+await q.waitForTimeout(500)
+await abrirCtrl(q, 'Vistas')
+const iconos = await menu(q).evaluate((m) => {
+  const fila = m.querySelector('.filtro-guardado')
+  return [...fila.querySelectorAll('.icon-btn')].map((e) => ({
+    etiqueta: e.getAttribute('aria-label'),
+    opacidad: +getComputedStyle(e).opacity,
+    apagado: e.disabled,
+    aviso: e.getAttribute('data-tip'),
+  }))
+})
+chk(iconos.length === 3, 'B7 la fila tiene los tres iconos', iconos.map((i) => i.etiqueta).join(' · '))
+chk(
+  iconos.every((i) => i.opacidad > 0),
+  'B7 los tres se ven SIN pasar el mouse',
+  iconos.map((i) => i.opacidad).join(' '),
+)
+const actualizarIcono = iconos[0]
+chk(actualizarIcono.apagado, 'B7 sin nada que guardar, el de actualizar no responde')
+chk(
+  Math.abs(actualizarIcono.opacidad - 0.35) < 0.01,
+  'B7 y se ve en el tono apagado estándar del producto (.35)',
+  `opacidad=${actualizarIcono.opacidad}`,
+)
+chk(!!actualizarIcono.aviso, 'B7 conservando su aviso al pasar el mouse', actualizarIcono.aviso ?? '')
+chk(
+  iconos.slice(1).every((i) => Math.abs(i.opacidad - 1) < 0.01 && !i.apagado),
+  'B7 renombrar y eliminar se ven enteros y responden',
+  iconos.slice(1).map((i) => i.opacidad).join(' '),
+)
+await cerrarMenu(q)
+
+// ── B9 · "Actualizar vista" a la izquierda de Vistas, que no se mueve ──────
+console.log('\n── B9 · Actualizar vista no mueve a Vistas ──')
+const izqVistas = () =>
+  q.locator('.controles-ctrl--vistas').evaluate((e) => Math.round(e.getBoundingClientRect().left))
+await abrirCtrl(q, 'Filtrar')
+await menu(q).locator('.filtro-op--campo', { hasText: 'Estado' }).click()
+await q.waitForTimeout(300)
+await opcion(q, 'Pendiente').click()
+await q.waitForTimeout(350)
+await cerrarMenu(q)
+const vistasAntes = await izqVistas()
+const checkB = q.locator('table.tareas tbody .check-hecha, table.tareas tbody input[type="checkbox"]').first()
+await checkB.click()
+await q.waitForTimeout(900)
+if (await q.locator('.controles-btn--actualizar').count()) {
+  const pos = await q.evaluate(() => {
+    const barra = document.querySelector('.controles-bar')
+    const btn = document.querySelector('.controles-btn--actualizar')
+    const vistas = document.querySelector('.controles-ctrl--vistas')
+    return {
+      actualizarDer: Math.round(btn.getBoundingClientRect().right),
+      vistasIzq: Math.round(vistas.getBoundingClientRect().left),
+      vistasDer: Math.round(vistas.getBoundingClientRect().right),
+      barraDer: Math.round(barra.getBoundingClientRect().right),
+      ultimo: barra.lastElementChild === vistas || barra.lastElementChild.contains(vistas),
+    }
+  })
+  chk(pos.actualizarDer <= pos.vistasIzq, 'B9 "Actualizar vista" queda a la IZQUIERDA de Vistas',
+      `actualizar acaba en ${pos.actualizarDer}, Vistas empieza en ${pos.vistasIzq}`)
+  chk(pos.ultimo && pos.barraDer - pos.vistasDer <= 24, 'B9 Vistas queda fijo en el extremo derecho',
+      `hueco=${pos.barraDer - pos.vistasDer}px`)
+  chk(pos.vistasIzq === vistasAntes, 'B9 y Vistas no se movió al aparecer el botón',
+      `antes=${vistasAntes} después=${pos.vistasIzq}`)
+} else {
+  chk(false, 'B9 la edición no dejó la foto desactualizada: no se pudo comprobar')
+}
+
 await b.close()
-console.log(process.exitCode ? '\n⛔ HAY FALLAS' : '\n✅ #305 — tres franjas y cuatro controles')
+console.log(process.exitCode ? '\n⛔ HAY FALLAS' : '\n✅ #305 y #305b — tres franjas, cuatro controles y menús parejos')
+

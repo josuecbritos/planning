@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import type { Proyecto, Usuario } from '../types'
+import type { Proyecto, TipoMarca, Usuario } from '../types'
 import { CATEGORIA_LABEL, type Categoria } from '../lib/derive'
 import {
   FECHA_RELATIVA_LABEL,
@@ -15,12 +15,13 @@ import {
 import type { CampoOrden, CampoOrdenOpc, Direccion, OrdenMulti } from '../lib/orden'
 import { coincideConVista } from '../lib/vistas'
 import { TextPromptModal } from './TextPromptModal'
+import { Marca } from './Marca'
 import { Avatar } from './RespPicker'
 
 // Barra de controles (#305). Cuatro controles, siempre los mismos y siempre en
 // el mismo lugar: `Filtrar · Ordenar · Rango` a la izquierda y `Vistas` a la
-// derecha, más "Actualizar vista" pegado al extremo derecho — el único que
-// aparece y desaparece, a propósito.
+// derecha, con "Actualizar vista" justo a su izquierda — el único que aparece
+// y desaparece, a propósito, y puesto ahí para que Vistas no se mueva (#305b).
 //
 // Antes eran diez elementos sueltos (un botón por campo de filtro, otro por
 // "limpiar" de cada cosa, "Guardar vista") que crecían y partían la barra en
@@ -41,6 +42,25 @@ const ESTADO_COLOR: Record<Categoria, string> = {
   atrasada: 'var(--rojo)',
   atrasada_replan: 'var(--morado)',
 }
+// #305b — Las marcas de la grilla para cada estado. El filtro de Estado sigue
+// la MISMA regla que los contadores del encabezado: marcas reales en Gantt,
+// puntos de color en tabla. Tener dos representaciones a la vez del mismo
+// modelo es justo lo que #305 vino a eliminar.
+// "Pendiente replanificada" no es un `TipoMarca` —en la grilla es el cuadro
+// ámbar de la celda, no una marca propia—, así que se dibuja aparte.
+const MARCA_ESTADO: Partial<Record<Categoria, TipoMarca>> = {
+  hecha: 'hecha',
+  pendiente: 'pendiente',
+  atrasada: 'incumplida',
+  atrasada_replan: 'incumplida_replan',
+}
+
+function MuestraEstado({ estado, gantt }: { estado: Categoria; gantt: boolean }) {
+  if (!gantt) return <span className="filtro-dot" style={{ background: ESTADO_COLOR[estado] }} />
+  const tipo = MARCA_ESTADO[estado]
+  return tipo ? <Marca tipo={tipo} /> : <span className="mark mark--ambar" />
+}
+
 // #279: "Próximo día hábil" va después de "Hoy", como pide el pedido.
 const RELATIVAS: FechaRelativa[] = ['hoy', 'proxHabil', 'semana', 'proxima', 'mes']
 
@@ -323,7 +343,7 @@ export function FiltrosBar({
                       checked={filtro.estados?.includes(c) ?? false}
                       onChange={() => toggleEstado(c)}
                     />
-                    <span className="filtro-dot" style={{ background: ESTADO_COLOR[c] }} />
+                    <MuestraEstado estado={c} gantt={vistaGantt} />
                     <span>{CATEGORIA_LABEL[c]}</span>
                   </label>
                 ))}
@@ -391,13 +411,19 @@ export function FiltrosBar({
         onLimpiar={ordenActivo ? () => onCambiarOrden([]) : undefined}
         tituloLimpiar="Limpiar el orden"
       >
+        {/* #305b: era el único menú de la barra sin título de sección. */}
+        <div className="filtro-menu__grupo">Criterios</div>
         {camposOrden.map((c) => {
           const prio = prioridadDe(c.campo)
           const regla = prio >= 0 ? orden[prio] : null
           return (
             <div key={c.campo} className={`orden-campo${regla ? ' orden-campo--activo' : ''}`}>
-              <span className="orden-campo__prio">{prio >= 0 ? prio + 1 : ''}</span>
               <span className="orden-campo__label">{c.label}</span>
+              {/* #305b: el número de prioridad va DESPUÉS del nombre y solo
+                  cuando la fila la tiene. Delante reservaba su ancho en todas
+                  las filas, con número o sin él, y dejaba los nombres de este
+                  menú más adentro que los de los demás. */}
+              {prio >= 0 && <span className="orden-campo__prio">{prio + 1}</span>}
               <button
                 className={`orden-campo__dir${regla?.dir === 1 ? ' orden-campo__dir--on' : ''}`}
                 aria-label={`Ordenar ${c.label} ascendente`}
@@ -452,7 +478,7 @@ export function FiltrosBar({
             <div className="filtro-menu__nota filtro-menu__nota--aviso">
               <span className="controles-punto" aria-hidden="true" />
               {rango.ocultasFinde} tarea{rango.ocultasFinde === 1 ? '' : 's'} con fecha de fin de semana no se{' '}
-              {rango.ocultasFinde === 1 ? 'muestra' : 'muestran'}.
+              {rango.ocultasFinde === 1 ? 'muestra' : 'muestran'}
             </div>
           )}
 
@@ -474,14 +500,32 @@ export function FiltrosBar({
             {rango.etiquetaTodo}
           </button>
           {horizonteImpuesto && (
-            <div className="filtro-menu__nota">
-              Definido por el filtro de fecha. Quítalo para volver a elegir el horizonte.
-            </div>
+            /* La palabra "horizonte" se conserva a propósito: la nota va
+               DESPUÉS de las dos opciones, no pegada al título del grupo, así
+               que sin ella no se entiende de qué habla. */
+            <div className="filtro-menu__nota">Horizonte definido por el filtro de fecha</div>
           )}
         </Control>
       )}
 
       <span className="controles-bar__sep" />
+
+      {/* P1: aparece solo cuando la foto quedó desactualizada por una edición;
+          recalcula la vista (saca lo que ya no calza, reordena) y desaparece.
+          #305: es el ÚNICO elemento de la barra que aparece y desaparece, y es
+          deliberado — avisa de algo que acaba de pasar.
+          #305b: va a la IZQUIERDA de Vistas. Estaba después, así que al
+          aparecer empujaba a Vistas; ahora Vistas queda fijo en el extremo
+          derecho y no se mueve nunca. */}
+      {stale && onActualizarVista && (
+        <button
+          className="controles-btn controles-btn--actualizar"
+          title="La vista quedó desactualizada por una edición: recalcular filtro y orden"
+          onClick={onActualizarVista}
+        >
+          ↻ <span className="controles-btn__nombre">Actualizar vista</span>
+        </button>
+      )}
 
       <Control
         nombre="Vistas"
@@ -586,19 +630,6 @@ export function FiltrosBar({
         )}
       </Control>
 
-      {/* P1: aparece solo cuando la foto quedó desactualizada por una edición;
-          recalcula la vista (saca lo que ya no calza, reordena) y desaparece.
-          #305: es el ÚNICO elemento de la barra que aparece y desaparece, y va
-          pegado al extremo derecho — avisa de algo que acaba de pasar. */}
-      {stale && onActualizarVista && (
-        <button
-          className="controles-btn controles-btn--actualizar"
-          title="La vista quedó desactualizada por una edición: recalcular filtro y orden"
-          onClick={onActualizarVista}
-        >
-          ↻ <span className="controles-btn__nombre">Actualizar vista</span>
-        </button>
-      )}
 
       {modal?.tipo === 'guardar' && (
         <TextPromptModal
@@ -650,7 +681,7 @@ function OpcionesFecha({
 }) {
   return (
     <>
-      <div className="filtro-menu__grupo">Relativas (se recalculan)</div>
+      <div className="filtro-menu__grupo">Relativas</div>
       {RELATIVAS.map((r) => (
         <button
           key={r}
@@ -973,7 +1004,10 @@ function Control({
         createPortal(
           <div
             ref={menuRef}
-            className={`filtro-menu filtro-menu--portal${alDerecha ? ' filtro-menu--derecha' : ''}`}
+            // #305b: ancho fijo para que la caja no cambie de tamaño al pasar
+            // de un control a otro. El anclado por la derecha —Vistas— queda
+            // fuera de la regla: sus nombres guardados pueden ser largos.
+            className={`filtro-menu filtro-menu--portal${alDerecha ? ' filtro-menu--derecha' : ' filtro-menu--fijo'}`}
             style={{
               position: 'fixed',
               top: pos.top,

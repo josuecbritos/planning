@@ -221,6 +221,10 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
         orden={orden}
         onCambiarOrden={setOrden}
         camposOrden={CAMPOS_MIS_TAREAS}
+        // #305b: el filtro de Estado usa las marcas de la grilla en Gantt y
+        // los puntos de color en tabla, igual que en un proyecto. ("En
+        // horizonte visible" no existe acá: lo excluye el contexto.)
+        vistaGantt={vistaEfectiva === 'gantt'}
         // #305: mismo control "Rango" que en un proyecto, solo en Gantt. El
         // horizonte completo acá son todas las tareas del usuario, no un
         // proyecto.
