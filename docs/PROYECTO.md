@@ -213,7 +213,11 @@ encabezado, contadores y barra de controles quedan siempre a la vista. En
 corte estaba forzado en cualquier letra —"Planificació / n"— para que ninguna
 palabra larga las ensanchara y desplazara los anclajes de las columnas fijas.
 Ahora el texto **envuelve por palabras** y la que no cabe se **recorta con
-puntos suspensivos**, con el nombre completo al pasar el mouse; que la columna
+puntos suspensivos**, con el nombre completo al pasar el mouse — en el **globo
+propio del producto, inmediato** (#305d), no en el del navegador, que solo
+aparece con el texto recortado y tarda cerca de un segundo. En la columna de
+tarea ese trabajo ya lo hace su tarjeta, que lleva el título completo y también
+es inmediata: no se le encima un segundo globo. Que la columna
 no se ensanche lo garantiza que el recorte va en un bloque con mínimo cero, que
 aporta cero al ancho mínimo de la celda. Las columnas fijas **siguen midiendo lo
 mismo**: 120 + 150 + 240 + 60 = 570, que con días de 30 sigue sin dejar caber la
@@ -252,6 +256,14 @@ de tamaño al pasar de un control a otro; Vistas queda fuera de esa regla porque
 se ancla a la derecha y los nombres guardados pueden ser largos.
 
 **Los cuatro controles.** Cada uno con ícono y nombre fijos:
+
+**Ningún menú lleva título que repita su botón (#305d).** "Campos" en el primer
+nivel de Filtrar y "Criterios" en Ordenar decían lo que ya decía el botón que
+acabas de apretar, y en el segundo nivel la vuelta y el nombre del campo
+gastaban dos renglones. Ahora la cabecera del segundo nivel es **una sola
+línea, "‹ Fecha"**: dice dónde estás y cómo volver a la vez. Se conservan los
+títulos que separan **grupos dentro de un mismo menú** —"Aplicado" en Filtrar,
+"Rango fijo" en Fecha, "Días" y "Horizonte" en Rango—: esos sí trabajan.
 
 - **Filtrar** reemplaza a los tres botones sueltos (Fecha, Responsable y Estado
   en un proyecto; Fecha, Proyecto y Estado en Mis Tareas), que ahora viven
@@ -294,9 +306,12 @@ se ancla a la derecha y los nombres guardados pueden ser largos.
   modificada** (#305c) —exactamente la condición del asterisco, así que las dos
   señales dicen lo mismo—; antes miraba únicamente si había algún filtro u orden
   puesto, que es la misma condición para todas, así que con cinco vistas
-  guardadas las cinco quedaban disponibles para ser sobrescritas. **"Guardar
-  vista" sí sigue mirando solo eso**: crea una vista nueva, no sobrescribe
-  ninguna.
+  guardadas las cinco quedaban disponibles para ser sobrescritas — y, ya dentro
+  de una, seguía encendido después de guardar, porque el filtro y el orden
+  seguían puestos. **El ícono y el asterisco usan exactamente la misma
+  condición y se mueven juntos:** si hay asterisco hay ícono encendido, y si no
+  hay asterisco no lo hay. **"Guardar vista" sí sigue mirando solo si hay algo
+  puesto**: crea una vista nueva, no sobrescribe ninguna.
 
 *El asterisco de Vistas y "Actualizar vista" son señales distintas y conviven:*
 el asterisco dice que te alejaste de lo guardado; el botón dice que la foto

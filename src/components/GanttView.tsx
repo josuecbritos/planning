@@ -1030,8 +1030,13 @@ function FilaGanttRow({
       <span className="fija-nombre">
         <span className="con-mas">
           {/* #321: el nombre se corta con "…" en vez de partirse a mitad de
-              palabra; completo, en el tooltip. */}
-          <span className="fija-txt" title={frente.nombre}>{frente.nombre}</span>
+              palabra; completo, en el globo.
+              #305d: el globo es el `data-tip` del producto —inmediato— y no el
+              `title` del navegador, que solo aparecía con el texto recortado y
+              con cerca de un segundo de retardo que fija el navegador. */}
+          <span className="fija-tip" data-tip={frente.nombre}>
+            <span className="fija-txt">{frente.nombre}</span>
+          </span>
           {permiteCrear && can.crearFrentes && (
             <button
               className="mas-btn"
@@ -1053,7 +1058,9 @@ function FilaGanttRow({
     <td className="fija fija--sf fija--rotula" rowSpan={span}>
       <span className="fija-nombre">
         <span className="con-mas">
-          <span className="fija-txt" title={sub.nombre}>{sub.nombre}</span>
+          <span className="fija-tip" data-tip={sub.nombre}>
+            <span className="fija-txt">{sub.nombre}</span>
+          </span>
           {permiteCrear && can.crearSubFrentes && (
             <button
               className="mas-btn"
@@ -1302,9 +1309,10 @@ function FilaGanttRow({
         )}
         <span className="con-mas">
           {/* #321: mismo corte con "…" que en frente y sub frente. Acá el
-              nombre completo ya lo muestra la tarjeta al pasar el mouse, que
-              lo lleva de título: no se agrega un segundo globo encima. */}
-          <span className="fija-txt">
+              nombre completo ya lo muestra la tarjeta al pasar el mouse —que
+              lo lleva de título y aparece de inmediato, sin retardo—: agregarle
+              un `data-tip` encima mostraría dos globos a la vez. */}
+          <span className="fija-tip"><span className="fija-txt">
           {can.editarTareas(tarea) ? (
             <InlineText
               valor={tarea.titulo}
@@ -1325,7 +1333,7 @@ function FilaGanttRow({
               </span>
             </HoverCard>
           )}
-          </span>
+          </span></span>
           <span className="con-mas__acciones">
             <button
               className="mas-btn"

@@ -1,10 +1,10 @@
-// #321, #324 y #305c — La Gantt (alto, scroll y columnas), el encabezado de
-// Mis Tareas, y el cierre de #305.
+// #321, #324, #305c y #305d — La Gantt (alto, scroll y columnas), el
+// encabezado de Mis Tareas, y el cierre de #305.
 //
 // Tres pedidos que entran juntos y se comprueban juntos, porque se tocan: #321
 // cambia la Gantt, #324 le da a Mis Tareas el mismo encabezado (y con él la
 // leyenda que #305 le había quitado), y #305c ajusta dos detalles de la barra.
-// Prefijos: G = #321, M = #324, C = #305c.
+// Prefijos: G = #321, M = #324, C = #305c, D = #305d.
 //
 // Controles negativos comprobados (contra el código anterior):
 //   · G1/G3 fallan: el alto era `100vh - 250px`, medido contra la pantalla
@@ -18,6 +18,16 @@
 //   · M1/M4/M5 fallan: Mis Tareas no tenía contadores, tenía el aviso de
 //     atrasadas en texto y el título con la cuenta en una línea aparte.
 //   · C3 falla: el ícono de actualizar se habilitaba en TODAS las vistas.
+//   · D2 falla contra main (sin #305c): el ícono se apagaba por la razón
+//     equivocada —porque ya no quedaba nada puesto, no porque la vista
+//     estuviera al día—, así que tras guardar con un orden puesto seguía
+//     encendido. Es la reproducción exacta del pedido.
+//   · D7/D8 fallan: los menús decían "Campos" y "Criterios", y el segundo
+//     nivel gastaba dos renglones ("< Filtrar" y el nombre del campo).
+//   · D10 falla: los dos campos de fecha sumaban unos 250 dentro de 230, y el
+//     segundo quedaba cortado por el borde del menú.
+//   · D13 falla: el nombre del frente no tenía globo propio; el que aparecía
+//     era el del navegador, con cerca de un segundo de retardo.
 //
 // Cómo correrla:
 //   npm run build && npx vite preview --port 4173 &
@@ -254,7 +264,10 @@ const textos = await p.evaluate(() => {
     const cs = getComputedStyle(t)
     return {
       texto: t.innerText.trim(),
-      title: t.getAttribute('title'),
+      // #305d: el nombre completo va en el `data-tip` del producto (inmediato)
+      // y no en el `title` del navegador (lento). Vive en el envoltorio, no en
+      // el elemento que recorta.
+      tip: t.parentElement?.getAttribute('data-tip') ?? null,
       // Con `overflow-wrap: anywhere` (lo de antes) una palabra larga se
       // PARTÍA y nunca desbordaba; que desborde a lo ancho es la prueba de
       // que ahora envuelve por palabras y recorta la que no cabe.
@@ -288,9 +301,9 @@ for (const [k, etiqueta] of [['frente', 'frente'], ['sf', 'sub frente'], ['tarea
 chk(textos.sf.desborda, 'G9 la palabra que no cabe desborda su línea y se recorta (sub frente)')
 chk(textos.tarea.desborda, 'G9 lo mismo en la columna de tarea')
 chk(
-  textos.frente.title === 'Herramienta Planificación' && textos.sf.title === 'Documentación Complementariaadicional',
+  textos.frente.tip === 'Herramienta Planificación' && textos.sf.tip === 'Documentación Complementariaadicional',
   'G8 el nombre completo queda al pasar el mouse',
-  `frente="${textos.frente.title}"`,
+  `frente="${textos.frente.tip}"`,
 )
 chk(
   textos.anchos.frente === 120 && textos.anchos.sf === 150 && textos.anchos.tarea === 240 && textos.anchos.resp === 60,
@@ -484,10 +497,14 @@ await abrirProyecto(q)
 await abrirCtrl(q, 'Filtrar')
 await menu(q).locator('.filtro-op--campo', { hasText: 'Fecha' }).click()
 await q.waitForTimeout(400)
+// #305c quitó el subtítulo "Relativas", que quedaba pegado al del campo.
+// #305d fue más allá: el nombre del campo se fundió con la vuelta en una sola
+// línea ("‹ Fecha"), así que dentro del menú solo queda el título que separa
+// un grupo de verdad. Su detalle va en la sección D.
 const titulosFecha = (await menu(q).locator('.filtro-menu__grupo').allInnerTexts()).map((t) => t.trim())
 chk(
-  titulosFecha.length === 2 && titulosFecha[0].toLowerCase() === 'fecha' && titulosFecha[1].toLowerCase() === 'rango fijo',
-  'C1 queda "FECHA" y, más abajo, "Rango fijo" — ya no hay dos títulos seguidos',
+  titulosFecha.length === 1 && titulosFecha[0].toLowerCase() === 'rango fijo',
+  'C1 dentro del menú de Fecha ya no hay títulos seguidos: solo queda "Rango fijo"',
   titulosFecha.join(' | '),
 )
 chk(
@@ -625,5 +642,292 @@ const opacidades = await q.evaluate(() =>
 chk(opacidades.every((o) => o > 0), 'C8 y siguen visibles sin pasar el mouse', opacidades.join(' '))
 await cerrarMenu(q)
 
+// ═══════════════════════════════════════════════════════════════════════════
+// #305d — Guardar vista, títulos de menú, rango de fechas y el globo del frente
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── D1 a D6 · El ícono de guardar sigue al asterisco ───────────────────────
+// La reproducción exacta del pedido, con un criterio de ORDEN (no un filtro):
+// es el caso donde la condición vieja —"hay algo puesto"— se apagaba por la
+// razón equivocada.
+console.log('\n── D1 a D6 · El ícono de guardar de cada vista ──')
+const d = await sesion(1440, 900)
+await abrirProyecto(d)
+
+const senales = async () => {
+  await abrirCtrl(d, 'Vistas')
+  const r = await d.evaluate(() => ({
+    asterisco: document.querySelector('.controles-ctrl--vistas .controles-btn').innerText.includes('*'),
+    guardarVistaOff: document.querySelector('.filtro-op--guardar').disabled,
+    filas: [...document.querySelectorAll('.filtro-menu--portal .filtro-guardado')].map((f) => ({
+      nombre: f.querySelector('.filtro-guardado__aplicar').textContent.replace(/[✓*]/g, '').trim(),
+      activa: f.classList.contains('filtro-guardado--activa'),
+      encendido: !f.querySelector('.icon-btn').disabled,
+    })),
+  }))
+  await cerrarMenu(d)
+  return r
+}
+async function filtrarPor(pg, estado) {
+  await abrirCtrl(pg, 'Filtrar')
+  await menu(pg).locator('.filtro-op--campo', { hasText: 'Estado' }).click()
+  await pg.waitForTimeout(300)
+  await opcion(pg, estado).click()
+  await pg.waitForTimeout(300)
+  await cerrarMenu(pg)
+}
+async function ordenarPor(pg, i) {
+  await abrirCtrl(pg, 'Ordenar')
+  await menu(pg).locator('.orden-campo').nth(i).locator('.orden-campo__dir').first().click()
+  await pg.waitForTimeout(400)
+  await cerrarMenu(pg)
+}
+async function crearVista(pg, nombre) {
+  await abrirCtrl(pg, 'Vistas')
+  await menu(pg).locator('.filtro-op--guardar').click()
+  await pg.waitForTimeout(400)
+  await pg.locator('.modal-card input').first().fill(nombre)
+  await pg.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await pg.waitForTimeout(800)
+}
+
+// Dos vistas guardadas, para comprobar que solo se enciende la de la activa.
+await filtrarPor(d, 'Atrasada')
+await crearVista(d, 'Vista A')
+await d.locator('.controles-ctrl--vistas .controles-x').click()
+await d.waitForTimeout(400)
+await filtrarPor(d, 'Hecha')
+await crearVista(d, 'Vista B')
+
+let sn = await senales()
+chk(
+  !sn.asterisco && sn.filas.every((f) => !f.encendido),
+  'D4 recién guardada: no hay asterisco y ningún ícono está encendido',
+  sn.filas.map((f) => `${f.nombre}:${f.encendido ? 'ON' : 'off'}`).join(' '),
+)
+
+// D1 · agregar un criterio de ORDEN.
+await ordenarPor(d, 0)
+sn = await senales()
+chk(sn.asterisco, 'D1 al agregar un orden aparece el asterisco')
+chk(
+  sn.filas.filter((f) => f.encendido).length === 1 && sn.filas.find((f) => f.activa)?.encendido,
+  'D1/D5 y se enciende el ícono de ESA vista, solo el de ella',
+  sn.filas.map((f) => `${f.nombre}:${f.encendido ? 'ON' : 'off'}`).join(' '),
+)
+
+// D2 · guardar: el asterisco desaparece y el ícono se apaga, AUNQUE el orden
+// siga puesto. Con la condición vieja —"hay algo puesto"— seguía encendido.
+await abrirCtrl(d, 'Vistas')
+await menu(d).locator('.filtro-guardado--activa .icon-btn').first().click()
+await d.waitForTimeout(800)
+await cerrarMenu(d)
+const ordenSigue = await d.locator('.controles-ctrl--conx', { hasText: 'Ordenar' }).count()
+sn = await senales()
+chk(ordenSigue === 1, 'D2 terreno: el orden sigue puesto después de guardar')
+chk(!sn.asterisco, 'D2 el asterisco desaparece')
+chk(
+  sn.filas.every((f) => !f.encendido),
+  'D2 y el ícono se apaga, aunque el orden siga puesto',
+  sn.filas.map((f) => `${f.nombre}:${f.encendido ? 'ON' : 'off'}`).join(' '),
+)
+
+// D3 · quitar el orden: vuelve el asterisco y el ícono; guardar lo apaga.
+await d.locator('.controles-ctrl--conx', { hasText: 'Ordenar' }).locator('.controles-x').click()
+await d.waitForTimeout(500)
+sn = await senales()
+chk(
+  sn.asterisco && sn.filas.find((f) => f.activa)?.encendido,
+  'D3 al quitar el orden vuelven el asterisco y el ícono',
+)
+await abrirCtrl(d, 'Vistas')
+await menu(d).locator('.filtro-guardado--activa .icon-btn').first().click()
+await d.waitForTimeout(800)
+await cerrarMenu(d)
+sn = await senales()
+chk(
+  !sn.asterisco && sn.filas.every((f) => !f.encendido),
+  'D3 y al guardar se apaga de nuevo',
+)
+
+// D6 · "Guardar vista" no cambia: depende de que haya filtro u orden puesto.
+chk(!sn.guardarVistaOff, 'D6 "Guardar vista" sigue habilitado con un filtro puesto y una vista activa')
+await d.locator('.controles-ctrl--vistas .controles-x').click()
+await d.waitForTimeout(500)
+sn = await senales()
+chk(sn.guardarVistaOff, 'D6 y apagado cuando no queda nada que guardar')
+await filtrarPor(d, 'Atrasada')
+sn = await senales()
+chk(!sn.guardarVistaOff, 'D6 se habilita con un filtro puesto aunque no haya vista activa')
+chk(
+  sn.filas.every((f) => !f.encendido),
+  'D4 sin vista activa no hay ningún ícono encendido, aunque haya filtro',
+)
+
+// ── D7 a D9 · Los títulos que repetían el botón ────────────────────────────
+console.log('\n── D7 a D9 · Los títulos de los menús ──')
+await abrirCtrl(d, 'Filtrar')
+let titulos = (await menu(d).locator('.filtro-menu__grupo').allInnerTexts()).map((t) => t.trim().toLowerCase())
+chk(!titulos.includes('campos'), 'D7 al abrir Filtrar ya no dice "Campos"', titulos.join(' | '))
+chk(titulos.includes('aplicado'), 'D7 y sí se conserva "Aplicado", que separa un grupo de verdad', titulos.join(' | '))
+await menu(d).locator('.filtro-op--campo', { hasText: 'Fecha' }).click()
+await d.waitForTimeout(400)
+const volver = (await menu(d).locator('.filtro-volver').innerText()).trim()
+chk(volver === '‹ Fecha', 'D8 la cabecera del segundo nivel es una sola línea, "‹ Fecha"', volver)
+chk(
+  await menu(d).evaluate((m) => {
+    const v = m.querySelector('.filtro-volver')
+    const g = m.querySelector('.filtro-menu__grupo')
+    return !g || g !== v.nextElementSibling
+  }),
+  'D8 y ya no hay un segundo renglón con el nombre del campo debajo',
+)
+await menu(d).locator('.filtro-volver').click()
+await d.waitForTimeout(400)
+chk(
+  (await menu(d).locator('.filtro-op--campo').count()) > 0,
+  'D8 y al tocarla vuelve al listado de campos',
+)
+await menu(d).locator('.filtro-op--campo', { hasText: 'Fecha' }).click()
+await d.waitForTimeout(400)
+titulos = (await menu(d).locator('.filtro-menu__grupo').allInnerTexts()).map((t) => t.trim().toLowerCase())
+chk(titulos.join('|') === 'rango fijo', 'D9 "Rango fijo" sigue estando', titulos.join(' | '))
+
+// ── D10 a D12 · El rango de fechas cabe entero ─────────────────────────────
+console.log('\n── D10 a D12 · Los dos campos de fecha ──')
+const rangoFechas = await d.evaluate(() => {
+  const m = document.querySelector('.filtro-menu--portal')
+  const cs = getComputedStyle(m)
+  const mr = m.getBoundingClientRect()
+  const util = {
+    izq: mr.left + parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth),
+    der: mr.right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth),
+  }
+  const ins = [...m.querySelectorAll('input[type=date]')].map((i) => {
+    const r = i.getBoundingClientRect()
+    return {
+      izq: Math.round(r.left),
+      der: Math.round(r.right),
+      ancho: Math.round(r.width),
+      // Si el navegador recorta el contenido del campo —y con él el ícono del
+      // calendario— el campo desborda por dentro. Es EL límite del pedido.
+      recorta: i.scrollWidth > i.clientWidth,
+    }
+  })
+  return { anchoMenu: Math.round(mr.width), util: { izq: Math.round(util.izq), der: Math.round(util.der) }, ins }
+})
+chk(rangoFechas.ins.length === 2, 'D10 hay dos campos de fecha')
+chk(
+  rangoFechas.ins.every((i) => i.izq >= rangoFechas.util.izq - 1 && i.der <= rangoFechas.util.der + 1),
+  'D10 los dos caben completos dentro del menú, sin cortarse por el borde',
+  rangoFechas.ins.map((i) => `[${i.izq}-${i.der}]`).join(' ') + ` dentro de [${rangoFechas.util.izq}-${rangoFechas.util.der}]`,
+)
+chk(
+  rangoFechas.ins.every((i) => !i.recorta),
+  'D11 ninguno recorta su contenido: el ícono del calendario se ve entero',
+  rangoFechas.ins.map((i) => `ancho=${i.ancho}`).join(' '),
+)
+// D12 · el rango sigue filtrando igual. Se mide el contador ANTES y DESPUÉS:
+// en este punto ya hay un filtro de estado puesto, así que lo que prueba que
+// el rango se aplicó es que el campo fecha sume su valor.
+const nAntes = Number(
+  (await d.locator('.controles-ctrl', { hasText: 'Filtrar' }).locator('.controles-btn__n').innerText().catch(() => '0')) || 0,
+)
+await menu(d).locator('input[type=date]').first().fill('2024-10-28')
+await d.waitForTimeout(400)
+await menu(d).locator('input[type=date]').nth(1).fill('2024-11-01')
+await d.waitForTimeout(500)
+await cerrarMenu(d)
+await abrirCtrl(d, 'Filtrar')
+const ficha = (await menu(d).locator('.filtro-ficha', { hasText: 'Fecha' }).innerText()).replace(/\s+/g, ' ')
+chk(
+  ficha.includes('2024-10-28') && ficha.includes('2024-11-01'),
+  'D12 el rango de fechas queda puesto, con sus dos extremos',
+  ficha,
+)
+const nDespues = Number(
+  await d.locator('.controles-ctrl', { hasText: 'Filtrar' }).locator('.controles-btn__n').innerText(),
+)
+chk(
+  nDespues === nAntes + 1,
+  'D12 y el rango sigue filtrando: el campo fecha suma su valor al contador',
+  `${nAntes} → ${nDespues}`,
+)
+await cerrarMenu(d)
+await d.locator('.controles-ctrl--conx', { hasText: 'Filtrar' }).locator('.controles-x').click()
+await d.waitForTimeout(400)
+
+// ── D13 a D15 · El globo rápido del nombre ─────────────────────────────────
+console.log('\n── D13 a D15 · El globo del nombre en la Gantt ──')
+await verVista(d, 'Gantt')
+for (const [sel, etiqueta] of [
+  ['.gantt td.fija--frente .fija-tip', 'frente'],
+  ['.gantt td.fija--sf .fija-tip', 'sub frente'],
+]) {
+  const el = d.locator(sel).first()
+  await el.hover()
+  // 120 ms: el globo del navegador tarda cerca de un segundo. Si a los 120 ms
+  // ya está, no es el del navegador.
+  await d.waitForTimeout(120)
+  const globo = await d.evaluate((s) => {
+    const e = document.querySelector(s)
+    const st = getComputedStyle(e, '::after')
+    const r = e.getBoundingClientRect()
+    const sc = document.querySelector('.gantt-scroll').getBoundingClientRect()
+    const ancho = parseFloat(st.width) || 0
+    return {
+      tip: e.getAttribute('data-tip'),
+      titleNativo: e.getAttribute('title') ?? e.parentElement?.getAttribute('title') ?? null,
+      contenido: st.content,
+      // El globo se abre a la derecha: su borde derecho no puede pasarse del
+      // scroll de la grilla, que es lo que recorta.
+      entero: r.right + 6 + ancho <= sc.right,
+    }
+  }, sel)
+  chk(!!globo.tip, `D13/D14 el nombre del ${etiqueta} tiene globo propio (data-tip)`, globo.tip ?? '')
+  chk(globo.titleNativo === null, `D13/D14 y ya no usa el title del navegador, que es el lento`)
+  chk(
+    globo.contenido.includes(globo.tip ?? ' '),
+    `D13/D14 el globo del ${etiqueta} aparece de inmediato al pasar el mouse`,
+    globo.contenido,
+  )
+  chk(globo.entero, `D15 y se ve entero, sin cortarse contra el borde de la columna`, globo.contenido)
+}
+// La columna de tarea: su tarjeta ya lleva el título completo y es inmediata,
+// así que no se le encima un segundo globo.
+const tareaCel = d.locator('.gantt td.fija--tarea .tarea-cell__link, .gantt td.fija--tarea .inline-text').first()
+await tareaCel.hover()
+await d.waitForTimeout(120)
+const tarjeta = await d.evaluate(() => {
+  const hc = document.querySelector('.hovercard')
+  return { hay: !!hc, titulo: hc?.querySelector('.hovercard__title')?.textContent?.trim() ?? null }
+})
+chk(tarjeta.hay, 'D14 en la columna de tarea la tarjeta aparece de inmediato')
+chk(!!tarjeta.titulo, 'D14 y lleva el nombre completo de la tarea', tarjeta.titulo ?? '')
+chk(
+  (await d.locator('.gantt td.fija--tarea .fija-tip[data-tip]').count()) === 0,
+  'D14 sin un segundo globo encima de la tarjeta',
+)
+
+// ── D16 · Los menús siguen midiendo todos lo mismo ─────────────────────────
+console.log('\n── D16 · La caja de los menús ──')
+const anchos = {}
+for (const nombre of ['Filtrar', 'Ordenar', 'Rango']) {
+  await abrirCtrl(d, nombre)
+  anchos[nombre] = await menu(d).evaluate((e) => Math.round(e.getBoundingClientRect().width))
+  await cerrarMenu(d)
+}
+await abrirCtrl(d, 'Filtrar')
+await menu(d).locator('.filtro-op--campo', { hasText: 'Fecha' }).click()
+await d.waitForTimeout(400)
+anchos['Filtrar-Fecha'] = await menu(d).evaluate((e) => Math.round(e.getBoundingClientRect().width))
+await cerrarMenu(d)
+chk(
+  new Set(Object.values(anchos)).size === 1 && Object.values(anchos)[0] === 280,
+  'D16 los menús siguen midiendo todos lo mismo: la caja no cambia de tamaño',
+  Object.entries(anchos).map(([k, v]) => `${k}=${v}`).join(' '),
+)
+
 await b.close()
-console.log(process.exitCode ? '\n⛔ HAY FALLAS' : '\n✅ #321, #324 y #305c — la Gantt ocupa lo que sobra, Mis Tareas tiene su encabezado y #305 queda cerrado')
+console.log(process.exitCode ? '\n⛔ HAY FALLAS' : '\n✅ #321, #324, #305c y #305d — la Gantt ocupa lo que sobra, Mis Tareas tiene su encabezado y #305 queda cerrado')
+

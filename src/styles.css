@@ -957,10 +957,23 @@ table.tareas .col-desv { text-align: center; }
   border: none; background: none; cursor: pointer; padding: 5px 8px 5px 4px; border-radius: 999px;
 }
 .filtro-ficha__x:hover { color: var(--rojo); }
-.filtro-rango { display: flex; align-items: center; gap: 6px; padding: 4px 10px 10px; font-size: 12px; color: var(--gris-texto); }
+/* #305d — Los dos campos de "Rango fijo" se salían por el borde derecho: el
+   segundo quedaba cortado. Las cuentas: el menú mide 280 y sus bordes se comen
+   18, quedan 262; con 10 de relleno a cada lado y 6 entre elementos, para los
+   dos campos y el guion quedaban 230, y cada campo pedía cerca de 125 —letra
+   de 12, 7 de relleno lateral, "dd/mm/aaaa" más el ícono del calendario—: 250,
+   faltaban 20. Se achican los campos hasta caber (letra 11, relleno 5) y
+   también el guion y el relleno de la fila, que devuelven otros 10 de holgura.
+   Ensanchar el menú no es opción: los 280 son la decisión de #305b, la que
+   hace que la caja no cambie de tamaño al pasar de un control a otro.
+   El LÍMITE es el ícono del calendario: por debajo de cierto punto el
+   navegador lo recorta y el campo deja de abrirse con un clic. La prueba mide
+   que los dos campos entren enteros en el menú y que ninguno recorte su
+   contenido. */
+.filtro-rango { display: flex; align-items: center; gap: 4px; padding: 4px 6px 8px; font-size: 11px; color: var(--gris-texto); }
 .filtro-rango .fecha-input {
-  width: auto; font-size: 12px; border: 1px solid var(--gris-borde); background: var(--superficie);
-  color: var(--texto); border-radius: 4px; padding: 5px 7px;
+  width: auto; min-width: 0; font-size: 11px; border: 1px solid var(--gris-borde); background: var(--superficie);
+  color: var(--texto); border-radius: 4px; padding: 5px;
 }
 .filtro-guardado { display: flex; align-items: center; gap: 2px; border-radius: 9px; padding-right: 4px; }
 .filtro-guardado:hover { background: var(--velo); }
@@ -1169,10 +1182,39 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    ancho intrínseco de la celda deja de depender de la palabra más larga. El
    nombre completo queda en el `title`. */
 .gantt .fija-txt {
-  display: block; flex: 1 1 auto; min-width: 0;
+  display: block;
   overflow: hidden; text-overflow: ellipsis;
   overflow-wrap: normal; word-break: normal;
 }
+
+/* #305d — El globo del nombre.
+   El nombre del frente no tenía globo PROPIO: lo que aparecía era el del
+   navegador (`title`), que solo sale cuando el texto está recortado y tarda
+   alrededor de un segundo por diseño del navegador. No estaba mal
+   configurado: no existía. Pasa al `data-tip` del producto, el mismo globo
+   inmediato que ya usan los "+" de estas mismas celdas.
+   Va en un envoltorio propio y NO en `.fija-txt`, que recorta con
+   `overflow: hidden` y se comería el globo; y no en el `td`, que también
+   contiene el "+" y mostraría los dos globos a la vez.
+   El envoltorio es además el que lleva `min-width: 0`, que es lo que impide
+   que una palabra larga ensanche la columna (ver `.fija-txt` en #321). */
+.gantt .fija-tip { position: relative; display: block; flex: 1 1 auto; min-width: 0; }
+.gantt .fija-tip[data-tip]:hover::after {
+  content: attr(data-tip);
+  /* Se abre hacia la DERECHA, como el rótulo del proyecto (#192): estas
+     columnas están pegadas al borde izquierdo del scroll de la grilla, y un
+     globo centrado quedaría recortado por ahí. */
+  position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%);
+  background: #1a1a1b; color: #fff; font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 5px; white-space: nowrap;
+  z-index: 1; pointer-events: none; border: 1px solid rgba(255,255,255,.25);
+}
+/* #193: el salto de capa es MÍNIMO y queda por DEBAJO del encabezado
+   congelado (30/40) — con un valor alto, estas celdas (que abarcan su bloque
+   entero con rowSpan) se pintarían sobre el encabezado al desplazarse bajo él.
+   Sin el salto, el globo queda tapado por la columna hermana, que es sticky y
+   se pinta después. */
+.gantt td.fija--rotula:hover { z-index: 5; }
 .gantt .fija--proy {
   left: 0;
   width: var(--gantt-proy-w); min-width: var(--gantt-proy-w); max-width: var(--gantt-proy-w);

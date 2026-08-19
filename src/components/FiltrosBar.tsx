@@ -274,11 +274,13 @@ export function FiltrosBar({
       >
         {campoActual ? (
           <>
-            {/* Segundo nivel: las opciones del campo, con la vuelta arriba. */}
+            {/* Segundo nivel. #305d: la vuelta y el nombre del campo se
+                funden en UNA línea — "‹ Fecha" dice dónde estás y cómo volver
+                a la vez. Antes eran dos renglones, "‹ Filtrar" arriba y el
+                nombre debajo. */}
             <button className="filtro-volver" onClick={() => setCampo(null)}>
-              ‹ Filtrar
+              ‹ {campoActual.nombre}
             </button>
-            <div className="filtro-menu__grupo">{campoActual.nombre}</div>
             {campo === 'fecha' && <OpcionesFecha
               contexto={contexto}
               filtro={filtro}
@@ -389,7 +391,11 @@ export function FiltrosBar({
                 </div>
               </>
             )}
-            <div className="filtro-menu__grupo">Campos</div>
+            {/* #305d: acá decía "Campos", y en Ordenar "Criterios": títulos
+                que repetían el botón que acabas de apretar. Los dos se
+                eliminan. Sí se conservan los que separan GRUPOS dentro de un
+                mismo menú ("Aplicado" acá, "Rango fijo" en Fecha, "Días" y
+                "Horizonte" en Rango): esos trabajan. */}
             {campos.map((c) => (
               <button key={c.clave} className="filtro-op filtro-op--campo" onClick={() => setCampo(c.clave)}>
                 <span className="filtro-op__nombre">{c.nombre}</span>
@@ -411,8 +417,10 @@ export function FiltrosBar({
         onLimpiar={ordenActivo ? () => onCambiarOrden([]) : undefined}
         tituloLimpiar="Limpiar el orden"
       >
-        {/* #305b: era el único menú de la barra sin título de sección. */}
-        <div className="filtro-menu__grupo">Criterios</div>
+        {/* #305d: acá había un título "Criterios" —agregado por #305b, que
+            pedía emparejarlo con los demás—. Se elimina: repetía el botón. La
+            barra queda pareja igual, por el otro lado: ningún menú lleva
+            título que repita su botón. */}
         {camposOrden.map((c) => {
           const prio = prioridadDe(c.campo)
           const regla = prio >= 0 ? orden[prio] : null

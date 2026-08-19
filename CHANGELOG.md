@@ -1865,3 +1865,88 @@ Una aserción de #305b se actualizó, no se relajó: comprobaba que el título d
 menú de Fecha dijera "Relativas", que #305c eliminó. Pasa a comprobar lo que de
 #305b sobrevive —que el paréntesis "(se recalculan)" no volvió— y que ningún
 título del menú ocupa dos líneas.
+
+### #305d — Guardar vista, títulos de menú, rango de fechas y el globo del frente
+
+Cuatro ajustes. Pantalla, sin migración.
+
+**1. Guardar una vista no apagaba su ícono.** Con una vista activa, agregar un
+criterio de orden encendía el ícono —correcto—, pero al tocar guardar **seguía
+encendido**: parecía que no había pasado nada, aunque el cambio sí se guardaba.
+Y al quitar el orden se apagaba **por la razón equivocada**: no porque la vista
+estuviera al día, sino porque ya no quedaba nada puesto.
+
+Es la parte de #305c que faltaba: se pidió habilitar el ícono solo en la vista
+activa **y modificada**, y lo de "modificada" seguía resolviéndose con "hay algo
+puesto" en vez de comparando. **Ahora el ícono usa exactamente la misma
+condición que el asterisco** —está activa y difiere de lo guardado—, así que las
+dos señales se mueven juntas: si hay asterisco hay ícono encendido, y si no hay
+asterisco no lo hay, aunque haya filtro y orden puestos. **"Guardar vista" no
+cambia**: sigue dependiendo de que haya filtro u orden, haya o no vista activa,
+porque crea una vista nueva.
+
+*Nota:* la corrección de #305c ya estaba en esta rama y resolvía la
+reproducción; se comprobó paso a paso antes de tocar nada. Lo que agrega #305d
+es la **prueba** que fija la regla —con un criterio de orden, que es el caso
+donde la condición vieja se apagaba por la razón equivocada— y la deja
+imposible de perder.
+
+**2. Los títulos que repetían el botón.** "Campos" en el primer nivel de Filtrar
+y "Criterios" en Ordenar decían lo que ya decía el botón que acabas de apretar.
+**Los dos se eliminan.** Y en el segundo nivel, la vuelta y el nombre del campo
+**se funden en una sola línea**: "‹ Fecha", "‹ Estado", "‹ Proyecto" — dice
+dónde estás y cómo volver a la vez, en vez de gastar dos renglones. Se conservan
+los títulos que separan grupos dentro de un mismo menú: "Aplicado" en Filtrar,
+"Rango fijo" en Fecha, y "Días" y "Horizonte" en Rango.
+
+*Esto deshace parte de #305b*, que le agregó un título a Ordenar porque era el
+único sin uno. Queda parejo igual, por el otro lado: **ningún menú lleva título
+que repita su botón.** Es un cambio deliberado del dueño, no un olvido.
+
+**3. El rango de fechas no cabía en el menú.** Los dos campos de "Rango fijo" se
+salían por el borde derecho y el segundo quedaba cortado. Las cuentas: el menú
+mide 280 y sus bordes se comen 18, quedan 262; con 10 de relleno a cada lado y 6
+entre elementos, para los dos campos y el guion quedaban 230, y cada campo pedía
+cerca de 125 —letra de 12, 7 de relleno lateral, "dd/mm/aaaa" más el ícono del
+calendario—: 250, **faltaban unos 20**. Los campos se achican hasta caber (letra
+11, relleno 5) y se achican también el guion y el relleno de la fila, que
+devuelven otros 10 de holgura. Medido: cada campo queda en 113 y los dos entran
+dentro del ancho útil, **sin recortar su contenido** — que es el límite real:
+por debajo de cierto punto el navegador se come el ícono del calendario y el
+campo deja de abrirse con un clic. Ensanchar el menú no era opción: los 280 son
+la decisión de #305b, la que hace que la caja no cambie de tamaño entre menús.
+
+**4. El globo del nombre del frente era muy lento.** *Causa:* **no tenía globo
+propio.** Lo que aparecía era el del navegador (el `title` que puso #321), que
+solo sale cuando el texto está recortado y tarda alrededor de un segundo por
+diseño del navegador. No estaba mal configurado: no existía. El nombre del
+frente y el del sub frente pasan al **`data-tip` del producto**, el mismo globo
+inmediato que ya usan los "+" de esas mismas celdas.
+
+Detalles que muerden y quedaron resueltos:
+
+- El globo **no puede colgar de `.fija-txt`**, que recorta con `overflow: hidden`
+  para poner los puntos suspensivos y se lo comería; ni del `td`, que también
+  contiene el "+" y mostraría **dos globos a la vez**. Va en un envoltorio
+  propio, que además es el que lleva el `min-width: 0` que impide que una
+  palabra larga ensanche la columna.
+- Se abre **hacia la derecha**, como el rótulo del proyecto (#192): estas
+  columnas están pegadas al borde izquierdo del scroll de la grilla y un globo
+  centrado quedaría recortado por ahí. Con un salto de capa mínimo al pasar el
+  mouse, para que la columna hermana —que es sticky y se pinta después— no lo
+  tape, y por debajo del encabezado congelado (#193).
+- **En la columna de tarea no se agrega nada:** su tarjeta ya lleva el título
+  completo y aparece de inmediato, sin retardo. Un `data-tip` encima serían dos
+  globos a la vez.
+
+**Verificado** en `docs/prueba-321-gantt-y-encabezados.mjs`, que pasa a cubrir
+los cuatro pedidos de la rama: **109 comprobaciones en verde** (G = #321,
+M = #324, C = #305c, D = #305d). La sección D reproduce el camino exacto del
+pedido con un criterio de orden, mide los dos campos de fecha contra el ancho
+útil del menú y comprueba que ninguno recorta su contenido, y mide el globo a
+los **120 ms** de pasar el mouse — si a esa altura ya está, no es el del
+navegador, que tarda cerca de un segundo.
+
+Dos aserciones anteriores se actualizaron, no se relajaron: la de #305b que
+exigía un título en Ordenar (que este pedido elimina a propósito) y la de #321
+que buscaba el nombre completo en el `title` (que ahora vive en el `data-tip`).

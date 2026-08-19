@@ -685,8 +685,13 @@ const refFiltrar = await menu(q).evaluate((m) => {
 })
 await cerrarMenu(q)
 await abrirCtrl(q, 'Ordenar')
+// #305b le agregó un título a Ordenar porque era el único sin uno; #305d lo
+// quitó, junto con el "Campos" de Filtrar: los dos repetían el botón que
+// acabas de apretar. Queda parejo igual, por el otro lado. Lo que se comprueba
+// acá es lo que de B2 sobrevive —el alto y la sangría de sus filas—; el
+// detalle de #305d va en su propia prueba.
 const titulosOrden = (await menu(q).locator('.filtro-menu__grupo').allInnerTexts()).map((t) => t.trim())
-chk(titulosOrden.length >= 1 && titulosOrden[0].length > 0, 'B2 el menú Ordenar tiene título de sección', titulosOrden.join(' | '))
+chk(titulosOrden.length === 0, 'B2 el menú Ordenar no lleva título que repita su botón', titulosOrden.join(' | '))
 const refOrden = await menu(q).evaluate((m) => {
   const fila = m.querySelector('.orden-campo')
   const label = fila.querySelector('.orden-campo__label')
