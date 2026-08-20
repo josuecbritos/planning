@@ -216,6 +216,16 @@ completo con creación y edición **inline** (sin formularios).
   construcción: el mismo 16 de un lado y del otro, no dos números ajustados
   para que coincidan.
 
+  **El nombre de la tarea pesa menos que lo que lo contiene (#326).** Iba en
+  semi negrita (600) y su sub frente en 500 —perdió la negrita en #306, a
+  propósito—, así que el hijo se leía **más pesado que su propio contenedor**.
+  Pasa al peso normal del resto de su fila, en la tabla, en la Gantt y en Mis
+  Tareas; el **visto verde** y la marca **↻ ×N** llevan peso propio y no
+  cambian, y el campo de edición hereda el de la celda, así que el texto **no
+  cambia de grosor** al entrar y salir de edición. De paso, **"+ Sub Frente" se
+  iguala al peso de "+ Tarea"**: son la misma acción y una era línea normal
+  mientras la otra era botón fantasma en 600.
+
   **Se pueden crear tareas con el filtro puesto (#320).** La fila de "+ Tarea"
   estaba escondida al filtrar, por un problema real —una tarea recién creada
   puede no cumplir el filtro y desaparecer en el mismo momento en que la
@@ -274,7 +284,24 @@ aparece con el texto recortado y tarda cerca de un segundo. En la columna de
 tarea ese trabajo ya lo hace su tarjeta, que lleva el título completo y también
 es inmediata: no se le encima un segundo globo. Que la columna
 no se ensanche lo garantiza que el recorte va en un bloque con mínimo cero, que
-aporta cero al ancho mínimo de la celda. Las columnas fijas **siguen midiendo lo
+aporta cero al ancho mínimo de la celda.
+
+**Los globos de la Gantt no se recortan (#327).** Los cuatro que tiene la
+grilla —el nombre completo del frente y del sub frente, el rótulo del proyecto
+en Mis Tareas, "Información" y "Agregar tarea debajo", y el detalle del día—
+colgaban de su celda, así que quedaban **dentro del recuadro con scroll** y ese
+recuadro los recortaba: en la primera fila, el que se abre hacia arriba caía
+bajo el encabezado congelado y solo asomaba una franja. **Un globo que se abre
+hacia afuera dentro de un contenedor con `overflow` se recorta sin importar el
+z-index**, así que el arreglo no es subirle la capa sino sacarlo del árbol: se
+dibujan en una **capa aparte por encima de la página**, el mismo camino que ya
+usaban la tarjeta flotante de la tarea y el nombre completo en administración de
+usuarios (#213). Cada uno **se sigue abriendo hacia donde se abría** —los de
+nombre hacia la derecha, los de botones y celdas hacia arriba— y conserva su
+inmediatez o su retardo; solo **se corre al lado contrario cuando no cabe**
+contra un borde de la pantalla. Al desplazar la grilla el globo se suelta, para
+que no quede flotando lejos de lo que lo disparó. *Que un globo tape el nombre
+de la fila de arriba mientras está visible se acepta como está.* Las columnas fijas **siguen midiendo lo
 mismo**: 120 + 150 + 240 + 60 = 570, que con días de 30 sigue sin dejar caber la
 línea de tiempo — decisión consciente, la grilla se sigue desplazando de lado.
 

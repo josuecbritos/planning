@@ -24,6 +24,7 @@ import { EmptyFrentes } from './EmptyFrentes'
 import { Marca } from './Marca'
 import { Avatar, RespPicker } from './RespPicker'
 import { HoverCard } from './HoverCard'
+import { GloboTip } from './GloboTip'
 import { TaskDetail } from './TaskDetail'
 import { InlineText } from './InlineText'
 
@@ -904,6 +905,11 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         </div>
       </div>
 
+      {/* #327: un solo globo para los cuatro de la grilla, dibujado en una capa
+          aparte por encima de la página. Colgando de su celda quedaban dentro
+          del recuadro con scroll, y ese recuadro los recortaba. */}
+      <GloboTip raiz={scrollRef} />
+
       {aviso &&
         createPortal(
           <div className="mini-aviso" role="alert" style={{ left: aviso.x, top: aviso.y }}>
@@ -1065,7 +1071,12 @@ function FilaGanttRow({
       // cuyo retardo lo fija el navegador y no se puede ajustar. El nombre
       // completo sigue en el DOM, así que los lectores de pantalla lo leen
       // aunque el rótulo se trunque visualmente.
+      // #327: el globo lo dibuja `GloboTip` en una capa aparte, fuera del
+      // recuadro con scroll que lo recortaba. `data-tip-lado` declara acá,
+      // junto al elemento, hacia dónde se abre: a la derecha, porque la
+      // columna es angosta y está pegada al borde izquierdo.
       data-tip={proyecto?.nombre}
+      data-tip-lado="derecha"
     >
       <span className="proy-rotulo">
         <span className="proy-rotulo__txt">{proyecto?.nombre ?? '—'}</span>
@@ -1082,7 +1093,9 @@ function FilaGanttRow({
               #305d: el globo es el `data-tip` del producto —inmediato— y no el
               `title` del navegador, que solo aparecía con el texto recortado y
               con cerca de un segundo de retardo que fija el navegador. */}
-          <span className="fija-tip" data-tip={frente.nombre}>
+          {/* #327: hacia la derecha, como el rótulo del proyecto — estas
+              columnas están pegadas al borde izquierdo de la grilla. */}
+          <span className="fija-tip" data-tip={frente.nombre} data-tip-lado="derecha">
             <span className="fija-txt">{frente.nombre}</span>
           </span>
           {permiteCrear && can.crearFrentes && (
@@ -1106,7 +1119,7 @@ function FilaGanttRow({
     <td className="fija fija--sf fija--rotula" rowSpan={span}>
       <span className="fija-nombre">
         <span className="con-mas">
-          <span className="fija-tip" data-tip={sub.nombre}>
+          <span className="fija-tip" data-tip={sub.nombre} data-tip-lado="derecha">
             <span className="fija-txt">{sub.nombre}</span>
           </span>
           {permiteCrear && can.crearSubFrentes && (
@@ -1433,6 +1446,11 @@ function FilaGanttRow({
             key={d}
             className={`celda${esLunes(d) ? ' lunes' : ''}${esHoy ? ' col-hoy' : ''}${esFinDeSemana(d) ? ' finde' : ''}${celdaPlanificable(d) ? ' celda--planificable' : ''}`}
             data-tip={tipCelda(d, tipo)}
+            /* #327: el único de los cuatro globos con retardo, para que no
+               aparezca al cruzar el mouse por la grilla. Antes lo ponía la
+               animación del CSS; ahora que el globo vive fuera de la celda, lo
+               declara la celda y lo cumple `GloboTip`. */
+            data-tip-espera="180"
             onClick={puedeEditar ? (e) => clickCelda(e, d) : undefined}
           >
             {tipo && (

@@ -412,12 +412,17 @@ for (const [sel, etiqueta] of [
     sinMouse.mascara,
   )
   // 14: el globo sigue mostrando el nombre completo.
+  // #327 sacó el globo de la celda: ya no es un `::after` del disparador sino
+  // un elemento propio en una capa aparte, fuera del recuadro con scroll que
+  // lo recortaba. Se actualiza dónde se lo busca; lo que se exige es lo mismo
+  // de antes, que muestre el nombre completo.
   const globo = await p.evaluate((s) => {
     const tip = document.querySelector(`${s} .fija-tip`)
-    return { tip: tip.getAttribute('data-tip'), contenido: getComputedStyle(tip, '::after').content }
+    const g = document.querySelector('.globo-tip')
+    return { tip: tip.getAttribute('data-tip'), contenido: g?.textContent ?? 'sin globo' }
   }, sel)
   chk(
-    !!globo.tip && globo.contenido.includes(globo.tip),
+    !!globo.tip && globo.contenido === globo.tip,
     `14 el globo de ${etiqueta} sigue mostrando el nombre completo`,
     globo.contenido,
   )

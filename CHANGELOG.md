@@ -2415,3 +2415,107 @@ y desde Mis Tareas.
 síntomas exactos del reporte: el frente arranca a 30 contra los 48 del proyecto,
 no hay línea, el frente mide 13.5 contra 13.3 —más grande que su padre—, las dos
 transiciones dan 0 en todas las muestras, y el bloque de acciones está entero.
+
+### #326 — El nombre de la tarea pesaba más que lo que lo contiene
+
+**En la tabla, el hijo pesaba más que el padre.** Medido: el nombre de la tarea
+iba en semi negrita (**600**) y el título del sub frente que la contiene en
+**500** — perdió la negrita en #306 **a propósito**, para dejar de competir con
+el nombre del frente. La tarea quedó fuera de aquel ajuste, así que se leía más
+pesada que su propio contenedor. En la Gantt pasaba lo mismo: la columna
+congelada de tarea también iba en 600.
+
+**Ahora el nombre de la tarea va en peso normal**, el mismo del resto del texto
+de su fila, en la **tabla**, en la **Gantt** y en **Mis Tareas** en sus dos
+vistas — las tres usan la misma celda y la misma vista de Gantt, así que las
+arrastra el mismo cambio. Queda 400 contra los 500 del sub frente y los 700 del
+frente: **la jerarquía se lee de arriba abajo.**
+
+**Vale también mientras se edita.** El campo de edición lleva `font: inherit`,
+así que hereda el peso de la celda: el texto **no cambia de grosor** al entrar ni
+al salir de edición. Verificado: 400 fuera, 400 editando, 400 al salir.
+
+**Lo que no depende de la celda no cambia.** El **visto verde** de una tarea
+hecha (700) y la marca **↻ ×N** (700) declaran su propio peso, igual que las
+filas de carga por persona al pie de la Gantt (600). Medido después del cambio:
+siguen en 700.
+
+**Y los dos accesos equivalentes dejan de leerse distinto.** Debajo del último
+sub frente, la línea **"+ Sub Frente"** iba en peso normal; la acción
+equivalente al pie de una lista de tareas, **"+ Tarea"**, es un botón fantasma en
+600. Ahora la línea va en 600 también. *Cuando el frente está vacío, "+ Sub
+Frente" ya era un botón fantasma en 600: ese caso no se toca.*
+
+### #327 — BUG: los globos de la Gantt se cortaban contra los bordes de la grilla
+
+La Gantt tiene **cuatro** globos de texto corto —el nombre completo del frente y
+del sub frente (#305d), el rótulo del proyecto en Mis Tareas (#192),
+"Información" y "Agregar tarea debajo", y el detalle del día— y los cuatro
+estaban construidos igual: **colgando de la celda que los dispara**, con un
+`::after`.
+
+**Como colgaban de su celda quedaban dentro del recuadro con scroll de la
+grilla, y ese recuadro los recorta.** Verificado en pantalla contra `main`: al
+pasar el mouse por el ⓘ de la primera fila, el globo cae bajo el encabezado
+congelado y **solo asoma una franja de su borde inferior**.
+
+**Un globo que se abre hacia afuera dentro de un contenedor con `overflow` se
+recorta sin importar el z-index.** Por eso el arreglo no es subirle la capa sino
+**sacarlo del árbol**: los cuatro pasan a dibujarse en una capa aparte por
+encima de la página, con `position: fixed`. *El producto ya resolvió esto dos
+veces por ese mismo camino, y las dos están en el código con su comentario: el
+nombre completo en administración de usuarios (#213) y la tarjeta flotante de la
+tarea.*
+
+**Un solo componente para los cuatro (`GloboTip`).** Escucha bajo el recuadro de
+la grilla y dibuja el globo del elemento apuntado. **No cambia el marcado de
+cada disparador:** se sigue leyendo el `data-tip` de siempre. Lo que cada uno
+declara aparte es lo que lo distingue —su lado (`data-tip-lado="derecha"`) y su
+retardo (`data-tip-espera`, que solo usan las celdas de la grilla)—, escrito
+**junto al elemento que lo pide** y no en una lista de selectores dentro del
+componente.
+
+**Cada globo se sigue abriendo hacia donde se abría**, con el mismo aspecto y la
+misma inmediatez: los de nombre hacia la derecha, los de botones y celdas hacia
+arriba, y solo el de la celda con su retardo corto para que no aparezca al
+cruzar el mouse por la grilla. **Solo se corre al lado contrario cuando no
+cabe** contra un borde de la pantalla. Al desplazar la grilla el globo se
+suelta: colgaba de coordenadas de pantalla y quedaría flotando lejos de lo que
+lo disparó.
+
+*Dos detalles que se unificaron al juntarlos:* el borde claro y la sombra que
+#193 le había puesto solo al globo del rótulo del proyecto —para que no se
+leyera como el nombre del frente al caer sobre esa columna oscura— ahora los
+llevan los cuatro: fuera de la grilla, cualquiera puede caer sobre cualquier
+fondo. Y con el globo fuera del recuadro se fueron los dos saltos de capa que
+existían solo para que no lo tapara la columna hermana.
+
+**El nombre de la tarea sigue sin globo propio:** ahí el nombre completo lo
+muestra la tarjeta flotante, y #305d ya había dejado escrito que sumarle un
+globo mostraría dos a la vez. Verificado: al pasar el mouse aparece **una sola**
+tarjeta y **ningún** globo.
+
+**Verificado** #326 y #327 juntos con `docs/prueba-326-327-pesos-y-globos.mjs`:
+**36 comprobaciones en verde**. De #326 mide los tres pesos y exige que la
+jerarquía se haya dado vuelta, que el visto y el ↻ ×N conserven el suyo, y que
+el grosor no cambie al entrar y salir de edición. De #327 comprueba **la
+propiedad que garantiza que no se recorte** —que el globo cuelgue del `body` y
+no del recuadro con scroll— y que quede entero dentro de la pantalla: en la
+primera fila visible, en la última, contra el extremo derecho, con la ventana
+angosta y en Mis Tareas. Además, que cada uno se abra hacia el lado que le
+corresponde, que el retardo de la celda siga estando y el de los botones no, que
+el globo desaparezca al salir y al desplazar, y que el nombre de la tarea siga
+mostrando una sola tarjeta y ningún globo.
+
+*Control negativo:* corrida contra `main`, **26 comprobaciones fallan**: el
+nombre de la tarea mide 600 contra los 500 de su sub frente, "+ Sub Frente" va
+en 400 contra los 600 de "+ Tarea", y no existe ningún globo fuera del recuadro
+—los cuatro siguen colgando de su celda—.
+
+*Dos pruebas anteriores se actualizaron, no se relajaron:* #306 y #321
+comprobaban el globo del frente y del sub frente leyendo el `content` del
+`::after` del disparador. Ahora el globo es un elemento propio en otra capa, así
+que pasan a buscarlo ahí. Lo que se exige es lo mismo de antes —que aparezca de
+inmediato, con el nombre completo y entero—, y en #321 "entero" pasa a medirse
+contra la pantalla en vez de contra el borde del recuadro con scroll, que es
+contra lo que ahora tiene que caber.
