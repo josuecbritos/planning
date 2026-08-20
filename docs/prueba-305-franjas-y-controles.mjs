@@ -659,10 +659,17 @@ const relativas = await menu(q).evaluate((m) => {
   }))
   return { titulos, hayRecalculan: m.innerText.includes('se recalculan') }
 })
-const tRel = relativas.titulos.find((t) => t.texto.toLowerCase() === 'relativas')
-chk(!!tRel, 'B4 en Fecha el título dice "Relativas"', relativas.titulos.map((t) => t.texto).join(' | '))
-chk(!relativas.hayRecalculan, 'B4 y ya no lleva el paréntesis "(se recalculan)"')
-chk(!!tRel && tRel.alto <= 26, 'B4 y ocupa una sola línea', `alto=${tRel?.alto}px`)
+// #305b acortó este título a "Relativas" porque "Relativas (se recalculan)" se
+// partía en dos líneas. #305c lo eliminó del todo: quedaba pegado al título del
+// campo ("FECHA"), dos títulos seguidos. Lo que se comprueba acá es lo que
+// sobrevive de #305b —que el paréntesis no volvió— y que ningún título del menú
+// se parte en dos líneas. El detalle de #305c va en su propia prueba.
+chk(!relativas.hayRecalculan, 'B4 el título ya no lleva el paréntesis "(se recalculan)"')
+chk(
+  relativas.titulos.every((t) => t.alto <= 26),
+  'B4 y ningún título del menú ocupa dos líneas',
+  relativas.titulos.map((t) => `${t.texto}=${t.alto}px`).join(' | '),
+)
 await cerrarMenu(q)
 
 // ── B2 · Ordenar: título, mismo alto de fila y misma sangría ───────────────
@@ -678,8 +685,13 @@ const refFiltrar = await menu(q).evaluate((m) => {
 })
 await cerrarMenu(q)
 await abrirCtrl(q, 'Ordenar')
+// #305b le agregó un título a Ordenar porque era el único sin uno; #305d lo
+// quitó, junto con el "Campos" de Filtrar: los dos repetían el botón que
+// acabas de apretar. Queda parejo igual, por el otro lado. Lo que se comprueba
+// acá es lo que de B2 sobrevive —el alto y la sangría de sus filas—; el
+// detalle de #305d va en su propia prueba.
 const titulosOrden = (await menu(q).locator('.filtro-menu__grupo').allInnerTexts()).map((t) => t.trim())
-chk(titulosOrden.length >= 1 && titulosOrden[0].length > 0, 'B2 el menú Ordenar tiene título de sección', titulosOrden.join(' | '))
+chk(titulosOrden.length === 0, 'B2 el menú Ordenar no lleva título que repita su botón', titulosOrden.join(' | '))
 const refOrden = await menu(q).evaluate((m) => {
   const fila = m.querySelector('.orden-campo')
   const label = fila.querySelector('.orden-campo__label')

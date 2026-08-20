@@ -222,6 +222,9 @@ docs/
   prueba-305-franjas-y-controles.mjs  Prueba e2e de las tres franjas sobre la
                          grilla y de los cuatro controles de la barra (#305 y
                          sus ajustes #305b), contra `vite preview`
+  prueba-321-gantt-y-encabezados.mjs  Prueba e2e del alto y el scroll de la
+                         Gantt, del encabezado de Mis Tareas y del cierre de
+                         #305 (#321, #324, #305c y #305d), contra `vite preview`
   documento-funcional-v3.1.md  (histórico)
 ```
 

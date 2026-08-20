@@ -197,6 +197,38 @@ completo con creación y edición **inline** (sin formularios).
 - **Gantt** (grilla tipo Excel): planificación por clics, horizonte configurable,
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
 
+**La grilla ocupa lo que sobra, y es lo único que se desplaza (#321).** El alto
+estaba fijado a mano —"la pantalla menos 250"— y medido contra la **pantalla
+completa**, cuando la grilla vive dentro de lo que sobra bajo el encabezado, que
+ya es más corto: de ahí salían los dos síntomas que parecían distintos, espacio
+muerto abajo o última fila cortada, según cuánto hubiera arriba. Cualquier valor
+escrito a mano vuelve a desalinearse cada vez que cambie algo de arriba —que es
+lo que pasó con #305, que ganó dos franjas—, así que la grilla pasa a **ocupar
+lo que sobra dentro de su contenedor**. De ahí sale solo lo demás: si nunca
+empuja la página hacia abajo, **el scroll de la pantalla deja de existir** y
+encabezado, contadores y barra de controles quedan siempre a la vista. En
+**tabla no se aplica**: una lista larga sí debe desplazar la pantalla.
+
+**Los nombres se cortan, no se parten (#321).** En las columnas congeladas el
+corte estaba forzado en cualquier letra —"Planificació / n"— para que ninguna
+palabra larga las ensanchara y desplazara los anclajes de las columnas fijas.
+Ahora el texto **envuelve por palabras** y la que no cabe se **recorta con
+puntos suspensivos**, con el nombre completo al pasar el mouse — en el **globo
+propio del producto, inmediato** (#305d), no en el del navegador, que solo
+aparece con el texto recortado y tarda cerca de un segundo. En la columna de
+tarea ese trabajo ya lo hace su tarjeta, que lleva el título completo y también
+es inmediata: no se le encima un segundo globo. Que la columna
+no se ensanche lo garantiza que el recorte va en un bloque con mínimo cero, que
+aporta cero al ancho mínimo de la celda. Las columnas fijas **siguen midiendo lo
+mismo**: 120 + 150 + 240 + 60 = 570, que con días de 30 sigue sin dejar caber la
+línea de tiempo — decisión consciente, la grilla se sigue desplazando de lado.
+
+**El bloque del frente ya no es negro (#321, cierra #323).** Era la superficie
+más oscura de la pantalla y competía con la grilla; pasa a un gris propio con el
+nombre en texto normal. Frente y sub frente usan ahora **dos tokens distintos**:
+en modo oscuro eran el mismo valor exacto (`#26262b`), no es que se parecieran —
+eran idénticos.
+
 **Tres franjas sobre la grilla, siempre las mismas (#305).** En tabla y en
 Gantt, y la altura sobre el contenido **no cambia nunca**: ni al filtrar, ni al
 ordenar, ni según el proyecto. Antes eran cinco —título, filtros, leyenda, aviso
@@ -224,6 +256,14 @@ de tamaño al pasar de un control a otro; Vistas queda fuera de esa regla porque
 se ancla a la derecha y los nombres guardados pueden ser largos.
 
 **Los cuatro controles.** Cada uno con ícono y nombre fijos:
+
+**Ningún menú lleva título que repita su botón (#305d).** "Campos" en el primer
+nivel de Filtrar y "Criterios" en Ordenar decían lo que ya decía el botón que
+acabas de apretar, y en el segundo nivel la vuelta y el nombre del campo
+gastaban dos renglones. Ahora la cabecera del segundo nivel es **una sola
+línea, "‹ Fecha"**: dice dónde estás y cómo volver a la vez. Se conservan los
+títulos que separan **grupos dentro de un mismo menú** —"Aplicado" en Filtrar,
+"Rango fijo" en Fecha, "Días" y "Horizonte" en Rango—: esos sí trabajan.
 
 - **Filtrar** reemplaza a los tres botones sueltos (Fecha, Responsable y Estado
   en un proyecto; Fecha, Proyecto y Estado en Mis Tareas), que ahora viven
@@ -262,8 +302,16 @@ se ancla a la derecha y los nombres guardados pueden ser largos.
   iconos de cada vista guardada —actualizar, renombrar, eliminar— están
   **siempre visibles**: estaban en invisible hasta pasar el mouse, lo que dejaba
   la fila despareja y los volvía inalcanzables en pantalla táctil. El de
-  actualizar, cuando no hay nada que guardar, se ve en el tono apagado del
-  producto y no responde, conservando su aviso.
+  actualizar **se habilita solo en la vista activa y solo cuando está
+  modificada** (#305c) —exactamente la condición del asterisco, así que las dos
+  señales dicen lo mismo—; antes miraba únicamente si había algún filtro u orden
+  puesto, que es la misma condición para todas, así que con cinco vistas
+  guardadas las cinco quedaban disponibles para ser sobrescritas — y, ya dentro
+  de una, seguía encendido después de guardar, porque el filtro y el orden
+  seguían puestos. **El ícono y el asterisco usan exactamente la misma
+  condición y se mueven juntos:** si hay asterisco hay ícono encendido, y si no
+  hay asterisco no lo hay. **"Guardar vista" sí sigue mirando solo si hay algo
+  puesto**: crea una vista nueva, no sobrescribe ninguna.
 
 *El asterisco de Vistas y "Actualizar vista" son señales distintas y conviven:*
 el asterisco dice que te alejaste de lo guardado; el botón dice que la foto
@@ -312,13 +360,28 @@ día en cada uso y son excluyentes entre sí. "Hábil" es L-V y nada más: la
 herramienta no conoce feriados a propósito, y un viernes la tarea del sábado
 NO entra en el filtro — cada opción muestra su rango literal.
 - **Mis Tareas:** las tareas donde el usuario es responsable, en todos sus
-  proyectos, vencidas primero. Tiene el mismo conmutador **Tabla / Gantt** que
+  proyectos, vencidas primero. **Su encabezado es el mismo componente que el de
+  un proyecto (#324)** —título con la cuenta al lado en gris, chip de fecha,
+  conmutador y fila de contadores—, y lo único que no lleva es **Miembros**:
+  cruza varios proyectos y no hay un grupo de miembros que mostrar. Compartir el
+  componente es lo que impide que vuelvan a separarse: cuando #305 quitó la
+  leyenda de la Gantt y le pasó ese trabajo a los contadores, Mis Tareas se
+  quedó sin nada que explicara las marcas, porque nunca los había tenido. Sus
+  contadores se calculan sobre las tareas a cargo del usuario cruzando
+  proyectos; la pantalla de proyecto los recibe ya calculados. El aviso de
+  atrasadas en texto desapareció: la caja roja dice el mismo número, en color y
+  en el mismo lugar.
+  Tiene el mismo conmutador **Tabla / Gantt** que
   un proyecto (#190): la Gantt muestra la **carga propia repartida en el
   tiempo**, cruzando proyectos, con una columna extra y muy angosta a la
   izquierda —nombre del proyecto **rotado** sobre su color— que se repite en
   cada frente; si no cabe, se trunca y el nombre completo queda en el tooltip
   (el globo propio de la app, inmediato — no el `title` nativo, cuyo retardo lo
-  fija el navegador, #192).
+  fija el navegador, #192). Ese rótulo **se centra en la porción visible de su
+  bloque y acompaña al desplazar** (#321), el mismo mecanismo que ya usaban
+  frente y sub frente: antes se centraba sobre el bloque completo, así que en un
+  proyecto más alto que la pantalla el nombre quedaba fuera de vista y la franja
+  se leía como color sin explicación.
   Es de **lectura y replanificación**: mover fechas, marcar hechas y abrir el
   detalle, sin crear ni eliminar nada (una tarea creada ahí no sería del
   usuario hasta asignársela). Al pie, una sola fila con su total diario.

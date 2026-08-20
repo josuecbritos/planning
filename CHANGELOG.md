@@ -1734,3 +1734,219 @@ actualizaron, no se relajaron — la posición de "Actualizar vista" (C14) y el
 texto de la nota del horizonte (C10). Y la búsqueda de una opción de Estado pasó
 a ser por nombre exacto: con las marcas, el texto de la fila incluye el glifo
 ("✓Hecha"), así que buscarla por el texto completo dejó de encontrarla.
+
+### #305c — Cierre de #305
+
+Dos ajustes finales. Pantalla, sin migración.
+
+- **El menú de Fecha tenía dos títulos seguidos.** Al entrar al campo desde
+  Filtrar decía "FECHA" —el campo en el que estás— y justo debajo "RELATIVAS".
+  **Se elimina "Relativas"**: las cinco opciones quedan directamente bajo el
+  nombre del campo. "FECHA" se queda (es lo que dice dónde estás, y lo tienen
+  todos los campos) y **"Rango fijo" también**: ese sí separa algo distinto, los
+  dos calendarios de desde y hasta.
+- **El ícono de actualizar se habilitaba en TODAS las vistas guardadas.** Al
+  modificar la vista en la que estás, las cinco quedaban disponibles para ser
+  sobrescritas con lo que tenías en pantalla. La condición miraba únicamente si
+  había algún filtro u orden puesto, y esa es la misma para todas: **no miraba
+  de qué vista se trataba**. Ahora se habilita **solo en la vista activa y solo
+  cuando está modificada** — exactamente la condición que ya usa el asterisco,
+  así que las dos señales pasan a decir lo mismo: esta vista tiene cambios sin
+  guardar, y este botón los guarda. **"Guardar vista" no cambia**: sigue
+  habilitándose con cualquier filtro u orden puesto, haya o no vista activa,
+  porque crea una vista nueva en vez de sobrescribir ninguna.
+
+### #324 — El encabezado de Mis Tareas se homologa al de los proyectos
+
+**#305 abrió una regresión en Mis Tareas.** Eliminó la leyenda de la Gantt y le
+pasó ese trabajo a la fila de contadores del encabezado. En la pantalla de
+proyecto el reemplazo funciona; **en Mis Tareas no, porque nunca tuvo
+contadores**: ahí se quitó la leyenda y no llegó nada en su lugar, y quedaron
+marcas verdes, ámbar, rojas, moradas y rosadas en la grilla sin nada que las
+explicara.
+
+Los dos encabezados no compartían estructura: el de proyecto usaba la suya y Mis
+Tareas la de administración —la misma que Usuarios y Proyectos—, con el título a
+18 y la cuenta en una línea aparte. Ahora **es el mismo componente**, que es lo
+que impide que vuelvan a separarse:
+
+- **Lleva la fila de contadores**, idéntica: cinco cajas y, en Gantt, la sexta de
+  "Fecha anterior" sin número, con las marcas de la grilla como muestras y los
+  puntos de color en tabla. Se calculan **sobre las tareas a cargo del usuario
+  cruzando todos sus proyectos**; a diferencia de la pantalla de proyecto, que
+  los recibe ya calculados desde afuera, acá hay que calcularlos.
+- **Se elimina el aviso de atrasadas en texto.** El contador rojo dice el mismo
+  número, con color y en el mismo lugar que en un proyecto. Se pierde la frase
+  "asignar nueva fecha"; el dueño lo evaluó y lo aceptó.
+- **Lleva el chip con la fecha de hoy**, con el mismo aviso cuando es simulada.
+- **El título pasa a la estructura del proyecto**, con la cuenta al lado en gris
+  ("Mis Tareas · 13 tareas en 1 proyecto"). La línea de abajo desaparece.
+- **NO lleva Miembros.** Es la única pieza que no se homologa: Mis Tareas cruza
+  varios proyectos y no hay un grupo de miembros que mostrar. No es una omisión.
+
+No cambia el selector Tabla/Gantt (oculto en móvil por la misma razón de
+siempre), ni la barra de controles, ni el contenido de la tabla y la Gantt.
+Absorbe el primer punto de #308; de #308 queda pendiente solo que su tabla no
+trae la columna de acciones.
+
+### #321 — La Gantt: alto de la grilla, doble scroll y columnas fijas
+
+*Segunda mitad de #305. **Cierra también #323**, el bug de modo oscuro.*
+
+**#305 ganó dos franjas de alto sobre la grilla y ese espacio no se estaba
+usando.** La grilla seguía reservando su alto con un número escrito a mano, así
+que al haber menos arriba simplemente sobraba más abajo.
+
+- **El alto se calcula solo.** Estaba fijado a `100vh - 250px`, **medido contra
+  la pantalla completa** cuando la grilla vive dentro de lo que sobra bajo el
+  encabezado, que ya es más corto: la caja pedía más alto del que había. De ahí
+  salían los dos síntomas que parecían distintos —espacio muerto abajo, o la
+  última fila cortada, según cuánto hubiera arriba—. No se ajustó el número:
+  cualquier valor a mano vuelve a desalinearse cada vez que cambie algo de
+  arriba, que es exactamente lo que acababa de pasar. La grilla **ocupa lo que
+  sobra dentro de su contenedor**, y así el problema no puede repetirse.
+- **Un solo scroll.** Sale de lo anterior: si la grilla ocupa exactamente lo que
+  sobra, nunca empuja la página hacia abajo y el scroll de la pantalla deja de
+  existir por sí solo. Encabezado, contadores y barra de controles quedan
+  siempre a la vista. **En tabla no se aplica**: una lista larga sí debe
+  desplazar la pantalla.
+- **El bloque del frente deja de ser negro — y con eso se cierra #323.** Era la
+  superficie más oscura de la pantalla y competía con la grilla; pasa a un gris
+  propio con el nombre en texto normal. Frente y sub frente usan ahora **dos
+  tokens distintos**: en modo oscuro eran **el mismo valor exacto** (`#26262b`,
+  uno vía `--estructura` y otro vía `--gris-sf`) — no es que se parecieran, eran
+  idénticos. `--estructura` queda sin usos y se elimina.
+- **Los nombres se cortan, no se parten.** "Planificació / n" era deliberado: el
+  corte en cualquier letra evitaba que una palabra larga ensanchara la columna y
+  desplazara los anclajes de las columnas congeladas. Ahora el texto **envuelve
+  por palabras** y la que no cabe **se recorta con puntos suspensivos**, con el
+  nombre completo al pasar el mouse. La protección se mantiene por otro camino:
+  el recorte va en un bloque con mínimo cero, que aporta cero al ancho mínimo de
+  la celda, así que **el ancho de la columna deja de depender de la palabra más
+  larga**. Aplica a frente, sub frente y tarea. En la columna de tarea el nombre
+  completo ya lo mostraba la tarjeta al pasar el mouse, que lo lleva de título:
+  no se agregó un segundo globo encima.
+- **El rótulo del proyecto se centra en lo visible.** En Mis Tareas se centraba
+  sobre el bloque COMPLETO de filas de ese proyecto: si el bloque era más alto
+  que la pantalla, el nombre quedaba fuera de vista y la franja de color se leía
+  sin explicación. Pasa a usar **el mecanismo que ya tenían frente y sub
+  frente** —centrado en la porción visible, acompañando el desplazamiento—, que
+  estaba documentado y probado; era aplicarlo a la columna que había quedado
+  fuera.
+
+**Las columnas fijas siguen midiendo lo mismo:** 120 + 150 + 240 + 60 = 570. Con
+días de 30 y cinco semanas de días hábiles la línea de tiempo necesita 750 y
+sigue sin caber: la grilla se sigue desplazando de lado. Es una decisión
+consciente del dueño, no un olvido. Tampoco se achicaron frente y sub frente, ni
+se fundieron en una columna, ni se tocó la de tarea.
+
+**Verificado** con `docs/prueba-321-gantt-y-encabezados.mjs`: **74
+comprobaciones en verde**, los criterios de los tres pedidos (G = #321, M =
+#324, C = #305c). Mide el hueco bajo la grilla y el scroll de pantalla en varios
+tamaños (1200×700, 1600×1000, 1024×620), fuerza una pantalla baja para
+comprobar que se llega al final sin mover ningún otro scroll y que la última
+fila no queda cortada, calcula la **razón de contraste** entre frente y sub
+frente en los dos temas (idénticos daría 1.00), renombra frente, sub frente y
+tarea con palabras largas para comprobar el recorte y que las columnas no se
+mueven, y sigue el rótulo del proyecto al desplazar comparándolo con el del
+frente del mismo bloque.
+
+*Nota de método:* la primera versión de la comprobación del rótulo exigía que
+quedara **entero** dentro de la banda visible tras desplazar. Es imposible por
+construcción: cuando la porción visible del bloque es más corta que el rótulo
+—que es alto, va rotado—, el mecanismo lo apoya contra el borde del bloque sin
+dejar que se salga de él. Es el mismo límite que ya tienen frente y sub frente,
+solo que sus nombres miden 30 píxeles y no se nota. La comprobación pasó a ser
+la regla real: cuando la porción visible alcanza, el rótulo queda centrado **en
+lo mismo que el nombre del frente** (sus centros coinciden), y en todo caso
+nunca se sale de su bloque de color.
+
+Una aserción de #305b se actualizó, no se relajó: comprobaba que el título del
+menú de Fecha dijera "Relativas", que #305c eliminó. Pasa a comprobar lo que de
+#305b sobrevive —que el paréntesis "(se recalculan)" no volvió— y que ningún
+título del menú ocupa dos líneas.
+
+### #305d — Guardar vista, títulos de menú, rango de fechas y el globo del frente
+
+Cuatro ajustes. Pantalla, sin migración.
+
+**1. Guardar una vista no apagaba su ícono.** Con una vista activa, agregar un
+criterio de orden encendía el ícono —correcto—, pero al tocar guardar **seguía
+encendido**: parecía que no había pasado nada, aunque el cambio sí se guardaba.
+Y al quitar el orden se apagaba **por la razón equivocada**: no porque la vista
+estuviera al día, sino porque ya no quedaba nada puesto.
+
+Es la parte de #305c que faltaba: se pidió habilitar el ícono solo en la vista
+activa **y modificada**, y lo de "modificada" seguía resolviéndose con "hay algo
+puesto" en vez de comparando. **Ahora el ícono usa exactamente la misma
+condición que el asterisco** —está activa y difiere de lo guardado—, así que las
+dos señales se mueven juntas: si hay asterisco hay ícono encendido, y si no hay
+asterisco no lo hay, aunque haya filtro y orden puestos. **"Guardar vista" no
+cambia**: sigue dependiendo de que haya filtro u orden, haya o no vista activa,
+porque crea una vista nueva.
+
+*Nota:* la corrección de #305c ya estaba en esta rama y resolvía la
+reproducción; se comprobó paso a paso antes de tocar nada. Lo que agrega #305d
+es la **prueba** que fija la regla —con un criterio de orden, que es el caso
+donde la condición vieja se apagaba por la razón equivocada— y la deja
+imposible de perder.
+
+**2. Los títulos que repetían el botón.** "Campos" en el primer nivel de Filtrar
+y "Criterios" en Ordenar decían lo que ya decía el botón que acabas de apretar.
+**Los dos se eliminan.** Y en el segundo nivel, la vuelta y el nombre del campo
+**se funden en una sola línea**: "‹ Fecha", "‹ Estado", "‹ Proyecto" — dice
+dónde estás y cómo volver a la vez, en vez de gastar dos renglones. Se conservan
+los títulos que separan grupos dentro de un mismo menú: "Aplicado" en Filtrar,
+"Rango fijo" en Fecha, y "Días" y "Horizonte" en Rango.
+
+*Esto deshace parte de #305b*, que le agregó un título a Ordenar porque era el
+único sin uno. Queda parejo igual, por el otro lado: **ningún menú lleva título
+que repita su botón.** Es un cambio deliberado del dueño, no un olvido.
+
+**3. El rango de fechas no cabía en el menú.** Los dos campos de "Rango fijo" se
+salían por el borde derecho y el segundo quedaba cortado. Las cuentas: el menú
+mide 280 y sus bordes se comen 18, quedan 262; con 10 de relleno a cada lado y 6
+entre elementos, para los dos campos y el guion quedaban 230, y cada campo pedía
+cerca de 125 —letra de 12, 7 de relleno lateral, "dd/mm/aaaa" más el ícono del
+calendario—: 250, **faltaban unos 20**. Los campos se achican hasta caber (letra
+11, relleno 5) y se achican también el guion y el relleno de la fila, que
+devuelven otros 10 de holgura. Medido: cada campo queda en 113 y los dos entran
+dentro del ancho útil, **sin recortar su contenido** — que es el límite real:
+por debajo de cierto punto el navegador se come el ícono del calendario y el
+campo deja de abrirse con un clic. Ensanchar el menú no era opción: los 280 son
+la decisión de #305b, la que hace que la caja no cambie de tamaño entre menús.
+
+**4. El globo del nombre del frente era muy lento.** *Causa:* **no tenía globo
+propio.** Lo que aparecía era el del navegador (el `title` que puso #321), que
+solo sale cuando el texto está recortado y tarda alrededor de un segundo por
+diseño del navegador. No estaba mal configurado: no existía. El nombre del
+frente y el del sub frente pasan al **`data-tip` del producto**, el mismo globo
+inmediato que ya usan los "+" de esas mismas celdas.
+
+Detalles que muerden y quedaron resueltos:
+
+- El globo **no puede colgar de `.fija-txt`**, que recorta con `overflow: hidden`
+  para poner los puntos suspensivos y se lo comería; ni del `td`, que también
+  contiene el "+" y mostraría **dos globos a la vez**. Va en un envoltorio
+  propio, que además es el que lleva el `min-width: 0` que impide que una
+  palabra larga ensanche la columna.
+- Se abre **hacia la derecha**, como el rótulo del proyecto (#192): estas
+  columnas están pegadas al borde izquierdo del scroll de la grilla y un globo
+  centrado quedaría recortado por ahí. Con un salto de capa mínimo al pasar el
+  mouse, para que la columna hermana —que es sticky y se pinta después— no lo
+  tape, y por debajo del encabezado congelado (#193).
+- **En la columna de tarea no se agrega nada:** su tarjeta ya lleva el título
+  completo y aparece de inmediato, sin retardo. Un `data-tip` encima serían dos
+  globos a la vez.
+
+**Verificado** en `docs/prueba-321-gantt-y-encabezados.mjs`, que pasa a cubrir
+los cuatro pedidos de la rama: **109 comprobaciones en verde** (G = #321,
+M = #324, C = #305c, D = #305d). La sección D reproduce el camino exacto del
+pedido con un criterio de orden, mide los dos campos de fecha contra el ancho
+útil del menú y comprueba que ninguno recorta su contenido, y mide el globo a
+los **120 ms** de pasar el mouse — si a esa altura ya está, no es el del
+navegador, que tarda cerca de un segundo.
+
+Dos aserciones anteriores se actualizaron, no se relajaron: la de #305b que
+exigía un título en Ordenar (que este pedido elimina a propósito) y la de #321
+que buscaba el nombre completo en el `title` (que ahora vive en el `data-tip`).

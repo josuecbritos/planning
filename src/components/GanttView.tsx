@@ -700,7 +700,10 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   const hayCarga = carga.personas.length > 0 || carga.sinAsignar !== null || (!!misTareas && !!carga.total)
 
   return (
-    <div>
+    // #321: la raíz participa del flujo vertical de `.content--gantt` — sin la
+    // clase, este envoltorio cortaría la cadena de flex y la grilla no podría
+    // ocupar lo que sobra.
+    <div className="gantt-raiz">
       {/* #305: sobre la grilla ya no hay franjas propias de la Gantt. La
           leyenda la absorbieron los contadores del encabezado, y el horizonte
           —con su aviso de fin de semana— es el control "Rango" de la barra.
@@ -1002,7 +1005,12 @@ function FilaGanttRow({
   // se trunca con "…" y el nombre completo queda en el tooltip.
   const celdaProyecto = (span: number) => (
     <td
-      className="fija fija--proy"
+      // #321: `fija--rotula` lo suma al mecanismo que ya usan frente y sub
+      // frente — el efecto centra el rótulo en la porción VISIBLE del bloque y
+      // lo acompaña al desplazar. Antes se centraba sobre el bloque COMPLETO,
+      // así que en un proyecto más alto que la pantalla el nombre quedaba
+      // fuera de vista y la franja se leía como color sin explicación.
+      className="fija fija--proy fija--rotula"
       rowSpan={span}
       style={{ background: proyecto?.color ?? '#607d8b' }}
       // #192: `data-tip` (globo propio, inmediato) en vez del `title` nativo,
@@ -1021,7 +1029,14 @@ function FilaGanttRow({
     <td className="fija fija--frente fija--rotula" rowSpan={span}>
       <span className="fija-nombre">
         <span className="con-mas">
-          {frente.nombre}
+          {/* #321: el nombre se corta con "…" en vez de partirse a mitad de
+              palabra; completo, en el globo.
+              #305d: el globo es el `data-tip` del producto —inmediato— y no el
+              `title` del navegador, que solo aparecía con el texto recortado y
+              con cerca de un segundo de retardo que fija el navegador. */}
+          <span className="fija-tip" data-tip={frente.nombre}>
+            <span className="fija-txt">{frente.nombre}</span>
+          </span>
           {permiteCrear && can.crearFrentes && (
             <button
               className="mas-btn"
@@ -1043,7 +1058,9 @@ function FilaGanttRow({
     <td className="fija fija--sf fija--rotula" rowSpan={span}>
       <span className="fija-nombre">
         <span className="con-mas">
-          {sub.nombre}
+          <span className="fija-tip" data-tip={sub.nombre}>
+            <span className="fija-txt">{sub.nombre}</span>
+          </span>
           {permiteCrear && can.crearSubFrentes && (
             <button
               className="mas-btn"
@@ -1291,6 +1308,11 @@ function FilaGanttRow({
           </button>
         )}
         <span className="con-mas">
+          {/* #321: mismo corte con "…" que en frente y sub frente. Acá el
+              nombre completo ya lo muestra la tarjeta al pasar el mouse —que
+              lo lleva de título y aparece de inmediato, sin retardo—: agregarle
+              un `data-tip` encima mostraría dos globos a la vez. */}
+          <span className="fija-tip"><span className="fija-txt">
           {can.editarTareas(tarea) ? (
             <InlineText
               valor={tarea.titulo}
@@ -1311,6 +1333,7 @@ function FilaGanttRow({
               </span>
             </HoverCard>
           )}
+          </span></span>
           <span className="con-mas__acciones">
             <button
               className="mas-btn"

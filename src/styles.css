@@ -5,6 +5,9 @@
   --verde-suave: #e6f4ea;
   --verde-check: #1b7f3b;
 
+  /* #321/#323: los dos grises de la Gantt. Frente más oscuro que sub frente,
+     con diferencia suficiente en los DOS temas. */
+  --gris-frente: #dcdce1;
   --gris-sf: #ececee;
   --gris-borde: #c7c6ca;
   --gris-linea: #e4e4e7;
@@ -42,7 +45,6 @@
      Antes se pedía `--primario-claro`, que no existe: funcionaba de casualidad
      por el valor de respaldo escrito al lado. Es el mismo color de siempre. */
   --sidebar-acento: #9fd0a8;
-  --estructura: #1a1a1b;
   --borde-input: #71717a;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --sombra-flotante: 0px 2px 4px rgba(0, 0, 0, 0.05);
@@ -78,7 +80,6 @@
   --primario: #f4f4f5;
   --primario-hover: #ffffff;
   --sobre-primario: #131316;
-  --estructura: #26262b;
   --borde-input: #8b8b93;
   --grilla-punto: rgba(255, 255, 255, 0.05);
 
@@ -88,6 +89,7 @@
   --velo: rgba(255, 255, 255, .07);
   --velo-fuerte: rgba(255, 255, 255, .12);
 
+  --gris-frente: #34343c;
   --gris-sf: #26262b;
   --gris-borde: #4b4b52;
   --gris-linea: #2c2c31;
@@ -955,10 +957,23 @@ table.tareas .col-desv { text-align: center; }
   border: none; background: none; cursor: pointer; padding: 5px 8px 5px 4px; border-radius: 999px;
 }
 .filtro-ficha__x:hover { color: var(--rojo); }
-.filtro-rango { display: flex; align-items: center; gap: 6px; padding: 4px 10px 10px; font-size: 12px; color: var(--gris-texto); }
+/* #305d — Los dos campos de "Rango fijo" se salían por el borde derecho: el
+   segundo quedaba cortado. Las cuentas: el menú mide 280 y sus bordes se comen
+   18, quedan 262; con 10 de relleno a cada lado y 6 entre elementos, para los
+   dos campos y el guion quedaban 230, y cada campo pedía cerca de 125 —letra
+   de 12, 7 de relleno lateral, "dd/mm/aaaa" más el ícono del calendario—: 250,
+   faltaban 20. Se achican los campos hasta caber (letra 11, relleno 5) y
+   también el guion y el relleno de la fila, que devuelven otros 10 de holgura.
+   Ensanchar el menú no es opción: los 280 son la decisión de #305b, la que
+   hace que la caja no cambie de tamaño al pasar de un control a otro.
+   El LÍMITE es el ícono del calendario: por debajo de cierto punto el
+   navegador lo recorta y el campo deja de abrirse con un clic. La prueba mide
+   que los dos campos entren enteros en el menú y que ninguno recorte su
+   contenido. */
+.filtro-rango { display: flex; align-items: center; gap: 4px; padding: 4px 6px 8px; font-size: 11px; color: var(--gris-texto); }
 .filtro-rango .fecha-input {
-  width: auto; font-size: 12px; border: 1px solid var(--gris-borde); background: var(--superficie);
-  color: var(--texto); border-radius: 4px; padding: 5px 7px;
+  width: auto; min-width: 0; font-size: 11px; border: 1px solid var(--gris-borde); background: var(--superficie);
+  color: var(--texto); border-radius: 4px; padding: 5px;
 }
 .filtro-guardado { display: flex; align-items: center; gap: 2px; border-radius: 9px; padding-right: 4px; }
 .filtro-guardado:hover { background: var(--velo); }
@@ -1053,8 +1068,10 @@ td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { 
   background: #1a1a1b; color: #fff; font-size: 11px; font-weight: 600;
   padding: 3px 9px; border-radius: 5px; white-space: nowrap; z-index: 100; pointer-events: none;
 }
-.gantt td.fija--frente .mas-btn { background: rgba(255,255,255,.25); color: #fff; }
-.gantt td.fija--frente .mas-btn:hover { background: rgba(255,255,255,.45); }
+/* #321: el "+" seguía el blanco-sobre-negro del bloque; ahora hereda el velo
+   estándar sobre superficie clara, como el resto. */
+.gantt td.fija--frente .mas-btn { background: var(--velo-fuerte); color: inherit; }
+.gantt td.fija--frente .mas-btn:hover { background: var(--velo); }
 
 /* Creacion inline desde la grilla (§6.4.25): el "+" inserta el input en
    su propia celda, igual que en la vista tabla. */
@@ -1106,10 +1123,33 @@ td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { 
 .gantt tr.carga-fila--total td.carga-celda { font-weight: 700; }
 .avatar--total { background: #2f2f34; color: #fff; font-weight: 700; }
 .carga-celda { font-size: 12px; color: var(--texto); text-align: center; }
+/* #321 — El alto de la grilla ya NO se fija con un número.
+   Era `100vh - 250px`: medido contra la pantalla COMPLETA cuando la grilla
+   vive dentro de lo que sobra bajo el encabezado, que ya es más corto. De ahí
+   los dos síntomas que parecían distintos —espacio muerto abajo o última fila
+   cortada, según cuánto hubiera arriba—, y con #305 el espacio muerto creció
+   porque quedó menos encima. Cualquier valor a mano vuelve a desalinearse cada
+   vez que cambie algo de arriba; ocupar lo que sobra hace que no pueda
+   repetirse. El tope se mantiene como respaldo para cuando el contenedor NO
+   impone alto (fuera de `.content--gantt`). */
 .gantt-scroll {
   overflow: auto; border: 1px solid var(--gris-borde); border-radius: 8px; background: var(--superficie);
   max-height: calc(100vh - 250px);
 }
+
+/* #321 — Un solo scroll. Si la grilla ocupa exactamente lo que sobra, nunca
+   empuja la página hacia abajo y el scroll de la pantalla deja de existir por
+   sí solo; de paso, encabezado, contadores y barra de controles quedan
+   siempre a la vista. En tabla NO se aplica: una lista larga sí debe
+   desplazar la pantalla. */
+.content--gantt { display: flex; flex-direction: column; overflow: hidden; }
+.content--gantt .controles-bar { flex: none; }
+.content--gantt .gantt-raiz { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.content--gantt .gantt-wrap {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+  padding-bottom: 16px;
+}
+.content--gantt .gantt-scroll { flex: 1; min-height: 0; max-height: none; }
 table.gantt { border-collapse: separate; border-spacing: 0; }
 table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); border-bottom: 1px solid var(--gris-linea); }
 
@@ -1122,7 +1162,59 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    proyecto la variable vale 0 y la geometría queda EXACTAMENTE como estaba. */
 .gantt { --gantt-proy-w: 0px; }
 .gantt--conproy { --gantt-proy-w: 28px; }
+/* `overflow-wrap: anywhere` es la RED DE SEGURIDAD de las columnas congeladas:
+   sus `left` asumen los anchos exactos declarados, así que una palabra larga
+   que ensanchara una columna desplazaría todos los anclajes (`break-word` no
+   reduce el ancho mínimo intrínseco dentro de una tabla). Se conserva.
+   #321: lo que cambia es que el NOMBRE ya no se parte a mitad de palabra —eso
+   lo hace `.fija-txt`, que corta con puntos suspensivos sin poder ensanchar
+   nada—. La red sigue puesta para todo lo demás que vive en estas celdas. */
 .gantt .fija { position: sticky; background: var(--superficie); z-index: 2; overflow-wrap: anywhere; }
+
+/* #321 — El nombre se corta, no se parte.
+   "Herramienta Planificación" en la columna de frente quedaba "Planificació /
+   n": el corte en cualquier letra estaba forzado a propósito, para que ninguna
+   palabra larga ensanchara la columna. Acá se consigue lo mismo por otro
+   camino: el texto envuelve por palabras (`overflow-wrap: normal`), y la
+   palabra que no cabe desborda su línea y se corta con "…".
+   Que la columna NO se ensanche lo garantiza `min-width: 0`: un ítem flexible
+   con mínimo cero aporta cero al ancho mínimo de su contenedor, así que el
+   ancho intrínseco de la celda deja de depender de la palabra más larga. El
+   nombre completo queda en el `title`. */
+.gantt .fija-txt {
+  display: block;
+  overflow: hidden; text-overflow: ellipsis;
+  overflow-wrap: normal; word-break: normal;
+}
+
+/* #305d — El globo del nombre.
+   El nombre del frente no tenía globo PROPIO: lo que aparecía era el del
+   navegador (`title`), que solo sale cuando el texto está recortado y tarda
+   alrededor de un segundo por diseño del navegador. No estaba mal
+   configurado: no existía. Pasa al `data-tip` del producto, el mismo globo
+   inmediato que ya usan los "+" de estas mismas celdas.
+   Va en un envoltorio propio y NO en `.fija-txt`, que recorta con
+   `overflow: hidden` y se comería el globo; y no en el `td`, que también
+   contiene el "+" y mostraría los dos globos a la vez.
+   El envoltorio es además el que lleva `min-width: 0`, que es lo que impide
+   que una palabra larga ensanche la columna (ver `.fija-txt` en #321). */
+.gantt .fija-tip { position: relative; display: block; flex: 1 1 auto; min-width: 0; }
+.gantt .fija-tip[data-tip]:hover::after {
+  content: attr(data-tip);
+  /* Se abre hacia la DERECHA, como el rótulo del proyecto (#192): estas
+     columnas están pegadas al borde izquierdo del scroll de la grilla, y un
+     globo centrado quedaría recortado por ahí. */
+  position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%);
+  background: #1a1a1b; color: #fff; font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 5px; white-space: nowrap;
+  z-index: 1; pointer-events: none; border: 1px solid rgba(255,255,255,.25);
+}
+/* #193: el salto de capa es MÍNIMO y queda por DEBAJO del encabezado
+   congelado (30/40) — con un valor alto, estas celdas (que abarcan su bloque
+   entero con rowSpan) se pintarían sobre el encabezado al desplazarse bajo él.
+   Sin el salto, el globo queda tapado por la columna hermana, que es sticky y
+   se pinta después. */
+.gantt td.fija--rotula:hover { z-index: 5; }
 .gantt .fija--proy {
   left: 0;
   width: var(--gantt-proy-w); min-width: var(--gantt-proy-w); max-width: var(--gantt-proy-w);
@@ -1162,8 +1254,15 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   border: 1px solid rgba(255,255,255,.28);
   box-shadow: 0 3px 12px rgba(0,0,0,.45);
 }
+/* #321: el rótulo pasa a tener ALTO NATURAL (acotado al del bloque) en vez de
+   ocupar el bloque entero, que es lo que le permite al efecto de `fija--rotula`
+   centrarlo en la porción visible y acompañar el desplazamiento — el mismo
+   mecanismo que ya usaban frente y sub frente. Con `inset: 0` el rótulo medía
+   todo el bloque y el nombre quedaba en su centro geométrico, fuera de la
+   pantalla cuando el bloque era más alto que ella. */
 .gantt td.fija--proy .proy-rotulo {
-  position: absolute; inset: 0;
+  position: absolute; left: 0; right: 0; top: 0;
+  max-height: 100%;
   display: flex; align-items: center; justify-content: center;
   writing-mode: vertical-rl; transform: rotate(180deg);
   overflow: hidden; padding: 4px 0;
@@ -1206,8 +1305,15 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .gantt td.lunes, .gantt th.lunes { border-left: 2px solid var(--semana-borde); }
 
 /* Etiquetas fijas de frente/subfrente (celdas combinadas) */
+/* #321/#323 — El bloque del frente era negro sólido (`--estructura`), la
+   superficie más oscura de la pantalla, y competía con la grilla. Pasa a un
+   gris propio, con el nombre en texto normal en vez de blanco sobre negro. La
+   separación entre columnas la sigue dando el borde, no el relleno.
+   #323: frente y sub frente usan ahora DOS tokens distintos. En modo oscuro
+   eran el mismo valor exacto (`#26262b`, uno vía `--estructura` y otro vía
+   `--gris-sf`): no es que se parecieran, eran idénticos. */
 .gantt td.fija--frente {
-  background: var(--estructura); color: #fff; font-weight: 700; font-size: 12px;
+  background: var(--gris-frente); color: var(--texto); font-weight: 700; font-size: 12px;
   letter-spacing: .02em; vertical-align: middle; text-align: center;
   padding: 8px 10px;
 }
@@ -1824,7 +1930,9 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 /* ---------- Fase 3: Mi Panel ---------- */
 
-.mipanel-alerta { color: var(--rojo); font-weight: 700; }
+/* #324: el aviso de atrasadas en texto de Mis Tareas desapareció — el contador
+   rojo del encabezado dice el mismo número, con color y en el mismo lugar que
+   en un proyecto. */
 .mipanel-proyecto { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; }
 .mipanel-ruta { font-size: 12px; color: var(--gris-texto); }
 .hc-estado--ninguno-claro { background: var(--gris-linea); color: var(--gris-texto); }
