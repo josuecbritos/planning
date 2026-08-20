@@ -509,7 +509,21 @@ table.tareas .col-desv { text-align: center; }
 .estado-chip--morado { color: var(--morado-texto); border-color: #d5bfe0; }
 
 /* Celda del titulo con color de gestion (6.5) */
-.tarea-cell { font-weight: 600; position: relative; }
+/* #326: el nombre de la tarea iba en 600 y su sub frente en 500 —perdió la
+   negrita en #306, para dejar de competir con el nombre del frente—, así que
+   el hijo pesaba más que el contenedor.
+   Queda en 500, el MISMO peso que su sub frente. La primera versión lo bajó a
+   400 y, visto en pantalla, se fue un escalón de más: los nombres costaban de
+   leer. El objetivo era que la tarea dejara de pesar MÁS que lo que la
+   contiene, no que pesara menos; igualarlos lo consigue y le deja cuerpo para
+   leerse de corrido.
+   El visto verde (`.tarea-cell__mark`, 700) y el ↻ ×N (`.replan-count`, 700)
+   declaran el suyo y no dependen de este; el campo de edición sí, porque
+   `.inline-input` lleva `font: inherit` — que es lo que hace que el texto no
+   cambie de grosor al entrar y salir de edición.
+   Vale para la tabla del proyecto y para Mis Tareas, que usan esta misma
+   celda. */
+.tarea-cell { font-weight: 500; position: relative; }
 
 
 .tarea-cell--verde { background: var(--verde-suave); }
@@ -675,9 +689,13 @@ table.tareas .col-desv { text-align: center; }
    hacía que la separación entre frentes se viera bastante mayor de lo que era.
    El margen negativo cancela la mitad del margen inferior del sub frente de
    arriba: quedan 4 contra los 20 que la separan del frente de abajo. */
+/* #326: el peso lo iguala al de "+ Tarea" y al del propio "+ Sub Frente"
+   cuando el frente está vacío —los dos son botones fantasma en 600—: son la
+   misma acción y no tenían por qué leerse distinto. Sigue siendo línea y sigue
+   en gris; lo único que cambia es el peso. */
 .subfrente-add-linea {
   display: block; margin: -4px 0 0; padding: 0 2px;
-  font: inherit; font-size: 12px; color: var(--gris-texto);
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--gris-texto);
   background: none; border: none; cursor: pointer;
 }
 .subfrente-add-linea:hover { color: var(--primario); text-decoration: underline; }
@@ -824,19 +842,11 @@ table.tareas .col-desv { text-align: center; }
 .marca-wrap { display: inline-flex; }
 .marca-wrap--click { cursor: pointer; }
 
-/* Tooltips contextuales por celda (punto 2): mismo estilo que los
-   tooltips de los iconos (burbuja charcoal), con retardo corto para que
-   no aparezcan al cruzar el mouse por la grilla. */
-.gantt td.celda[data-tip] { position: relative; }
-.gantt td.celda[data-tip]:hover::after {
-  content: attr(data-tip);
-  position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%);
-  background: #1a1a1b; color: #fff; font-size: 11px; font-weight: 600;
-  padding: 3px 9px; border-radius: 4px; white-space: nowrap;
-  z-index: 120; pointer-events: none;
-  opacity: 0; animation: tip-in .12s ease .18s forwards;
-}
-@keyframes tip-in { to { opacity: 1; } }
+/* #327: el globo de la celda colgaba de acá con un `::after`, así que quedaba
+   dentro del recuadro con scroll de la grilla y ese recuadro lo recortaba
+   contra el borde de arriba. Ahora lo dibuja `GloboTip` en una capa aparte
+   (ver `.globo-tip`); la celda solo declara su texto, su lado y su retardo. */
+
 /* ---------- Barra de controles (#305) ----------
    Franja 3 de las tres que hay sobre la grilla. Cuatro controles fijos y un
    único elemento que aparece y desaparece ("Actualizar vista"), pegado al
@@ -1138,12 +1148,7 @@ td:hover > .con-mas .mas-btn, td:hover > .con-mas .con-mas__acciones .mas-btn { 
    la celda-rotula, igual que el de tareas. */
 .gantt td.fija--rotula:hover .con-mas .mas-btn { opacity: 1; }
 .mas-btn:hover { background: rgba(0,0,0,.2); }
-.mas-btn[data-tip]:hover::after {
-  content: attr(data-tip);
-  position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
-  background: #1a1a1b; color: #fff; font-size: 11px; font-weight: 600;
-  padding: 3px 9px; border-radius: 5px; white-space: nowrap; z-index: 100; pointer-events: none;
-}
+/* #327: su globo también salió de acá — ver `.globo-tip`. */
 /* #321: el "+" seguía el blanco-sobre-negro del bloque; ahora hereda el velo
    estándar sobre superficie clara, como el resto. */
 .gantt td.fija--frente .mas-btn { background: var(--velo-fuerte); color: inherit; }
@@ -1275,22 +1280,12 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    El envoltorio es además el que lleva `min-width: 0`, que es lo que impide
    que una palabra larga ensanche la columna (ver `.fija-txt` en #321). */
 .gantt .fija-tip { position: relative; display: block; flex: 1 1 auto; min-width: 0; }
-.gantt .fija-tip[data-tip]:hover::after {
-  content: attr(data-tip);
-  /* Se abre hacia la DERECHA, como el rótulo del proyecto (#192): estas
-     columnas están pegadas al borde izquierdo del scroll de la grilla, y un
-     globo centrado quedaría recortado por ahí. */
-  position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%);
-  background: #1a1a1b; color: #fff; font-size: 11px; font-weight: 600;
-  padding: 3px 9px; border-radius: 5px; white-space: nowrap;
-  z-index: 1; pointer-events: none; border: 1px solid rgba(255,255,255,.25);
-}
-/* #193: el salto de capa es MÍNIMO y queda por DEBAJO del encabezado
-   congelado (30/40) — con un valor alto, estas celdas (que abarcan su bloque
-   entero con rowSpan) se pintarían sobre el encabezado al desplazarse bajo él.
-   Sin el salto, el globo queda tapado por la columna hermana, que es sticky y
-   se pinta después. */
-.gantt td.fija--rotula:hover { z-index: 5; }
+/* #327: el globo salió de acá a `.globo-tip`. El envoltorio se queda porque
+   sigue haciendo el otro trabajo por el que existe: lleva el `min-width: 0`
+   que impide que una palabra larga ensanche la columna (ver `.fija-txt` en
+   #321), y es donde el marcado declara el texto y el lado del globo.
+   Con él se fue el salto de capa que necesitaba: el globo ya no puede quedar
+   tapado por la columna hermana, porque no vive dentro de la grilla. */
 .gantt .fija--proy {
   left: 0;
   width: var(--gantt-proy-w); min-width: var(--gantt-proy-w); max-width: var(--gantt-proy-w);
@@ -1317,19 +1312,11 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    #193: el salto es MÍNIMO (5) y queda por DEBAJO del encabezado (30/40). Con
    un valor alto, esta celda —que abarca todo su frente con rowSpan— se pintaba
    sobre el encabezado congelado y parecía "salirse" tapando lo de arriba. */
-.gantt td.fija--proy[data-tip]:hover { z-index: 5; }
-.gantt td.fija--proy[data-tip]:hover::after {
-  content: attr(data-tip);
-  position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%);
-  background: #1a1a1b; color: #fff; font-size: 11px; font-weight: 600;
-  padding: 3px 9px; border-radius: 5px; white-space: nowrap;
-  z-index: 1; pointer-events: none;
-  /* #193: el globo cae sobre la columna de Frente, que también es oscura, y
-     sin separación se leía como si fuera el nombre del frente. El borde claro
-     y la sombra lo despegan del fondo: se ve flotando, no incrustado. */
-  border: 1px solid rgba(255,255,255,.28);
-  box-shadow: 0 3px 12px rgba(0,0,0,.45);
-}
+/* #327: el globo del rótulo también salió de acá. El borde claro y la sombra
+   que le puso #193 —para que no se leyera como el nombre del frente al caer
+   sobre esa columna, que es oscura— pasan a `.globo-tip` y ahora los llevan
+   los cuatro: fuera de la grilla, cualquiera de ellos puede caer sobre
+   cualquier fondo. */
 /* #321: el rótulo pasa a tener ALTO NATURAL (acotado al del bloque) en vez de
    ocupar el bloque entero, que es lo que le permite al efecto de `fija--rotula`
    centrarlo en la porción visible y acompañar el desplazamiento — el mismo
@@ -1443,7 +1430,12 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   -webkit-mask-image: linear-gradient(to left, transparent 2px, #000 26px);
   mask-image: linear-gradient(to left, transparent 2px, #000 26px);
 }
-.gantt td.fija--tarea { font-weight: 600; padding: 4px 10px; font-size: 12.5px; }
+/* #326: mismo peso que en la tabla —500, el de su sub frente—, para que el
+   nombre de la tarea se lea igual en las dos vistas. El TAMAÑO no se toca: acá
+   ya mide 12.5 contra los 13 de la tabla, y lo que se reportó es legibilidad.
+   Las filas de carga por persona declaran su propio 600
+   (`.carga-fila__nombre`) y no dependen de este. */
+.gantt td.fija--tarea { font-weight: 500; padding: 4px 10px; font-size: 12.5px; }
 .gantt td.fija--tarea.tarea-cell--verde { background: var(--verde-suave); }
 .gantt td.fija--tarea.tarea-cell--rojo { background: var(--rojo-suave); }
 .gantt td.fija--tarea.tarea-cell--ambar { background: var(--ambar-suave); }
@@ -1896,6 +1888,29 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 /* #213: el globo con el nombre completo. Va en un portal con position fixed,
    así que ningún `overflow` de la tabla puede recortarlo — que es justo lo que
    arruinó el menú de Vistas cuando se abría hacia arriba en la primera fila. */
+/* #327 — El globo de la Gantt, ya fuera del recuadro con scroll.
+   Es la misma burbuja charcoal de siempre; lo único que cambió es dónde vive.
+   `position: fixed` y un `z-index` por encima de la grilla y de su encabezado
+   congelado, porque ahora puede caer sobre cualquiera de los dos. El borde
+   claro y la sombra venían del globo del rótulo del proyecto (#193, para que
+   no se leyera como el nombre del frente al caer sobre esa columna oscura): en
+   una capa que pasa por encima de todo, ese riesgo lo corren los cuatro, así
+   que los llevan los cuatro.
+   `pointer-events: none` para que el globo no se ponga entre el cursor y la
+   celda que lo disparó. */
+.globo-tip {
+  position: fixed; z-index: 2000; pointer-events: none;
+  background: #1a1a1b; color: #fff; font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 5px; white-space: nowrap;
+  border: 1px solid rgba(255,255,255,.28);
+  box-shadow: 0 3px 12px rgba(0,0,0,.45);
+}
+/* Solo el de las celdas de la grilla, que es el que tiene retardo: aparece
+   suave, como lo hacía su animación. Los otros tres son inmediatos y se
+   dibujan de una vez. */
+.globo-tip--suave { opacity: 0; animation: globo-in .12s ease forwards; }
+@keyframes globo-in { to { opacity: 1; } }
+
 .nombre-globo {
   position: fixed; z-index: 140;
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px;

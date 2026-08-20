@@ -869,29 +869,36 @@ for (const [sel, etiqueta] of [
   // 120 ms: el globo del navegador tarda cerca de un segundo. Si a los 120 ms
   // ya está, no es el del navegador.
   await d.waitForTimeout(120)
+  // #327 sacó el globo de la celda: dejó de ser un `::after` del disparador y
+  // pasó a ser un elemento propio en una capa por encima de la página, porque
+  // dentro del recuadro con scroll de la grilla quedaba recortado. Se actualiza
+  // DÓNDE se lo busca; lo que se exige es lo mismo —que aparezca de inmediato,
+  // con el nombre completo y entero—, y de paso "entero" pasa a medirse contra
+  // la pantalla, que es contra lo que ahora tiene que caber.
   const globo = await d.evaluate((s) => {
     const e = document.querySelector(s)
-    const st = getComputedStyle(e, '::after')
-    const r = e.getBoundingClientRect()
-    const sc = document.querySelector('.gantt-scroll').getBoundingClientRect()
-    const ancho = parseFloat(st.width) || 0
+    const g = document.querySelector('.globo-tip')
+    const r = g?.getBoundingClientRect()
     return {
       tip: e.getAttribute('data-tip'),
       titleNativo: e.getAttribute('title') ?? e.parentElement?.getAttribute('title') ?? null,
-      contenido: st.content,
-      // El globo se abre a la derecha: su borde derecho no puede pasarse del
-      // scroll de la grilla, que es lo que recorta.
-      entero: r.right + 6 + ancho <= sc.right,
+      contenido: g?.textContent ?? 'sin globo',
+      fueraDelScroll: !!g && !document.querySelector('.gantt-scroll').contains(g),
+      entero: !!r && r.top >= 0 && r.left >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
     }
   }, sel)
   chk(!!globo.tip, `D13/D14 el nombre del ${etiqueta} tiene globo propio (data-tip)`, globo.tip ?? '')
   chk(globo.titleNativo === null, `D13/D14 y ya no usa el title del navegador, que es el lento`)
   chk(
-    globo.contenido.includes(globo.tip ?? ' '),
+    globo.contenido === globo.tip,
     `D13/D14 el globo del ${etiqueta} aparece de inmediato al pasar el mouse`,
     globo.contenido,
   )
-  chk(globo.entero, `D15 y se ve entero, sin cortarse contra el borde de la columna`, globo.contenido)
+  chk(
+    globo.entero && globo.fueraDelScroll,
+    `D15 y se ve entero, sin cortarse contra el borde de la columna`,
+    globo.contenido,
+  )
 }
 // La columna de tarea: su tarjeta ya lleva el título completo y es inmediata,
 // así que no se le encima un segundo globo.
