@@ -197,19 +197,22 @@ completo con creación y edición **inline** (sin formularios).
   chico, **cuántos sub frentes tiene** (no cuántas tareas: esa cuenta ya
   aparece en varios lugares). El **sub frente pierde la negrita**; su caja, su
   fondo y su borde no se tocan. Y el **aire se reordena**: entre sub frentes
-  del mismo frente baja de 26 a 8, y la separación grande (20) queda solo entre
+  del mismo frente baja de 26 a 8, y la separación grande (16) queda solo entre
   un frente y el siguiente. **Ese contraste es lo que comunica la
   pertenencia.** De paso se recupera pantalla: con los sub frentes cerrados el
-  contenido pasó de **600 a 432** de alto, y ese es justo el estado en que uno
+  contenido pasó de **600 a 412** de alto, y ese es justo el estado en que uno
   abre la pantalla para orientarse. **"+ Sub Frente"** deja de ser una fila de
   unos 60 y pasa a ser una **línea chica y gris** pegada debajo del último —
   salvo cuando el frente **no tiene ninguno**, donde **sigue siendo un botón**:
   es el momento más importante y la única acción posible, y ahí tiene que
   pesar. La línea "Sin sub frentes en este frente" se mantiene junto a él. Esa
-  línea va **pegada al último sub frente** (4 contra los 20 que la separan del
+  línea va **pegada al último sub frente** (4 contra los 16 que la separan del
   frente siguiente): así cierra su grupo en vez de leerse como un elemento más
   de la lista, que era lo que hacía que la separación entre frentes se viera
-  mucho mayor de lo que es.
+  mucho mayor de lo que es. **Con el frente plegado, su título queda centrado
+  entre la línea de arriba y la suya de abajo (#306c)**, y sale por
+  construcción: el mismo 16 de un lado y del otro, no dos números ajustados
+  para que coincidan.
 
   **Se pueden crear tareas con el filtro puesto (#320).** La fila de "+ Tarea"
   estaba escondida al filtrar, por un problema real —una tarea recién creada
@@ -301,12 +304,21 @@ desaparecían solas.
    de algo que acaba de pasar, y va ahí para que Vistas no se mueva al
    aparecer. **Rango solo existe en Gantt.**
 
-Entre los contadores y la barra de controles hay **13** (#306b): eran 26 —12
-debajo del encabezado más 14 arriba de la barra, sumados—, y con eso el bloque
-de botones se leía desprendido de lo de arriba. El aire de **arriba** del
-encabezado no se toca. Sigue siendo **padding** y no margen de la barra, para
-que la franja pegajosa incluya ese aire y **tape con su fondo opaco** lo que
-pasa por debajo al desplazar.
+**Un solo valor separa bloques: 16 (#306c).** La barra de controles queda
+**centrada** —16 arriba y 16 abajo—, y de ese mismo 16 sale la separación entre
+un frente y el siguiente, así que **el primer frente se separa de los botones
+igual que un frente del anterior**. Antes había cuatro espaciados fijados cada
+uno por su cuenta —12 arriba de la barra, 24 abajo, 28 del título de un frente
+plegado a la línea de arriba y 8 a la de abajo— y ninguno calzaba con otro; por
+eso ajustar uno descuadraba otro, que es lo que pasó en #306b. El aire de
+**arriba** del encabezado no se toca, y el de arriba de la barra va **partido en
+dos mitades** para que la línea del encabezado caiga justo en el medio. El de
+abajo lo pone **entero la barra**, como **padding y no margen**: así la franja
+pegajosa lo incluye y **tapa con su fondo opaco** lo que pasa por debajo al
+desplazar — puesto en el contenedor, el hueco sería transparente. Lo que **no**
+entra en la regla es el aire de **adentro** de un grupo (los 8 entre sub
+frentes): ese contraste contra el 16 es justo lo que hace que los grupos se
+lean.
 
 Los cuatro menús **abren con la misma caja**, de ancho fijo, para que no cambie
 de tamaño al pasar de un control a otro; Vistas queda fuera de esa regla porque

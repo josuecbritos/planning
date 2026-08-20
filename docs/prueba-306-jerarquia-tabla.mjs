@@ -1,4 +1,5 @@
-// #306 y #306b — La tabla: jerarquía y espacio muerto, y el "+" de la Gantt.
+// #306, #306b y #306c — La tabla: jerarquía y espacio muerto, el "+" de la
+// Gantt, y un solo valor para todo lo que separa bloques.
 //
 // Dos problemas que se resuelven juntos, porque el aire que se recupera es el
 // mismo que pasa a marcar los grupos:
@@ -26,12 +27,20 @@
 // frente tenían el MISMO peso (15px/700 contra 13.5px/700), no había cuenta de
 // sub frentes al lado del nombre, y el alto con todo plegado era 600.
 //
-// Los criterios de #306b —los ajustes tras la primera revisión— van al final,
-// con prefijo B. Medido entre las dos versiones: el aire entre los contadores y
+// Los criterios de #306b —los ajustes tras la primera revisión— van con
+// prefijo B. Medido entre las dos versiones: el aire entre los contadores y
 // los botones pasó de 26 a 13, la separación entre frentes de 28 a 20, y el
 // alto con todo plegado de 452 a 432. Y el "+" de la Gantt dejó de estar
 // siempre en el borde: ahora se pega al nombre, y solo se apoya en el borde
 // cuando el nombre no deja sitio.
+//
+// Los de #306c van al final, con prefijo C. Ahí los cuatro espaciados que
+// estaban fijados cada uno por su cuenta pasan a salir de un valor único de
+// 16, y lo que se comprueba son las IGUALDADES —arriba contra abajo de la
+// barra, el primer frente contra uno cualquiera, el título plegado contra sus
+// dos líneas—, no los números: un valor se puede cambiar, que calcen entre sí
+// es la propiedad. Medido: la barra pasó de 12 arriba y 24 abajo a 16 y 16, y
+// el alto con todo plegado de 432 a 412.
 //
 // Cómo correrla:
 //   npm run build && npx vite preview --port 4173 &
@@ -158,14 +167,18 @@ chk(
   `${aire.hermanos.join(', ')} (antes 26)`,
 )
 chk(
-  // #306b bajó esta distancia de 28 a 20: lo que se exige es que siga siendo
-  // la separación GRANDE, no un número concreto.
-  aire.entreFrentes.length > 0 && aire.entreFrentes.every((d) => d >= 18),
+  // #306b bajó esta distancia de 28 a 20 y #306c la fijó en 16, el valor único
+  // de bloque: lo que se exige es que siga siendo la separación GRANDE, no un
+  // número concreto.
+  aire.entreFrentes.length > 0 && aire.entreFrentes.every((d) => d >= 16),
   '1 y la separación grande queda solo entre un frente y el siguiente',
   aire.entreFrentes.join(', '),
 )
 chk(
-  Math.min(...aire.entreFrentes) > Math.max(...aire.hermanos) * 2,
+  // `>=` y no `>`: con el valor único de #306c la separación entre frentes es
+  // EXACTAMENTE el doble del aire de adentro (16 contra 8). Doblar es la
+  // propiedad que se pide; pasarse no aporta nada.
+  Math.min(...aire.entreFrentes) >= Math.max(...aire.hermanos) * 2,
   '1 el contraste entre las dos distancias es lo que comunica la pertenencia',
   `${Math.max(...aire.hermanos)} dentro contra ${Math.min(...aire.entreFrentes)} entre frentes`,
 )
@@ -196,7 +209,11 @@ const conFrentePlegado = await p.evaluate(() => {
   return Math.round(bl[1].getBoundingClientRect().top - bl[0].getBoundingClientRect().bottom)
 })
 chk(
-  conFrentePlegado !== null && conFrentePlegado >= 18,
+  // #306c la fijó en `--aire-bloque` (16). Se exige que la separación siga
+  // existiendo, no un número concreto: el frente plegado dejó de poner además
+  // su propio margen abajo, que era lo que dejaba el título a 28 de una línea
+  // y a 8 de la otra.
+  conFrentePlegado !== null && conFrentePlegado >= 16,
   '9 con un frente plegado, la separación con el siguiente se sigue leyendo',
   `${conFrentePlegado}px`,
 )
@@ -472,7 +489,12 @@ const aireTabla = await aireSobreLaBarra()
 await verVista('Gantt')
 const aireGantt = await aireSobreLaBarra()
 chk(
-  aireTabla <= 14,
+  // #306b lo bajó de 26 a 13 y #306c lo volvió a subir a 16 (17 contando la
+  // línea del encabezado), a propósito: 13 arriba contra 24 abajo dejaba la
+  // barra descolgada. Lo que se exige acá es que siga siendo claramente menor
+  // que los 26 del principio; que ARRIBA Y ABAJO midan lo mismo lo comprueba
+  // C1, que es el criterio real.
+  aireTabla <= 20,
   'B1 el aire entre los contadores y los botones es claramente menor que antes',
   `${aireTabla} (antes 26)`,
 )
@@ -670,5 +692,222 @@ const siguePie = await p.evaluate(() => {
 chk(siguePie.masGrande, 'B9 el frente sigue pesando más que sus sub frentes')
 chk(!!siguePie.cuenta && /sub frentes?$/.test(siguePie.cuenta), 'B9 y sigue diciendo cuántos tiene', siguePie.cuenta ?? '')
 
+// ═══════════════════════════════════════════════════════════════════════════
+// #306c — Un solo valor para todo lo que separa bloques
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Cuatro espaciados, cada uno fijado por su cuenta y ninguno calzando con
+// otro: 12 arriba de la barra de botones, 24 abajo, 28 del título de un frente
+// a la línea de arriba y 8 a la de abajo. Por eso ajustar uno descuadraba
+// otro. Ahora los cuatro salen del mismo `--aire-bloque`.
+//
+// Lo que se comprueba NO son los números sino las igualdades: que arriba y
+// abajo de la barra midan lo mismo, que el primer frente se separe de los
+// botones igual que un frente del anterior, y que el título plegado quede a la
+// misma distancia de sus dos líneas. Un solo valor se puede cambiar; que
+// calcen entre sí es la propiedad.
+
+// ── C1 y C2 · La barra queda centrada, y lo mismo en las dos vistas ────────
+console.log('\n── C1 y C2 · La barra de botones, centrada ──')
+await abrirProyecto()
+const alrededorDeLaBarra = () =>
+  p.evaluate(() => {
+    const r = (e) => e.getBoundingClientRect()
+    const contadores = r(document.querySelector('.counters'))
+    const boton = r(document.querySelector('.controles-bar .controles-btn'))
+    const envoltorio = document.querySelector('.tabla-wrap, .gantt-wrap')
+    return {
+      arriba: Math.round(boton.top - contadores.bottom),
+      abajo: Math.round(r(envoltorio.firstElementChild).top - boton.bottom),
+    }
+  })
+const barraTabla = await alrededorDeLaBarra()
+await verVista('Gantt')
+const barraGantt = await alrededorDeLaBarra()
+await verVista('Tabla')
+// El de arriba cruza la línea del encabezado, que suma 1: se admite esa
+// diferencia y nada más.
+chk(
+  Math.abs(barraTabla.arriba - barraTabla.abajo) <= 1,
+  'C1 la barra de botones queda centrada: mide lo mismo arriba que abajo',
+  `${barraTabla.arriba} arriba contra ${barraTabla.abajo} abajo (antes 12 contra 24)`,
+)
+chk(
+  barraTabla.arriba === barraGantt.arriba && barraTabla.abajo === barraGantt.abajo,
+  'C2 y es igual en tabla y en Gantt',
+  `tabla ${barraTabla.arriba}/${barraTabla.abajo} · gantt ${barraGantt.arriba}/${barraGantt.abajo}`,
+)
+
+// ── C3 · El aire de abajo es de la barra, no del contenedor ────────────────
+// Es lo que hace que la franja pegajosa lo incluya y tape con su fondo opaco
+// lo que pasa por debajo. Si lo pusiera el contenedor, el hueco sería
+// transparente y las filas se verían pasar por ahí.
+console.log('\n── C3 · La franja pegajosa incluye su aire ──')
+const franjaPegajosa = await p.evaluate(async () => {
+  const contenido = document.querySelector('.content')
+  contenido.scrollTop = 300
+  await new Promise((r) => requestAnimationFrame(r))
+  const barra = document.querySelector('.controles-bar')
+  const rb = barra.getBoundingClientRect()
+  const s = getComputedStyle(barra)
+  const envoltorio = getComputedStyle(document.querySelector('.tabla-wrap'))
+  return {
+    desplazado: contenido.scrollTop,
+    desfase: Math.round(rb.top - contenido.getBoundingClientRect().top),
+    rellenoAbajo: Math.round(parseFloat(s.paddingBottom)),
+    rellenoDelEnvoltorio: Math.round(parseFloat(envoltorio.paddingTop)),
+    // Justo sobre el borde de abajo del aire tiene que estar la barra, no una
+    // fila pasando por debajo.
+    justoAbajo: document.elementFromPoint(rb.left + 40, rb.bottom - 2)?.closest('.controles-bar') !== null,
+  }
+})
+chk(
+  franjaPegajosa.desplazado > 0 && Math.abs(franjaPegajosa.desfase) <= 1,
+  'C3 al desplazar la barra sigue pegada arriba',
+  `scroll=${franjaPegajosa.desplazado} desfase=${franjaPegajosa.desfase}`,
+)
+chk(
+  franjaPegajosa.rellenoAbajo > 0 && franjaPegajosa.rellenoDelEnvoltorio === 0,
+  'C3 y el aire de abajo lo pone la barra como relleno, no el contenedor',
+  `barra=${franjaPegajosa.rellenoAbajo} envoltorio=${franjaPegajosa.rellenoDelEnvoltorio}`,
+)
+chk(franjaPegajosa.justoAbajo, 'C3 y ese aire tapa lo que pasa por debajo: es franja, no hueco')
+await p.evaluate(() => (document.querySelector('.content').scrollTop = 0))
+await esperar(300)
+
+// ── C4 y C5 · El título plegado, centrado entre sus dos líneas ─────────────
+console.log('\n── C4 y C5 · El frente plegado ──')
+const chevsFrente = p.locator('.frente-cabecera .colapso-btn')
+const nFrentes = await chevsFrente.count()
+for (let i = 0; i < nFrentes; i++) {
+  await chevsFrente.nth(i).click()
+  await esperar(140)
+}
+await esperar(400)
+const franjas = await p.evaluate(() => {
+  const r = (e) => e.getBoundingClientRect()
+  const cabs = [...document.querySelectorAll('.frente-cabecera--colapsado')]
+  const boton = r(document.querySelector('.controles-bar .controles-btn'))
+  return cabs.map((c, i) => {
+    const t = c.querySelector('.frente-titulo')
+    // Para el primero, "lo que viene antes" es la barra de botones; para el
+    // resto, la línea del frente anterior. El pedido pide que se vean IGUAL.
+    const arriba = i === 0 ? boton.bottom : r(cabs[i - 1]).bottom
+    return {
+      nombre: t.firstChild.textContent.trim(),
+      deArriba: Math.round(r(t).top - arriba),
+      aSuLinea: Math.round(r(c).bottom - r(t).bottom),
+      primero: i === 0,
+    }
+  })
+})
+chk(franjas.length >= 2, 'C4 terreno: hay al menos dos frentes plegados', `${franjas.length}`)
+chk(
+  franjas.every((f) => Math.abs(f.deArriba - f.aSuLinea) <= 1),
+  'C4 el título del frente plegado queda centrado entre su línea de arriba y la de abajo',
+  franjas.map((f) => `${f.nombre} ${f.deArriba}/${f.aSuLinea}`).join(' · '),
+)
+const primero = franjas.find((f) => f.primero)
+const resto = franjas.filter((f) => !f.primero)
+chk(
+  resto.length > 0 && resto.every((f) => f.deArriba === primero.deArriba),
+  'C5 y el primer frente se separa de los botones igual que un frente del anterior',
+  `primero ${primero.deArriba} · resto ${resto.map((f) => f.deArriba).join(', ')}`,
+)
+
+// ── C6 y C7 · Los grupos se siguen leyendo, y el 8 de adentro no se toca ───
+console.log('\n── C6 y C7 · La agrupación no se pierde ──')
+for (let i = 0; i < nFrentes; i++) {
+  await chevsFrente.nth(i).click()
+  await esperar(140)
+}
+await esperar(400)
+const contraste = await p.evaluate(() => {
+  const r = (e) => e.getBoundingClientRect()
+  const bl = [...document.querySelectorAll('.frente-bloque')]
+  const dentro = []
+  for (const b of bl) {
+    const subs = [...b.querySelectorAll('.subfrente')]
+    for (let i = 1; i < subs.length; i++) dentro.push(Math.round(r(subs[i]).top - r(subs[i - 1]).bottom))
+  }
+  const entre = []
+  for (let i = 1; i < bl.length; i++) entre.push(Math.round(r(bl[i]).top - r(bl[i - 1]).bottom))
+  const linea = bl[0].querySelector('.subfrente-add-linea')
+  const subs0 = [...bl[0].querySelectorAll('.subfrente')]
+  return {
+    dentro,
+    entre,
+    lineaAlUltimoSub: linea && subs0.length ? Math.round(r(linea).top - r(subs0.at(-1)).bottom) : null,
+  }
+})
+chk(
+  contraste.dentro.length > 0 && contraste.dentro.every((d) => d === 8),
+  'C7 los sub frentes de un mismo frente siguen separados por 8, sin cambios',
+  contraste.dentro.join(', '),
+)
+chk(
+  contraste.entre.length > 0 && Math.min(...contraste.entre) >= Math.max(...contraste.dentro) * 2,
+  'C6 y la separación entre frentes sigue doblando a la de adentro: los grupos se leen',
+  `${Math.max(...contraste.dentro)} dentro contra ${Math.min(...contraste.entre)} entre frentes`,
+)
+chk(
+  contraste.lineaAlUltimoSub !== null && contraste.lineaAlUltimoSub <= 6,
+  'C8 la línea de "+ Sub Frente" sigue pegada al último sub frente, como en #306b',
+  `${contraste.lineaAlUltimoSub}`,
+)
+
+// ── C9 · Un solo valor, y de ahí salen los cuatro espaciados ───────────────
+// Si mañana hay que ajustar el espaciado, tiene que ser UNA decisión. Esta
+// comprobación es la que se rompe si alguien vuelve a fijar un número suelto.
+console.log('\n── C9 · Los cuatro espaciados salen del mismo valor ──')
+const regla = await p.evaluate(() => {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--aire-bloque').trim()
+  const n = parseFloat(v)
+  const s = getComputedStyle(document.querySelector('.controles-bar'))
+  const cab = document.querySelector('.frente-cabecera')
+  const bloque = document.querySelectorAll('.frente-bloque')[1]
+  return {
+    valor: n,
+    barraArriba: Math.round(parseFloat(s.paddingTop)) * 2,
+    barraAbajo: Math.round(parseFloat(s.paddingBottom)),
+    entreBloques: Math.round(parseFloat(getComputedStyle(bloque).marginTop)),
+    // La franja del frente plegado: hay que plegarlo para leerla, así que se
+    // mide sobre la regla, no sobre el elemento.
+    tieneCabecera: !!cab,
+  }
+})
+chk(regla.valor === 16, 'C9 hay un valor único de aire de bloque', `--aire-bloque: ${regla.valor}`)
+chk(
+  regla.barraArriba === regla.valor && regla.barraAbajo === regla.valor,
+  'C9 y de él salen el aire de arriba y el de abajo de la barra',
+  `arriba ${regla.barraArriba} (dos mitades) · abajo ${regla.barraAbajo}`,
+)
+chk(
+  regla.entreBloques === regla.valor,
+  'C9 y también la separación entre un frente y el siguiente',
+  `${regla.entreBloques}`,
+)
+
+// ── C10 · Lo de #306 y #306b sigue en pie ──────────────────────────────────
+console.log('\n── C10 · Lo verificado en #306 y #306b ──')
+const cierre = await p.evaluate(() => {
+  const fr = document.querySelector('.frente-titulo')
+  const sf = document.querySelector('.subfrente__titulo')
+  const px = (e) => parseFloat(getComputedStyle(e).fontSize)
+  const peso = (e) => Number(getComputedStyle(e).fontWeight)
+  return {
+    masGrande: px(fr) > px(sf) && peso(fr) > peso(sf),
+    cuenta: fr.querySelector('.frente-titulo__count')?.textContent.trim() ?? null,
+    hayLinea: !!document.querySelector('.subfrente-add-linea'),
+  }
+})
+chk(cierre.masGrande, 'C10 el frente sigue pesando más que sus sub frentes')
+chk(!!cierre.cuenta && /sub frentes?$/.test(cierre.cuenta), 'C10 y sigue diciendo cuántos tiene', cierre.cuenta ?? '')
+chk(cierre.hayLinea, 'C10 y "+ Sub Frente" sigue siendo línea con el frente poblado')
+
 await b.close()
-console.log(process.exitCode ? '\n⛔ HAY FALLAS' : '\n✅ #306 y #306b — la tabla se lee por grupos y el "+" se pega al nombre')
+console.log(
+  process.exitCode
+    ? '\n⛔ HAY FALLAS'
+    : '\n✅ #306, #306b y #306c — la tabla se lee por grupos, el "+" se pega al nombre y los espaciados calzan',
+)

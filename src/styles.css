@@ -1,4 +1,16 @@
 :root {
+  /* #306c — UN SOLO valor para todo lo que separa bloques.
+     Antes había cuatro espaciados fijados cada uno por su cuenta —12 arriba de
+     la barra de botones, 24 abajo, 28 del título de un frente a la línea de
+     arriba y 8 a la de abajo—, y ninguno calzaba con otro. Por eso ajustar uno
+     descuadraba otro: en #306b se bajó el aire de arriba de la barra y quedó
+     peor, porque el de abajo siguió igual. Con un valor único, ajustar el
+     espaciado vuelve a ser una sola decisión.
+     NO entra acá el aire de ADENTRO de un grupo —los 8 entre sub frentes del
+     mismo frente y los 10 del título a su contenido—: ese contraste contra los
+     16 es justo lo que hace que los grupos se lean. */
+  --aire-bloque: 16px;
+
   /* Paleta institucional del plan */
   --verde: #2e7d32;
   --verde-oscuro: #1b5e20;
@@ -320,14 +332,16 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
 
 /* ---------- Topbar / Header ---------- */
 
-/* #306b: entre la fila de contadores y la barra de Filtrar / Ordenar había 26
-   seguidos —12 debajo del encabezado más 14 arriba de la barra—, en tabla y en
-   Gantt. Bajan a 6 y 6: 12 en total, la mitad. El aire de ARRIBA del
-   encabezado no se toca. */
+/* #306b/#306c: entre la fila de contadores y la barra de Filtrar / Ordenar
+   había 26 seguidos —12 debajo del encabezado más 14 arriba de la barra—.
+   #306b los bajó a 6 y 6 y quedó peor, porque abajo de la barra seguía
+   habiendo 24. Ahora el hueco completo es `--aire-bloque`, repartido en dos
+   mitades iguales: así la línea del encabezado cae JUSTO EN EL MEDIO del aire
+   y ningún lado se lo apropia. El aire de ARRIBA del encabezado no se toca. */
 .topbar {
   background: var(--panel);
   border-bottom: 1px solid var(--gris-borde);
-  padding: 12px 20px 6px;
+  padding: 12px 20px calc(var(--aire-bloque) / 2);
   display: flex; flex-direction: column; gap: 12px;
 }
 .topbar__row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -385,10 +399,11 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
 
 /* ---------- Vista Tabla ---------- */
 
-/* #306: el aire de arriba se iguala al de la Gantt para que la franja gris de
-   los controles mida lo mismo en las dos vistas. Medido antes: 20 en la tabla
-   contra 16 en la Gantt. */
-.tabla-wrap { padding: 16px 20px 20px; }
+/* #306/#306c: el aire de arriba lo pone la barra de controles, no este
+   contenedor. Antes lo ponían los dos y sumaban 24 contra los 12 de arriba de
+   la barra, que es lo que la hacía verse descolgada; y además, puesto acá,
+   quedaba fuera de la franja pegajosa. */
+.tabla-wrap { padding: 0 20px 20px; }
 
 /* #306 — La pertenencia se marca con PESO y PROXIMIDAD, no con marcos ni
    sangría (es como agrupan Asana y Notion). Antes el hijo tenía más presencia
@@ -409,9 +424,12 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
    el aire llenaba el alto sin mostrar una sola tarea, que es justo el estado
    en que uno abre la pantalla para orientarse. */
 .subfrente { margin-bottom: 8px; }
-/* #306b: de 28 a 20. Solo se podía juzgar una vez que la línea de "+ Sub
-   Frente" dejó de caer en el medio y sumar su alto a la separación. */
-.frente-bloque + .frente-bloque { margin-top: 20px; }
+/* #306b: de 28 a 20, una vez que la línea de "+ Sub Frente" dejó de caer en el
+   medio y sumar su alto a la separación. #306c: pasa a ser `--aire-bloque`, el
+   mismo que deja la barra de controles arriba del primer frente. Los dos casos
+   —el primer frente y uno cualquiera— se ven iguales porque son el mismo
+   número, no porque se hayan ajustado dos números para que coincidan. */
+.frente-bloque + .frente-bloque { margin-top: var(--aire-bloque); }
 .subfrente__titulo {
   display: flex; align-items: center; gap: 8px;
   /* #306: pierde la negrita para dejar de competir con su padre. La caja, su
@@ -783,9 +801,11 @@ table.tareas .col-desv { text-align: center; }
 
 /* ---------- Vista Gantt (grilla) ---------- */
 
-/* #306: el aire de arriba es el MISMO que el de la tabla, para que la franja
-   gris de los controles mida lo mismo en las dos vistas. */
-.gantt-wrap { padding: 16px 20px 40px; }
+/* #306/#306c: el aire de arriba es el MISMO que el de la tabla, para que la
+   franja gris de los controles mida lo mismo en las dos vistas. Desde #306c ya
+   no lo pone este contenedor sino la barra de controles, que es lo que lo deja
+   DENTRO de la franja pegajosa: puesto acá, el hueco sería transparente. */
+.gantt-wrap { padding: 0 20px 40px; }
 
 /* #305: sobre la grilla ya no hay barra propia de la Gantt. La leyenda la
    absorbieron los contadores del encabezado y el horizonte —con su aviso de
@@ -833,10 +853,16 @@ table.tareas .col-desv { text-align: center; }
      margen se pasa a padding para que la franja sticky incluya el aire y
      tape las filas que pasan por debajo (fondo opaco). */
   position: sticky; top: 0; z-index: 30; background: var(--fondo);
-  /* #306b: el aire de arriba baja de 14 a 6 (ver `.topbar`). Sigue siendo
-     PADDING y no margen, para que la franja pegajosa incluya el aire y tape
-     con su fondo opaco lo que pasa por debajo al desplazar. */
-  margin: 0; padding: 6px 20px 8px;
+  /* #306c: la barra queda CENTRADA entre el encabezado y el contenido —el
+     mismo `--aire-bloque` de un lado y del otro—. Arriba pone su mitad (la
+     otra la pone `.topbar`, con la línea en el medio); abajo pone el aire
+     entero, y por eso los contenedores de tabla y Gantt ya no llevan relleno
+     arriba: si lo pusieran ellos, el aire quedaría FUERA de la franja
+     pegajosa. Sigue siendo PADDING y no margen justamente por eso: la franja
+     incluye el aire y tapa con su fondo opaco lo que pasa por debajo al
+     desplazar. */
+  margin: 0;
+  padding: calc(var(--aire-bloque) / 2) 20px var(--aire-bloque);
 }
 .controles-bar__sep { flex: 1 1 0; min-width: 0; }
 
@@ -2327,9 +2353,16 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 .filtro-menu--derecha { overflow: visible; }
 
 /* #177: encabezado de frente / sub frente plegado — conserva su borde inferior
-   para verse como un bloque cerrado, no "abierto" contra el fondo. */
+   para verse como un bloque cerrado, no "abierto" contra el fondo.
+   #306c: el título queda CENTRADO entre su línea de arriba y la suya de abajo,
+   y sale por construcción: `--aire-bloque` abajo, contra el mismo
+   `--aire-bloque` que trae arriba (el margen entre bloques, o el de la barra
+   de controles si es el primero). Por eso el margen de abajo se va a 0: el
+   aire que separa de la franja siguiente ya lo pone ese margen, y sumarle este
+   era lo que dejaba el título a 28 de una línea y a 8 de la otra. */
 .frente-cabecera--colapsado {
-  border-bottom: 1px solid var(--gris-borde); padding-bottom: 8px; margin-bottom: 8px;
+  border-bottom: 1px solid var(--gris-borde);
+  padding-bottom: var(--aire-bloque); margin-bottom: 0;
 }
 .subfrente__titulo--colapsado { border-bottom: 1px solid var(--gris-borde); border-radius: 8px; }
 

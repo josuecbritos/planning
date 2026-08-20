@@ -2226,3 +2226,72 @@ por celda, con el mismo `Range`— dónde acaba el texto contra dónde empieza e
 la distancia entre bloques, que ahora es 20. Lo que corresponde exigir ahí es
 que **siga siendo la separación grande**, no un número concreto, así que pasan a
 `>= 18` con el motivo escrito al lado.
+
+### #306c — Los espaciados de la tabla no calzaban entre sí: ahora salen de un solo valor
+
+**Cuatro espaciados, cada uno fijado en un momento distinto mirando solo su
+lado, y ninguno calzaba con otro.** Medido antes:
+
+| Dónde | Cuánto | De dónde salía |
+|---|---|---|
+| Arriba de la barra de botones | **12** | 6 del encabezado + 6 de la barra |
+| Abajo de la barra, hasta el contenido | **24** | 8 de la barra + 16 del contenedor |
+| Del título de un frente plegado a la línea de arriba | **28** | 8 del frente anterior + 20 entre bloques |
+| Del título a su propia línea de abajo | **8** | el relleno de la franja |
+
+De ahí los tres síntomas: la barra de botones **se veía descolgada** (cuatro
+veces más aire abajo que arriba), el título de un frente plegado quedaba
+**pegado a la línea de arriba** (28 de una, 8 de la otra), y el primer frente se
+separaba de los botones **distinto** de como un frente se separa del anterior.
+
+**Por eso ajustar uno descuadraba otro** — es exactamente lo que había pasado en
+#306b, donde se bajó el aire de arriba de la barra y el conjunto quedó peor,
+porque el de abajo siguió igual.
+
+**Ahora hay un solo valor, `--aire-bloque: 16`, y los cuatro salen de él.**
+
+- **La barra de botones queda centrada:** 16 arriba y 16 abajo. El de arriba va
+  **partido en dos mitades** —8 en el encabezado y 8 en la barra— para que la
+  línea del encabezado caiga justo en el medio del hueco y ningún lado se lo
+  apropie. El de abajo lo pone **entero la barra**, y por eso los contenedores
+  de tabla y Gantt dejaron de llevar relleno arriba: puesto en el contenedor, el
+  aire quedaría **fuera** de la franja pegajosa y el hueco sería transparente,
+  con las filas viéndose pasar por ahí al desplazar. Sigue siendo **padding y no
+  margen** justamente por eso.
+- **Del título de un frente a lo que venga antes: 16**, dé igual si lo anterior
+  es la barra de botones —primer frente— o el frente anterior. **Los dos casos
+  se ven iguales porque son el mismo número**, no porque se hayan ajustado dos
+  números para que coincidan.
+- **Con los frentes plegados, el centrado sale por construcción:** la franja del
+  frente lleva 16 abajo hasta su línea, contra los 16 que trae arriba. El margen
+  de abajo de la franja se fue a 0 — el aire que separa de la franja siguiente
+  ya lo pone el de entre bloques, y sumarle este era lo que dejaba el título a
+  28 de una línea y a 8 de la otra.
+
+**Lo que NO entra en la regla es el aire de adentro de un grupo:** los **8**
+entre sub frentes del mismo frente no se tocan. El contraste entre ese 8 y el 16
+de afuera es justo lo que hace que los grupos se lean, y es lo que #306 vino a
+conseguir.
+
+**Medido después:** la barra pasó de 12/24 a **16/16** (17 arriba contando la
+línea del encabezado), idéntico en tabla y en Gantt; el título de cada frente
+plegado quedó a **22 de su línea de arriba y 22 de la de abajo**, y el primero
+—medido desde los botones— a los mismos 22; los sub frentes siguen a **8**; y el
+alto con todo plegado bajó de **432 a 412**.
+
+**Verificado** con `docs/prueba-306-jerarquia-tabla.mjs`, que pasa de 69 a **86
+comprobaciones en verde**. Lo que comprueban las nuevas **no son los números
+sino las igualdades**: que arriba y abajo de la barra midan lo mismo, que sea
+igual en las dos vistas, que el primer frente se separe de los botones igual que
+un frente del anterior, que el título plegado quede a la misma distancia de sus
+dos líneas, y que los cuatro espaciados salgan efectivamente del mismo valor.
+*Un valor se puede cambiar; que calcen entre sí es la propiedad.* Se comprueba
+además que el aire de abajo lo ponga la barra como relleno y que ahí, tras
+desplazar, siga habiendo franja y no hueco.
+
+*Tres umbrales anteriores se actualizaron, no se relajaron:* exigían `>= 18` a
+la separación entre frentes, que ahora es 16, y un `>` donde el contraste con el
+aire de adentro pasó a ser **exactamente el doble** (16 contra 8). Doblar es la
+propiedad que se pide; pasarse no aporta nada. Y el umbral de #306b sobre el
+aire de arriba de la barra sube de 14 a 20, porque #306c lo volvió a subir a 16
+a propósito: 13 arriba contra 24 abajo era lo que dejaba la barra descolgada.
