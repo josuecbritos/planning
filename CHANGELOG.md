@@ -2081,3 +2081,217 @@ se queda, porque sí cumple. Y **"Actualizar vista" se enciende igual aunque la
 nueva cumpla el filtro**: con filtro puesto la vista está congelada y una tarea
 recién creada nunca está en esa foto. Lo que distingue los dos casos no es si el
 botón aparece, sino qué pasa al tocarlo.
+
+### #306 — La tabla: jerarquía y espacio muerto, y el "+" de la Gantt
+
+Dos problemas que se resuelven juntos, porque **el aire que se recupera es el
+mismo que pasa a marcar los grupos**.
+
+**1. El frente no se leía como el contenedor de sus sub frentes.** Medido: el
+frente era texto de **15 en negrita, sin fondo**; el sub frente, texto de **13.5
+en la misma negrita, con fondo y con borde**. **El hijo tenía más presencia
+visual que el padre**, así que el frente se leía como un rótulo suelto sobre
+unas cajas que no parecían suyas.
+
+**2. Con los sub frentes cerrados, la pantalla era casi todo aire:** 26 de
+margen entre sub frentes contra una barra de 33 de alto, 18 alrededor del título
+de cada frente, y unos 60 por frente para la fila de "+ Sub Frente". Con seis
+sub frentes cerrados llenaban la pantalla **sin mostrar una sola tarea** — y ese
+es justo el estado en que uno abre la pantalla para orientarse.
+
+**La pertenencia se marca con peso y proximidad, no con marcos ni sangría.** Es
+como agrupan Asana y Notion:
+
+- **El frente sube de peso**, claramente por encima del sub frente, y lleva al
+  lado —en gris y chico— **cuántos sub frentes tiene**. Solo sub frentes: la
+  cuenta de tareas ya aparece en varios lugares y repetirla no aporta.
+- **El sub frente pierde la negrita.** Sigue siendo una caja con su fondo y su
+  borde —eso no se toca—, pero deja de competir con su padre.
+- **El aire se reordena:** entre sub frentes del mismo frente baja de **26 a
+  8**, y la separación grande (**28**) queda solo entre un frente y el
+  siguiente. **Ese contraste es lo que comunica la pertenencia:** lo que está
+  junto es del mismo frente, lo que está separado es otro.
+- **"+ Sub Frente" deja de ser una fila.** Con el frente ya poblado es una
+  **línea de texto chica y gris** pegada debajo del último: sigue donde uno la
+  busca, pero deja de pesar como un elemento de la lista. Con el frente
+  **vacío** sigue siendo un **botón** —es el momento más importante y la única
+  acción posible: alguien acaba de crear un frente y lo siguiente que tiene que
+  hacer es agregarle un sub frente—, junto a la línea "Sin sub frentes en este
+  frente", que se mantiene.
+
+**Medido:** con los cinco sub frentes del proyecto de prueba cerrados, el
+contenido de la tabla pasó de **600 a 452** de alto.
+
+**El "+" de la Gantt descentraba los nombres.** Compartía la línea con el nombre
+y **ocupaba su lugar aunque estuviera invisible** —18 de ancho más 6 de
+separación—, así que el nombre estaba corrido 12 a la izquierda **siempre**, y
+con el mouse encima el desorden se notaba más. Ahora **sale del flujo** y se
+coloca a la derecha del nombre: el nombre queda centrado de verdad y **no se
+mueve al aparecer el "+"**. Si el nombre no llega hasta ahí, el "+" cae sobre
+espacio vacío y no tapa nada; si llega, el texto **se desvanece hacia el fondo
+justo bajo el "+"** con un degradado corto, en vez de cortarse contra él. El
+nombre completo sigue en el globo rápido de #305d. *Una sola posición y una sola
+regla, sin casos especiales: la máscara está puesta mientras el "+" se ve, y
+solo se nota donde hay texto debajo.* Efecto lateral medido y bienvenido: al no
+reservar esos 24 píxeles, el nombre dispone de **103 en vez de 79**, así que
+recorta menos.
+
+**La franja gris de los controles medía distinto en cada vista.** Verificado: la
+barra mide lo mismo en las dos —14 arriba, 8 abajo—; lo que cambiaba era el aire
+del contenedor de después. Medido: **24 en la tabla contra 16 en la Gantt**.
+Ahora las dos miden **16**.
+
+**Verificado** con `docs/prueba-306-jerarquia-tabla.mjs`: **50 comprobaciones en
+verde**. Mide los dos pesos y los dos aires, exige que el contraste entre las
+distancias sea de más del doble, comprueba el alto con todo plegado contra el
+valor de antes, recorre el frente vacío —botón, aviso, y el paso a línea al
+crear el primero—, y en la Gantt mide que el "+" esté fuera del flujo, que el
+nombre **no se mueva** entre con y sin mouse, y que el desvanecido esté puesto
+solo mientras el "+" se ve.
+
+*Control negativo:* corrida contra `main`, **12 comprobaciones fallan** y después
+la prueba se detiene, porque el elemento que reemplaza a la fila de "+ Sub
+Frente" todavía no existe.
+
+*Dos pruebas anteriores se actualizaron, no se relajaron:* #297 y #311 leían el
+nombre del frente como el `innerText` completo del título, que ahora incluye la
+cuenta de sub frentes. Pasan a leer el primer nodo de texto, que es el nombre.
+
+### #306b — Ajustes sobre #306: el aire, la línea que cerraba mal, y el "+" pegado al nombre
+
+Tres correcciones sobre la misma rama, antes de fusionar.
+
+**1. Demasiado aire entre el encabezado y los botones.** Medido: **26
+seguidos** entre la fila de contadores y la barra de `Filtrar · Ordenar`, y no
+venían de un solo lado — eran **12 debajo del encabezado más 14 arriba de la
+barra**, sumándose. Pasaba igual en tabla y en Gantt. Bajan a **6 y 6: 13 en
+total**, la mitad. El aire de **arriba** del encabezado no se toca. Los 6 de la
+barra siguen siendo **padding y no margen**, que es lo que hace que la franja
+pegajosa incluya ese aire y **tape con su fondo opaco** lo que pasa por debajo
+al desplazar: con margen, el hueco sería transparente y el contenido se vería
+pasar por ahí.
+
+**2. La separación entre frentes se leía mucho mayor de lo que era.** La causa
+no era el número: la línea de **"+ Sub Frente" caía justo en el medio**,
+separada del último sub frente por los mismos 8 que separan a los sub frentes
+entre sí. Se leía como **un elemento más de la lista** y sumaba su alto y su
+aire a la separación. **El orden importó:** primero la línea se pega al último
+sub frente —`margin-top: -4`, que la deja a **4** del sub frente contra los
+**20** que la separan del frente siguiente—, y recién ahí se puede juzgar el
+segundo cambio: la separación entre frentes baja de **28 a 20**.
+
+*Sobre la reserva declarada en el pedido* —subir a 24 si los grupos se
+fundían—: mirado el resultado con los sub frentes cerrados, **la agrupación se
+sigue leyendo a 20** (20 contra 8 hacia adentro, más del doble), así que se
+queda en 20. **Medido:** con todo plegado el contenido pasa de los **452** que
+dejó #306 a **432**.
+
+**3. El "+" de la Gantt se veía suelto contra el borde.** #306 lo había anclado
+al borde derecho de la **columna**, así que quedaba lejos del nombre. Ahora se
+pega **al borde derecho del nombre**, y solo se apoya en el borde de la columna
+**cuando no cabe**. *Consecuencia aceptada por el dueño:* queda en un punto
+distinto en cada fila.
+
+**Esto no se puede hacer solo con CSS, y está medido.** El primer intento fue
+`max-width: calc(100% - 26px)` sobre el nombre con el "+" en `left: 100%`. Al
+medirlo: `conMas [286,363]` en el frente y `[406,513]` en el sub frente — **los
+dos nombres tocaban el tope**, así que el "+" seguía en el borde en todas las
+filas y el cambio habría sido **invisible**. El motivo: el ancho de la **caja**
+del texto no es el ancho del **texto renderizado** — una caja de 103 con dos
+palabras que envuelven tiene líneas mucho más cortas—, y CSS no tiene forma de
+saber dónde acaba la línea más larga. Un `Range` sobre el contenido sí:
+`getClientRects()` devuelve **un rectángulo por línea**. Un efecto toma el
+máximo de esos bordes derechos y lo acota contra el borde de la celda; el
+`Math.min` cubre los dos casos **sin ningún condicional**. **No corre al
+desplazar:** dónde acaba el texto depende del contenido y del ancho de la
+columna, no del scroll. El valor de CSS queda como respaldo para el instante
+anterior al efecto: apoyado en el borde, que es el peor caso.
+
+**Medido por fila:** "Diseño" y "Procesos Operacionales" quedan pegados al
+nombre (+4); "Levantamiento", "Procesos Comerciales", "Procesos Financieros" y
+"Arquitectura de datos" se apoyan a 8 del borde con el texto desvaneciéndose
+bajo el "+". Todo lo demás de #306 sigue igual: el "+" fuera del flujo, el
+nombre centrado y sin moverse al aparecer, y el degradado bajo él.
+
+**Verificado** con `docs/prueba-306-jerarquia-tabla.mjs`, que pasa de 50 a **69
+comprobaciones en verde**. Las nuevas miden el aire en las dos vistas y exigen
+que sea el mismo, comprueban que la barra siga pegada arriba tras desplazar 300
+y con fondo opaco, miden que la línea esté al menos **tres veces más cerca** del
+último sub frente que del frente siguiente, que la separación entre frentes sea
+menor que antes pero siga siendo **más del doble** del aire de adentro, y —celda
+por celda, con el mismo `Range`— dónde acaba el texto contra dónde empieza el
+"+".
+
+*Dos umbrales de la prueba de #306 se relajaron a propósito:* exigían `>= 24` a
+la distancia entre bloques, que ahora es 20. Lo que corresponde exigir ahí es
+que **siga siendo la separación grande**, no un número concreto, así que pasan a
+`>= 18` con el motivo escrito al lado.
+
+### #306c — Los espaciados de la tabla no calzaban entre sí: ahora salen de un solo valor
+
+**Cuatro espaciados, cada uno fijado en un momento distinto mirando solo su
+lado, y ninguno calzaba con otro.** Medido antes:
+
+| Dónde | Cuánto | De dónde salía |
+|---|---|---|
+| Arriba de la barra de botones | **12** | 6 del encabezado + 6 de la barra |
+| Abajo de la barra, hasta el contenido | **24** | 8 de la barra + 16 del contenedor |
+| Del título de un frente plegado a la línea de arriba | **28** | 8 del frente anterior + 20 entre bloques |
+| Del título a su propia línea de abajo | **8** | el relleno de la franja |
+
+De ahí los tres síntomas: la barra de botones **se veía descolgada** (cuatro
+veces más aire abajo que arriba), el título de un frente plegado quedaba
+**pegado a la línea de arriba** (28 de una, 8 de la otra), y el primer frente se
+separaba de los botones **distinto** de como un frente se separa del anterior.
+
+**Por eso ajustar uno descuadraba otro** — es exactamente lo que había pasado en
+#306b, donde se bajó el aire de arriba de la barra y el conjunto quedó peor,
+porque el de abajo siguió igual.
+
+**Ahora hay un solo valor, `--aire-bloque: 16`, y los cuatro salen de él.**
+
+- **La barra de botones queda centrada:** 16 arriba y 16 abajo. El de arriba va
+  **partido en dos mitades** —8 en el encabezado y 8 en la barra— para que la
+  línea del encabezado caiga justo en el medio del hueco y ningún lado se lo
+  apropie. El de abajo lo pone **entero la barra**, y por eso los contenedores
+  de tabla y Gantt dejaron de llevar relleno arriba: puesto en el contenedor, el
+  aire quedaría **fuera** de la franja pegajosa y el hueco sería transparente,
+  con las filas viéndose pasar por ahí al desplazar. Sigue siendo **padding y no
+  margen** justamente por eso.
+- **Del título de un frente a lo que venga antes: 16**, dé igual si lo anterior
+  es la barra de botones —primer frente— o el frente anterior. **Los dos casos
+  se ven iguales porque son el mismo número**, no porque se hayan ajustado dos
+  números para que coincidan.
+- **Con los frentes plegados, el centrado sale por construcción:** la franja del
+  frente lleva 16 abajo hasta su línea, contra los 16 que trae arriba. El margen
+  de abajo de la franja se fue a 0 — el aire que separa de la franja siguiente
+  ya lo pone el de entre bloques, y sumarle este era lo que dejaba el título a
+  28 de una línea y a 8 de la otra.
+
+**Lo que NO entra en la regla es el aire de adentro de un grupo:** los **8**
+entre sub frentes del mismo frente no se tocan. El contraste entre ese 8 y el 16
+de afuera es justo lo que hace que los grupos se lean, y es lo que #306 vino a
+conseguir.
+
+**Medido después:** la barra pasó de 12/24 a **16/16** (17 arriba contando la
+línea del encabezado), idéntico en tabla y en Gantt; el título de cada frente
+plegado quedó a **22 de su línea de arriba y 22 de la de abajo**, y el primero
+—medido desde los botones— a los mismos 22; los sub frentes siguen a **8**; y el
+alto con todo plegado bajó de **432 a 412**.
+
+**Verificado** con `docs/prueba-306-jerarquia-tabla.mjs`, que pasa de 69 a **86
+comprobaciones en verde**. Lo que comprueban las nuevas **no son los números
+sino las igualdades**: que arriba y abajo de la barra midan lo mismo, que sea
+igual en las dos vistas, que el primer frente se separe de los botones igual que
+un frente del anterior, que el título plegado quede a la misma distancia de sus
+dos líneas, y que los cuatro espaciados salgan efectivamente del mismo valor.
+*Un valor se puede cambiar; que calcen entre sí es la propiedad.* Se comprueba
+además que el aire de abajo lo ponga la barra como relleno y que ahí, tras
+desplazar, siga habiendo franja y no hueco.
+
+*Tres umbrales anteriores se actualizaron, no se relajaron:* exigían `>= 18` a
+la separación entre frentes, que ahora es 16, y un `>` donde el contraste con el
+aire de adentro pasó a ser **exactamente el doble** (16 contra 8). Doblar es la
+propiedad que se pide; pasarse no aporta nada. Y el umbral de #306b sobre el
+aire de arriba de la barra sube de 14 a 20, porque #306c lo volvió a subir a 16
+a propósito: 13 arriba contra 24 abajo era lo que dejaba la barra descolgada.

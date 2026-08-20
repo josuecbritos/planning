@@ -188,6 +188,32 @@ completo con creación y edición **inline** (sin formularios).
   SIGUE siendo de cada máquina, a propósito: **en qué vista estabas** —entrar
   desde un computador nuevo abre limpio, con todas las vistas disponibles—,
   el tema y el modo/ancho de la barra lateral.
+  **La jerarquía se marca con peso y proximidad, no con marcos ni sangría
+  (#306).** El hijo tenía más presencia que el padre: el frente era texto de 15
+  en negrita **sin fondo** y el sub frente texto de 13.5 en la **misma**
+  negrita, con fondo y con borde, así que el frente se leía como un rótulo
+  suelto sobre unas cajas que no parecían suyas. Ahora el **frente sube de
+  peso** —más grande y por encima del sub frente— y lleva al lado, en gris y
+  chico, **cuántos sub frentes tiene** (no cuántas tareas: esa cuenta ya
+  aparece en varios lugares). El **sub frente pierde la negrita**; su caja, su
+  fondo y su borde no se tocan. Y el **aire se reordena**: entre sub frentes
+  del mismo frente baja de 26 a 8, y la separación grande (16) queda solo entre
+  un frente y el siguiente. **Ese contraste es lo que comunica la
+  pertenencia.** De paso se recupera pantalla: con los sub frentes cerrados el
+  contenido pasó de **600 a 412** de alto, y ese es justo el estado en que uno
+  abre la pantalla para orientarse. **"+ Sub Frente"** deja de ser una fila de
+  unos 60 y pasa a ser una **línea chica y gris** pegada debajo del último —
+  salvo cuando el frente **no tiene ninguno**, donde **sigue siendo un botón**:
+  es el momento más importante y la única acción posible, y ahí tiene que
+  pesar. La línea "Sin sub frentes en este frente" se mantiene junto a él. Esa
+  línea va **pegada al último sub frente** (4 contra los 16 que la separan del
+  frente siguiente): así cierra su grupo en vez de leerse como un elemento más
+  de la lista, que era lo que hacía que la separación entre frentes se viera
+  mucho mayor de lo que es. **Con el frente plegado, su título queda centrado
+  entre la línea de arriba y la suya de abajo (#306c)**, y sale por
+  construcción: el mismo 16 de un lado y del otro, no dos números ajustados
+  para que coincidan.
+
   **Se pueden crear tareas con el filtro puesto (#320).** La fila de "+ Tarea"
   estaba escondida al filtrar, por un problema real —una tarea recién creada
   puede no cumplir el filtro y desaparecer en el mismo momento en que la
@@ -219,6 +245,22 @@ lo que sobra dentro de su contenedor**. De ahí sale solo lo demás: si nunca
 empuja la página hacia abajo, **el scroll de la pantalla deja de existir** y
 encabezado, contadores y barra de controles quedan siempre a la vista. En
 **tabla no se aplica**: una lista larga sí debe desplazar la pantalla.
+
+**El "+" de la grilla no descentra los nombres (#306).** Compartía la línea con
+el nombre y ocupaba su lugar **aunque estuviera invisible** —18 de ancho más 6
+de separación—, así que el nombre estaba corrido 12 a la izquierda siempre.
+Ahora sale del flujo, así que el nombre queda centrado de verdad y **no se mueve
+al aparecer el "+"**, y **se pega al borde derecho del nombre**; solo cuando el
+nombre no deja sitio se apoya contra el borde de la columna, y ahí el texto **se
+desvanece** bajo él en vez de cortarse. *Queda en un punto distinto en cada fila
+según cuán largo sea cada nombre, que es el comportamiento que se prefiere.*
+Pegarlo al nombre **no se puede hacer solo con CSS:** el ancho de la CAJA del
+texto no es el del texto renderizado —una caja de 103 con dos palabras que
+envuelven tiene líneas mucho más cortas— y CSS no sabe dónde acaba la línea más
+larga. Lo resuelve un efecto con un `Range` sobre el contenido, que devuelve un
+rectángulo por línea; el `Math.min` contra el borde de la celda cubre los dos
+casos sin ningún condicional. No corre al desplazar: dónde acaba el texto no
+depende del scroll.
 
 **Los nombres se cortan, no se parten (#321).** En las columnas congeladas el
 corte estaba forzado en cualquier letra —"Planificació / n"— para que ninguna
@@ -261,6 +303,22 @@ desaparecían solas.
    izquierda** — el único elemento que aparece y desaparece, a propósito: avisa
    de algo que acaba de pasar, y va ahí para que Vistas no se mueva al
    aparecer. **Rango solo existe en Gantt.**
+
+**Un solo valor separa bloques: 16 (#306c).** La barra de controles queda
+**centrada** —16 arriba y 16 abajo—, y de ese mismo 16 sale la separación entre
+un frente y el siguiente, así que **el primer frente se separa de los botones
+igual que un frente del anterior**. Antes había cuatro espaciados fijados cada
+uno por su cuenta —12 arriba de la barra, 24 abajo, 28 del título de un frente
+plegado a la línea de arriba y 8 a la de abajo— y ninguno calzaba con otro; por
+eso ajustar uno descuadraba otro, que es lo que pasó en #306b. El aire de
+**arriba** del encabezado no se toca, y el de arriba de la barra va **partido en
+dos mitades** para que la línea del encabezado caiga justo en el medio. El de
+abajo lo pone **entero la barra**, como **padding y no margen**: así la franja
+pegajosa lo incluye y **tapa con su fondo opaco** lo que pasa por debajo al
+desplazar — puesto en el contenedor, el hueco sería transparente. Lo que **no**
+entra en la regla es el aire de **adentro** de un grupo (los 8 entre sub
+frentes): ese contraste contra el 16 es justo lo que hace que los grupos se
+lean.
 
 Los cuatro menús **abren con la misma caja**, de ancho fijo, para que no cambie
 de tamaño al pasar de un control a otro; Vistas queda fuera de esa regla porque
