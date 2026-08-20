@@ -188,6 +188,17 @@ completo con creación y edición **inline** (sin formularios).
   SIGUE siendo de cada máquina, a propósito: **en qué vista estabas** —entrar
   desde un computador nuevo abre limpio, con todas las vistas disponibles—,
   el tema y el modo/ancho de la barra lateral.
+  **Se pueden crear tareas con el filtro puesto (#320).** La fila de "+ Tarea"
+  estaba escondida al filtrar, por un problema real —una tarea recién creada
+  puede no cumplir el filtro y desaparecer en el mismo momento en que la
+  creas—, pero la Gantt ya resolvía ese problema en vez de esconder la acción,
+  así que el mismo proyecto con el mismo filtro se comportaba al revés según la
+  vista. Ahora la tabla usa el mismo remedio, que ya vivía ahí para la foto
+  congelada: la recién creada **se queda a la vista** aunque no cumpla el
+  filtro, con "Actualizar vista" encendido; al tocarlo desaparece si no cumple y
+  se queda si cumple. Lo que sigue escondido con filtro puesto, por decisión:
+  **"+ Sub Frente"**, el **bloque de archivadas**, y los **sub frentes sin
+  ninguna coincidencia**.
   La última columna, la de los iconos, se titula **"Acciones"** (#298), la misma
   palabra que en administración de usuarios y de proyectos, centrada como las
   demás cabeceras de esta tabla. Aparece solo si se
@@ -274,7 +285,8 @@ títulos que separan **grupos dentro de un mismo menú** —"Aplicado" en Filtra
   un valor suelto se entra al campo y se destilda. Se conservan "Seleccionar
   todos" y "Deseleccionar todos"; **desaparecen los "Limpiar filtro"** de dentro
   de cada campo, que es el trabajo que hace la × de la ficha. El campo Fecha
-  conserva **todas** sus opciones y sus exclusiones sin cambios. El campo
+  conserva **todas** sus opciones, y desde #322 sus cinco opciones se excluyen
+  entre sí **sin excepciones**. El campo
   **Estado sigue la misma regla que los contadores**: las marcas reales de la
   grilla cuando se está en Gantt, los puntos de color cuando se está en tabla —
   dos representaciones del mismo modelo a la vez es justo lo que se eliminó.
@@ -368,7 +380,19 @@ las de esta semana, la ventana es esa semana. El bug era que en la Gantt hacía
 solo lo segundo, y por eso "Hoy" mostraba tareas de cualquier día y hasta las
 que no tienen fecha. Las opciones que no son una ventana temporal —"Sin fecha",
 "Con fecha"— filtran sin tocar el horizonte, y "En horizonte visible" va al
-revés: deriva su rango del horizonte en vez de definirlo. Las relativas son
+revés: deriva su rango del horizonte en vez de definirlo.
+
+**Las cinco opciones del campo Fecha se excluyen entre sí (#322).** Faltaba una
+pareja: "Sin fecha" y una fecha —relativa o rango fijo— podían convivir, y
+entonces el filtro **sumaba**: las tareas sin fecha MÁS las del rango. El
+cálculo no estaba mal, hacía lo que decía; lo que estaba mal es que esa
+combinación pudiera existir, y se llegaba a ella desde los dos lados. Ahora
+activar "Sin fecha" apaga la fecha y el rango, y activar una relativa o
+escribir un rango apaga "Sin fecha" — como ya hacían "Con fecha" y "En
+horizonte visible". *El motor del filtro no se tocó: sigue sabiendo sumar las
+dos cosas, porque una vista guardada de antes de #322 puede traerlas juntas y
+tiene que seguir funcionando.* Los filtros de responsable, proyecto y estado no
+cambian: ahí sí se eligen varios a la vez. Las relativas son
 cinco (#279): Hoy, **Próximo día hábil** —un solo día: el siguiente que no es
 sábado ni domingo; de lunes a jueves es mañana, de viernes a domingo es el
 lunes—, Esta semana, Próxima semana y Este mes. Se recalculan con la fecha del

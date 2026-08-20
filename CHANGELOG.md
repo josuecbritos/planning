@@ -2007,3 +2007,77 @@ contra el repo en memoria la vista guardada y la de pantalla son el mismo objeto
 y el texto siempre coincide — ahí el defecto solo se ve contra la base real. Se
 conservan porque son los criterios del pedido y fijan el comportamiento
 correcto, pero los que muerden son los otros tres.
+
+### #322 — "Sin fecha" convivía con una fecha relativa y no debía
+
+Con **"Esta semana"** y **"Sin fecha"** puestos a la vez, la lista mostraba
+tareas que no se esperaban. **El cálculo no estaba mal: hacía exactamente lo que
+decía** — con las dos activas mostraba las tareas sin fecha *más* las de esta
+semana. Es una suma. **Lo que estaba mal es que esa combinación pudiera
+existir.**
+
+En el campo Fecha todas las opciones se excluían entre sí menos esa pareja:
+activar una relativa —o escribir un rango fijo— apagaba "Con fecha" pero **no**
+"Sin fecha"; y activar "Sin fecha" apagaba "Con fecha" pero **no** la relativa.
+Se llegaba desde los dos lados, y nadie decidió nunca qué debía significar la
+mezcla.
+
+Ahora **"Sin fecha" se excluye con todo el resto del campo**, igual que "Con
+fecha" y "En horizonte visible": activarla apaga la relativa y el rango fijo, y
+activar una relativa o escribir un rango la apaga a ella. **Las cinco opciones
+del campo Fecha se excluyen entre sí sin excepciones**, que es como el menú ya
+se comportaba en los otros cuatro casos.
+
+Lo que **no** se tocó: el motor del filtro sigue sabiendo sumar las dos cosas,
+porque **una vista guardada de antes de #322 puede traerlas juntas** y tiene que
+seguir funcionando. Por lo mismo, el contador del campo y su ficha conservan la
+suma y el "+": para las vistas nuevas siempre valen uno, pero si una vieja trae
+dos, el número tiene que decir la verdad. Los filtros de responsable, proyecto y
+estado no cambian: ahí sí se eligen varios a la vez.
+
+### #320 — Se pueden agregar tareas en la tabla aunque esté filtrada
+
+Con cualquier filtro puesto, la tabla del proyecto **escondía la fila de "+
+Tarea"** de cada sub frente: no había forma de crear una tarea sin limpiar el
+filtro primero. **No era un descuido: estaba hecho a propósito**, por un
+problema real — una tarea recién creada puede no cumplir el filtro y desaparecer
+en el mismo momento en que la creas.
+
+**Pero la Gantt sí dejaba crear con filtro puesto**, y resolvía ese problema en
+vez de esconder la acción: la tarea recién creada se muestra igual aunque el
+filtro o la foto la dejen fuera, y se enciende "Actualizar vista". Resultado:
+mismo proyecto, mismo filtro, **dos comportamientos opuestos según la vista**.
+
+El remedio no hubo que inventarlo, y **ni siquiera hubo que traerlo**: ya vivía
+en la tabla, para el caso de la foto congelada (#137/#253). Solo había que dejar
+de esconder la fila. La tarea recién creada se queda a la vista, se enciende
+"Actualizar vista", y al tocarlo desaparece si no cumple el filtro y se queda si
+lo cumple.
+
+Lo que **no** cambia, por decisión del dueño: los **sub frentes sin ninguna
+coincidencia siguen ocultos** (no se muestran vacíos solo para poder crear ahí),
+**"+ Sub Frente" sigue escondido** con filtro puesto, y el **bloque de
+archivadas** también. Sin filtro, todo igual que antes; la Gantt, igual que
+antes.
+
+**Verificado** con `docs/prueba-322-320-fecha-y-crear-filtrado.mjs`: **48
+comprobaciones en verde** (F = #322, T = #320). Recorre las cinco relativas
+contra "Sin fecha" **desde los dos lados**, el rango fijo en los dos sentidos,
+que "Con fecha" y "En horizonte visible" no cambiaron, que el contador y la
+ficha nunca muestran más de una opción, y que responsable y estado siguen
+aceptando varios valores. Para #320 cuenta las filas de "+ Tarea" contra los sub
+frentes visibles, crea una tarea con el filtro puesto, comprueba **en el estado
+guardado** que quedó en el sub frente correcto, y recorre los dos desenlaces de
+"Actualizar vista".
+
+*Control negativo:* corrida contra `main` antes del arreglo fallan **19**
+comprobaciones. Entre ellas T1, medido: con un filtro puesto había **0 filas de
+"+ Tarea" en 4 sub frentes visibles**.
+
+*Dos supuestos míos que la prueba corrigió, y que vale la pena dejar escritos:*
+una tarea recién creada nace sin fecha y sin marcar, así que **su categoría es
+"pendiente"** — filtrar por "Pendiente" no sirve para comprobar que la forzada
+se queda, porque sí cumple. Y **"Actualizar vista" se enciende igual aunque la
+nueva cumpla el filtro**: con filtro puesto la vista está congelada y una tarea
+recién creada nunca está en esa foto. Lo que distingue los dos casos no es si el
+botón aparece, sino qué pasa al tocarlo.
