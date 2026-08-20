@@ -107,9 +107,63 @@ export function estadoInicial(
 }
 
 /**
+ * #305e — Clave canónica de un dato plano, para compararlo por CONTENIDO.
+ *
+ * `JSON.stringify` compara letra por letra, así que solo da igual si las
+ * propiedades vienen en el mismo orden. Y el orden de las propiedades no es
+ * información: es un accidente de cómo se armó el objeto. Dos caminos lo
+ * cambian sin que cambie nada real —
+ *
+ *   · **La base.** El filtro se guarda en una columna `jsonb`, que reordena
+ *     las claves por su cuenta. Al guardar, la vista en memoria se reemplaza
+ *     con lo que devolvió la base (correcto: la base es la fuente de verdad),
+ *     y esa versión reordenada dejaba de "coincidir" con la de la pantalla.
+ *   · **El orden en que armaste el filtro.** Elegir Estado y después "Sin
+ *     fecha" produce `{estados, sinFecha}`; al revés produce
+ *     `{sinFecha, estados}`. Mismo filtro, distinto texto. Esto pasa **sin
+ *     base real**, así que el defecto también se reproduce en modo local.
+ *
+ * `listasComoConjunto` distingue los dos casos que hay:
+ *   · El **filtro** lleva listas de valores elegidos (responsables, estados,
+ *     proyectos). Son conjuntos: los mismos valores en distinta secuencia son
+ *     el mismo filtro. Destildar y volver a tildar una opción la manda al
+ *     final de la lista, y eso no debe encender el asterisco.
+ *   · El **orden** es una secuencia: `[fecha, estado]` y `[estado, fecha]` son
+ *     órdenes DISTINTOS y deben seguir contando como diferentes. Ahí las
+ *     listas se comparan tal como vienen; lo único que se normaliza son las
+ *     claves de cada regla.
+ */
+function canonico(valor: unknown, listasComoConjunto: boolean): unknown {
+  if (Array.isArray(valor)) {
+    const items = valor.map((v) => canonico(v, listasComoConjunto))
+    if (!listasComoConjunto) return items
+    return [...items].sort((a, b) => {
+      const sa = JSON.stringify(a)
+      const sb = JSON.stringify(b)
+      return sa < sb ? -1 : sa > sb ? 1 : 0
+    })
+  }
+  if (valor && typeof valor === 'object') {
+    // Las claves en `undefined` no existen: es como las escribe la pantalla
+    // (`{ ...filtro, estados: undefined }`) y es lo que JSON descarta al
+    // guardar, así que la vista que vuelve de la base no las trae.
+    return Object.entries(valor as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([k, v]) => [k, canonico(v, listasComoConjunto)])
+  }
+  return valor ?? null
+}
+
+const mismoContenido = (a: unknown, b: unknown, listasComoConjunto: boolean) =>
+  JSON.stringify(canonico(a, listasComoConjunto)) === JSON.stringify(canonico(b, listasComoConjunto))
+
+/**
  * ¿El filtro y el orden actuales siguen siendo los de la vista guardada? De
- * esto depende el asterisco. Se compara por JSON porque son datos planos y
- * serializables: es exactamente lo que se guardó.
+ * esto dependen el asterisco y el ícono de guardar de esa vista, que son la
+ * misma señal dicha dos veces.
+ *
+ * Se compara por CONTENIDO, no por texto (#305e): ver `canonico`.
  */
 export function coincideConVista(
   vista: FiltroGuardado | undefined,
@@ -118,7 +172,7 @@ export function coincideConVista(
 ): boolean {
   if (!vista) return false
   return (
-    JSON.stringify(vista.filtro ?? {}) === JSON.stringify(filtro ?? {}) &&
-    JSON.stringify(vista.orden ?? []) === JSON.stringify(orden ?? [])
+    mismoContenido(vista.filtro ?? {}, filtro ?? {}, true) &&
+    mismoContenido(vista.orden ?? [], orden ?? [], false)
   )
 }

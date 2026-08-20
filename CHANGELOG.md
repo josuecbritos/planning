@@ -1950,3 +1950,60 @@ navegador, que tarda cerca de un segundo.
 Dos aserciones anteriores se actualizaron, no se relajaron: la de #305b que
 exigía un título en Ordenar (que este pedido elimina a propósito) y la de #321
 que buscaba el nombre completo en el `title` (que ahora vive en el `data-tip`).
+
+### #305e — Guardar una vista no apagaba su asterisco
+
+Corrección de #305d, que dio este punto por resuelto y no lo estaba. Pantalla,
+sin migración.
+
+**El síntoma.** Con una vista activa, agregar un criterio de orden encendía el
+asterisco y el ícono —correcto—, pero al tocar guardar **ninguno de los dos se
+iba**, aunque el cambio sí se guardaba. Y al quitar el orden se apagaba, pero
+**por la razón equivocada**: no porque la vista estuviera al día, sino porque ya
+no quedaba nada que comparar.
+
+**La causa.** #305c había corregido una causa distinta y sigue bien: la
+condición del ícono es "esta vista está activa **y** está modificada". Lo que
+estaba mal es **cómo se decidía "modificada"**: comparando la vista guardada y
+la de pantalla con `JSON.stringify`, letra por letra. Eso solo da igual si las
+propiedades vienen en el mismo orden — y el orden de las propiedades no es
+información, es un accidente de cómo se armó el objeto.
+
+**Ahora se compara por contenido.** Las **listas de valores del filtro**
+—responsables, estados, proyectos— son **conjuntos**: los mismos valores en
+distinta secuencia son el mismo filtro. El **orden** es una **secuencia**:
+`[fecha, estado]` y `[estado, fecha]` son órdenes distintos y siguen contando
+como diferentes. Las claves se normalizan en los dos casos. No se tocó nada más:
+ni cómo se guarda, ni el tipo de la columna, ni que la vista en memoria se
+reemplace con lo que devuelve la base —que es lo correcto, la base es la fuente
+de verdad—, ni la condición del ícono, ni la de "Guardar vista".
+
+**El defecto NO existía solo en producción.** El pedido lo atribuyó a la columna
+`jsonb`, que reordena las claves al devolverlas, y dio por hecho que contra la
+base de mentira no se reproduce. Hay un **segundo camino que no necesita base
+real**: el orden en que se arma el filtro. Elegir Estado y después "Sin fecha"
+produce `{estados, sinFecha}`; al revés produce `{sinFecha, estados}` — mismo
+filtro, distinto texto. Medido en `main` antes del arreglo: guardar una vista y
+rearmar el mismo filtro al revés dejaba el asterisco encendido. Eso permite que
+la prueba automática sea un **control negativo de verdad**, sin tocar
+producción.
+
+Un tercer caso que el arreglo cierra de paso: **destildar y volver a tildar una
+opción** la manda al final de su lista, y eso encendía el asterisco aunque el
+filtro fuera idéntico.
+
+**Verificado** con `docs/prueba-305e-vista-modificada.mjs`: **28 comprobaciones
+en verde**. Cubre el camino literal del pedido (E1 a E4: guardar con el orden
+puesto, con filtro por responsable, con los dos a la vez, y después de
+recargar), los dos caminos que reordenan las propiedades —rearmar el filtro en
+otro orden (E5) y las claves de la vista guardada reordenadas a mano, que es lo
+que hace `jsonb` (E6)—, las listas como conjuntos (E7), el orden como secuencia
+(E8), y que solo se encienda el ícono de la vista activa mientras "Guardar
+vista" no cambia (E9).
+
+*Qué comprueba cada bloque, para no confundirlos:* corrida contra `main` sin el
+arreglo fallan **E5, E6 y E7**. **E1 a E4 pasan con y sin arreglo**, porque
+contra el repo en memoria la vista guardada y la de pantalla son el mismo objeto
+y el texto siempre coincide — ahí el defecto solo se ve contra la base real. Se
+conservan porque son los criterios del pedido y fijan el comportamiento
+correcto, pero los que muerden son los otros tres.
