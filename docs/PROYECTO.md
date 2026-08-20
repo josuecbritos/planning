@@ -313,6 +313,22 @@ títulos que separan **grupos dentro de un mismo menú** —"Aplicado" en Filtra
   hay asterisco no lo hay. **"Guardar vista" sí sigue mirando solo si hay algo
   puesto**: crea una vista nueva, no sobrescribe ninguna.
 
+**"Modificada" se decide comparando CONTENIDO, no texto (#305e).** La
+comparación se hacía con `JSON.stringify`, letra por letra, y eso solo da igual
+si las propiedades vienen en el mismo orden — que no es información, sino un
+accidente de cómo se armó el objeto. Dos caminos lo cambian sin que cambie nada
+real: la columna `jsonb` donde vive el filtro, que **reordena las claves** al
+devolverlas (y al guardar la vista en memoria se reemplaza con lo que devolvió
+la base, que es lo correcto), y **el orden en que se arma el filtro** — elegir
+Estado y después "Sin fecha" produce `{estados, sinFecha}`; al revés produce
+`{sinFecha, estados}`. Por eso, tras guardar, el asterisco no se iba. Ahora:
+las **listas de valores del filtro** (responsables, estados, proyectos) se
+comparan como **conjuntos** —los mismos valores en distinta secuencia son el
+mismo filtro, así que destildar y volver a tildar una opción no enciende
+nada—, y el **orden** se compara como **secuencia**, porque `[fecha, estado]`
+y `[estado, fecha]` son órdenes distintos. Es el único sitio donde se usa esa
+comparación: no afecta a nada más.
+
 *El asterisco de Vistas y "Actualizar vista" son señales distintas y conviven:*
 el asterisco dice que te alejaste de lo guardado; el botón dice que la foto
 quedó vieja por una edición, y puede aparecer sin ninguna vista guardada activa.
