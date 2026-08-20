@@ -222,6 +222,8 @@ docs/
   prueba-305-franjas-y-controles.mjs  Prueba e2e de las tres franjas sobre la
                          grilla y de los cuatro controles de la barra (#305 y
                          sus ajustes #305b), contra `vite preview`
+  prueba-306-jerarquia-tabla.mjs  Prueba e2e de la jerarquía y el espacio de la
+                         tabla, y del "+" de la Gantt, contra `vite preview`
   prueba-322-320-fecha-y-crear-filtrado.mjs  Prueba e2e de la exclusión mutua
                          del campo Fecha y de crear tareas con filtro puesto,
                          contra `vite preview`

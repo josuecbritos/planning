@@ -381,13 +381,36 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
 
 /* ---------- Vista Tabla ---------- */
 
-.tabla-wrap { padding: 20px; }
-.frente-titulo { font-size: 15px; font-weight: 700; color: var(--texto); margin: 4px 0 14px; }
+/* #306: el aire de arriba se iguala al de la Gantt para que la franja gris de
+   los controles mida lo mismo en las dos vistas. Medido antes: 20 en la tabla
+   contra 16 en la Gantt. */
+.tabla-wrap { padding: 16px 20px 20px; }
 
-.subfrente { margin-bottom: 26px; }
+/* #306 — La pertenencia se marca con PESO y PROXIMIDAD, no con marcos ni
+   sangría (es como agrupan Asana y Notion). Antes el hijo tenía más presencia
+   que el padre: el frente era texto de 15 sin fondo y el sub frente era texto
+   de 13.5 en la MISMA negrita, con fondo y con borde, así que el frente se
+   leía como un rótulo suelto sobre unas cajas que no parecían suyas. */
+.frente-titulo {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 17px; font-weight: 700; color: var(--texto); margin: 0;
+}
+.frente-titulo__count { font-size: 12px; font-weight: 500; color: var(--gris-texto); }
+
+/* #306 — El aire se reordena: junto lo que pertenece junto.
+   Entre sub frentes del mismo frente baja de 26 a 8 —siguen siendo piezas
+   distintas, pero se leen como un grupo— y la separación grande queda solo
+   entre un frente y el siguiente. Ese contraste ES lo que comunica la
+   pertenencia. De paso se recupera la pantalla: con seis sub frentes cerrados
+   el aire llenaba el alto sin mostrar una sola tarea, que es justo el estado
+   en que uno abre la pantalla para orientarse. */
+.subfrente { margin-bottom: 8px; }
+.frente-bloque + .frente-bloque { margin-top: 28px; }
 .subfrente__titulo {
   display: flex; align-items: center; gap: 8px;
-  font-size: 13.5px; font-weight: 700; color: var(--texto);
+  /* #306: pierde la negrita para dejar de competir con su padre. La caja, su
+     fondo y su borde no se tocan. */
+  font-size: 13.5px; font-weight: 500; color: var(--texto);
   padding: 8px 10px; background: var(--gris-sf); border: 1px solid var(--gris-borde);
   border-bottom: none; border-radius: 8px 8px 0 0;
 }
@@ -616,8 +639,18 @@ table.tareas .col-desv { text-align: center; }
 .fila-nueva td { background: var(--verde-suave); }
 .fila-nueva .mudo { color: var(--gris-texto); }
 
-/* Boton fantasma para crear sub frente */
-.subfrente-add { margin: -10px 0 26px; }
+/* Boton fantasma para crear sub frente. #306: solo cuando el frente está
+   VACÍO — ahí es la única acción posible y tiene que pesar. */
+.subfrente-add { margin: 0; }
+/* #306: con el frente ya poblado, la misma acción es una línea chica y gris
+   pegada debajo del último sub frente. Deja de pesar como un elemento de la
+   lista, pero sigue donde uno la busca. */
+.subfrente-add-linea {
+  display: block; margin: 0; padding: 2px 2px 0;
+  font: inherit; font-size: 12px; color: var(--gris-texto);
+  background: none; border: none; cursor: pointer;
+}
+.subfrente-add-linea:hover { color: var(--primario); text-decoration: underline; }
 .subfrente--nuevo .subfrente__titulo { border-radius: 8px; border-bottom: 1px solid var(--gris-borde); }
 
 /* Indicador de replanificaciones junto al titulo (↻ ×N, solo tabla) */
@@ -738,6 +771,8 @@ table.tareas .col-desv { text-align: center; }
 
 /* ---------- Vista Gantt (grilla) ---------- */
 
+/* #306: el aire de arriba es el MISMO que el de la tabla, para que la franja
+   gris de los controles mida lo mismo en las dos vistas. */
 .gantt-wrap { padding: 16px 20px 40px; }
 
 /* #305: sobre la grilla ya no hay barra propia de la Gantt. La leyenda la
@@ -1333,6 +1368,26 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   display: flex; align-items: center; justify-content: center;
   padding: 8px 8px; box-sizing: border-box;
 }
+
+/* #306 — El "+" sale del flujo y se coloca SIEMPRE a la derecha del nombre.
+   Compartía la línea con él y ocupaba su lugar aunque estuviera invisible —18
+   de ancho más 6 de separación—, así que el nombre estaba corrido 12 a la
+   izquierda siempre, y con el mouse encima el desorden se notaba más. Al no
+   ocupar lugar, el nombre queda centrado de verdad y NO se mueve al aparecer
+   el "+". Se ancla en `.fija-nombre`, que ya es el envoltorio posicionado. */
+.gantt td.fija--rotula .con-mas { flex: 1 1 auto; min-width: 0; }
+.gantt td.fija--rotula .mas-btn {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+}
+/* Si el nombre no llega hasta ahí, el "+" cae sobre espacio vacío y no tapa
+   nada. Si llega, el texto se DESVANECE hacia el fondo justo bajo el "+" en
+   vez de cortarse contra él; el nombre completo sigue en el globo de #305d.
+   Una sola posición y una sola regla: la máscara está siempre puesta mientras
+   el "+" se ve, y solo se nota donde hay texto debajo. */
+.gantt td.fija--rotula:hover .fija-txt {
+  -webkit-mask-image: linear-gradient(to left, transparent 2px, #000 26px);
+  mask-image: linear-gradient(to left, transparent 2px, #000 26px);
+}
 .gantt td.fija--tarea { font-weight: 600; padding: 4px 10px; font-size: 12.5px; }
 .gantt td.fija--tarea.tarea-cell--verde { background: var(--verde-suave); }
 .gantt td.fija--tarea.tarea-cell--rojo { background: var(--rojo-suave); }
@@ -1572,7 +1627,7 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 /* ---------- Tabla: cabeceras con acciones ---------- */
 
-.frente-cabecera { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; }
+.frente-cabecera { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; }
 .frente-cabecera .frente-titulo { margin: 0; }
 
 .subfrente__titulo { justify-content: space-between; }
@@ -2533,6 +2588,10 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .col-acc .icon-btn[aria-label='Archivar'],
   .col-acc .icon-btn[aria-label='Eliminar'] { display: none; }
   .subfrente__titulo { font-size: 12.5px; padding: 6px 8px; }
+  /* #306: el frente sigue pesando más que sus hijos, pero sin pasarle por
+     encima al título de la pantalla, que en mobile mide 15. */
+  .frente-titulo { font-size: 15px; }
+  .frente-titulo__count { font-size: 11px; }
   /* ↻×N y 💬 como unidades atómicas que fluyen inline con el nombre y
      envuelven junto a él (no se parten ni saltan solas de línea). */
   .replan-count { font-size: 9px; padding: 0 3px; display: inline-block; vertical-align: middle; margin-left: 4px; }
@@ -2546,7 +2605,7 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .mistareas .col-ruta { width: 84px; }
   .mistareas .mipanel-ruta { font-size: 9px; }
 
-  .gantt-wrap { padding: 8px 12px 20px; }
+  .gantt-wrap { padding: 12px 12px 20px; }
   .gantt-scroll { -webkit-overflow-scrolling: touch; max-height: calc(100dvh - 220px); }
   .gantt--conproy { --gantt-proy-w: 22px; }
   .gantt .fija--frente { left: var(--gantt-proy-w); width: 76px; min-width: 76px; max-width: 76px; }

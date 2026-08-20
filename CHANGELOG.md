@@ -2081,3 +2081,78 @@ se queda, porque sí cumple. Y **"Actualizar vista" se enciende igual aunque la
 nueva cumpla el filtro**: con filtro puesto la vista está congelada y una tarea
 recién creada nunca está en esa foto. Lo que distingue los dos casos no es si el
 botón aparece, sino qué pasa al tocarlo.
+
+### #306 — La tabla: jerarquía y espacio muerto, y el "+" de la Gantt
+
+Dos problemas que se resuelven juntos, porque **el aire que se recupera es el
+mismo que pasa a marcar los grupos**.
+
+**1. El frente no se leía como el contenedor de sus sub frentes.** Medido: el
+frente era texto de **15 en negrita, sin fondo**; el sub frente, texto de **13.5
+en la misma negrita, con fondo y con borde**. **El hijo tenía más presencia
+visual que el padre**, así que el frente se leía como un rótulo suelto sobre
+unas cajas que no parecían suyas.
+
+**2. Con los sub frentes cerrados, la pantalla era casi todo aire:** 26 de
+margen entre sub frentes contra una barra de 33 de alto, 18 alrededor del título
+de cada frente, y unos 60 por frente para la fila de "+ Sub Frente". Con seis
+sub frentes cerrados llenaban la pantalla **sin mostrar una sola tarea** — y ese
+es justo el estado en que uno abre la pantalla para orientarse.
+
+**La pertenencia se marca con peso y proximidad, no con marcos ni sangría.** Es
+como agrupan Asana y Notion:
+
+- **El frente sube de peso**, claramente por encima del sub frente, y lleva al
+  lado —en gris y chico— **cuántos sub frentes tiene**. Solo sub frentes: la
+  cuenta de tareas ya aparece en varios lugares y repetirla no aporta.
+- **El sub frente pierde la negrita.** Sigue siendo una caja con su fondo y su
+  borde —eso no se toca—, pero deja de competir con su padre.
+- **El aire se reordena:** entre sub frentes del mismo frente baja de **26 a
+  8**, y la separación grande (**28**) queda solo entre un frente y el
+  siguiente. **Ese contraste es lo que comunica la pertenencia:** lo que está
+  junto es del mismo frente, lo que está separado es otro.
+- **"+ Sub Frente" deja de ser una fila.** Con el frente ya poblado es una
+  **línea de texto chica y gris** pegada debajo del último: sigue donde uno la
+  busca, pero deja de pesar como un elemento de la lista. Con el frente
+  **vacío** sigue siendo un **botón** —es el momento más importante y la única
+  acción posible: alguien acaba de crear un frente y lo siguiente que tiene que
+  hacer es agregarle un sub frente—, junto a la línea "Sin sub frentes en este
+  frente", que se mantiene.
+
+**Medido:** con los cinco sub frentes del proyecto de prueba cerrados, el
+contenido de la tabla pasó de **600 a 452** de alto.
+
+**El "+" de la Gantt descentraba los nombres.** Compartía la línea con el nombre
+y **ocupaba su lugar aunque estuviera invisible** —18 de ancho más 6 de
+separación—, así que el nombre estaba corrido 12 a la izquierda **siempre**, y
+con el mouse encima el desorden se notaba más. Ahora **sale del flujo** y se
+coloca a la derecha del nombre: el nombre queda centrado de verdad y **no se
+mueve al aparecer el "+"**. Si el nombre no llega hasta ahí, el "+" cae sobre
+espacio vacío y no tapa nada; si llega, el texto **se desvanece hacia el fondo
+justo bajo el "+"** con un degradado corto, en vez de cortarse contra él. El
+nombre completo sigue en el globo rápido de #305d. *Una sola posición y una sola
+regla, sin casos especiales: la máscara está puesta mientras el "+" se ve, y
+solo se nota donde hay texto debajo.* Efecto lateral medido y bienvenido: al no
+reservar esos 24 píxeles, el nombre dispone de **103 en vez de 79**, así que
+recorta menos.
+
+**La franja gris de los controles medía distinto en cada vista.** Verificado: la
+barra mide lo mismo en las dos —14 arriba, 8 abajo—; lo que cambiaba era el aire
+del contenedor de después. Medido: **24 en la tabla contra 16 en la Gantt**.
+Ahora las dos miden **16**.
+
+**Verificado** con `docs/prueba-306-jerarquia-tabla.mjs`: **50 comprobaciones en
+verde**. Mide los dos pesos y los dos aires, exige que el contraste entre las
+distancias sea de más del doble, comprueba el alto con todo plegado contra el
+valor de antes, recorre el frente vacío —botón, aviso, y el paso a línea al
+crear el primero—, y en la Gantt mide que el "+" esté fuera del flujo, que el
+nombre **no se mueva** entre con y sin mouse, y que el desvanecido esté puesto
+solo mientras el "+" se ve.
+
+*Control negativo:* corrida contra `main`, **12 comprobaciones fallan** y después
+la prueba se detiene, porque el elemento que reemplaza a la fila de "+ Sub
+Frente" todavía no existe.
+
+*Dos pruebas anteriores se actualizaron, no se relajaron:* #297 y #311 leían el
+nombre del frente como el `innerText` completo del título, que ahora incluye la
+cuenta de sub frentes. Pasan a leer el primer nodo de texto, que es el nombre.

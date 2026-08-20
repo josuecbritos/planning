@@ -29,6 +29,10 @@ const esperar = (ms) => p.waitForTimeout(ms)
 
 /** El bloque de un frente en la vista principal, por su título. */
 const bloqueDe = (nombre) => p.locator('section', { has: p.locator('h2.frente-titulo', { hasText: nombre }) }).first()
+// #306: el título del frente lleva además, en gris y chico, cuántos sub
+// frentes tiene. El NOMBRE es el primer nodo de texto del `h2`.
+const primerNombreDeFrente = () =>
+  p.evaluate(() => document.querySelector('h2.frente-titulo')?.firstChild?.textContent?.trim() ?? '')
 
 async function irAlProyecto() {
   await p.getByText('Resumen', { exact: true }).first().click()
@@ -53,7 +57,7 @@ await p.getByText('Daniela Vera', { exact: true }).click()
 await esperar(900)
 await irAlProyecto()
 
-const FRENTE = (await p.locator('h2.frente-titulo').first().innerText()).trim()
+const FRENTE = await primerNombreDeFrente()
 console.log(`Frente de prueba: "${FRENTE}"\n`)
 
 // ── Preparación · plegarlo en "todos los frentes" ──────────────────────────
@@ -156,7 +160,7 @@ if (hayPicker) {
   await p.getByText('Josue Britos', { exact: true }).click()
   await esperar(900)
   await irAlProyecto()
-  const conTarea = (await p.locator('h2.frente-titulo').first().innerText()).trim()
+  const conTarea = await primerNombreDeFrente()
   await bloqueDe(conTarea).locator('.frente-cabecera .colapso-btn').click()
   await esperar(400)
   chk(

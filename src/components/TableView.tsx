@@ -299,12 +299,22 @@ function FrentePagina({
   if (filtrando && subsVisibles.length === 0) return null
 
   return (
-    <section>
+    <section className="frente-bloque">
       {/* #142/#161: en vista "Todos" el frente colapsa; el chevron va a la
           DERECHA del título (más grande, se lee como control). #177: al
           plegarse conserva su borde inferior (se ve como bloque cerrado). */}
       <div className={`frente-cabecera${colapsado ? ' frente-cabecera--colapsado' : ''}`}>
-        <h2 className="frente-titulo">{frente.nombre}</h2>
+        {/* #306: al lado del nombre, cuántos SUB FRENTES tiene —no cuántas
+            tareas—: esa cuenta ya aparece en varios lugares y repetirla no
+            aporta. La pertenencia se marca con peso y proximidad, no con
+            marcos ni sangría: el frente pesa más que sus hijos y sus hijos
+            van juntos. */}
+        <h2 className="frente-titulo">
+          {frente.nombre}
+          <span className="frente-titulo__count">
+            {subs.length} sub frente{subs.length === 1 ? '' : 's'}
+          </span>
+        </h2>
         {colapsable && (
           <button
             className="colapso-btn"
@@ -342,7 +352,9 @@ function FrentePagina({
             />
           ))}
           {subs.length === 0 && <p className="vacio-inline">Sin sub frentes en este frente.</p>}
-          {can.crearSubFrentes && !filtrando && <NuevoSubFrenteInline frenteId={frente.id} actions={actions} />}
+          {can.crearSubFrentes && !filtrando && (
+            <NuevoSubFrenteInline frenteId={frente.id} vacio={subs.length === 0} actions={actions} />
+          )}
         </>
       )}
     </section>
@@ -350,7 +362,16 @@ function FrentePagina({
 }
 
 /** N2: crear sub frente escribiendo el nombre directo, sin ventana. */
-function NuevoSubFrenteInline({ frenteId, actions }: { frenteId: string; actions: Actions }) {
+function NuevoSubFrenteInline({
+  frenteId,
+  vacio,
+  actions,
+}: {
+  frenteId: string
+  /** #306: el frente todavía no tiene ningún sub frente. */
+  vacio: boolean
+  actions: Actions
+}) {
   const [editando, setEditando] = useState(false)
   const [nombre, setNombre] = useState('')
 
@@ -364,8 +385,24 @@ function NuevoSubFrenteInline({ frenteId, actions }: { frenteId: string; actions
   }
 
   if (!editando) {
-    return (
+    // #306 — Dos pesos para la misma acción, según el momento.
+    //
+    // Con el frente VACÍO sigue siendo un botón: es el momento más importante
+    // y la única acción posible —alguien acaba de crear un frente y lo
+    // siguiente que tiene que hacer es agregarle un sub frente—, así que ahí
+    // el botón tiene que pesar.
+    //
+    // Con el frente ya poblado pasa a ser una línea de texto chica y gris,
+    // pegada debajo del último: sigue donde uno la busca, pero deja de pesar
+    // como un elemento más de la lista. Medía unos 60 por frente con su aire,
+    // y con seis sub frentes cerrados eso llenaba la pantalla sin mostrar una
+    // sola tarea.
+    return vacio ? (
       <button className="btn btn--ghost subfrente-add" onClick={() => setEditando(true)}>
+        + Sub Frente
+      </button>
+    ) : (
+      <button className="subfrente-add-linea" onClick={() => setEditando(true)}>
         + Sub Frente
       </button>
     )

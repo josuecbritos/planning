@@ -20,6 +20,14 @@
 //     fallan los dos "paso 2" (la app termina en Resumen).
 import { chromium } from 'playwright-core'
 
+// #306: el título del frente lleva además, en gris y chico, cuántos sub
+// frentes tiene. El NOMBRE es el primer nodo de texto del `h2`, no su
+// `innerText` completo.
+const nombresDeFrente = (pg) =>
+  pg.evaluate(() =>
+    [...document.querySelectorAll('h2.frente-titulo')].map((e) => e.firstChild?.textContent?.trim() ?? ''),
+  )
+
 const EXE = process.env.CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 const URL = process.env.URL ?? 'http://localhost:4173/'
 const PROYECTO_BASE = 'Plan PGP Arauco'
@@ -95,7 +103,7 @@ chk(
   'C1/Tabla paso 4: el mensaje "aún no tiene frentes" desaparece',
 )
 chk(
-  (await p.locator('h2.frente-titulo').allInnerTexts()).includes('Frente Tabla'),
+  (await nombresDeFrente(p)).includes('Frente Tabla'),
   'C1/Tabla paso 4: el frente aparece en la vista principal SIN clics extra',
 )
 chk((await p.locator('.nav-frente-row').count()) === 1, 'C1/Tabla paso 4: el frente aparece en la lateral')
@@ -153,7 +161,7 @@ chk(
 
 // ── C5 · Elegir un frente concreto sigue funcionando ────────────────────────
 const nombreFrente = await elegirPrimerFrente()
-const titulos = await p.locator('h2.frente-titulo').allInnerTexts()
+const titulos = await nombresDeFrente(p)
 chk(
   titulos.length === 1 && titulos[0].trim() === nombreFrente,
   'C5 elegir un frente concreto muestra ESE frente y solo ese',

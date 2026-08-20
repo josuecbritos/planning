@@ -188,6 +188,25 @@ completo con creación y edición **inline** (sin formularios).
   SIGUE siendo de cada máquina, a propósito: **en qué vista estabas** —entrar
   desde un computador nuevo abre limpio, con todas las vistas disponibles—,
   el tema y el modo/ancho de la barra lateral.
+  **La jerarquía se marca con peso y proximidad, no con marcos ni sangría
+  (#306).** El hijo tenía más presencia que el padre: el frente era texto de 15
+  en negrita **sin fondo** y el sub frente texto de 13.5 en la **misma**
+  negrita, con fondo y con borde, así que el frente se leía como un rótulo
+  suelto sobre unas cajas que no parecían suyas. Ahora el **frente sube de
+  peso** —más grande y por encima del sub frente— y lleva al lado, en gris y
+  chico, **cuántos sub frentes tiene** (no cuántas tareas: esa cuenta ya
+  aparece en varios lugares). El **sub frente pierde la negrita**; su caja, su
+  fondo y su borde no se tocan. Y el **aire se reordena**: entre sub frentes
+  del mismo frente baja de 26 a 8, y la separación grande (28) queda solo entre
+  un frente y el siguiente. **Ese contraste es lo que comunica la
+  pertenencia.** De paso se recupera pantalla: con los sub frentes cerrados el
+  contenido pasó de **600 a 452** de alto, y ese es justo el estado en que uno
+  abre la pantalla para orientarse. **"+ Sub Frente"** deja de ser una fila de
+  unos 60 y pasa a ser una **línea chica y gris** pegada debajo del último —
+  salvo cuando el frente **no tiene ninguno**, donde **sigue siendo un botón**:
+  es el momento más importante y la única acción posible, y ahí tiene que
+  pesar. La línea "Sin sub frentes en este frente" se mantiene junto a él.
+
   **Se pueden crear tareas con el filtro puesto (#320).** La fila de "+ Tarea"
   estaba escondida al filtrar, por un problema real —una tarea recién creada
   puede no cumplir el filtro y desaparecer en el mismo momento en que la
@@ -219,6 +238,15 @@ lo que sobra dentro de su contenedor**. De ahí sale solo lo demás: si nunca
 empuja la página hacia abajo, **el scroll de la pantalla deja de existir** y
 encabezado, contadores y barra de controles quedan siempre a la vista. En
 **tabla no se aplica**: una lista larga sí debe desplazar la pantalla.
+
+**El "+" de la grilla no descentra los nombres (#306).** Compartía la línea con
+el nombre y ocupaba su lugar **aunque estuviera invisible** —18 de ancho más 6
+de separación—, así que el nombre estaba corrido 12 a la izquierda siempre.
+Ahora sale del flujo y se coloca a la derecha del nombre: el nombre queda
+centrado de verdad y **no se mueve al aparecer el "+"**. Si el nombre no llega
+hasta ahí, el "+" cae sobre espacio vacío; si llega, el texto **se desvanece**
+bajo él en vez de cortarse. Una sola posición y una sola regla, sin casos
+especiales: el desvanecido se nota solo donde hay texto debajo.
 
 **Los nombres se cortan, no se parten (#321).** En las columnas congeladas el
 corte estaba forzado en cualquier letra —"Planificació / n"— para que ninguna
