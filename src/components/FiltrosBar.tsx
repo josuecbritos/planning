@@ -711,6 +711,11 @@ function OpcionesFecha({
               ...filtro,
               // #223: elegir cualquier otra opción de fecha apaga "Con fecha".
               conFecha: undefined,
+              // #322: y también "Sin fecha". Era la única pareja del campo que
+              // no se apagaba entre sí, y con las dos puestas el filtro sumaba
+              // —las sin fecha MÁS las del rango—, que es un resultado que
+              // nadie decidió nunca.
+              sinFecha: undefined,
               fecha:
                 filtro.fecha?.tipo === 'relativa' && filtro.fecha.valor === r
                   ? undefined
@@ -731,7 +736,13 @@ function OpcionesFecha({
           onChange={(e) => {
             const hasta = filtro.fecha?.tipo === 'rango' ? filtro.fecha.hasta : undefined
             const desde = e.target.value || undefined
-            onCambiar({ ...filtro, conFecha: undefined, fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined })
+            // #322: escribir un rango también apaga "Sin fecha".
+            onCambiar({
+              ...filtro,
+              conFecha: undefined,
+              sinFecha: undefined,
+              fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined,
+            })
           }}
         />
         –
@@ -743,7 +754,12 @@ function OpcionesFecha({
           onChange={(e) => {
             const desde = filtro.fecha?.tipo === 'rango' ? filtro.fecha.desde : undefined
             const hasta = e.target.value || undefined
-            onCambiar({ ...filtro, conFecha: undefined, fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined })
+            onCambiar({
+              ...filtro,
+              conFecha: undefined,
+              sinFecha: undefined,
+              fecha: desde || hasta ? { tipo: 'rango', desde, hasta } : undefined,
+            })
           }}
         />
       </div>
@@ -763,10 +779,23 @@ function OpcionesFecha({
       >
         Con fecha
       </button>
-      {/* Mismo formato que las demas opciones del campo (punto 1). */}
+      {/* Mismo formato que las demas opciones del campo (punto 1).
+          #322: EXCLUYENTE con todo el resto del campo, igual que "Con fecha" y
+          "En horizonte visible". Antes solo apagaba "Con fecha", así que podía
+          convivir con una relativa o con el rango fijo y el filtro sumaba las
+          dos cosas. Se llegaba desde los dos lados, y nadie decidió nunca qué
+          debía significar esa mezcla; ahora las cinco opciones del campo se
+          excluyen entre sí sin excepciones. */}
       <button
         className={`filtro-op${filtro.sinFecha ? ' filtro-op--on' : ''}`}
-        onClick={() => onCambiar({ ...filtro, conFecha: undefined, sinFecha: filtro.sinFecha ? undefined : true })}
+        onClick={() =>
+          onCambiar({
+            ...filtro,
+            fecha: undefined,
+            conFecha: undefined,
+            sinFecha: filtro.sinFecha ? undefined : true,
+          })
+        }
       >
         Sin fecha
       </button>

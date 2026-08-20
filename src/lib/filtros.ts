@@ -117,8 +117,10 @@ export function filtraTareas(f: Filtro): boolean {
  *
  * Lo usa el control "Filtrar": el número del botón es el total, y el del panel
  * es el de cada campo (una ficha por campo, no por valor). El campo fecha
- * cuenta sus tres componentes por separado porque son elegibles por separado:
- * "Hoy" y "Sin fecha" pueden convivir, así que ahí el campo vale dos.
+ * suma sus tres componentes. Desde #322 sus opciones son EXCLUYENTES entre sí,
+ * así que en la práctica vale 0 o 1; la suma se conserva porque una vista
+ * guardada de antes de #322 puede traer todavía dos puestas a la vez, y ahí
+ * el número tiene que decir la verdad.
  * `proyectos` cuenta como cualquier otro campo: solo existe en Mis Tareas.
  */
 export interface CuentaFiltro {
@@ -140,7 +142,9 @@ export function cuentaFiltro(f: Filtro): CuentaFiltro {
 /**
  * #305 — Texto del campo fecha para su ficha. A diferencia de los demás
  * campos, acá el valor se nombra en vez de contarse: "Fecha: 1" no dice nada,
- * "Fecha: Esta semana" sí. Con dos componentes puestos se nombran los dos.
+ * "Fecha: Esta semana" sí. Desde #322 las opciones son excluyentes, así que
+ * normalmente hay una sola; el "+" sigue por las vistas guardadas de antes,
+ * que pueden traer dos.
  */
 export function etiquetaCampoFecha(f: Filtro): string {
   const partes: string[] = []

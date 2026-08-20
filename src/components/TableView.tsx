@@ -551,7 +551,17 @@ function SubFrenteTabla({
               onAbrirTarea={onAbrirTarea}
             />
           ))}
-          {can.crearTareas && !filtrando && (
+          {/* #320: la fila de "+ Tarea" se muestra TAMBIÉN con filtro puesto.
+              Estaba escondida a propósito, por un problema real —la tarea
+              recién creada puede no cumplir el filtro y desaparecer en el mismo
+              momento en que la creas—, pero la Gantt ya resolvía ese problema
+              en vez de esconder la acción, así que el mismo proyecto con el
+              mismo filtro se comportaba al revés según la vista. El remedio ya
+              vive acá: `forzarIds` deja la recién creada a la vista aunque el
+              filtro o la foto la dejen fuera, y enciende "Actualizar vista".
+              Lo que SÍ se sigue escondiendo con filtro puesto: "+ Sub Frente",
+              el bloque de archivadas, y los sub frentes sin coincidencias. */}
+          {can.crearTareas && (
             <NuevaTareaFila subFrenteId={sub.id} candidatos={candidatos} actions={actions} />
           )}
         </tbody>
