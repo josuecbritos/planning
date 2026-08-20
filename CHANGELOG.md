@@ -2295,3 +2295,123 @@ aire de adentro pasó a ser **exactamente el doble** (16 contra 8). Doblar es la
 propiedad que se pide; pasarse no aporta nada. Y el umbral de #306b sobre el
 aire de arriba de la barra sube de 14 a 20, porque #306c lo volvió a subir a 16
 a propósito: 13 arriba contra 24 abajo era lo que dejaba la barra descolgada.
+
+### #318 — La barra lateral: el frente cuelga de su proyecto, y se despliega
+
+**La jerarquía estaba invertida, y no por descuido.** Medido sobre el borde de
+la barra: el nombre del **proyecto** arrancaba a **48** (8 del contenedor de la
+lista + 12 de la fila + 10 del botón + el cuadradito de color de 10 + 8 de
+separación) y el del **frente** a **30** (8 + 12 + 10). El hijo quedaba **18 a
+la izquierda de su padre**, y el frente no llevaba nada que lo ligara a su
+proyecto.
+
+*#225 lo había dejado así a propósito:* antes los frentes estaban prácticamente
+alineados con el proyecto y consumían ancho, así que se corrieron para alinearse
+con el cuadradito de color y ganar espacio para el nombre. **Priorizó el ancho, y
+el efecto lateral fue esta inversión.** Este pedido paga parte de ese ancho de
+vuelta, a conciencia.
+
+**Ahora el grupo de frentes lleva 16 de sangría y una línea vertical a su
+izquierda**, que empieza con el primero y termina con el último. La línea hace
+dos trabajos: dice que el grupo cuelga del proyecto de arriba, y marca dónde
+empieza y dónde termina. **Por qué la línea y no un punto de color por frente:**
+el punto costaría unos 18 de ancho en **cada** fila; la línea cuesta **2 más un
+aire chico**, una sola vez, y comunica mejor porque abarca el grupo entero en vez
+de repetirse. Es el patrón de los sistemas de diseño de barras laterales:
+sangría de 12 a 16 por nivel, con una línea que conecta el hijo con el padre.
+
+**Y el frente se ve algo más chico y más tenue.** Medido, esto estaba peor de lo
+que se creía: el frente era **13.5** contra los **13.3** del proyecto, o sea el
+hijo era **más grande** que su padre. Ahora es 12.5 y de un gris más apagado; el
+frente **elegido** recupera el blanco, para que la selección no dependa solo del
+fondo de la fila.
+
+**Costo aceptado y medido:** el nombre del frente pasa de **204 a 182** de ancho
+útil, así que algunos nombres largos se cortan un poco antes. Se siguen cortando
+con puntos suspensivos y con el nombre completo al pasar el mouse.
+
+**Los frentes se despliegan, no aparecen.** Al abrir un proyecto bajan con una
+transición corta, empujando lo que viene después; al cerrarlo, o al abrir otro,
+se repliegan igual. *Lo que se corrigió no es que la lista se mueva —eso es
+correcto y necesario— sino que el movimiento fuera **instantáneo**: el ojo no
+veía nada moverse, solo encontraba la lista distinta.*
+
+**Dos decisiones técnicas que valen la pena, porque el camino obvio no
+funciona:**
+
+- **La caja de frentes es una grilla de una fila que va de `0fr` a `1fr`.** Es
+  la única forma de animar "de nada a lo que mida" sin medir el alto por JS: con
+  `height: auto` no hay interpolación posible, y con un `max-height` inventado la
+  velocidad depende de cuánto sobre del tope, así que un proyecto de un frente y
+  uno de seis se moverían distinto — justo lo que el criterio 6 no quiere.
+- **La ENTRADA es animación y la SALIDA transición.** Una transición necesita dos
+  estados y al abrir la caja acaba de montarse, así que no hay desde dónde salir;
+  una animación, en cambio, corre sola al aparecer. Al cerrar la caja ya existe y
+  solo pierde su clase, y ahí la transición sí tiene de dónde salir.
+- **Y el proyecto que se cierra se calcula EN EL RENDER, no en un efecto.** Esta
+  fue la parte que costó, y está medida: con un `useEffect`, en el render del
+  cierre la caja ya no estaba dibujada, se desmontaba, y el efecto la volvía a
+  montar en 0 — **el repliegue daba 0 en las catorce muestras**, es decir el
+  defecto seguía intacto. Ajustar estado durante el render comparando contra el
+  valor anterior es el camino que React documenta para esto: se resuelve antes de
+  pintar, así que la caja pasa de abierta a cerrada en el mismo commit.
+
+**Medido después:** el repliegue va `58 53 43 31 21 14 5 2 1 0`, el despliegue
+`5 15 27 37 49 53 56 57 58`, con seis frentes `174 128 93 63 41 15 7 3 1 0`, y al
+pasar de un proyecto a otro el saliente baja de 174 a 3 mientras el entrante
+aparece en 29.
+
+### #307 — El panel de detalle: solo leer y comentar
+
+El panel terminaba con un bloque de acciones —marcar hecha, replanificar,
+archivar y restaurar— **después del historial y del hilo de comentarios
+completo**. Con comentarios, había que bajar hasta el fondo para llegar a ellas.
+
+**Se saca el bloque entero.** La razón ordena todo el pedido: *el panel se usa
+para leer los datos de la tarea y anotar comentarios, nada más.* Marcar hecha y
+replanificar ya se hacen desde la tabla y desde la Gantt, así que tenerlas acá
+era un **tercer lugar para lo mismo**. El panel queda con el estado, el título,
+la ubicación, el responsable, las fechas, el historial de replanificaciones y los
+comentarios al final. **Debajo de los comentarios no queda nada.**
+
+**Dos cosas se resolvieron solas al sacarlo:**
+
+- **El estado dejó de decirse dos veces.** Estaba la etiqueta sobre el título y
+  la casilla "Hecha" abajo. Queda solo la etiqueta.
+- **Desapareció del panel el texto "La fecha de una tarea hecha no se edita.
+  Desmárcala para corregirla."**, que acompañaba al control de replanificar. Ese
+  texto **sigue existiendo como globo** sobre la fecha en la tabla y en Mis
+  Tareas, que es donde vive el control; sale de un solo lugar del código
+  (`MOTIVO_FECHA_HECHA`) y ahora aparece en dos en vez de tres.
+
+**Consecuencia declarada:** archivar y restaurar existían **solo en la tabla** y
+en este panel, así que **la Gantt queda sin forma de archivar** y hay que ir a la
+tabla. **El dueño lo evaluó y decidió sacarlas igual.** Marcar hecha y
+replanificar no tienen ese problema: existen en las dos vistas.
+
+**Al no tener acciones, el panel tampoco necesita permisos.** El `can` se fue con
+ellas, y con él los dos `useMemo` de App que existían solo para armarlo. La regla
+de **#243** —los permisos son los del proyecto **de la tarea**, no los del
+proyecto abierto— sigue viva donde todavía hay acciones que cruzan proyectos: las
+filas de Mis Tareas, que arman su `makeCan` por tarea. Lo que NO se tocó, por
+decisión del dueño: el ancho del panel, cómo están dispuestos los datos, y que no
+atenúe lo que hay detrás.
+
+**Verificado** #318 y #307 juntos con `docs/prueba-318-307-sidebar-y-panel.mjs`:
+**46 comprobaciones en verde**. Mide las dos sangrías y exige que la relación se
+haya dado vuelta, que la línea empiece y termine con el grupo y cueste 2 y no 18
+por fila, y que el frente sea más chico y más apagado que su padre. Para la
+transición **muestrea el alto de la caja cada 20ms** y exige que pase por alturas
+intermedias: una aparición de golpe salta de 0 al total en una sola muestra.
+Recorre el proyecto de seis frentes, el cambio de un proyecto a otro y el
+proyecto sin frentes. Del panel comprueba que no quede nada bajo los comentarios
+—ni casilla, ni control de fecha, ni archivar, ni restaurar en una archivada—,
+que el estado se diga una sola vez, y que sigan funcionando el globo de la fecha
+en la tabla, marcar hecha, replanificar, archivar desde la columna de acciones y
+restaurar desde el bloque de archivadas, además de abrir el panel desde la Gantt
+y desde Mis Tareas.
+
+*Control negativo:* corrida contra `main`, **19 comprobaciones fallan** con los
+síntomas exactos del reporte: el frente arranca a 30 contra los 48 del proyecto,
+no hay línea, el frente mide 13.5 contra 13.3 —más grande que su padre—, las dos
+transiciones dan 0 en todas las muestras, y el bloque de acciones está entero.

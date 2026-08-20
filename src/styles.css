@@ -1617,7 +1617,59 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 }
 .nav-proyecto__menu-op:hover { background: #333338; color: #fff; }
 
-.nav-frentes { padding-bottom: 6px; }
+/* #318 — Los frentes se despliegan, no aparecen.
+   La caja es una grilla de UNA fila, y esa fila va de `0fr` a `1fr`. Es la
+   única forma de animar "de nada a lo que mida" sin medir el alto por JS: con
+   `height: auto` no hay interpolación posible, y con un `max-height` inventado
+   la velocidad depende de cuánto sobre del tope —un frente y seis se moverían
+   distinto, que es justo lo que el criterio 6 no quiere—.
+   La ENTRADA es animación y no transición porque una transición necesita dos
+   estados y la caja acaba de montarse; una animación corre sola al aparecer.
+   La SALIDA sí es transición: ahí la caja ya existe y solo pierde su clase
+   (Sidebar la conserva dibujada mientras dura, ver `replegando`). */
+.nav-frentes-caja {
+  --ms-despliegue: 180ms;
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows var(--ms-despliegue) ease;
+}
+.nav-frentes-caja--abierta {
+  grid-template-rows: 1fr;
+  animation: desplegar-frentes var(--ms-despliegue) ease;
+}
+@keyframes desplegar-frentes {
+  from { grid-template-rows: 0fr; }
+  to { grid-template-rows: 1fr; }
+}
+/* El `min-height: 0` es lo que deja que la fila valga menos que su contenido;
+   sin él, `0fr` no achica nada. */
+.nav-frentes-caja > .nav-frentes { overflow: hidden; min-height: 0; }
+/* Quien pidió no ver movimiento no lo ve: la lista cambia de golpe, como
+   antes. */
+@media (prefers-reduced-motion: reduce) {
+  .nav-frentes-caja { transition: none; }
+  .nav-frentes-caja--abierta { animation: none; }
+}
+
+/* #318 — El frente se lee como HIJO de su proyecto.
+   #225 había alineado los frentes con el cuadradito de color del proyecto para
+   ganar ancho, y el efecto lateral fue invertir la jerarquía: medido, el
+   nombre del proyecto arranca a 48 del borde de la barra y el del frente a 30,
+   o sea el hijo quedaba 18 A LA IZQUIERDA de su padre. Este pedido paga parte
+   de ese ancho de vuelta, a conciencia.
+   La línea vertical hace dos trabajos: dice que el grupo cuelga del proyecto
+   de arriba, y marca dónde empieza y dónde termina. Un punto de color por
+   frente costaría unos 18 en CADA fila; la línea cuesta 2 más un aire chico,
+   una sola vez, y comunica mejor porque abarca el grupo entero en vez de
+   repetirse. Va en `.nav-frentes` y no en la caja para que crezca y se achique
+   CON el grupo mientras se despliega.
+   El relleno de abajo que había acá se fue: hacía que la línea sobrara por
+   debajo del último frente en vez de terminar con él. La separación con el
+   proyecto siguiente ya la pone el relleno de arriba de ese proyecto. */
+.nav-frentes {
+  margin-left: 16px;
+  border-left: 2px solid #3f3f46;
+  padding-left: 4px;
+}
 /* #225: el fondo de la fila lo pinta LA FILA, no el botón del nombre. Así el
    ⋯ montado encima (escritorio) puede heredarlo con `--fila-fondo` y quedar
    legible sobre el texto en lugar de chocar contra él. */
@@ -1631,13 +1683,22 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   --fila-fondo: #27272a; background: var(--fila-fondo); border-radius: 6px;
 }
 .nav-frentes .nav-frente:hover { background: none; }
-/* #225: la sangría de los frentes no comunicaba jerarquía —el nombre del
-   proyecto arrancaba a 36px y el del frente a 38px, prácticamente alineados—
-   pero sí consumía ancho. Los frentes se alinean ahora con el CUADRADITO DE
-   COLOR del proyecto (8px del contenedor + 10px), que es lo que marca el
-   comienzo del bloque; la jerarquía la dan el punto, la negrita y el hecho de
-   que los frentes solo aparecen bajo el proyecto abierto. */
-.nav-frentes .nav-frente { padding-left: 10px; padding-right: 8px; }
+/* #225 alineó los frentes con el CUADRADITO DE COLOR del proyecto para ganar
+   ancho; #318 los corre a la derecha del NOMBRE del proyecto, que es lo que
+   comunica la jerarquía. El relleno de acá no cambia: la sangría la ponen el
+   margen, la línea y su aire, en `.nav-frentes`.
+   #318 — Además el frente se ve algo más chico y más tenue que el nombre del
+   proyecto (13.3/600/#fff): antes era 13.5, o sea MÁS GRANDE que su padre.
+   Esto refuerza la jerarquía sin costar ancho. Se acota a `.nav-frentes`
+   porque `.nav-frente` también viste Notificaciones, Resumen, Mis Tareas y las
+   dos entradas de Administración, que son de primer nivel. */
+.nav-frentes .nav-frente {
+  padding-left: 10px; padding-right: 8px;
+  font-size: 12.5px; color: #a1a1aa;
+}
+/* El frente elegido recupera el blanco: si se queda tenue, el fondo de la fila
+   tiene que marcar la selección solo. */
+.nav-frente-row--activo .nav-frente { color: #fff; }
 /* #222: el nombre en UNA línea; el completo queda en el title. */
 .nav-frente--flex { flex: 1; min-width: 0; }
 .nav-frente--flex > span {
@@ -2008,13 +2069,11 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .panel-detalle__cadena li.marcada-lista .fecha-cadena { color: var(--verde-check); }
 .panel-detalle__comentarios p { font-size: 13px; margin: 0; white-space: pre-wrap; }
 
-.panel-detalle__acciones {
-  margin-top: 18px; border-top: 1px solid var(--gris-linea); padding-top: 14px;
-  display: flex; flex-direction: column; gap: 12px;
-}
-.panel-accion { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; }
-/* #245: por qué no hay control de fecha en una tarea hecha. */
-.panel-nota { margin: 0; font-size: 12.5px; font-style: italic; color: var(--gris-texto); }
+/* #307: acá vivía `.panel-detalle__acciones` con sus `.panel-accion` y la
+   `.panel-nota` de #245. El panel pasó a ser solo para leer y comentar, así
+   que debajo de los comentarios no queda nada y estas tres reglas se fueron
+   con el bloque. El texto de #245 sigue existiendo, pero como globo sobre la
+   fecha en la tabla y en Mis Tareas. */
 
 /* ---------- Fase 3: archivadas ---------- */
 
