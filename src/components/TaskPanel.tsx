@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Tarea, Usuario } from '../types'
 import type { Actions } from '../App'
-import { MOTIVO_FECHA_HECHA, miembrosDeProyecto, puedeEditarFecha, responsableDeTarea, type Can } from '../lib/permisos'
+import { miembrosDeProyecto, responsableDeTarea } from '../lib/permisos'
 import { formatoFecha, formatoFechaHora } from '../lib/dates'
 import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, historialDe } from '../lib/derive'
 import {
@@ -12,17 +12,19 @@ import {
   partirComentario,
   type MencionElegida,
 } from '../lib/menciones'
-import { FechaEditable } from './FechaEditable'
 
 // Panel lateral de detalle (7.2, era backlog en v3.1): click sobre una tarea
-// o una marca abre este panel con el detalle completo, el historial y las
-// acciones operativas (solo admin).
+// o una marca abre este panel con el detalle completo, el historial y los
+// comentarios.
+//
+// #307: SOLO leer y comentar. Ya no lleva acciones, así que tampoco necesita
+// permisos: no decide nada que dependa de quién mira. Lo único que escribe es
+// el comentario, y comentar puede cualquier miembro (3.3).
 
 interface Props {
   state: AppState
   tarea: Tarea
   hoy: string
-  can: Can
   actions: Actions
   /** #208/#209: quién mira — para no ofrecerse a uno mismo en el selector de
    *  menciones y para saber qué comentarios puede editar. */
@@ -30,7 +32,7 @@ interface Props {
   onClose: () => void
 }
 
-export function TaskPanel({ state, tarea, hoy, can, actions, sesionId, onClose }: Props) {
+export function TaskPanel({ state, tarea, hoy, actions, sesionId, onClose }: Props) {
   const asideRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -157,59 +159,21 @@ export function TaskPanel({ state, tarea, hoy, can, actions, sesionId, onClose }
         actions={actions}
       />
 
-      {can.algunoDeTareas && (
-        <div className="panel-detalle__acciones">
-          {!tarea.archivada && (
-            <>
-              {can.marcarHechas(tarea) && (
-                <label className="panel-accion">
-                  <input
-                    className="chk"
-                    type="checkbox"
-                    checked={tarea.hecha}
-                    onChange={() => actions.toggleHecha(tarea.id, !tarea.hecha)}
-                  />
-                  Hecha
-                </label>
-              )}
-              {/* #245: en una tarea hecha no se ofrece replanificar. La fecha
-                  vigente sigue arriba, en el detalle; lo que desaparece es el
-                  control, no el dato. */}
-              {puedeEditarFecha(can, tarea) ? (
-                <label className="panel-accion">
-                  {tarea.fechaObjetivo ? 'Replanificar a' : 'Planificar para'}
-                  <FechaEditable
-                    valor={tarea.fechaObjetivo}
-                    onCambiar={(nueva) => actions.cambiarFechaObjetivo(tarea.id, nueva)}
-                    ariaLabel="Nueva fecha objetivo"
-                  />
-                </label>
-              ) : (
-                tarea.hecha &&
-                can.editarFechas(tarea) && <p className="panel-nota">{MOTIVO_FECHA_HECHA}</p>
-              )}
-              {can.archivarEliminar(tarea) && (
-                <button
-                  className="btn"
-                  title="Sale del plan y conserva su historial"
-                  onClick={() => {
-                    if (confirm(`¿Archivar la tarea "${tarea.titulo}"? Sale del plan y conserva su historial.`)) {
-                      actions.updateTarea(tarea.id, { archivada: true })
-                    }
-                  }}
-                >
-                  Archivar tarea
-                </button>
-              )}
-            </>
-          )}
-          {tarea.archivada && can.archivarEliminar(tarea) && (
-            <button className="btn btn--primary" onClick={() => actions.updateTarea(tarea.id, { archivada: false })}>
-              Restaurar al plan
-            </button>
-          )}
-        </div>
-      )}
+      {/* #307: acá terminaba el panel con un bloque de acciones —marcar hecha,
+          replanificar, archivar y restaurar—, DESPUÉS del historial y del hilo
+          de comentarios completo, así que con comentarios había que bajar
+          hasta el fondo para llegar a ellas. El panel se usa para LEER una
+          tarea y comentarla, nada más: marcar hecha y replanificar ya se hacen
+          desde la tabla y desde la Gantt, así que tenerlas acá era un tercer
+          lugar para lo mismo. Debajo de los comentarios no queda nada.
+          Dos cosas se resolvieron solas al sacarlo: el estado dejó de decirse
+          dos veces (queda la etiqueta del título, se fue la casilla "Hecha"), y
+          desapareció de acá el texto de #245 sobre la fecha de una tarea hecha
+          — que SIGUE existiendo como globo en la tabla y en Mis Tareas, que es
+          donde el control de fecha vive.
+          Consecuencia declarada y aceptada por el dueño: archivar y restaurar
+          existían solo en la tabla y acá, así que la Gantt queda sin forma de
+          archivar y hay que ir a la tabla. */}
     </aside>
   )
 }

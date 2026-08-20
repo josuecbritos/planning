@@ -130,11 +130,13 @@ DEFINITIVO (#258) sigue sin definirse: tareas, comentarios, historial y
 accesos de la persona se conservan (los accesos, desde #301, ya no).
 
 **Los permisos son del proyecto de la tarea, no del que esté abierto (#243).**
-El panel de detalle se abre también desde Mis Tareas y desde una notificación,
-que cruzan proyectos: sus acciones se calculan con los permisos del proyecto **al
-que pertenece esa tarea**. Antes usaba los del proyecto activo de la barra, así
-que alguien con control total en A veía botones que no le corresponden al abrir
-una tarea de B — y al revés, quien tenía permisos en B no los veía.
+Las acciones sobre una tarea se calculan con los permisos del proyecto **al que
+pertenece esa tarea**, no con los del proyecto activo de la barra: si no,
+alguien con control total en A vería botones que no le corresponden al abrir una
+tarea de B — y al revés. La regla nació por el panel de detalle, que se abre
+también desde Mis Tareas y desde una notificación; **desde #307 el panel ya no
+tiene acciones ni permisos**, así que hoy quien la aplica es Mis Tareas, que
+arma su `makeCan` por tarea.
 
 **Mis Tareas es para todos los roles (#254).** El cliente es ejecutor del plan
 —se le asignan tareas, se le dan permisos sobre las suyas y se le notifica—, así
@@ -553,13 +555,14 @@ fabricar); ni el marcado ni el desmarcado escriben historial de
 replanificaciones ni generan notificación. Los datos anteriores al cambio se
 corrigieron con la misma regla (la fecha grabada es su día de marcado).
 
-**La fecha de una tarea hecha no se edita (#245).** Vale en las **cuatro**
-vistas —tabla, Mis Tareas, Gantt y panel de detalle—: mover la fecha de algo ya
-cerrado reescribiría el registro de cuándo se comprometió, que es justamente el
+**La fecha de una tarea hecha no se edita (#245).** Vale en **todas** las
+vistas donde se puede mover una fecha —tabla, Mis Tareas y Gantt; el panel de
+detalle dejó de ofrecer el control en #307—: mover la fecha de algo ya cerrado
+reescribiría el registro de cuándo se comprometió, que es justamente el
 diferenciador del producto. La regla vive en un solo lugar
-(`puedeEditarFecha`), así que las cuatro no pueden volver a separarse. La fecha
-sigue **a la vista**, como texto: lo que desaparece es el control, no el dato, y
-quien podría editarla ve por qué ("La fecha de una tarea hecha no se edita.
+(`puedeEditarFecha`), así que no pueden volver a separarse. La fecha sigue **a
+la vista**, como texto: lo que desaparece es el control, no el dato, y quien
+podría editarla ve por qué ("La fecha de una tarea hecha no se edita.
 Desmárcala para corregirla."). El check **sigue siendo reversible**: el camino
 para corregir es desmarcar, cambiar la fecha y volver a marcar.
 
@@ -591,8 +594,23 @@ replanificación (↻ ×N) y deja rastro; mover una fecha futura es planificaci�
 siempre. Se puede etiquetar con `@` a gente **con acceso al proyecto** (la
 mención se guarda por id, así sobrevive a un cambio de nombre) y el **autor**
 puede editar lo suyo, con marca visible de editado. **No se borra** ninguno: el
-hilo acompaña al registro de replanificaciones. Panel lateral de detalle con la
-línea de tiempo.
+hilo acompaña al registro de replanificaciones.
+
+**El panel de detalle es solo para leer y comentar (#307).** Muestra el estado,
+el título, la ubicación, el responsable, las fechas, la línea de tiempo de
+replanificaciones y los comentarios — y **debajo de los comentarios no queda
+nada**. Antes terminaba con un bloque de acciones —marcar hecha, replanificar,
+archivar y restaurar— **después** del historial y del hilo completo, así que con
+comentarios había que bajar hasta el fondo para llegar a ellas; y marcar hecha y
+replanificar ya se hacen desde la tabla y desde la Gantt, así que tenerlas ahí
+era un tercer lugar para lo mismo. Al sacarlo se resolvieron dos cosas solas: el
+estado **dejó de decirse dos veces** (queda la etiqueta junto al título) y
+desapareció del panel el texto de #245 sobre la fecha de una tarea hecha, que
+sigue existiendo como **globo sobre la fecha** en la tabla y en Mis Tareas, que
+es donde vive el control. **Consecuencia declarada y aceptada:** archivar y
+restaurar existían solo en la tabla y en el panel, así que **desde la Gantt hay
+que ir a la tabla para archivar**. Al no tener acciones, el panel tampoco
+necesita permisos: no decide nada que dependa de quién mira.
 
 **Administración → Proyectos (#132):** módulo de admin, hermano de Usuarios.
 Dueño de la relación usuario↔proyecto (miembros, 🔑) y del ciclo de vida:
@@ -625,9 +643,35 @@ extremo derecho de la fila, con el fondo de la fila y un degradado que desvanece
 el texto bajo él (#225). En el teléfono, donde está siempre visible, conserva su
 lugar. En los dos casos el nombre —en una sola línea, con el completo en el
 tooltip— dispone del mismo ancho con y sin el mouse encima, y la fila nunca
-cambia de alto. Los frentes se alinean con el **cuadradito de color** del
-proyecto, no con su texto: la sangría anterior no comunicaba jerarquía (36 vs
-38px) y sí consumía ancho. Solo hay **un menú abierto a la vez**: abrir el de un
+cambia de alto.
+
+**El frente se lee como hijo de su proyecto (#318).** #225 había alineado los
+frentes con el **cuadradito de color** del proyecto para ganarle ancho al
+nombre, y el efecto lateral fue **invertir la jerarquía**: medido sobre el borde
+de la barra, el nombre del proyecto arrancaba a 48 y el del frente a 30, o sea
+el hijo quedaba **18 a la izquierda de su padre**. Ahora el grupo de frentes
+lleva **16 de sangría** y una **línea vertical** a su izquierda que lo abarca
+entero, empezando con el primero y terminando con el último. La línea hace dos
+trabajos —dice que el grupo cuelga del proyecto de arriba y marca dónde empieza
+y dónde termina— y es más barata que un punto de color por frente: cuesta 2 más
+un aire chico **una vez**, contra unos 18 en **cada** fila. El frente además se
+ve **algo más chico y más tenue** que el nombre del proyecto (antes era más
+grande que su padre), lo que refuerza la jerarquía sin costar ancho; el frente
+elegido recupera el blanco. **Costo aceptado:** el nombre pasa de 204 a 182 de
+ancho útil, así que algunos nombres largos se cortan un poco antes — se siguen
+cortando con puntos suspensivos y con el completo en el tooltip. En un proyecto
+**sin frentes** no aparece la línea: no hay grupo que abarcar.
+
+**Los frentes se despliegan, no aparecen (#318).** Al abrir un proyecto sus
+frentes bajan con una transición corta, empujando lo que viene después; al
+cerrarlo, o al abrir otro, se repliegan igual. Lo que se corrigió no es que la
+lista se mueva —eso es correcto— sino que el movimiento fuera **instantáneo**:
+el ojo no veía nada moverse, solo encontraba la lista distinta. Los frentes
+siguen existiendo **solo dentro del proyecto abierto**; el que acaba de cerrarse
+se conserva dibujado apenas lo que dura el repliegue, porque un elemento que se
+desmonta no transiciona.
+
+Solo hay **un menú abierto a la vez**: abrir el de un
 frente cierra el de un proyecto y viceversa. La barra mide 244px por defecto y
 el usuario puede **ajustar su ancho arrastrando el borde derecho** (entre 244 y
 400px, doble clic para restablecer; se recuerda por usuario, #226). Ni los

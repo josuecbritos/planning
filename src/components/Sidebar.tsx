@@ -63,6 +63,12 @@ type ModalState =
 /** #222: qué ⋯ está desplegado. Uno solo a la vez en toda la barra. */
 type MenuAbierto = { tipo: 'proyecto' | 'frente'; id: string } | null
 
+/** #318: lo que dura desplegar o replegar los frentes. El mismo número vive en
+ *  `--ms-despliegue` (styles.css); acá se usa para saber cuánto conservar
+ *  dibujado el proyecto que se cierra. Corto a propósito: se trata de que el
+ *  ojo VEA moverse la lista, no de esperarla. */
+const MS_DESPLIEGUE = 180
+
 /** #187: chevron doble — comunica plegar/desplegar (no "fijar"). Mismo trazo
  *  que el resto de la iconografía de la barra (la campana es la referencia). */
 function IconoPlegar({ plegar }: { plegar: boolean }) {
@@ -124,6 +130,42 @@ export function Sidebar({
   useEffect(() => {
     onMenuAbierto(menu !== null)
   }, [menu, onMenuAbierto])
+
+  // #318 — Los frentes se REPLIEGAN, no desaparecen.
+  //
+  // El despliegue lo hace CSS solo: la caja entra con una animación, y una
+  // animación corre sola al montarse. El repliegue no puede hacerlo solo,
+  // porque un elemento que se desmonta no transiciona: si al cerrar el
+  // proyecto se fuera del DOM en el mismo instante, el cierre volvería a ser
+  // instantáneo, que es exactamente lo que este pedido corrige. Por eso el
+  // proyecto que acaba de cerrarse se conserva dibujado el tiempo que dura la
+  // transición, y solo ese: la lista sigue mostrando los frentes de UN
+  // proyecto, el abierto.
+  //
+  // Quién se está replegando se calcula EN EL RENDER y no en un efecto, y esa
+  // es la parte que importa: un efecto corre después de pintar, así que en el
+  // render del cierre la caja ya no estaría dibujada, se desmontaría, y el
+  // efecto la volvería a montar en 0 — sin ningún estado anterior desde el
+  // cual transicionar. Medido así: el repliegue daba 0 en todas las muestras.
+  // Ajustar estado durante el render, comparando contra el valor anterior, es
+  // el camino que React documenta para esto; el `setState` de acá se resuelve
+  // antes de pintar, así que la caja pasa de "abierta" a "cerrada" en el mismo
+  // commit y la transición sí tiene de dónde salir.
+  const abierto = pantalla === 'proyectos' ? proyectoActivoId : null
+  const [rastro, setRastro] = useState<{ abierto: string | null; replegando: string | null }>({
+    abierto,
+    replegando: null,
+  })
+  if (rastro.abierto !== abierto) setRastro({ abierto, replegando: rastro.abierto })
+  const replegando = rastro.replegando
+  useEffect(() => {
+    if (!replegando) return
+    const id = window.setTimeout(
+      () => setRastro((r) => (r.replegando === replegando ? { ...r, replegando: null } : r)),
+      MS_DESPLIEGUE,
+    )
+    return () => window.clearTimeout(id)
+  }, [replegando])
   const cerrarMenu = () => {
     setMenu(null)
     setMenuPos(null)
@@ -169,9 +211,11 @@ export function Sidebar({
     }
   }, [menu])
 
-  const frentes = state.frentes
-    .filter((f) => f.proyectoId === proyectoActivoId)
-    .sort((a, b) => a.orden - b.orden)
+  // #318: por proyecto y no solo el activo — el que se está replegando también
+  // necesita los suyos para tener algo que replegar.
+  const frentesDe = (proyectoId: string) =>
+    state.frentes.filter((f) => f.proyectoId === proyectoId).sort((a, b) => a.orden - b.orden)
+  const frentes = proyectoActivoId ? frentesDe(proyectoActivoId) : []
 
   // #188: los proyectos y los frentes ya no muestran contador de tareas (era
   // ruido: no se usa para navegar). Los contadores de Administración
@@ -268,32 +312,41 @@ export function Sidebar({
                 )}
               </div>
 
-              {activo && (
-                <div className="nav-frentes">
-                  {frentes.map((f) => (
-                    <div key={f.id} className={`nav-frente-row${frenteSel === f.id ? ' nav-frente-row--activo' : ''}`}>
-                      <button className="nav-frente nav-frente--flex" onClick={() => onSelectFrente(f.id)}>
-                        <span title={f.nombre}>{f.nombre}</span>
-                      </button>
-                      {/* #222: las acciones del frente pasan al ⋯, como las del
-                          proyecto. Los iconos sueltos le quitaban ancho al
-                          nombre al aparecer y la fila crecía de alto. El botón
-                          reserva su lugar siempre (visibility), así el nombre
-                          no cambia de ancho al pasar el mouse. */}
-                      {can.editarEstructura && (
-                        <button
-                          className="nav-frente__menu-btn"
-                          aria-label={`Opciones de ${f.nombre}`}
-                          aria-expanded={menu?.tipo === 'frente' && menu.id === f.id}
-                          onClick={(e) => alternarMenu(e, { tipo: 'frente', id: f.id })}
-                        >
-                          ⋯
+              {/* #318: la caja se dibuja mientras el proyecto está abierto y,
+                  además, mientras se repliega el que acaba de cerrarse (ver
+                  `replegando`). Sin frentes no hay caja —y por lo tanto tampoco
+                  línea vertical—: no hay grupo que abarcar. */}
+              {(activo || p.id === replegando) && frentesDe(p.id).length > 0 && (
+                <div className={`nav-frentes-caja${activo ? ' nav-frentes-caja--abierta' : ''}`}>
+                  <div className="nav-frentes">
+                    {frentesDe(p.id).map((f) => (
+                      <div
+                        key={f.id}
+                        className={`nav-frente-row${frenteSel === f.id ? ' nav-frente-row--activo' : ''}`}
+                      >
+                        <button className="nav-frente nav-frente--flex" onClick={() => onSelectFrente(f.id)}>
+                          <span title={f.nombre}>{f.nombre}</span>
                         </button>
-                      )}
-                    </div>
-                  ))}
-                  {/* #189: "+ Frente" salió de la lista — ahora vive en el ⋯
-                      del proyecto. La lista contiene solo frentes. */}
+                        {/* #222: las acciones del frente pasan al ⋯, como las
+                            del proyecto. Los iconos sueltos le quitaban ancho
+                            al nombre al aparecer y la fila crecía de alto. El
+                            botón reserva su lugar siempre (visibility), así el
+                            nombre no cambia de ancho al pasar el mouse. */}
+                        {can.editarEstructura && (
+                          <button
+                            className="nav-frente__menu-btn"
+                            aria-label={`Opciones de ${f.nombre}`}
+                            aria-expanded={menu?.tipo === 'frente' && menu.id === f.id}
+                            onClick={(e) => alternarMenu(e, { tipo: 'frente', id: f.id })}
+                          >
+                            ⋯
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {/* #189: "+ Frente" salió de la lista — ahora vive en el ⋯
+                        del proyecto. La lista contiene solo frentes. */}
+                  </div>
                 </div>
               )}
             </div>

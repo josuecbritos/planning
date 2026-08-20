@@ -1180,28 +1180,14 @@ export default function App({ repo }: { repo: Repo }) {
     [state, tareasVisibles, HOY],
   )
 
-  // #243: los permisos del panel de detalle son los del proyecto DE LA TAREA,
-  // no los del proyecto activo de la barra. El panel también se abre desde Mis
-  // Tareas, que cruza proyectos: con el `can` del activo, alguien con control
-  // total en A veía acciones que no le corresponden al abrir una tarea de B (y
-  // al revés). Es el mismo camino que usan las filas de Mis Tareas: un
-  // `makeCan` por el proyecto de la tarea.
-  //
-  // Vive acá arriba, con el resto de los hooks, porque más abajo empiezan los
-  // `return` tempranos (login, cargando) y un hook después de un return
-  // condicional rompe el orden de hooks de React.
-  const proyectoDeTarea = useMemo(() => {
-    if (!state || !tareaDetalleId) return null
-    const tarea = state.tareas.find((t) => t.id === tareaDetalleId)
-    if (!tarea) return null
-    const sub = state.subFrentes.find((sf) => sf.id === tarea.subFrenteId)
-    const frente = state.frentes.find((f) => f.id === sub?.frenteId)
-    return frente?.proyectoId ?? null
-  }, [state, tareaDetalleId])
-  const canDetalle = useMemo(
-    () => makeCan(state, sesion ?? null, proyectoDeTarea),
-    [state, sesion, proyectoDeTarea],
-  )
+  // #243/#307: el panel de detalle resolvía sus permisos por el proyecto DE LA
+  // TAREA y no por el proyecto activo de la barra —el panel también se abre
+  // desde Mis Tareas, que cruza proyectos, y con el `can` del activo alguien
+  // con control total en A veía acciones que no le correspondían al abrir una
+  // tarea de B—. #307 le sacó el bloque de acciones: el panel solo lee y
+  // comenta, así que ya no decide nada por permisos y el `can` se fue con
+  // ellas. La regla de #243 sigue viva donde sí hay acciones que cruzan
+  // proyectos: las filas de Mis Tareas, que arman su `makeCan` por tarea.
 
   // -- Render --
 
@@ -1559,7 +1545,6 @@ export default function App({ repo }: { repo: Repo }) {
           state={state}
           tarea={tareaDetalle}
           hoy={HOY}
-          can={canDetalle}
           actions={actions}
           sesionId={sesion.id}
           onClose={() => setTareaDetalleId(null)}
