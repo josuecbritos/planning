@@ -671,6 +671,54 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     }
   }, [filas, dias, soloHabiles, modo])
 
+  // #306b — El "+" se pega al borde derecho del NOMBRE, no al de la columna.
+  //
+  // Anclado al borde de la columna quedaba lejos del nombre y se veía
+  // desprendido de él. Pegarlo al nombre no se puede resolver solo con CSS: el
+  // ancho de la CAJA del texto no es el ancho del texto RENDERIZADO —una caja
+  // de 103 con dos palabras que envuelven tiene líneas mucho más cortas—, y
+  // CSS no sabe dónde acaba la línea más larga. Un `Range` sobre el contenido
+  // sí: devuelve un rectángulo por línea.
+  //
+  // Se coloca en la coordenada de la línea más ancha más 4, y se ACOTA al
+  // borde derecho de la celda: cuando el nombre no deja sitio, el "+" queda
+  // apoyado ahí, que es el otro caso del pedido. No hay condicional — es el
+  // mismo `Math.min` para los dos.
+  //
+  // No corre al DESPLAZAR, a diferencia de la rótula: dónde acaba el texto no
+  // depende del scroll, solo del contenido y del ancho de la columna.
+  useLayoutEffect(() => {
+    const scroll = scrollRef.current
+    if (!scroll) return
+    const colocarMas = () => {
+      scroll.querySelectorAll<HTMLElement>('td.fija--rotula').forEach((td) => {
+        const btn = td.querySelector<HTMLElement>('.mas-btn')
+        const txt = td.querySelector<HTMLElement>('.fija-txt')
+        if (!btn || !txt) return
+        const rango = document.createRange()
+        rango.selectNodeContents(txt)
+        const lineas = [...rango.getClientRects()]
+        const caja = txt.getBoundingClientRect()
+        const derecha = lineas.length ? Math.max(...lineas.map((r) => r.right)) : caja.right
+        const celda = td.getBoundingClientRect()
+        // El tope deja al botón dentro del relleno de la celda (8), que es
+        // donde lo dejaría el respaldo del CSS.
+        const tope = celda.width - 8 - btn.offsetWidth
+        const izquierda = Math.min(Math.max(0, derecha - celda.left + 4), tope)
+        btn.style.right = 'auto'
+        btn.style.left = `${Math.round(izquierda)}px`
+      })
+    }
+    colocarMas()
+    window.addEventListener('resize', colocarMas)
+    const ro = new ResizeObserver(colocarMas)
+    ro.observe(scroll)
+    return () => {
+      window.removeEventListener('resize', colocarMas)
+      ro.disconnect()
+    }
+  }, [filas, dias])
+
   // #162: "sin frentes" se decide por la EXISTENCIA de frentes, no por si hay
   // filas que renderizar. Un frente recién creado sin sub frentes ni tareas no
   // produce filas, pero el proyecto ya no está "sin frentes": debe mostrar su

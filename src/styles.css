@@ -320,10 +320,14 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
 
 /* ---------- Topbar / Header ---------- */
 
+/* #306b: entre la fila de contadores y la barra de Filtrar / Ordenar había 26
+   seguidos —12 debajo del encabezado más 14 arriba de la barra—, en tabla y en
+   Gantt. Bajan a 6 y 6: 12 en total, la mitad. El aire de ARRIBA del
+   encabezado no se toca. */
 .topbar {
   background: var(--panel);
   border-bottom: 1px solid var(--gris-borde);
-  padding: 12px 20px;
+  padding: 12px 20px 6px;
   display: flex; flex-direction: column; gap: 12px;
 }
 .topbar__row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -405,7 +409,9 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
    el aire llenaba el alto sin mostrar una sola tarea, que es justo el estado
    en que uno abre la pantalla para orientarse. */
 .subfrente { margin-bottom: 8px; }
-.frente-bloque + .frente-bloque { margin-top: 28px; }
+/* #306b: de 28 a 20. Solo se podía juzgar una vez que la línea de "+ Sub
+   Frente" dejó de caer en el medio y sumar su alto a la separación. */
+.frente-bloque + .frente-bloque { margin-top: 20px; }
 .subfrente__titulo {
   display: flex; align-items: center; gap: 8px;
   /* #306: pierde la negrita para dejar de competir con su padre. La caja, su
@@ -645,8 +651,14 @@ table.tareas .col-desv { text-align: center; }
 /* #306: con el frente ya poblado, la misma acción es una línea chica y gris
    pegada debajo del último sub frente. Deja de pesar como un elemento de la
    lista, pero sigue donde uno la busca. */
+/* #306b: la línea se PEGA al último sub frente. Estaba a los mismos 8 que
+   separan a los sub frentes entre sí, así que se leía como un elemento más de
+   la lista en vez de como el cierre del grupo — y, cayendo justo en el medio,
+   hacía que la separación entre frentes se viera bastante mayor de lo que era.
+   El margen negativo cancela la mitad del margen inferior del sub frente de
+   arriba: quedan 4 contra los 20 que la separan del frente de abajo. */
 .subfrente-add-linea {
-  display: block; margin: 0; padding: 2px 2px 0;
+  display: block; margin: -4px 0 0; padding: 0 2px;
   font: inherit; font-size: 12px; color: var(--gris-texto);
   background: none; border: none; cursor: pointer;
 }
@@ -821,7 +833,10 @@ table.tareas .col-desv { text-align: center; }
      margen se pasa a padding para que la franja sticky incluya el aire y
      tape las filas que pasan por debajo (fondo opaco). */
   position: sticky; top: 0; z-index: 30; background: var(--fondo);
-  margin: 0; padding: 14px 20px 8px;
+  /* #306b: el aire de arriba baja de 14 a 6 (ver `.topbar`). Sigue siendo
+     PADDING y no margen, para que la franja pegajosa incluya el aire y tape
+     con su fondo opaco lo que pasa por debajo al desplazar. */
+  margin: 0; padding: 6px 20px 8px;
 }
 .controles-bar__sep { flex: 1 1 0; min-width: 0; }
 
@@ -1375,9 +1390,23 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    izquierda siempre, y con el mouse encima el desorden se notaba más. Al no
    ocupar lugar, el nombre queda centrado de verdad y NO se mueve al aparecer
    el "+". Se ancla en `.fija-nombre`, que ya es el envoltorio posicionado. */
+/* #306b: el "+" va PEGADO al nombre, no anclado al borde de la columna —ahí
+   quedaba lejos y se veía desprendido—. La caja del nombre se encoge a su
+   contenido y el "+" cuelga de su borde derecho, así que queda en un punto
+   distinto en cada fila según cuán largo sea el nombre: es el comportamiento
+   que tenía antes y es el que se prefiere.
+   El tope de ancho es lo que resuelve el otro caso sin ningún condicional:
+   cuando el nombre no deja sitio, la caja deja de crecer y el "+" queda
+   apoyado contra el borde derecho de la columna. Como la caja va CENTRADA, el
+   tope reparte su hueco a los dos lados: 26 menos son 13 por lado, y el "+"
+   —4 de separación más 18 de ancho— termina justo en el borde. */
 .gantt td.fija--rotula .con-mas { flex: 1 1 auto; min-width: 0; }
+/* La posición de `left` la pone un efecto, que es el único que puede saber
+   dónde ACABA el texto renderizado (ver `colocarMas` en GanttView). El valor
+   de aquí es el de respaldo, para el instante anterior a que ese efecto
+   corra: apoyado en el borde derecho, que es el peor caso. */
 .gantt td.fija--rotula .mas-btn {
-  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
 }
 /* Si el nombre no llega hasta ahí, el "+" cae sobre espacio vacío y no tapa
    nada. Si llega, el texto se DESVANECE hacia el fondo justo bajo el "+" en

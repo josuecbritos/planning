@@ -1,4 +1,4 @@
-// #306 — La tabla: jerarquía y espacio muerto, y el "+" de la Gantt.
+// #306 y #306b — La tabla: jerarquía y espacio muerto, y el "+" de la Gantt.
 //
 // Dos problemas que se resuelven juntos, porque el aire que se recupera es el
 // mismo que pasa a marcar los grupos:
@@ -26,6 +26,13 @@
 // frente tenían el MISMO peso (15px/700 contra 13.5px/700), no había cuenta de
 // sub frentes al lado del nombre, y el alto con todo plegado era 600.
 //
+// Los criterios de #306b —los ajustes tras la primera revisión— van al final,
+// con prefijo B. Medido entre las dos versiones: el aire entre los contadores y
+// los botones pasó de 26 a 13, la separación entre frentes de 28 a 20, y el
+// alto con todo plegado de 452 a 432. Y el "+" de la Gantt dejó de estar
+// siempre en el borde: ahora se pega al nombre, y solo se apoya en el borde
+// cuando el nombre no deja sitio.
+//
 // Cómo correrla:
 //   npm run build && npx vite preview --port 4173 &
 //   node docs/prueba-306-jerarquia-tabla.mjs
@@ -37,6 +44,8 @@ const URL_APP = process.env.URL ?? 'http://localhost:4173/'
 // Alto del contenido de la tabla con TODO plegado, medido en `main` antes de
 // este pedido. La comprobación exige quedar claramente por debajo.
 const ALTO_ANTES = 600
+// Y el que dejó la primera versión de #306, antes de los ajustes de #306b.
+const ALTO_306 = 452
 
 const chk = (ok, m, extra = '') => {
   console.log(`${ok ? 'OK   ' : 'FALLA'} ${m}${extra ? ' — ' + extra : ''}`)
@@ -149,7 +158,9 @@ chk(
   `${aire.hermanos.join(', ')} (antes 26)`,
 )
 chk(
-  aire.entreFrentes.length > 0 && aire.entreFrentes.every((d) => d >= 24),
+  // #306b bajó esta distancia de 28 a 20: lo que se exige es que siga siendo
+  // la separación GRANDE, no un número concreto.
+  aire.entreFrentes.length > 0 && aire.entreFrentes.every((d) => d >= 18),
   '1 y la separación grande queda solo entre un frente y el siguiente',
   aire.entreFrentes.join(', '),
 )
@@ -185,7 +196,7 @@ const conFrentePlegado = await p.evaluate(() => {
   return Math.round(bl[1].getBoundingClientRect().top - bl[0].getBoundingClientRect().bottom)
 })
 chk(
-  conFrentePlegado !== null && conFrentePlegado >= 24,
+  conFrentePlegado !== null && conFrentePlegado >= 18,
   '9 con un frente plegado, la separación con el siguiente se sigue leyendo',
   `${conFrentePlegado}px`,
 )
@@ -444,5 +455,220 @@ chk(
   JSON.stringify(intacto.anchos),
 )
 
+// ═══════════════════════════════════════════════════════════════════════════
+// #306b — Ajustes tras la primera revisión
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── B1 y B2 · El aire entre el encabezado y la barra ───────────────────────
+console.log('\n── B1 y B2 · El aire sobre la barra de controles ──')
+await abrirProyecto()
+const aireSobreLaBarra = () =>
+  p.evaluate(() => {
+    const contadores = document.querySelector('.counters').getBoundingClientRect()
+    const boton = document.querySelector('.controles-bar .controles-btn').getBoundingClientRect()
+    return Math.round(boton.top - contadores.bottom)
+  })
+const aireTabla = await aireSobreLaBarra()
+await verVista('Gantt')
+const aireGantt = await aireSobreLaBarra()
+chk(
+  aireTabla <= 14,
+  'B1 el aire entre los contadores y los botones es claramente menor que antes',
+  `${aireTabla} (antes 26)`,
+)
+chk(aireTabla === aireGantt, 'B1 y es el mismo en tabla y en Gantt', `tabla=${aireTabla} gantt=${aireGantt}`)
+
+// B2 · la barra sigue pegándose arriba, con fondo opaco.
+await verVista('Tabla')
+const pegajosa = await p.evaluate(() => {
+  const barra = document.querySelector('.controles-bar')
+  const s = getComputedStyle(barra)
+  const contenido = document.querySelector('.content')
+  contenido.scrollTop = 300
+  return {
+    posicion: s.position,
+    // Sin fondo opaco, las filas se verían pasar por debajo.
+    fondoTransparente: s.backgroundColor === 'transparent' || s.backgroundColor.endsWith(', 0)'),
+    relleno: s.paddingTop,
+  }
+})
+await esperar(400)
+const trasDesplazar = await p.evaluate(() => {
+  const barra = document.querySelector('.controles-bar').getBoundingClientRect()
+  const contenido = document.querySelector('.content').getBoundingClientRect()
+  return { desfase: Math.round(barra.top - contenido.top), desplazado: document.querySelector('.content').scrollTop }
+})
+chk(pegajosa.posicion === 'sticky', 'B2 la barra sigue siendo pegajosa', pegajosa.posicion)
+chk(!pegajosa.fondoTransparente, 'B2 y conserva su fondo opaco, que tapa lo que pasa por debajo')
+chk(
+  trasDesplazar.desplazado > 0 && Math.abs(trasDesplazar.desfase) <= 1,
+  'B2 al desplazar queda pegada arriba',
+  `scroll=${trasDesplazar.desplazado} desfase=${trasDesplazar.desfase}`,
+)
+await p.evaluate(() => (document.querySelector('.content').scrollTop = 0))
+await esperar(300)
+
+// ── B3 a B5 · La línea cierra el grupo, y la separación baja ───────────────
+console.log('\n── B3 a B5 · La línea de "+ Sub Frente" cierra su grupo ──')
+const chevs2 = p.locator('.subfrente__titulo .colapso-btn')
+const n2 = await chevs2.count()
+for (let i = 0; i < n2; i++) {
+  await chevs2.nth(i).click()
+  await esperar(140)
+}
+await esperar(400)
+const grupos = await p.evaluate(() => {
+  const bl = [...document.querySelectorAll('.frente-bloque')]
+  const medidas = []
+  for (let i = 0; i < bl.length; i++) {
+    const linea = bl[i].querySelector('.subfrente-add-linea')
+    const subs = [...bl[i].querySelectorAll('.subfrente')]
+    if (!linea || !subs.length) continue
+    const ultimo = subs[subs.length - 1].getBoundingClientRect()
+    const lr = linea.getBoundingClientRect()
+    const siguiente = bl[i + 1]?.getBoundingClientRect() ?? null
+    medidas.push({
+      alUltimoSub: Math.round(lr.top - ultimo.bottom),
+      alSiguienteFrente: siguiente ? Math.round(siguiente.top - lr.bottom) : null,
+    })
+  }
+  const entreBloques = []
+  for (let i = 1; i < bl.length; i++) {
+    entreBloques.push(Math.round(bl[i].getBoundingClientRect().top - bl[i - 1].getBoundingClientRect().bottom))
+  }
+  return { medidas, entreBloques, alto: Math.round(document.querySelector('.tabla-wrap').getBoundingClientRect().height) }
+})
+chk(
+  grupos.medidas.length > 0 && grupos.medidas.every((m) => m.alUltimoSub <= 6),
+  'B3 la línea de "+ Sub Frente" queda pegada al último sub frente de su grupo',
+  grupos.medidas.map((m) => m.alUltimoSub).join(', '),
+)
+const conSiguiente = grupos.medidas.filter((m) => m.alSiguienteFrente !== null)
+chk(
+  conSiguiente.length > 0 && conSiguiente.every((m) => m.alSiguienteFrente >= m.alUltimoSub * 3),
+  'B3 y está mucho más cerca del sub frente de arriba que del frente de abajo: no flota entre dos',
+  conSiguiente.map((m) => `${m.alUltimoSub} arriba contra ${m.alSiguienteFrente} abajo`).join(' · '),
+)
+chk(
+  grupos.entreBloques.every((d) => d < 28),
+  'B4 la separación entre frentes bajó',
+  `${grupos.entreBloques.join(', ')} (antes 28)`,
+)
+// Y los grupos se siguen distinguiendo: el contraste con el aire de adentro
+// tiene que seguir siendo grande. Es la propiedad que #306 vino a conseguir y
+// la reserva que el pedido declaró.
+const dentro = await p.evaluate(() => {
+  const bl = [...document.querySelectorAll('.frente-bloque')]
+  const d = []
+  for (const b of bl) {
+    const subs = [...b.querySelectorAll('.subfrente')]
+    for (let i = 1; i < subs.length; i++) {
+      d.push(Math.round(subs[i].getBoundingClientRect().top - subs[i - 1].getBoundingClientRect().bottom))
+    }
+  }
+  return d
+})
+chk(
+  Math.min(...grupos.entreBloques) >= Math.max(...dentro) * 2,
+  'B4 y los grupos se siguen distinguiendo: la separación entre frentes sigue doblando a la de adentro',
+  `${Math.max(...dentro)} dentro contra ${Math.min(...grupos.entreBloques)} entre frentes`,
+)
+// Se compara contra `aire.alto`, medido MÁS ARRIBA sobre el proyecto intacto:
+// a esta altura de la prueba ya se creó y se eliminó estructura, así que el
+// alto de acá no es comparable con la referencia.
+chk(
+  aire.alto < ALTO_306,
+  'B5 caben más sub frentes en la misma pantalla que en la primera versión',
+  `${aire.alto} contra ${ALTO_306} de #306 (y ${ALTO_ANTES} antes de todo)`,
+)
+
+// ── B6 a B8 · El "+" de la Gantt, pegado al nombre ─────────────────────────
+console.log('\n── B6 a B8 · El "+" se pega al nombre ──')
+await verVista('Gantt')
+/** Para cada celda de rótula: dónde acaba el TEXTO y dónde empieza el "+". */
+const celdas = () =>
+  p.evaluate(() =>
+    [...document.querySelectorAll('td.fija--rotula')]
+      .map((td) => {
+        const txt = td.querySelector('.fija-txt')
+        const btn = td.querySelector('.mas-btn')
+        if (!txt || !btn) return null
+        // El ancho de la CAJA no es el del texto: con dos palabras que
+        // envuelven, las líneas son mucho más cortas. Un `Range` da un
+        // rectángulo por línea.
+        const r = document.createRange()
+        r.selectNodeContents(txt)
+        const lineas = [...r.getClientRects()]
+        const c = td.getBoundingClientRect()
+        const caja = txt.getBoundingClientRect()
+        const b = btn.getBoundingClientRect()
+        return {
+          nombre: txt.innerText.replace(/\s+/g, ' ').trim(),
+          textoDer: Math.round(Math.max(...lineas.map((x) => x.right)) - c.left),
+          masIzq: Math.round(b.left - c.left),
+          masDer: Math.round(b.right - c.left),
+          ancho: Math.round(c.width),
+          cajaIzq: Math.round(caja.left - c.left),
+          cajaDer: Math.round(c.right - caja.right),
+        }
+      })
+      .filter(Boolean),
+  )
+const antesDelMouse = await celdas()
+await p.locator('td.fija--rotula .fija-tip').first().hover()
+await esperar(250)
+const conMouse = await celdas()
+
+chk(antesDelMouse.length > 0, 'B6 terreno: hay celdas de frente y sub frente con "+"')
+const pegados = conMouse.filter((c) => c.masIzq - c.textoDer >= 0 && c.masIzq - c.textoDer <= 8)
+chk(
+  pegados.length > 0,
+  'B6 en los nombres que dejan sitio, el "+" queda pegado a su derecha',
+  pegados.map((c) => `"${c.nombre}" +${c.masIzq - c.textoDer}`).join(' · ') || 'ninguno',
+)
+const apoyados = conMouse.filter((c) => c.masIzq - c.textoDer < 0)
+chk(
+  apoyados.every((c) => c.ancho - c.masDer <= 10),
+  'B7 y en los que no dejan sitio, se apoya contra el borde derecho de la columna',
+  apoyados.map((c) => `"${c.nombre}" a ${c.ancho - c.masDer} del borde`).join(' · ') || 'ninguno',
+)
+chk(
+  apoyados.length > 0,
+  'B7 terreno: hay al menos un nombre que no deja sitio',
+  apoyados.map((c) => c.nombre).join(' · '),
+)
+chk(
+  await p.evaluate(
+    () => getComputedStyle(document.querySelector('td.fija--rotula:hover .fija-txt') ?? document.body).maskImage !== 'none',
+  ),
+  'B7 y el texto se sigue desvaneciendo bajo él',
+)
+// B8 · el nombre sigue centrado y no se mueve.
+chk(
+  conMouse.every((c) => Math.abs(c.cajaIzq - c.cajaDer) <= 1),
+  'B8 el nombre sigue centrado en su columna',
+  conMouse.map((c) => `${c.cajaIzq}/${c.cajaDer}`).join(' '),
+)
+chk(
+  conMouse.every((c, i) => c.textoDer === antesDelMouse[i].textoDer),
+  'B8 y no se mueve al pasar el mouse',
+)
+
+// ── B9 · Lo de #306 sigue en pie ───────────────────────────────────────────
+console.log('\n── B9 · Lo verificado en #306 ──')
+await verVista('Tabla')
+const siguePie = await p.evaluate(() => {
+  const fr = document.querySelector('.frente-titulo')
+  const sf = document.querySelector('.subfrente__titulo')
+  const px = (e) => parseFloat(getComputedStyle(e).fontSize)
+  const peso = (e) => Number(getComputedStyle(e).fontWeight)
+  return {
+    masGrande: px(fr) > px(sf) && peso(fr) > peso(sf),
+    cuenta: fr.querySelector('.frente-titulo__count')?.textContent.trim() ?? null,
+  }
+})
+chk(siguePie.masGrande, 'B9 el frente sigue pesando más que sus sub frentes')
+chk(!!siguePie.cuenta && /sub frentes?$/.test(siguePie.cuenta), 'B9 y sigue diciendo cuántos tiene', siguePie.cuenta ?? '')
+
 await b.close()
-console.log(process.exitCode ? '\n⛔ HAY FALLAS' : '\n✅ #306 — la tabla se lee por grupos y el "+" de la Gantt salió del flujo')
+console.log(process.exitCode ? '\n⛔ HAY FALLAS' : '\n✅ #306 y #306b — la tabla se lee por grupos y el "+" se pega al nombre')

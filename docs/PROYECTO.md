@@ -197,15 +197,19 @@ completo con creación y edición **inline** (sin formularios).
   chico, **cuántos sub frentes tiene** (no cuántas tareas: esa cuenta ya
   aparece en varios lugares). El **sub frente pierde la negrita**; su caja, su
   fondo y su borde no se tocan. Y el **aire se reordena**: entre sub frentes
-  del mismo frente baja de 26 a 8, y la separación grande (28) queda solo entre
+  del mismo frente baja de 26 a 8, y la separación grande (20) queda solo entre
   un frente y el siguiente. **Ese contraste es lo que comunica la
   pertenencia.** De paso se recupera pantalla: con los sub frentes cerrados el
-  contenido pasó de **600 a 452** de alto, y ese es justo el estado en que uno
+  contenido pasó de **600 a 432** de alto, y ese es justo el estado en que uno
   abre la pantalla para orientarse. **"+ Sub Frente"** deja de ser una fila de
   unos 60 y pasa a ser una **línea chica y gris** pegada debajo del último —
   salvo cuando el frente **no tiene ninguno**, donde **sigue siendo un botón**:
   es el momento más importante y la única acción posible, y ahí tiene que
-  pesar. La línea "Sin sub frentes en este frente" se mantiene junto a él.
+  pesar. La línea "Sin sub frentes en este frente" se mantiene junto a él. Esa
+  línea va **pegada al último sub frente** (4 contra los 20 que la separan del
+  frente siguiente): así cierra su grupo en vez de leerse como un elemento más
+  de la lista, que era lo que hacía que la separación entre frentes se viera
+  mucho mayor de lo que es.
 
   **Se pueden crear tareas con el filtro puesto (#320).** La fila de "+ Tarea"
   estaba escondida al filtrar, por un problema real —una tarea recién creada
@@ -242,11 +246,18 @@ encabezado, contadores y barra de controles quedan siempre a la vista. En
 **El "+" de la grilla no descentra los nombres (#306).** Compartía la línea con
 el nombre y ocupaba su lugar **aunque estuviera invisible** —18 de ancho más 6
 de separación—, así que el nombre estaba corrido 12 a la izquierda siempre.
-Ahora sale del flujo y se coloca a la derecha del nombre: el nombre queda
-centrado de verdad y **no se mueve al aparecer el "+"**. Si el nombre no llega
-hasta ahí, el "+" cae sobre espacio vacío; si llega, el texto **se desvanece**
-bajo él en vez de cortarse. Una sola posición y una sola regla, sin casos
-especiales: el desvanecido se nota solo donde hay texto debajo.
+Ahora sale del flujo, así que el nombre queda centrado de verdad y **no se mueve
+al aparecer el "+"**, y **se pega al borde derecho del nombre**; solo cuando el
+nombre no deja sitio se apoya contra el borde de la columna, y ahí el texto **se
+desvanece** bajo él en vez de cortarse. *Queda en un punto distinto en cada fila
+según cuán largo sea cada nombre, que es el comportamiento que se prefiere.*
+Pegarlo al nombre **no se puede hacer solo con CSS:** el ancho de la CAJA del
+texto no es el del texto renderizado —una caja de 103 con dos palabras que
+envuelven tiene líneas mucho más cortas— y CSS no sabe dónde acaba la línea más
+larga. Lo resuelve un efecto con un `Range` sobre el contenido, que devuelve un
+rectángulo por línea; el `Math.min` contra el borde de la celda cubre los dos
+casos sin ningún condicional. No corre al desplazar: dónde acaba el texto no
+depende del scroll.
 
 **Los nombres se cortan, no se parten (#321).** En las columnas congeladas el
 corte estaba forzado en cualquier letra —"Planificació / n"— para que ninguna
@@ -289,6 +300,13 @@ desaparecían solas.
    izquierda** — el único elemento que aparece y desaparece, a propósito: avisa
    de algo que acaba de pasar, y va ahí para que Vistas no se mueva al
    aparecer. **Rango solo existe en Gantt.**
+
+Entre los contadores y la barra de controles hay **13** (#306b): eran 26 —12
+debajo del encabezado más 14 arriba de la barra, sumados—, y con eso el bloque
+de botones se leía desprendido de lo de arriba. El aire de **arriba** del
+encabezado no se toca. Sigue siendo **padding** y no margen de la barra, para
+que la franja pegajosa incluya ese aire y **tape con su fondo opaco** lo que
+pasa por debajo al desplazar.
 
 Los cuatro menús **abren con la misma caja**, de ancho fijo, para que no cambie
 de tamaño al pasar de un control a otro; Vistas queda fuera de esa regla porque

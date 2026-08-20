@@ -2156,3 +2156,73 @@ Frente" todavía no existe.
 *Dos pruebas anteriores se actualizaron, no se relajaron:* #297 y #311 leían el
 nombre del frente como el `innerText` completo del título, que ahora incluye la
 cuenta de sub frentes. Pasan a leer el primer nodo de texto, que es el nombre.
+
+### #306b — Ajustes sobre #306: el aire, la línea que cerraba mal, y el "+" pegado al nombre
+
+Tres correcciones sobre la misma rama, antes de fusionar.
+
+**1. Demasiado aire entre el encabezado y los botones.** Medido: **26
+seguidos** entre la fila de contadores y la barra de `Filtrar · Ordenar`, y no
+venían de un solo lado — eran **12 debajo del encabezado más 14 arriba de la
+barra**, sumándose. Pasaba igual en tabla y en Gantt. Bajan a **6 y 6: 13 en
+total**, la mitad. El aire de **arriba** del encabezado no se toca. Los 6 de la
+barra siguen siendo **padding y no margen**, que es lo que hace que la franja
+pegajosa incluya ese aire y **tape con su fondo opaco** lo que pasa por debajo
+al desplazar: con margen, el hueco sería transparente y el contenido se vería
+pasar por ahí.
+
+**2. La separación entre frentes se leía mucho mayor de lo que era.** La causa
+no era el número: la línea de **"+ Sub Frente" caía justo en el medio**,
+separada del último sub frente por los mismos 8 que separan a los sub frentes
+entre sí. Se leía como **un elemento más de la lista** y sumaba su alto y su
+aire a la separación. **El orden importó:** primero la línea se pega al último
+sub frente —`margin-top: -4`, que la deja a **4** del sub frente contra los
+**20** que la separan del frente siguiente—, y recién ahí se puede juzgar el
+segundo cambio: la separación entre frentes baja de **28 a 20**.
+
+*Sobre la reserva declarada en el pedido* —subir a 24 si los grupos se
+fundían—: mirado el resultado con los sub frentes cerrados, **la agrupación se
+sigue leyendo a 20** (20 contra 8 hacia adentro, más del doble), así que se
+queda en 20. **Medido:** con todo plegado el contenido pasa de los **452** que
+dejó #306 a **432**.
+
+**3. El "+" de la Gantt se veía suelto contra el borde.** #306 lo había anclado
+al borde derecho de la **columna**, así que quedaba lejos del nombre. Ahora se
+pega **al borde derecho del nombre**, y solo se apoya en el borde de la columna
+**cuando no cabe**. *Consecuencia aceptada por el dueño:* queda en un punto
+distinto en cada fila.
+
+**Esto no se puede hacer solo con CSS, y está medido.** El primer intento fue
+`max-width: calc(100% - 26px)` sobre el nombre con el "+" en `left: 100%`. Al
+medirlo: `conMas [286,363]` en el frente y `[406,513]` en el sub frente — **los
+dos nombres tocaban el tope**, así que el "+" seguía en el borde en todas las
+filas y el cambio habría sido **invisible**. El motivo: el ancho de la **caja**
+del texto no es el ancho del **texto renderizado** — una caja de 103 con dos
+palabras que envuelven tiene líneas mucho más cortas—, y CSS no tiene forma de
+saber dónde acaba la línea más larga. Un `Range` sobre el contenido sí:
+`getClientRects()` devuelve **un rectángulo por línea**. Un efecto toma el
+máximo de esos bordes derechos y lo acota contra el borde de la celda; el
+`Math.min` cubre los dos casos **sin ningún condicional**. **No corre al
+desplazar:** dónde acaba el texto depende del contenido y del ancho de la
+columna, no del scroll. El valor de CSS queda como respaldo para el instante
+anterior al efecto: apoyado en el borde, que es el peor caso.
+
+**Medido por fila:** "Diseño" y "Procesos Operacionales" quedan pegados al
+nombre (+4); "Levantamiento", "Procesos Comerciales", "Procesos Financieros" y
+"Arquitectura de datos" se apoyan a 8 del borde con el texto desvaneciéndose
+bajo el "+". Todo lo demás de #306 sigue igual: el "+" fuera del flujo, el
+nombre centrado y sin moverse al aparecer, y el degradado bajo él.
+
+**Verificado** con `docs/prueba-306-jerarquia-tabla.mjs`, que pasa de 50 a **69
+comprobaciones en verde**. Las nuevas miden el aire en las dos vistas y exigen
+que sea el mismo, comprueban que la barra siga pegada arriba tras desplazar 300
+y con fondo opaco, miden que la línea esté al menos **tres veces más cerca** del
+último sub frente que del frente siguiente, que la separación entre frentes sea
+menor que antes pero siga siendo **más del doble** del aire de adentro, y —celda
+por celda, con el mismo `Range`— dónde acaba el texto contra dónde empieza el
+"+".
+
+*Dos umbrales de la prueba de #306 se relajaron a propósito:* exigían `>= 24` a
+la distancia entre bloques, que ahora es 20. Lo que corresponde exigir ahí es
+que **siga siendo la separación grande**, no un número concreto, así que pasan a
+`>= 18` con el motivo escrito al lado.
