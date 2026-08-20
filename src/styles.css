@@ -511,14 +511,19 @@ table.tareas .col-desv { text-align: center; }
 /* Celda del titulo con color de gestion (6.5) */
 /* #326: el nombre de la tarea iba en 600 y su sub frente en 500 —perdió la
    negrita en #306, para dejar de competir con el nombre del frente—, así que
-   el hijo pesaba más que el contenedor. Pasa al peso normal del resto de su
-   fila. El visto verde (`.tarea-cell__mark`, 700) y el ↻ ×N
-   (`.replan-count`, 700) declaran el suyo y no dependen de este; el campo de
-   edición sí, porque `.inline-input` lleva `font: inherit` — que es lo que
-   hace que el texto no cambie de grosor al entrar y salir de edición.
+   el hijo pesaba más que el contenedor.
+   Queda en 500, el MISMO peso que su sub frente. La primera versión lo bajó a
+   400 y, visto en pantalla, se fue un escalón de más: los nombres costaban de
+   leer. El objetivo era que la tarea dejara de pesar MÁS que lo que la
+   contiene, no que pesara menos; igualarlos lo consigue y le deja cuerpo para
+   leerse de corrido.
+   El visto verde (`.tarea-cell__mark`, 700) y el ↻ ×N (`.replan-count`, 700)
+   declaran el suyo y no dependen de este; el campo de edición sí, porque
+   `.inline-input` lleva `font: inherit` — que es lo que hace que el texto no
+   cambie de grosor al entrar y salir de edición.
    Vale para la tabla del proyecto y para Mis Tareas, que usan esta misma
    celda. */
-.tarea-cell { font-weight: 400; position: relative; }
+.tarea-cell { font-weight: 500; position: relative; }
 
 
 .tarea-cell--verde { background: var(--verde-suave); }
@@ -1425,11 +1430,12 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   -webkit-mask-image: linear-gradient(to left, transparent 2px, #000 26px);
   mask-image: linear-gradient(to left, transparent 2px, #000 26px);
 }
-/* #326: mismo cambio que en la tabla —de 600 al peso normal—, para que el
-   nombre de la tarea se lea igual de liviano en las dos vistas. Las filas de
-   carga por persona declaran su propio 600 (`.carga-fila__nombre`) y no
-   dependen de este. */
-.gantt td.fija--tarea { font-weight: 400; padding: 4px 10px; font-size: 12.5px; }
+/* #326: mismo peso que en la tabla —500, el de su sub frente—, para que el
+   nombre de la tarea se lea igual en las dos vistas. El TAMAÑO no se toca: acá
+   ya mide 12.5 contra los 13 de la tabla, y lo que se reportó es legibilidad.
+   Las filas de carga por persona declaran su propio 600
+   (`.carga-fila__nombre`) y no dependen de este. */
+.gantt td.fija--tarea { font-weight: 500; padding: 4px 10px; font-size: 12.5px; }
 .gantt td.fija--tarea.tarea-cell--verde { background: var(--verde-suave); }
 .gantt td.fija--tarea.tarea-cell--rojo { background: var(--rojo-suave); }
 .gantt td.fija--tarea.tarea-cell--ambar { background: var(--ambar-suave); }

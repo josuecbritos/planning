@@ -3,9 +3,15 @@
 // #326 · El nombre de la tarea iba en semi negrita (600) y el título del sub
 // frente que la contiene en 500 —perdió la negrita en #306, a propósito, para
 // dejar de competir con el nombre del frente—, así que **el hijo pesaba más
-// que su contenedor**. Pasa al peso normal en la tabla, en la Gantt y en Mis
-// Tareas. Y "+ Sub Frente", que es la misma acción que "+ Tarea", se iguala a
-// su peso: uno era línea normal y el otro botón fantasma en 600.
+// que su contenedor**. Queda en **500, el mismo peso que su sub frente**, en la
+// tabla, en la Gantt y en Mis Tareas. Y "+ Sub Frente", que es la misma acción
+// que "+ Tarea", se iguala a su peso: uno era línea normal y el otro botón
+// fantasma en 600.
+//   *La primera versión bajó dos escalones de una vez, de 600 a 400, y visto en
+//   pantalla se fue de largo: los nombres costaban de leer. El objetivo era que
+//   la tarea dejara de pesar MÁS que lo que la contiene, no que pesara menos,
+//   así que la corrección los iguala. El TAMAÑO de la letra no se toca: en la
+//   Gantt ya mide 12.5 contra los 13 de la tabla.*
 //
 // #327 · Los cuatro globos de texto corto de la Gantt colgaban de su celda con
 // un `::after`, así que quedaban DENTRO del recuadro con scroll de la grilla y
@@ -30,6 +36,9 @@ const URL_APP = process.env.URL ?? 'http://localhost:4173/'
 // Pesos medidos en `main` antes del arreglo.
 const TAREA_ANTES = 600
 const SUB_ANTES = 500
+// Y el que dejó la primera versión de #326, antes de la corrección: 400 se vio
+// en pantalla y quedó demasiado liviano para leer los nombres de corrido.
+const TAREA_PRIMERA_VERSION = 400
 
 const chk = (ok, m, extra = '') => {
   console.log(`${ok ? 'OK   ' : 'FALLA'} ${m}${extra ? ' — ' + extra : ''}`)
@@ -83,8 +92,11 @@ chk(
   `${TAREA_ANTES} → ${enTabla.tarea}`,
 )
 chk(
-  enTabla.tarea < enTabla.sub,
-  '1 y se ve más liviano que el título del sub frente que lo contiene',
+  // Corrección de #326: la primera versión lo bajó a 400 y se fue un escalón
+  // de más. Lo que se exige es IGUALDAD, no que pese menos: el objetivo era
+  // que la tarea dejara de pesar más que lo que la contiene.
+  enTabla.tarea === enTabla.sub,
+  '1 y se ve con el mismo peso que el título del sub frente que lo contiene',
   `tarea ${enTabla.tarea} · sub frente ${enTabla.sub}`,
 )
 chk(
@@ -154,9 +166,20 @@ await verVista('Gantt')
 const enGantt = await peso('.gantt td.fija--tarea')
 chk(
   enGantt === enTabla.tarea,
-  '2 el nombre de la tarea se ve igual de liviano que en la tabla',
+  '2 el nombre de la tarea se ve con el mismo peso que en la tabla',
   `gantt ${enGantt} · tabla ${enTabla.tarea} (antes ${TAREA_ANTES} en las dos)`,
 )
+chk(
+  enGantt > TAREA_PRIMERA_VERSION && enGantt < TAREA_ANTES,
+  '2 y queda en el escalón del medio: más marcado que la primera versión, menos que producción',
+  `${TAREA_ANTES} (producción) → ${TAREA_PRIMERA_VERSION} (primera versión) → ${enGantt}`,
+)
+// 3 · el TAMAÑO de la letra no cambia: lo reportado es legibilidad, y en la
+// Gantt la letra ya es más chica que en la tabla.
+const tamGantt = await p.evaluate(() =>
+  parseFloat(getComputedStyle(document.querySelector('.gantt td.fija--tarea')).fontSize),
+)
+chk(tamGantt === 12.5, '3 y el tamaño de la letra de la Gantt no cambia', `${tamGantt}px`)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // #327 · Los globos ya no se recortan
@@ -436,5 +459,5 @@ await b.close()
 console.log(
   process.exitCode
     ? '\n⛔ HAY FALLAS'
-    : '\n✅ #326 y #327 — el nombre de la tarea pesa menos que su contenedor, y los globos ya no se recortan',
+    : '\n✅ #326 y #327 — el nombre de la tarea pesa lo mismo que su contenedor, y los globos ya no se recortan',
 )

@@ -2425,15 +2425,25 @@ el nombre del frente. La tarea quedó fuera de aquel ajuste, así que se leía m
 pesada que su propio contenedor. En la Gantt pasaba lo mismo: la columna
 congelada de tarea también iba en 600.
 
-**Ahora el nombre de la tarea va en peso normal**, el mismo del resto del texto
-de su fila, en la **tabla**, en la **Gantt** y en **Mis Tareas** en sus dos
-vistas — las tres usan la misma celda y la misma vista de Gantt, así que las
-arrastra el mismo cambio. Queda 400 contra los 500 del sub frente y los 700 del
-frente: **la jerarquía se lee de arriba abajo.**
+**Ahora el nombre de la tarea va en 500, el MISMO peso que su sub frente**, en
+la **tabla**, en la **Gantt** y en **Mis Tareas** en sus dos vistas — las tres
+usan la misma celda y la misma vista de Gantt, así que las arrastra el mismo
+cambio. Queda 500 contra 500 del sub frente y 700 del frente: la tarea deja de
+pesar más que lo que la contiene, que era el problema, y **la jerarquía se lee
+de arriba abajo**.
+
+**Corrección sobre la primera versión, antes de fusionar.** El pedido pidió
+"peso normal" y así se hizo: de 600 a **400**. Visto en pantalla, eso **bajaba
+dos escalones de una vez** y se iba de largo — los nombres costaban de leer, en
+la tabla y en la Gantt. *El objetivo era que la tarea dejara de pesar MÁS que su
+contenedor, no que pesara menos*, y para eso alcanza con **igualarlos**: 500 y
+500. El **tamaño** de la letra no se tocó en ninguna de las dos vistas; se
+evaluó achicar el nombre en la Gantt y se descartó, porque ahí ya mide 12.5
+contra los 13 de la tabla y lo reportado era legibilidad.
 
 **Vale también mientras se edita.** El campo de edición lleva `font: inherit`,
 así que hereda el peso de la celda: el texto **no cambia de grosor** al entrar ni
-al salir de edición. Verificado: 400 fuera, 400 editando, 400 al salir.
+al salir de edición. Verificado: 500 fuera, 500 editando, 500 al salir.
 
 **Lo que no depende de la celda no cambia.** El **visto verde** de una tarea
 hecha (700) y la marca **↻ ×N** (700) declaran su propio peso, igual que las
@@ -2496,9 +2506,12 @@ globo mostraría dos a la vez. Verificado: al pasar el mouse aparece **una sola*
 tarjeta y **ningún** globo.
 
 **Verificado** #326 y #327 juntos con `docs/prueba-326-327-pesos-y-globos.mjs`:
-**36 comprobaciones en verde**. De #326 mide los tres pesos y exige que la
-jerarquía se haya dado vuelta, que el visto y el ↻ ×N conserven el suyo, y que
-el grosor no cambie al entrar y salir de edición. De #327 comprueba **la
+**38 comprobaciones en verde**. De #326 mide los tres pesos y exige que el de la
+tarea sea **igual** al de su sub frente —no menor: la corrección se hizo
+justamente porque "menor" se fue de largo—, que quede en el escalón del medio
+entre producción y la primera versión, que el tamaño de la letra de la Gantt no
+cambie, que el visto y el ↻ ×N conserven el suyo, y que el grosor no cambie al
+entrar y salir de edición. De #327 comprueba **la
 propiedad que garantiza que no se recorte** —que el globo cuelgue del `body` y
 no del recuadro con scroll— y que quede entero dentro de la pantalla: en la
 primera fila visible, en la última, contra el extremo derecho, con la ventana

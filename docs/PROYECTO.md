@@ -216,15 +216,18 @@ completo con creación y edición **inline** (sin formularios).
   construcción: el mismo 16 de un lado y del otro, no dos números ajustados
   para que coincidan.
 
-  **El nombre de la tarea pesa menos que lo que lo contiene (#326).** Iba en
+  **El nombre de la tarea pesa lo mismo que lo que lo contiene (#326).** Iba en
   semi negrita (600) y su sub frente en 500 —perdió la negrita en #306, a
   propósito—, así que el hijo se leía **más pesado que su propio contenedor**.
-  Pasa al peso normal del resto de su fila, en la tabla, en la Gantt y en Mis
-  Tareas; el **visto verde** y la marca **↻ ×N** llevan peso propio y no
-  cambian, y el campo de edición hereda el de la celda, así que el texto **no
-  cambia de grosor** al entrar y salir de edición. De paso, **"+ Sub Frente" se
-  iguala al peso de "+ Tarea"**: son la misma acción y una era línea normal
-  mientras la otra era botón fantasma en 600.
+  Queda en **500, el mismo peso que su sub frente**, en la tabla, en la Gantt y
+  en Mis Tareas. *Igualarlos, y no dejarlo por debajo, es lo que resuelve el
+  problema sin costar legibilidad: bajarlo a peso normal se probó y se fue un
+  escalón de más — los nombres costaban de leer.* El **tamaño** de la letra no
+  cambia en ninguna vista. El **visto verde** y la marca **↻ ×N** llevan peso
+  propio y no cambian, y el campo de edición hereda el de la celda, así que el
+  texto **no cambia de grosor** al entrar y salir de edición. De paso, **"+ Sub
+  Frente" se iguala al peso de "+ Tarea"**: son la misma acción y una era línea
+  normal mientras la otra era botón fantasma en 600.
 
   **Se pueden crear tareas con el filtro puesto (#320).** La fila de "+ Tarea"
   estaba escondida al filtrar, por un problema real —una tarea recién creada
