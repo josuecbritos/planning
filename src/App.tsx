@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { AppState, PermisosTareas, Rol, Tarea, Usuario } from './types'
+import type { AppState, Frente, PermisosTareas, Rol, SubFrente, Tarea, Usuario } from './types'
 import { HOY_SIMULADO } from './data/hoy'
 import { MENSAJE_SALIDA, makeAuth, type MotivoSalida } from './auth'
 import { supabaseConfigured } from './data/client'
@@ -67,13 +67,16 @@ export interface Actions {
   createProyecto: (i: NuevoProyecto) => Promise<boolean>
   updateProyecto: (id: string, p: PatchProyecto) => Promise<boolean>
   deleteProyecto: (id: string) => Promise<boolean>
-  createFrente: (i: NuevoFrente) => Promise<boolean>
+  /** #333: los tres `create` devuelven lo creado (o `null` si falló), igual que
+   *  `createUsuario`. Quien crea con la vista congelada necesita el id en el
+   *  acto para meterlo en la foto en su posición; `run` ya mostró el error. */
+  createFrente: (i: NuevoFrente) => Promise<Frente | null>
   updateFrente: (id: string, p: { nombre?: string; orden?: number }) => Promise<boolean>
   deleteFrente: (id: string) => Promise<boolean>
-  createSubFrente: (i: NuevoSubFrente) => Promise<boolean>
+  createSubFrente: (i: NuevoSubFrente) => Promise<SubFrente | null>
   updateSubFrente: (id: string, p: { nombre?: string; orden?: number }) => Promise<boolean>
   deleteSubFrente: (id: string) => Promise<boolean>
-  createTarea: (i: NuevaTarea) => Promise<boolean>
+  createTarea: (i: NuevaTarea) => Promise<Tarea | null>
   updateTarea: (id: string, p: PatchTarea) => Promise<boolean>
   deleteTarea: (id: string) => Promise<boolean>
   /** #293: deja la tarea ANTE `antesDeId` (null = al final) del sub frente
@@ -287,6 +290,12 @@ export default function App({ repo }: { repo: Repo }) {
   // mecanismo que ya usa la llegada desde una notificación, y se enciende
   // "Actualizar vista"; la lista no se reordena sola.
   const [tareasNuevas, setTareasNuevas] = useState<string[]>([])
+  // #333: lo mismo para los CONTENEDORES. Un frente o un sub frente recién
+  // creado nace vacío, y con un filtro puesto la vista omite los contenedores
+  // sin coincidencias: el elemento nuevo no aparecía en ninguna parte —ni en su
+  // sitio ni fuera de él— hasta quitar el filtro. Se muestra por la misma razón
+  // que la tarea recién creada, y con "Actualizar vista" encendido.
+  const [contenedoresNuevos, setContenedoresNuevos] = useState<string[]>([])
   // #219: contador que sube en cada llegada desde una notificación. Sin él, si
   // ya estás en el proyecto de la tarea, `setTareaResaltada` asigna el MISMO
   // valor, React descarta la actualización y el efecto del realce no vuelve a
@@ -793,11 +802,16 @@ export default function App({ repo }: { repo: Repo }) {
           setProyectoActivoId((cur) => (cur === id ? null : cur))
           return (s) => apply.removeProyecto(s, id)
         }),
-      createFrente: (i) =>
-        run(async () => {
+      createFrente: async (i) => {
+        const salida: { frente: Frente | null } = { frente: null }
+        await run(async () => {
           const f = await repo.createFrente(i)
+          salida.frente = f
+          setContenedoresNuevos((prev) => (prev.includes(f.id) ? prev : [...prev, f.id]))
           return (s) => apply.upsertFrente(s, f)
-        }),
+        })
+        return salida.frente
+      },
       updateFrente: (id, p) =>
         run(async () => {
           const f = await repo.updateFrente(id, p)
@@ -808,11 +822,16 @@ export default function App({ repo }: { repo: Repo }) {
           await repo.deleteFrente(id)
           return (s) => apply.removeFrente(s, id)
         }),
-      createSubFrente: (i) =>
-        run(async () => {
+      createSubFrente: async (i) => {
+        const salida: { sub: SubFrente | null } = { sub: null }
+        await run(async () => {
           const sf = await repo.createSubFrente(i)
+          salida.sub = sf
+          setContenedoresNuevos((prev) => (prev.includes(sf.id) ? prev : [...prev, sf.id]))
           return (s) => apply.upsertSubFrente(s, sf)
-        }),
+        })
+        return salida.sub
+      },
       updateSubFrente: (id, p) =>
         run(async () => {
           const sf = await repo.updateSubFrente(id, p)
@@ -823,12 +842,16 @@ export default function App({ repo }: { repo: Repo }) {
           await repo.deleteSubFrente(id)
           return (s) => apply.removeSubFrente(s, id)
         }),
-      createTarea: (i) =>
-        run(async () => {
+      createTarea: async (i) => {
+        const salida: { tarea: Tarea | null } = { tarea: null }
+        await run(async () => {
           const t = await repo.createTarea(i)
+          salida.tarea = t
           setTareasNuevas((prev) => (prev.includes(t.id) ? prev : [...prev, t.id]))
           return (s) => apply.upsertTarea(s, t)
-        }),
+        })
+        return salida.tarea
+      },
       updateTarea: (id, p) =>
         run(async () => {
           const t = await repo.updateTarea(id, p)
@@ -1000,6 +1023,7 @@ export default function App({ repo }: { repo: Repo }) {
     setVistaStale(false)
     setTareaResaltada(null)
     setTareasNuevas([])
+    setContenedoresNuevos([])
   }, [])
 
   // Cambiar de vista/proyecto recalcula la foto naturalmente (no cuenta como
@@ -1542,6 +1566,7 @@ export default function App({ repo }: { repo: Repo }) {
                   actions={actions}
                   onAbrirTarea={abrirDetalle}
                   tareasNuevas={tareasNuevas}
+                  contenedoresNuevos={contenedoresNuevos}
                   puedeArrastrar={puedeArrastrar}
                   modoHorizonte={ganttModo}
                   soloHabiles={ganttHabiles}

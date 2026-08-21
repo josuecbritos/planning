@@ -15,6 +15,7 @@ import {
 } from '../lib/dates'
 import { colorTarea, fechaVigente, marcasDe } from '../lib/derive'
 import { filtraTareas, pasaFiltroCompleto, rangoDeFecha, type Filtro } from '../lib/filtros'
+import { abrirHueco } from '../lib/crear'
 import { referenciaEnFoto, useVistaCongelada } from '../lib/vistaCongelada'
 import { enMitadSuperior, useArrastreTareas, type DndTareas } from '../lib/arrastre'
 import { planMoverTarea } from '../lib/mover'
@@ -92,6 +93,10 @@ interface Props {
   /** #253: ids recién creados. Se muestran aunque la foto congelada o el filtro
    *  los dejen fuera; el resto de la grilla no se reordena. */
   tareasNuevas?: string[]
+  /** #333: ids de frentes y sub frentes recién creados. Nacen vacíos, y con un
+   *  filtro puesto la vista omite los contenedores sin coincidencias: sin esto
+   *  el elemento nuevo no aparecía en ninguna parte hasta quitar el filtro. */
+  contenedoresNuevos?: string[]
   actions: Actions
   /** Abre el panel lateral de detalle (7.2). */
   onAbrirTarea: (tareaId: string) => void
@@ -188,7 +193,7 @@ function ventanaHoy(hoy: ISODate): { desde: ISODate; hasta: ISODate } {
 // Referencia estable para el valor por defecto (ver TableView).
 const SIN_NUEVAS: string[] = []
 
-export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, onCambiarFiltro, snapshotNonce, onStale, actions, onAbrirTarea, misTareas, tareasNuevas = SIN_NUEVAS, puedeArrastrar = false, modoHorizonte: modo, soloHabiles, onOcultasFinde }: Props) {
+export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orden, onCambiarFiltro, snapshotNonce, onStale, actions, onAbrirTarea, misTareas, tareasNuevas = SIN_NUEVAS, contenedoresNuevos = SIN_NUEVAS, puedeArrastrar = false, modoHorizonte: modo, soloHabiles, onOcultasFinde }: Props) {
   // #190: en modo Mis Tareas la grilla es de lectura y replanificación —
   // ninguna afordancia de creación (una tarea creada aquí no sería del
   // usuario hasta asignársela, así que aparecería y desaparecería sola).
@@ -337,7 +342,35 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tareasNuevas, state, congelada, visibleIds, hayFiltroTareas, filtro, hoy])
 
-  useEffect(() => onStale(stale || forzarIds.size > 0), [stale, forzarIds, onStale])
+  // #333: y lo mismo con los contenedores. Un frente o un sub frente recién
+  // creado nace VACÍO, y con filtro puesto la vista omite los contenedores sin
+  // coincidencias: el elemento nuevo no aparecía en ninguna parte —medido: ni
+  // en su sitio ni fuera de él— hasta quitar el filtro. Su posición sí era
+  // correcta desde el principio, porque frentes y sub frentes se dibujan por su
+  // `orden` y no por la foto (que es solo de tareas): lo que faltaba era que se
+  // vieran.
+  const contenedoresForzados = useMemo(() => {
+    const fuera = new Set<string>()
+    if (!omitirVacios) return fuera
+    const enScope = new Set(frentesFuente.map((f) => f.id))
+    for (const id of contenedoresNuevos) {
+      const sub = state.subFrentes.find((x) => x.id === id)
+      if (sub) {
+        if (enScope.has(sub.frenteId) && !state.tareas.some((t) => t.subFrenteId === id && !t.archivada && esMia(t))) {
+          fuera.add(id)
+        }
+      } else if (enScope.has(id) && !state.subFrentes.some((sf) => sf.frenteId === id)) {
+        fuera.add(id)
+      }
+    }
+    return fuera
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contenedoresNuevos, state, frentesFuente, omitirVacios])
+
+  useEffect(
+    () => onStale(stale || forzarIds.size > 0 || contenedoresForzados.size > 0),
+    [stale, forzarIds, contenedoresForzados, onStale],
+  )
 
   // -- Filas (incluye contenedores vacios §6.4.26 e inputs inline §6.4.25) --
   const filas = useMemo<FilaGantt[]>(() => {
@@ -351,7 +384,10 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
 
       const filasFrente: FilaGantt[] = []
       if (subs.length === 0) {
-        if (!omitirVacios) filasFrente.push({ tipo: 'vacio-frente', frente: f, esPrimeraGlobal: false })
+        // #333: el frente recién creado se muestra aunque haya filtro.
+        if (!omitirVacios || contenedoresForzados.has(f.id)) {
+          filasFrente.push({ tipo: 'vacio-frente', frente: f, esPrimeraGlobal: false })
+        }
       } else {
         for (const sf of subs) {
           const todasSub = state.tareas
@@ -379,7 +415,8 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
               )
           const filasSub: FilaGantt[] = []
           if (tareas.length === 0) {
-            if (omitirVacios) continue
+            // #333: ídem el sub frente recién creado.
+            if (omitirVacios && !contenedoresForzados.has(sf.id)) continue
             filasSub.push({
               tipo: 'vacio-sub',
               frente: f,
@@ -461,7 +498,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, frentesFuente, omitirVacios, crearEn, filtro, orden, hoy, hayFiltroTareas, congelada, visibleIds, indice, forzarIds])
+  }, [state, frentesFuente, omitirVacios, contenedoresForzados, crearEn, filtro, orden, hoy, hayFiltroTareas, congelada, visibleIds, indice, forzarIds])
 
   const filasTarea = useMemo(
     () => filas.filter((f): f is Extract<FilaGantt, { tipo: 'tarea' }> => f.tipo === 'tarea'),
@@ -599,8 +636,10 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
 
   // -- Creacion inline (§6.4.25/26) --
 
-  function abrirCrear(e: React.MouseEvent, crear: CrearEn) {
-    e.stopPropagation()
+  /** `e` solo cuando lo dispara un botón de la grilla: el menú del clic derecho
+   *  (#328) llama sin evento, y ya frenó la propagación al abrirse. */
+  function abrirCrear(crear: CrearEn, e?: React.MouseEvent) {
+    e?.stopPropagation()
     setCrearEn(crear)
   }
 
@@ -609,25 +648,38 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     const { tipo, despuesDe, contenedorId } = crearEn
     // Insertar justo debajo del hermano: se corren los ordenes siguientes.
     // (Los clientes crean al final: el corrimiento exige editar hermanos.)
-    const insertar = can.controlTotal && despuesDe ? despuesDe.orden + 1 : undefined
     if (tipo === 'frente') {
-      if (insertar !== undefined) {
-        const hermanos = state.frentes.filter((f) => f.proyectoId === contenedorId && f.orden >= insertar)
-        await Promise.all(hermanos.map((h) => actions.updateFrente(h.id, { orden: h.orden + 1 })))
-      }
-      await actions.createFrente({ proyectoId: contenedorId, nombre, orden: insertar })
+      const hermanos = state.frentes.filter((f) => f.proyectoId === contenedorId)
+      const orden = await abrirHueco(hermanos, despuesDe, can.controlTotal, (id, o) =>
+        actions.updateFrente(id, { orden: o }),
+      )
+      await actions.createFrente({ proyectoId: contenedorId, nombre, orden })
     } else if (tipo === 'sub') {
-      if (insertar !== undefined) {
-        const hermanos = state.subFrentes.filter((sf) => sf.frenteId === contenedorId && sf.orden >= insertar)
-        await Promise.all(hermanos.map((h) => actions.updateSubFrente(h.id, { orden: h.orden + 1 })))
-      }
-      await actions.createSubFrente({ frenteId: contenedorId, nombre, orden: insertar })
+      const hermanos = state.subFrentes.filter((sf) => sf.frenteId === contenedorId)
+      const orden = await abrirHueco(hermanos, despuesDe, can.controlTotal, (id, o) =>
+        actions.updateSubFrente(id, { orden: o }),
+      )
+      await actions.createSubFrente({ frenteId: contenedorId, nombre, orden })
     } else {
-      if (insertar !== undefined) {
-        const hermanos = state.tareas.filter((t) => t.subFrenteId === contenedorId && t.orden >= insertar)
-        await Promise.all(hermanos.map((h) => actions.updateTarea(h.id, { orden: h.orden + 1 })))
+      const hermanos = state.tareas.filter((t) => t.subFrenteId === contenedorId)
+      const orden = await abrirHueco(hermanos, despuesDe, can.controlTotal, (id, o) =>
+        actions.updateTarea(id, { orden: o }),
+      )
+      const nueva = await actions.createTarea({ subFrenteId: contenedorId, titulo: nombre, orden })
+      // #333: con la vista congelada, la foto solo tiene posición para lo que
+      // ya estaba cuando se la tomó — la tarea nueva caía donde el render la
+      // dejara, casi siempre al final del bloque. Entra en la foto justo
+      // después de su hermana, por el MISMO camino que ya usa el arrastre al
+      // soltar (#293), y como aquél enciende "Actualizar vista". El orden
+      // guardado ya era el correcto: lo que faltaba era decírselo a la foto.
+      //
+      // La condición es `orden`, no `despuesDe`: quien no tiene control total
+      // crea AL FINAL aunque haya pedido "debajo de esta". Mirando `despuesDe`
+      // la foto la mostraba en el medio y el orden guardado la tenía al final
+      // —medido—, que es el mismo desencuentro que este pedido viene a cerrar.
+      if (nueva && congelada && despuesDe && orden !== undefined) {
+        moverEnFoto(nueva.id, { despuesDe: despuesDe.id })
       }
-      await actions.createTarea({ subFrenteId: contenedorId, titulo: nombre, orden: insertar })
     }
   }
 
@@ -947,6 +999,16 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                 actions,
                 onAbrirTarea,
                 () => pedirRenombrar(tareaDelMenu.id),
+                // #328: lo MISMO que el "+" de la fila, que se queda. En Mis
+                // Tareas no se crean tareas, así que ahí no se ofrece.
+                permiteCrear
+                  ? () =>
+                      abrirCrear({
+                        tipo: 'tarea',
+                        despuesDe: { id: tareaDelMenu.id, orden: tareaDelMenu.orden },
+                        contenedorId: tareaDelMenu.subFrenteId,
+                      })
+                  : null,
               )
             : []
         }
@@ -1090,7 +1152,7 @@ function FilaGanttRow({
    *  marcar la tarea como lista, y ese idioma no se toca. */
   onMenu: (e: React.MouseEvent, tareaId: string) => void
   pulsoRenombrar: (tareaId: string) => number
-  abrirCrear: (e: React.MouseEvent, crear: CrearEn) => void
+  abrirCrear: (crear: CrearEn, e?: React.MouseEvent) => void
   crearEn: CrearEn | null
   onCrear: (nombre: string) => void
   onCerrarCrear: () => void
@@ -1153,7 +1215,7 @@ function FilaGanttRow({
               data-tip="Agregar frente debajo"
               aria-label="Agregar frente debajo"
               onClick={(e) =>
-                abrirCrear(e, { tipo: 'frente', despuesDe: { id: frente.id, orden: frente.orden }, contenedorId: frente.proyectoId })
+                abrirCrear({ tipo: 'frente', despuesDe: { id: frente.id, orden: frente.orden }, contenedorId: frente.proyectoId }, e)
               }
             >
               +
@@ -1177,7 +1239,7 @@ function FilaGanttRow({
               data-tip="Agregar sub frente debajo"
               aria-label="Agregar sub frente debajo"
               onClick={(e) =>
-                abrirCrear(e, { tipo: 'sub', despuesDe: { id: sub.id, orden: sub.orden }, contenedorId: frente.id })
+                abrirCrear({ tipo: 'sub', despuesDe: { id: sub.id, orden: sub.orden }, contenedorId: frente.id }, e)
               }
             >
               +
@@ -1253,7 +1315,7 @@ function FilaGanttRow({
           ) : permiteCrear && can.crearSubFrentes ? (
             <button
               className="btn btn--ghost btn--sm"
-              onClick={(e) => abrirCrear(e, { tipo: 'sub', contenedorId: fila.frente.id })}
+              onClick={(e) => abrirCrear({ tipo: 'sub', contenedorId: fila.frente.id }, e)}
             >
               + agregar sub frente
             </button>
@@ -1286,7 +1348,7 @@ function FilaGanttRow({
           ) : permiteCrear && can.crearTareas ? (
             <button
               className="btn btn--ghost btn--sm"
-              onClick={(e) => abrirCrear(e, { tipo: 'tarea', contenedorId: fila.sub.id })}
+              onClick={(e) => abrirCrear({ tipo: 'tarea', contenedorId: fila.sub.id }, e)}
             >
               + agregar tarea
             </button>
@@ -1450,28 +1512,27 @@ function FilaGanttRow({
             </HoverCard>
           )}
           </span></span>
-          <span className="con-mas__acciones">
-            <button
-              className="mas-btn"
-              data-tip="Información"
-              aria-label="Información"
-              onClick={() => onAbrirTarea(tarea.id)}
-            >
-              ⓘ
-            </button>
-            {permiteCrear && can.crearTareas && (
+          {/* #328: el ⓘ salió de acá. Hacía lo mismo que el clic sobre el
+              nombre —abrir el panel—, y esa función ya está en el menú del clic
+              derecho, que llega a todos por igual. Lo que costaba no eran
+              letras sino FILAS: el nombre no se corta, envuelve, y esos 20px
+              reservados de forma permanente empujaban nombres a una línea más.
+              El envoltorio se dibuja solo si hay algo dentro: quien no puede
+              crear tareas dispone del ancho completo, sin pagar su separación. */}
+          {permiteCrear && can.crearTareas && (
+            <span className="con-mas__acciones">
               <button
                 className="mas-btn"
                 data-tip="Agregar tarea debajo"
                 aria-label="Agregar tarea debajo"
                 onClick={(e) =>
-                  abrirCrear(e, { tipo: 'tarea', despuesDe: { id: tarea.id, orden: tarea.orden }, contenedorId: tarea.subFrenteId })
+                  abrirCrear({ tipo: 'tarea', despuesDe: { id: tarea.id, orden: tarea.orden }, contenedorId: tarea.subFrenteId }, e)
                 }
               >
                 +
               </button>
-            )}
-          </span>
+            </span>
+          )}
         </span>
       </td>
       <td className="fija fija--resp">

@@ -216,7 +216,7 @@ const globoDe = async (sel, ms = 500) => {
   })
 }
 /** Marca la primera o la última fila visible que de verdad CONTENGA `dentro`.
- *  Sin esto, la fila de más arriba podía ser una que no tiene ⓘ, o una sin
+ *  Sin esto, la fila de más arriba podía ser una que no tiene "+", o una sin
  *  ninguna celda con globo, y la comprobación fallaba por terreno y no por el
  *  producto. */
 const marcarFila = (dentro, cual, marca) =>
@@ -254,8 +254,12 @@ const ladoRespectoDe = async (sel) =>
     return rg.left >= ra.right - 1 ? 'derecha' : rg.bottom <= ra.top + 1 ? 'arriba' : 'otro'
   }, sel)
 
-const info = await globoDe('.gantt tbody .mas-btn[data-tip="Información"]')
-chk(info?.hay, '#327 terreno: el ⓘ de la grilla muestra su globo', info?.texto ?? 'sin globo')
+// #328 quitó el ⓘ de la fila de la Gantt: hacía lo mismo que el clic sobre el
+// nombre y su función pasó al menú del clic derecho. El botón de la fila que
+// queda —el "+"— tiene el mismo globo y sirve igual para lo que se comprueba
+// acá, que es DÓNDE vive el globo, no cuál de los dos lo dispara.
+const info = await globoDe('.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]')
+chk(info?.hay, '#327 terreno: el "+" de la grilla muestra su globo', info?.texto ?? 'sin globo')
 chk(
   info?.padre === 'BODY' && !info.dentroDelScroll,
   '1 el globo NO cuelga del recuadro con scroll: vive en una capa aparte',
@@ -268,8 +272,9 @@ console.log('\n── #327 · 1 a 4 · Contra el borde de arriba ──')
 await p.evaluate(() => document.querySelector('.gantt-scroll').scrollBy(0, 220))
 await esperar(450)
 for (const [etiqueta, dentro, ms] of [
-  ['1 el globo del ⓘ', '.mas-btn[data-tip="Información"]', 500],
-  ['2 el del "+"', '.mas-btn[data-tip="Agregar tarea debajo"]', 500],
+  // El criterio 1 era el globo del ⓘ; #328 lo sacó de la fila, así que el
+  // primer botón con globo pasa a ser el "+", que es el criterio 2.
+  ['2 el globo del "+"', '.mas-btn[data-tip="Agregar tarea debajo"]', 500],
   ['3 el de una celda de la grilla', 'td.celda[data-tip]', 600],
 ]) {
   const hay = await marcarFila(dentro, 'primera', 'data-primera')
@@ -296,8 +301,8 @@ await p.evaluate(() => {
   s.scrollTop = s.scrollHeight
 })
 await esperar(500)
-const ultima = await marcarFila('.mas-btn[data-tip="Información"]', 'ultima', 'data-ultima')
-const abajo = ultima ? await globoDe('tr[data-ultima] .mas-btn[data-tip="Información"]') : null
+const ultima = await marcarFila('.mas-btn[data-tip="Agregar tarea debajo"]', 'ultima', 'data-ultima')
+const abajo = ultima ? await globoDe('tr[data-ultima] .mas-btn[data-tip="Agregar tarea debajo"]') : null
 chk(
   abajo?.hay && abajo.entero && !abajo.dentroDelScroll,
   '4 en la última fila visible el globo también se ve entero',
@@ -316,10 +321,10 @@ for (const [etiqueta, sel] of [
   chk(g?.hay === true && g.entero && !g.dentroDelScroll, `${etiqueta} se ve entero`, g?.texto ?? 'sin globo')
   chk((await ladoRespectoDe(sel)) === 'derecha', `9 ${etiqueta} sigue abriéndose hacia la derecha`)
 }
-const gBoton = await globoDe('.gantt tbody .mas-btn[data-tip="Información"]')
-chk(gBoton?.hay === true, '9 terreno: el globo del ⓘ está visible')
+const gBoton = await globoDe('.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]')
+chk(gBoton?.hay === true, '9 terreno: el globo del "+" está visible')
 chk(
-  (await ladoRespectoDe('.gantt tbody .mas-btn[data-tip="Información"]')) === 'arriba',
+  (await ladoRespectoDe('.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]')) === 'arriba',
   '9 el de los botones sigue abriéndose hacia arriba',
 )
 
@@ -335,7 +340,7 @@ const luegoCelda = await p.evaluate(() => !!document.querySelector('.globo-tip')
 chk(!prontoCelda && luegoCelda, '3 el globo de la celda conserva su retardo corto', `a los 70ms ${prontoCelda}, después ${luegoCelda}`)
 await p.mouse.move(4, 4)
 await esperar(250)
-await p.locator('.gantt tbody .mas-btn[data-tip="Información"]').first().hover()
+await p.locator('.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]').first().hover()
 await esperar(70)
 chk(
   await p.evaluate(() => !!document.querySelector('.globo-tip')),
@@ -377,7 +382,7 @@ chk(
   !(await p.evaluate(() => !!document.querySelector('.globo-tip'))),
   '10 al sacar el mouse el globo desaparece',
 )
-await p.locator('.gantt tbody .mas-btn[data-tip="Información"]').first().hover()
+await p.locator('.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]').first().hover()
 await esperar(300)
 chk(await p.evaluate(() => !!document.querySelector('.globo-tip')), '10 terreno: hay un globo visible')
 await p.evaluate(() => document.querySelector('.gantt-scroll').scrollBy(0, 90))
@@ -419,7 +424,7 @@ await p.setViewportSize({ width: 900, height: 600 })
 await esperar(700)
 for (const [etiqueta, sel, ms] of [
   ['8 el del frente', '.gantt .fija--frente .fija-tip', 500],
-  ['8 el del ⓘ', '.gantt tbody .mas-btn[data-tip="Información"]', 500],
+  ['8 el del "+"', '.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]', 500],
 ]) {
   const g = await globoDe(sel, ms)
   chk(g?.hay && g.entero, `${etiqueta} no queda cortado por el borde de la pantalla`, g?.rect?.join(',') ?? 'sin globo')

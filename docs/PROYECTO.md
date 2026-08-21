@@ -267,23 +267,40 @@ completo con creación y edición **inline** (sin formularios).
   esa columna —Información, Archivar y Eliminar—, y **en la Gantt no había
   ninguna**: desde ahí no se podía archivar ni eliminar. El menú las lleva a las
   dos vistas sin crear **ninguna acción nueva ni ningún permiso nuevo**: son las
-  mismas, disponibles donde faltaban, y la columna se queda como está. Cuatro
+  mismas, disponibles donde faltaban, y la columna se queda como está. Cinco
   opciones con sus condiciones de siempre: **Información** —que no depende de
   ningún permiso, así que el menú siempre tiene al menos una y quien solo mira
-  también lo ve—, **Renombrar** si puede editar la tarea, y **Archivar** y
-  **Eliminar** si puede archivarlas o eliminarlas, con las mismas
-  confirmaciones. Renombrar no es una acción nueva: es el clic sobre el nombre,
-  pedido desde otro lado.
+  también lo ve—, **Renombrar** si puede editar la tarea, **Agregar tarea
+  debajo** (#328) si puede crear tareas, y **Archivar** y **Eliminar** si puede
+  archivarlas o eliminarlas, con las mismas confirmaciones. Renombrar no es una
+  acción nueva: es el clic sobre el nombre, pedido desde otro lado.
   Se abre **sobre cualquier celda de la fila** en la tabla y **solo sobre la
   celda del nombre** en la Gantt: ahí el clic derecho sobre la grilla ya
   significa marcar la tarea como lista, y ese idioma no se toca. Sobre el
   frente, el sub frente y las filas de carga no se abre. **En el teléfono no
   existe** —es un atajo de escritorio, y no se agrega por pulsación larga—: ahí
   la columna de acciones sigue siendo el camino.
-  *En la tabla de Mis Tareas el menú va sin **Renombrar**: en esa tabla el
-  nombre abre el panel de detalle y nunca fue editable, así que ofrecerlo
-  prometería algo que no pasaría. Su Gantt sí lo tiene, porque ahí el nombre
-  siempre se pudo editar.*
+  *En **Mis Tareas** el menú va sin **Agregar tarea debajo**, en sus dos vistas:
+  ahí no se crean tareas —una creada desde ese módulo no sería del usuario hasta
+  asignársela—. **Renombrar sí está** (#334): #292 la había dejado fuera de esa
+  tabla porque su nombre nunca fue editable, y ahora la opción abre la edición
+  en la celda **sin tocar lo que hace el clic**, que sigue abriendo el panel de
+  detalle. Es la puerta más directa al detalle en la única pantalla que no está
+  dentro de un proyecto, y cruzando proyectos es lo que más se usa: Renombrar se
+  gana sin perderla. Su Gantt no cambia.*
+
+  **"Agregar tarea debajo" abre la fila de carga en el sitio (#328).** En la
+  Gantt hace **exactamente lo mismo que el "+" de la fila**, que se queda: son
+  dos caminos al mismo gesto. En la **tabla es una capacidad que no existía** —
+  ahí solo se podía agregar al final del sub frente, con la línea "+ Tarea"—, y
+  llega **sin agregar ningún botón a la pantalla**. La fila que se abre es la
+  misma de siempre; lo que cambia es que arranca abierta y **se cierra al
+  guardar**, porque una inserción es para *esa* posición y encadenar debajo de
+  ella diría otra cosa. La línea "+ Tarea" del final sigue igual, y sí encadena.
+  *Insertar en el medio obliga a correr el orden de los hermanos posteriores,
+  que es editar tareas ajenas: por eso lo hace solo quien tiene control total, y
+  el resto crea al final, con menú o sin él. Esa regla vive en un solo lugar
+  (`lib/crear.ts`), compartida por la tabla y la Gantt.*
 
   **Se ve como el menú de Filtrar, porque comparte sus reglas.** Fondo, borde,
   esquina, sombra, relleno, tamaño y aire de cada opción, realce al pasar el
@@ -362,6 +379,20 @@ que no quede flotando lejos de lo que lo disparó. *Que un globo tape el nombre
 de la fila de arriba mientras está visible se acepta como está.* Las columnas fijas **siguen midiendo lo
 mismo**: 120 + 150 + 240 + 60 = 570, que con días de 30 sigue sin dejar caber la
 línea de tiempo — decisión consciente, la grilla se sigue desplazando de lado.
+
+**El ⓘ sale de la fila de la Gantt (#328).** La celda de tarea reserva su espacio
+**siempre**, aunque los botones solo aparezcan al pasar el mouse, y **lo que eso
+cuesta no son letras: son filas** — el nombre no se corta, envuelve, así que
+cada nombre que no cabe sube el alto de su fila, y en la Gantt la altura es lo
+escaso. El ⓘ hacía **lo mismo que el clic sobre el nombre** —abrir el panel—, y
+esa función ya está en el menú del clic derecho, que llega a todos por igual.
+El **"+" se queda**, con su comportamiento y sus permisos de siempre.
+*Medido sobre el mismo plan, a 1440px: de 240 de columna quedan 208 útiles; el
+nombre pasa de **164 a 184**, la grilla de **1048 a 1005px** con las mismas 27
+filas, y los nombres de más de una línea de **21 a 15**. Quien no puede crear
+tareas dispone de los **208 completos**: el envoltorio no se dibuja, así que
+tampoco paga su separación.* La columna de acciones de la tabla **no se toca**:
+ahí el ⓘ se queda.
 
 **El bloque del frente ya no es negro (#321, cierra #323).** Era la superficie
 más oscura de la pantalla y competía con la grilla; pasa a un gris propio con el
@@ -620,6 +651,28 @@ desde una notificación, con el aviso encendido. La lista **no se reordena sola*
 —ese es el punto de la vista congelada—: la nueva entra al final de su sub
 frente y todo lo demás se queda donde está hasta tocar "Actualizar vista", que
 entonces recalcula y la manda a su lugar. Encadenando con Enter, todas aparecen.
+
+**Y aparece EN SU SITIO (#333).** Creando debajo de una hermana con filtro u
+orden puestos, la tarea aparecía pero **no donde se la había creado**: la foto
+solo tiene posición para lo que ya estaba cuando se la tomó, así que la nueva
+caía donde el render la dejara —al final del bloque—. El arrastre ya sabía
+reubicar un elemento dentro de la foto (#293); al crear no se llamaba a nada
+equivalente. Ahora sí: la nueva **entra en la foto justo después de aquella
+sobre la que se creó**, por ese mismo camino, y enciende "Actualizar vista".
+*El orden guardado siempre fue el correcto —al recalcular la vista la tarea
+aparecía en su lugar—: lo que faltaba era decírselo a la foto.* La foto se mueve
+**solo si de verdad se insertó**: quien no tiene control total crea al final
+aunque haya pedido "debajo de esta", y entonces la foto dice lo mismo que el
+orden guardado.
+Vale para la Gantt y para la tabla, que con #328 pasa a insertar en el medio por
+primera vez.
+**Los contenedores nuevos también se ven.** Un frente o un sub frente recién
+creado nace vacío, y con filtro puesto la vista omite los contenedores sin
+coincidencias: el elemento nuevo **no aparecía en ninguna parte** —ni en su
+sitio ni fuera de él— hasta quitar el filtro. Se muestran por la misma razón que
+la tarea recién creada, con "Actualizar vista" encendido. *Su posición nunca
+estuvo mal: frentes y sub frentes se dibujan por su `orden` y no por la foto,
+que es solo de tareas.*
 
 **El selector de fecha es un calendario propio (#262).** Antes era el nativo
 del navegador (`showPicker`), y con él no había forma de distinguir "navegó de

@@ -15,6 +15,7 @@ import {
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { CAMPOS_MIS_TAREAS, GRAVEDAD, ordenarMulti, valorOrden, type OrdenMulti } from '../lib/orden'
 import { MenuTarea, opcionesDeTarea, useMenuTarea } from './MenuTarea'
+import { InlineText } from './InlineText'
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import { escribirVistaActiva, estadoInicial, leerGuardados } from '../lib/vistas'
 import { FiltrosBar } from './FiltrosBar'
@@ -198,11 +199,13 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
     return () => ro.disconnect()
   }, [])
 
-  // #292: el menú contextual de la tarea, también acá. Sin "Renombrar": en
-  // ESTA tabla el nombre abre el panel de detalle, no la edición —el gesto de
-  // renombrar no existe—, así que ofrecerlo prometería algo que no pasaría. Su
-  // Gantt sí lo tiene, porque ahí el nombre siempre fue editable.
-  const { menu, abrir: abrirMenu, cerrar: cerrarMenu } = useMenuTarea()
+  // #292/#334: el menú contextual de la tarea, también acá. #292 lo dejó sin
+  // "Renombrar" porque en ESTA tabla el nombre nunca fue editable: es un enlace
+  // que abre el panel. #334 la trae igual, sin tocar el clic — al elegirla, el
+  // nombre queda en edición en su propia celda. El clic al panel se queda: es
+  // la puerta más directa al detalle en la única pantalla que no está dentro de
+  // un proyecto, y cruzando proyectos es lo que más se usa.
+  const { menu, abrir: abrirMenu, cerrar: cerrarMenu, pedirRenombrar, pulsoDe } = useMenuTarea()
   const tareaDelMenu = menu ? state.tareas.find((t) => t.id === menu.tareaId) : undefined
   const proyectoDelMenu = tareaDelMenu
     ? misFilas.find((f) => f.tarea.id === tareaDelMenu.id)?.proyecto
@@ -318,6 +321,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
               actions={actions}
               onAbrirTarea={onAbrirTarea}
               onMenu={abrirMenu}
+              pulsoRenombrar={pulsoDe(fila.tarea.id)}
             />
           ))}
           {mostradas.length === 0 && (
@@ -341,6 +345,10 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
                 canDe(proyectoDelMenu?.id ?? ''),
                 actions,
                 onAbrirTarea,
+                () => pedirRenombrar(tareaDelMenu.id),
+                // #328: en Mis Tareas no se crean tareas —una tarea creada acá
+                // no sería del usuario hasta asignársela—, así que la opción no
+                // aparece. Ya era así y no cambia.
                 null,
               )
             : []
@@ -359,6 +367,7 @@ function FilaTarea({
   actions,
   onAbrirTarea,
   onMenu,
+  pulsoRenombrar,
 }: {
   fila: FilaMisTareas
   state: AppState
@@ -368,6 +377,8 @@ function FilaTarea({
   onAbrirTarea: (id: string) => void
   /** #292: clic derecho sobre la fila. */
   onMenu: (e: React.MouseEvent, tareaId: string) => void
+  /** #334: pulso de "Renombrar" — la ÚNICA entrada a la edición en esta tabla. */
+  pulsoRenombrar: number
 }) {
   const { tarea, proyecto, ruta } = fila
   const color = colorTarea(state, tarea, hoy)
@@ -392,17 +403,30 @@ function FilaTarea({
       <td className="tarea-cell">
         <span className="tarea-cell__row">
           {cat === 'hecha' && <span className="tarea-cell__mark mk-verde">✓</span>}
-          <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
-            <span
-              className="tarea-cell__link"
-              role="button"
-              tabIndex={0}
-              onClick={() => onAbrirTarea(tarea.id)}
-              onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
-            >
-              {tarea.titulo}
-            </span>
-          </HoverCard>
+          {/* #334: el enlace es el mismo de siempre —clic = panel de detalle—;
+              lo que cambia es que ahora puede convertirse en el campo de
+              edición cuando lo pide el menú. La edición es LA MISMA pieza que
+              en la tabla de un proyecto (`InlineText`), no una copia: Enter
+              guarda, Escape cancela, el foco fuera guarda. */}
+          <InlineText
+            valor={tarea.titulo}
+            onGuardar={(titulo) => actions.updateTarea(tarea.id, { titulo })}
+            ariaLabel={`Editar título: ${tarea.titulo}`}
+            abrirEdicion={can.editarTareas(tarea) ? pulsoRenombrar : 0}
+            display={
+              <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
+                <span
+                  className="tarea-cell__link"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onAbrirTarea(tarea.id)}
+                  onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
+                >
+                  {tarea.titulo}
+                </span>
+              </HoverCard>
+            }
+          />
           {nReplan > 0 && (
             <span className="replan-count" title={`Se replanificó ${nReplan} ${nReplan === 1 ? 'vez' : 'veces'}`}>
               ↻ ×{nReplan}

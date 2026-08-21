@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ordenarMulti, valorOrden, type ClaveOrden, type OrdenMulti } from '../lib/orden'
 import { MenuTarea, opcionesDeTarea, useMenuTarea } from './MenuTarea'
+import { abrirHueco } from '../lib/crear'
 import { referenciaEnFoto, useVistaCongelada } from '../lib/vistaCongelada'
 import { enMitadSuperior, useArrastreTareas, type DndTareas } from '../lib/arrastre'
 import { planMoverTarea } from '../lib/mover'
@@ -196,6 +197,37 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   const { menu, abrir, cerrar, pedirRenombrar, pulsoDe } = useMenuTarea()
   const tareaDelMenu = menu ? state.tareas.find((t) => t.id === menu.tareaId) : undefined
 
+  // #328: tarea bajo la cual está abierta la fila de carga. Hasta ahora la
+  // tabla solo sabía agregar AL FINAL del sub frente, con la línea "+ Tarea";
+  // insertar en una posición concreta no se podía. Es un id y no un booleano
+  // porque la fila se dibuja donde corresponde, no en un lugar fijo.
+  const [insertarTrasId, setInsertarTrasId] = useState<string | null>(null)
+
+  /**
+   * Crear una tarea desde la tabla. Vive acá, y no en la fila de carga, porque
+   * las dos cosas que la posicionan son de esta vista: el hueco entre hermanas
+   * (#328) y la foto congelada (#333).
+   */
+  const crearTarea = useCallback(
+    async (subFrenteId: string, datos: DatosNuevaTarea, debajoDe?: Tarea) => {
+      const hermanos = state.tareas.filter((t) => t.subFrenteId === subFrenteId)
+      const orden = await abrirHueco(hermanos, debajoDe, can.controlTotal, (id, o) =>
+        actions.updateTarea(id, { orden: o }),
+      )
+      const nueva = await actions.createTarea({ subFrenteId, ...datos, orden })
+      // #333: la foto solo tiene posición para lo que ya estaba cuando se la
+      // tomó, así que la tarea nueva caía donde el render la dejara. Entra
+      // justo después de su hermana por el mismo camino que el arrastre (#293).
+      // La condición es `orden` y no `debajoDe`: quien no tiene control total
+      // crea AL FINAL aunque haya pedido "debajo de esta", y la foto tiene que
+      // decir lo mismo que el orden guardado.
+      if (nueva && congelada && debajoDe && orden !== undefined) {
+        moverEnFoto(nueva.id, { despuesDe: debajoDe.id })
+      }
+    },
+    [state.tareas, can, actions, congelada, moverEnFoto],
+  )
+
   return (
     // #293: el dragover que llega hasta acá no pasó por ningún destino
     // válido — se apaga el indicador (soltar ahí no hace nada).
@@ -235,6 +267,9 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           onAbrirTarea={onAbrirTarea}
           onMenu={abrir}
           pulsoDe={pulsoDe}
+          crearTarea={crearTarea}
+          insertarTrasId={insertarTrasId}
+          onCerrarInsercion={() => setInsertarTrasId(null)}
         />
       ))}
       {frentes.length === 0 && (
@@ -245,8 +280,15 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         onCerrar={cerrar}
         opciones={
           tareaDelMenu
-            ? opcionesDeTarea(tareaDelMenu, can, actions, onAbrirTarea, () =>
-                pedirRenombrar(tareaDelMenu.id),
+            ? opcionesDeTarea(
+                tareaDelMenu,
+                can,
+                actions,
+                onAbrirTarea,
+                () => pedirRenombrar(tareaDelMenu.id),
+                // #328: acá es una capacidad NUEVA — hasta ahora la tabla solo
+                // agregaba al final del sub frente.
+                () => setInsertarTrasId(tareaDelMenu.id),
               )
             : []
         }
@@ -279,6 +321,9 @@ function FrentePagina({
   onAbrirTarea,
   onMenu,
   pulsoDe,
+  crearTarea,
+  insertarTrasId,
+  onCerrarInsercion,
 }: {
   dnd?: DndTareas
   frente: Frente
@@ -302,6 +347,11 @@ function FrentePagina({
   /** #292: clic derecho sobre una fila de tarea, y el pulso de "Renombrar". */
   onMenu: (e: React.MouseEvent, tareaId: string) => void
   pulsoDe: (tareaId: string) => number
+  /** #328/#333: crear una tarea, opcionalmente justo debajo de una hermana. */
+  crearTarea: (subFrenteId: string, datos: DatosNuevaTarea, debajoDe?: Tarea) => void
+  /** #328: tarea bajo la cual está abierta la fila de carga (o `null`). */
+  insertarTrasId: string | null
+  onCerrarInsercion: () => void
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -376,6 +426,9 @@ function FrentePagina({
               onAbrirTarea={onAbrirTarea}
               onMenu={onMenu}
               pulsoDe={pulsoDe}
+              crearTarea={crearTarea}
+              insertarTrasId={insertarTrasId}
+              onCerrarInsercion={onCerrarInsercion}
             />
           ))}
           {subs.length === 0 && <p className="vacio-inline">Sin sub frentes en este frente.</p>}
@@ -480,6 +533,9 @@ function SubFrenteTabla({
   onToggleColapso,
   onMenu,
   pulsoDe,
+  crearTarea,
+  insertarTrasId,
+  onCerrarInsercion,
   actions,
   onAbrirTarea,
 }: {
@@ -502,6 +558,11 @@ function SubFrenteTabla({
   /** #292: clic derecho sobre una fila de tarea, y el pulso de "Renombrar". */
   onMenu: (e: React.MouseEvent, tareaId: string) => void
   pulsoDe: (tareaId: string) => number
+  /** #328/#333: crear una tarea, opcionalmente justo debajo de una hermana. */
+  crearTarea: (subFrenteId: string, datos: DatosNuevaTarea, debajoDe?: Tarea) => void
+  /** #328: tarea bajo la cual está abierta la fila de carga (o `null`). */
+  insertarTrasId: string | null
+  onCerrarInsercion: () => void
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -603,27 +664,38 @@ function SubFrenteTabla({
         </thead>
         <tbody>
           {tareas.map((t, i) => (
-            <TareaFila
-              key={t.id}
-              dnd={dnd}
-              siguienteId={tareas[i + 1]?.id ?? null}
-              dropAntes={dnd?.destino?.subFrenteId === sub.id && dnd.destino.antesDeId === t.id}
-              dropDespues={
-                dnd?.destino?.subFrenteId === sub.id &&
-                dnd.destino.antesDeId === null &&
-                i === tareas.length - 1
-              }
-              tarea={t}
-              state={state}
-              hoy={hoy}
-              candidatos={candidatos}
-              can={can}
-              resaltar={t.id === realceId}
-              actions={actions}
-              onAbrirTarea={onAbrirTarea}
-              onMenu={onMenu}
-              pulsoRenombrar={pulsoDe(t.id)}
-            />
+            <Fragment key={t.id}>
+              <TareaFila
+                dnd={dnd}
+                siguienteId={tareas[i + 1]?.id ?? null}
+                dropAntes={dnd?.destino?.subFrenteId === sub.id && dnd.destino.antesDeId === t.id}
+                dropDespues={
+                  dnd?.destino?.subFrenteId === sub.id &&
+                  dnd.destino.antesDeId === null &&
+                  i === tareas.length - 1
+                }
+                tarea={t}
+                state={state}
+                hoy={hoy}
+                candidatos={candidatos}
+                can={can}
+                resaltar={t.id === realceId}
+                actions={actions}
+                onAbrirTarea={onAbrirTarea}
+                onMenu={onMenu}
+                pulsoRenombrar={pulsoDe(t.id)}
+              />
+              {/* #328: "Agregar tarea debajo" abre la fila de carga JUSTO acá,
+                  no al final del sub frente. Es la misma fila de siempre; lo que
+                  cambia es dónde se dibuja y qué orden le toca a lo que guarda. */}
+              {insertarTrasId === t.id && can.crearTareas && (
+                <NuevaTareaFila
+                  candidatos={candidatos}
+                  crear={(datos) => crearTarea(sub.id, datos, t)}
+                  insercion={{ onCerrar: onCerrarInsercion }}
+                />
+              )}
+            </Fragment>
           ))}
           {/* #320: la fila de "+ Tarea" se muestra TAMBIÉN con filtro puesto.
               Estaba escondida a propósito, por un problema real —la tarea
@@ -636,7 +708,7 @@ function SubFrenteTabla({
               Lo que SÍ se sigue escondiendo con filtro puesto: "+ Sub Frente",
               el bloque de archivadas, y los sub frentes sin coincidencias. */}
           {can.crearTareas && (
-            <NuevaTareaFila subFrenteId={sub.id} candidatos={candidatos} actions={actions} />
+            <NuevaTareaFila candidatos={candidatos} crear={(datos) => crearTarea(sub.id, datos)} />
           )}
         </tbody>
       </table>
@@ -668,21 +740,35 @@ function SubFrenteTabla({
   )
 }
 
+/** Lo que la fila de carga recoge antes de crear la tarea. */
+export interface DatosNuevaTarea {
+  titulo: string
+  responsableId?: string
+  fechaObjetivo?: string
+}
+
 /**
  * N1: fila de creacion inline. Click en "+ Tarea" abre una fila vacia con el
  * cursor en el titulo; Enter guarda y deja lista la siguiente (encadena);
  * el foco fuera de la fila guarda si hay titulo; Escape cierra.
+ *
+ * #328: la MISMA fila sirve para insertar en el medio, desde "Agregar tarea
+ * debajo". Cambian dos cosas y ninguna es el formulario: arranca abierta —el
+ * gesto ya ocurrió, en el menú— y se cierra al guardar, porque una inserción es
+ * para ESA posición y encadenar debajo de ella diría otra cosa. Dónde va la
+ * tarea lo decide quien llama (`crear`), que es el que conoce la foto.
  */
 function NuevaTareaFila({
-  subFrenteId,
   candidatos,
-  actions,
+  crear,
+  insercion,
 }: {
-  subFrenteId: string
   candidatos: Usuario[]
-  actions: Actions
+  crear: (datos: DatosNuevaTarea) => void
+  /** #328: presente = fila de inserción (abierta desde el menú). */
+  insercion?: { onCerrar: () => void }
 }) {
-  const [activa, setActiva] = useState(false)
+  const [activa, setActiva] = useState(!!insercion)
   const [titulo, setTitulo] = useState('')
   const [responsableId, setResponsableId] = useState('')
   // La tarea nace SIN FECHA (1.2): el campo parte en blanco; la primera fecha
@@ -708,15 +794,25 @@ function NuevaTareaFila({
     setActiva(true)
   }
 
+  function cerrar() {
+    setTitulo('')
+    setActiva(false)
+    insercion?.onCerrar()
+  }
+
   function guardar(): boolean {
     const limpio = titulo.trim()
     if (!limpio) return false
-    actions.createTarea({
-      subFrenteId,
+    crear({
       titulo: limpio,
       responsableId: responsableId || undefined,
       fechaObjetivo: fechaObjetivo || undefined,
     })
+    // #328: insertando no se encadena — la posición es de esta inserción.
+    if (insercion) {
+      cerrar()
+      return true
+    }
     // Encadena: limpia el titulo y conserva responsable/fecha como defaults.
     setTitulo('')
     tituloRef.current?.focus()
@@ -728,10 +824,7 @@ function NuevaTareaFila({
       e.preventDefault()
       guardar()
     }
-    if (e.key === 'Escape') {
-      setTitulo('')
-      setActiva(false)
-    }
+    if (e.key === 'Escape') cerrar()
   }
 
   // Guarda (o cierra) cuando el foco sale de la fila completa.
@@ -739,7 +832,7 @@ function NuevaTareaFila({
     setTimeout(() => {
       if (filaRef.current && !filaRef.current.contains(document.activeElement)) {
         const guardo = titulo.trim() ? guardar() : false
-        if (!guardo) setActiva(false)
+        if (!guardo) cerrar()
       }
     }, 0)
   }
@@ -766,7 +859,7 @@ function NuevaTareaFila({
           ref={tituloRef}
           className="inline-input"
           autoFocus
-          placeholder="Título de la tarea… (Enter guarda y encadena)"
+          placeholder={insercion ? 'Título de la tarea… (Enter guarda)' : 'Título de la tarea… (Enter guarda y encadena)'}
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
           aria-label="Título de la nueva tarea"
@@ -800,7 +893,7 @@ function NuevaTareaFila({
       <td className="col-desv mudo">—</td>
       <td className="col-acc">
         <button className="icon-btn" title="Guardar (Enter)" onMouseDown={(e) => e.preventDefault()} onClick={guardar}>✓</button>
-        <button className="icon-btn" title="Cerrar (Esc)" onMouseDown={(e) => e.preventDefault()} onClick={() => { setTitulo(''); setActiva(false) }}>✕</button>
+        <button className="icon-btn" title="Cerrar (Esc)" onMouseDown={(e) => e.preventDefault()} onClick={cerrar}>✕</button>
       </td>
     </tr>
   )
