@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
+import { ordenarMulti, valorOrden, type ClaveOrden, type OrdenMulti } from '../lib/orden'
 import { referenciaEnFoto, useVistaCongelada } from '../lib/vistaCongelada'
 import { enMitadSuperior, useArrastreTareas, type DndTareas } from '../lib/arrastre'
 import { planMoverTarea } from '../lib/mover'
@@ -105,8 +105,8 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           .sort((a, b) => a.orden - b.orden)
         for (const t of todas) existentes.push(t.id)
         const visibles = todas.filter((t) => !filtrando || pasaFiltroCompleto(state, t, filtro, hoy))
-        const ordenadas = ordenarMulti(visibles, orden, (t, campo) =>
-          valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
+        const ordenadas = ordenarMulti(visibles, orden, (t, clave) =>
+          valorOrden(state, t, clave as Exclude<ClaveOrden, 'proyecto'>, hoy),
         )
         for (const t of ordenadas) fresco.push(t.id)
       }
@@ -486,7 +486,7 @@ function SubFrenteTabla({
     : ordenarMulti(
         todas.filter((t) => !t.archivada && (!filtrando || pasaFiltroCompleto(state, t, filtro, hoy))),
         orden,
-        (t, campo) => valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
+        (t, clave) => valorOrden(state, t, clave as Exclude<ClaveOrden, 'proyecto'>, hoy),
       )
   // #137/#253: las forzadas (excluidas por el filtro o por la foto) se insertan
   // igual —al final, sin tocar el orden de las demás— para poder verlas. El
@@ -498,7 +498,10 @@ function SubFrenteTabla({
   const archivadas = filtrando ? [] : todas.filter((t) => t.archivada)
 
   return (
-    <div className="subfrente">
+    // #329: el estado plegado sube al bloque entero, porque de él depende
+    // cuánto separa del siguiente: desplegado no alcanzaba con 8 entre la
+    // última fila de una tabla y el título del sub frente de abajo.
+    <div className={`subfrente${colapsado ? ' subfrente--colapsado' : ''}`}>
       {/* #142: chevron para colapsar el sub frente; su fila-título no cambia,
           solo se antepone el chevron y se oculta la tabla de tareas. #177: al
           plegarse conserva su borde inferior. */}

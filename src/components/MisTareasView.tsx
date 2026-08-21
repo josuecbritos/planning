@@ -139,10 +139,13 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
           if (filtro.proyectos && filtro.proyectos.length > 0 && !filtro.proyectos.includes(proyecto.id)) return false
           return pasaFiltroCompleto(state, tarea, filtro, hoy)
         })
-    return ordenarMulti(base, orden, (f, campo) =>
-      campo === 'proyecto'
+    // #319: `proyecto` compara el nombre, y `frente`/`subfrente` —que
+    // `clavesDeOrden` agrega detrás— salen del orden con el que están armados
+    // en su proyecto, no del alfabético.
+    return ordenarMulti(base, orden, (f, clave) =>
+      clave === 'proyecto'
         ? f.proyecto.nombre.toLowerCase()
-        : valorOrden(state, f.tarea, campo, hoy),
+        : valorOrden(state, f.tarea, clave, hoy),
     )
   }, [misFilas, filtro, filtrando, orden, state, hoy])
 

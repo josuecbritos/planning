@@ -39,6 +39,7 @@ import { AdminProyectosView } from './components/AdminProyectosView'
 import { NotificacionesPanel, NotificacionesView } from './components/Notificaciones'
 import { DefinirPassword, type FlujoPassword } from './components/DefinirPassword'
 import { ConfiguracionView } from './components/ConfiguracionView'
+import { IconoMisTareas, IconoResumen } from './components/Iconos'
 import type { Notificacion } from './types'
 
 export type Vista = 'tabla' | 'gantt'
@@ -1315,7 +1316,7 @@ export default function App({ repo }: { repo: Repo }) {
                 "Notificaciones" en la barra desplegada (primera, bajo el logo),
                 con el contador naranja de no leídas. */}
             <button
-              className={`sidebar-mini__campana${notifAbierto ? ' sidebar-mini__campana--activo' : ''}`}
+              className={`sidebar-mini__seccion${notifAbierto ? ' sidebar-mini__seccion--activo' : ''}`}
               title="Notificaciones"
               aria-label="Notificaciones"
               onClick={abrirNotificaciones}
@@ -1331,6 +1332,29 @@ export default function App({ repo }: { repo: Repo }) {
                 <path d="M9.7 19.5a2.4 2.4 0 0 0 4.6 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
               </svg>
               {noLeidas > 0 && <span className="sidebar-mini__badge">{noLeidas}</span>}
+            </button>
+            {/* #331: de las tres secciones fijas de la barra desplegada, a la
+                franja solo había llegado la campana (#159). Resumen y Mis
+                Tareas van acá, entre ella y los proyectos, en el MISMO orden
+                que arriba: campana · Resumen · Mis Tareas · proyectos. Se
+                comportan como lo que ya vive en la franja — el nombre en globo
+                al pasar el mouse, como la campana, y marcados como activos
+                cuando se está en su pantalla, como los cuadritos. */}
+            <button
+              className={`sidebar-mini__seccion${pantalla === 'resumen' ? ' sidebar-mini__seccion--activo' : ''}`}
+              title="Resumen"
+              aria-label="Resumen"
+              onClick={() => onSelectPantalla('resumen')}
+            >
+              <IconoResumen size={19} trazo={1.6} />
+            </button>
+            <button
+              className={`sidebar-mini__seccion${pantalla === 'mipanel' ? ' sidebar-mini__seccion--activo' : ''}`}
+              title="Mis Tareas"
+              aria-label="Mis Tareas"
+              onClick={() => onSelectPantalla('mipanel')}
+            >
+              <IconoMisTareas size={19} trazo={1.6} />
             </button>
             {proyectosVisibles.map((p) => (
               <button

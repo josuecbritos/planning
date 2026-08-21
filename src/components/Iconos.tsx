@@ -14,9 +14,13 @@
 interface Props {
   /** Tamaño en px (cuadrado). Por defecto 16, el alto de los iconos de tabla. */
   size?: number
+  /** #331: grosor del trazo. Por defecto 1.7, el del juego de acciones. Los
+   *  dos iconos de la franja lateral usan 1.6, que es el de la campana con la
+   *  que comparten esa columna. */
+  trazo?: number
 }
 
-function Svg({ size = 16, children }: Props & { children: React.ReactNode }) {
+function Svg({ size = 16, trazo = 1.7, children }: Props & { children: React.ReactNode }) {
   return (
     <svg
       width={size}
@@ -24,7 +28,7 @@ function Svg({ size = 16, children }: Props & { children: React.ReactNode }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth={trazo}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -115,5 +119,33 @@ export const IconoInfo = (p: Props) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="8.5" />
     <path d="M12 11v5M12 7.8v.6" />
+  </Svg>
+)
+
+// #331 — Los dos primeros iconos que NO son de una acción sobre una fila: son
+// las dos secciones fijas de la barra que faltaban en la franja contraída
+// (Notificaciones ya estaba, con su campana, desde #159). Siguen la misma base
+// que el resto —trazo, `currentColor`, viewBox de 24— y se dibujan con el
+// trazo de la campana, que es su vecina en la franja.
+
+/** Resumen — tres barras verticales sobre una misma línea de base, la del
+ *  medio la más alta. */
+export const IconoResumen = (p: Props) => (
+  <Svg {...p}>
+    <path d="M6 13v6" />
+    <path d="M12 6v13" />
+    <path d="M18 10v9" />
+  </Svg>
+)
+
+/** Mis Tareas — una lista de tres renglones con un visto a la izquierda del
+ *  primero. El visto va SOLO en el primero: con los tres marcados se leería
+ *  como "todo terminado" y no como "cosas por hacer". */
+export const IconoMisTareas = (p: Props) => (
+  <Svg {...p}>
+    <path d="M4 7.6l1.9 1.9L9.4 5.6" />
+    <path d="M12.5 8h7" />
+    <path d="M12.5 13h7" />
+    <path d="M12.5 18h7" />
   </Svg>
 )

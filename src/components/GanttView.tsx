@@ -18,7 +18,7 @@ import { filtraTareas, pasaFiltroCompleto, rangoDeFecha, type Filtro } from '../
 import { referenciaEnFoto, useVistaCongelada } from '../lib/vistaCongelada'
 import { enMitadSuperior, useArrastreTareas, type DndTareas } from '../lib/arrastre'
 import { planMoverTarea } from '../lib/mover'
-import { ordenarMulti, valorOrden, type CampoOrden, type OrdenMulti } from '../lib/orden'
+import { ordenarMulti, valorOrden, type ClaveOrden, type OrdenMulti } from '../lib/orden'
 import { miembrosDeProyecto, puedeEditarFecha, responsableDeTarea, type Can } from '../lib/permisos'
 import { EmptyFrentes } from './EmptyFrentes'
 import { Marca } from './Marca'
@@ -266,8 +266,8 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         const visibles = todas.filter(
           (t) => !hayFiltroTareas || (pasaProyecto(f) && pasaFiltroCompleto(state, t, filtro, hoy)),
         )
-        const ord = ordenarMulti(visibles, orden, (t, campo) =>
-          valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
+        const ord = ordenarMulti(visibles, orden, (t, clave) =>
+          valorOrden(state, t, clave as Exclude<ClaveOrden, 'proyecto'>, hoy),
         )
         for (const t of ord) fresco.push(t.id)
       }
@@ -354,7 +354,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                   (t) => !hayFiltroTareas || (pasaProyecto(f) && pasaEnGantt(t)) || forzarIds.has(t.id),
                 ),
                 orden,
-                (t, campo) => valorOrden(state, t, campo as Exclude<CampoOrden, 'proyecto'>, hoy),
+                (t, clave) => valorOrden(state, t, clave as Exclude<ClaveOrden, 'proyecto'>, hoy),
               )
           const filasSub: FilaGantt[] = []
           if (tareas.length === 0) {

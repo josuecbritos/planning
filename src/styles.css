@@ -424,6 +424,24 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
    el aire llenaba el alto sin mostrar una sola tarea, que es justo el estado
    en que uno abre la pantalla para orientarse. */
 .subfrente { margin-bottom: 8px; }
+/* #329 — Contraído, 8 funciona: es lo que agrupa. Desplegado no, porque entre
+   la última fila de una tabla y el título del sub frente de abajo 8 no alcanza
+   para separar dos piezas distintas. El desplegado separa 16, que es
+   `--aire-bloque`, el mismo valor que #306c dejó para todo lo que separa
+   bloques.
+   Los 8 de más van como RELLENO y no como margen, y no es un detalle: los
+   márgenes verticales de hermanos COLAPSAN —tomando el mayor, no la suma—, y
+   el del último sub frente además se escapa de su sección y colapsa con el
+   `margin-top` que separa un frente del siguiente. Medido: por eso la
+   separación entre frentes es 16 y no 24. Subir este margen a 16 dejaría la
+   separación entre frentes igual a la que hay entre sub frentes desplegados y
+   se perdería el contraste que comunica la pertenencia (#306). El relleno vive
+   DENTRO de la caja, así que suma con el margen sin tocar ninguno de los dos
+   límites: el sub frente desplegado separa 16 del siguiente, la línea de
+   "+ Sub Frente" sigue a 4 de la caja (#306b) y la separación entre frentes
+   sigue valiendo lo que fijó #306c. El bloque no tiene fondo ni borde, así que
+   el relleno no se ve. */
+.subfrente:not(.subfrente--colapsado) { padding-bottom: 8px; }
 /* #306b: de 28 a 20, una vez que la línea de "+ Sub Frente" dejó de caer en el
    medio y sumar su alto a la separación. #306c: pasa a ser `--aire-bloque`, el
    mismo que deja la barra de controles arriba del primer frente. Los dos casos
@@ -642,13 +660,25 @@ table.tareas .col-desv { text-align: center; }
   border: 1.5px dashed var(--gris-borde);
 }
 
+/* #332: la flecha sale del flujo. Estaba dentro del botón, invisible en reposo
+   pero OCUPANDO su lugar, y como el botón entero se centra en la celda el
+   círculo quedaba corrido a la izquierda media flecha más su separación. Fuera
+   del flujo, el botón mide lo que mide el círculo y centrarlo lo centra de
+   verdad; la flecha sigue apareciendo a su derecha al pasar el mouse, sin
+   moverlo. Es el mismo recurso que usó #306 para el "+" de la Gantt.
+   Sigue siendo hija del botón, así que un clic sobre ella sigue abriendo el
+   menú. */
 .resp-picker {
-  display: inline-flex; align-items: center; gap: 3px;
+  position: relative;
+  display: inline-flex; align-items: center;
   background: none; border: none; padding: 3px; border-radius: 8px; cursor: pointer;
 }
 .resp-picker:hover { background: var(--gris-linea); }
 .resp-picker:hover .avatar--vacio { border-color: var(--gris-texto); }
-.resp-picker__caret { font-size: 9px; color: var(--gris-texto); opacity: 0; transition: opacity .12s; }
+.resp-picker__caret {
+  position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
+  font-size: 9px; color: var(--gris-texto); opacity: 0; transition: opacity .12s;
+}
 .resp-picker:hover .resp-picker__caret, .resp-picker[aria-expanded="true"] .resp-picker__caret { opacity: 1; }
 
 .resp-menu__inner {
@@ -2453,13 +2483,17 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
 
 /* #159: campana fija en la barra contraída (mismo lugar que Notificaciones en
    la barra desplegada: primera, bajo el logo), con el contador naranja. */
-.sidebar-mini__campana {
+/* #159 la estrenó con la campana; #331 la comparten los tres botones de
+   sección de la franja —Notificaciones, Resumen y Mis Tareas—, así que la clase
+   deja de llamarse por la campana. El `position: relative` lo pide el contador
+   naranja, que solo lleva la campana. */
+.sidebar-mini__seccion {
   position: relative; width: 34px; height: 34px; border-radius: 9px;
   border: 1px solid transparent; background: none; color: #d4d4d8;
   font-size: 17px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
-.sidebar-mini__campana:hover { background: #27272a; }
-.sidebar-mini__campana--activo { background: #27272a; border-color: #3f3f46; }
+.sidebar-mini__seccion:hover { background: #27272a; }
+.sidebar-mini__seccion--activo { background: #27272a; border-color: #3f3f46; }
 .sidebar-mini__badge {
   position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px;
   padding: 0 4px; border-radius: 999px; background: var(--naranja); color: #fff;
