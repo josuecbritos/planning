@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ordenarMulti, valorOrden, type ClaveOrden, type OrdenMulti } from '../lib/orden'
+import { MenuTarea, opcionesDeTarea, useMenuTarea } from './MenuTarea'
 import { referenciaEnFoto, useVistaCongelada } from '../lib/vistaCongelada'
 import { enMitadSuperior, useArrastreTareas, type DndTareas } from '../lib/arrastre'
 import { planMoverTarea } from '../lib/mover'
@@ -189,6 +190,12 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   }, [resaltarTareaId, resaltarNonce])
   const realceId = realceOn ? resaltarTareaId : null
 
+  // #292: el menú contextual de la tarea. Vive acá y no en App porque es esta
+  // vista la que sabe sobre qué fila se hizo clic derecho; la Gantt tiene el
+  // suyo, y las dos arman sus opciones con la MISMA función.
+  const { menu, abrir, cerrar, pedirRenombrar, pulsoDe } = useMenuTarea()
+  const tareaDelMenu = menu ? state.tareas.find((t) => t.id === menu.tareaId) : undefined
+
   return (
     // #293: el dragover que llega hasta acá no pasó por ningún destino
     // válido — se apaga el indicador (soltar ahí no hace nada).
@@ -226,11 +233,24 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           onToggleSub={toggleSub}
           actions={actions}
           onAbrirTarea={onAbrirTarea}
+          onMenu={abrir}
+          pulsoDe={pulsoDe}
         />
       ))}
       {frentes.length === 0 && (
         <EmptyFrentes proyectoId={proyectoId} puedeCrear={can.crearFrentes} actions={actions} />
       )}
+      <MenuTarea
+        menu={menu}
+        onCerrar={cerrar}
+        opciones={
+          tareaDelMenu
+            ? opcionesDeTarea(tareaDelMenu, can, actions, onAbrirTarea, () =>
+                pedirRenombrar(tareaDelMenu.id),
+              )
+            : []
+        }
+      />
     </div>
   )
 }
@@ -257,6 +277,8 @@ function FrentePagina({
   onToggleSub,
   actions,
   onAbrirTarea,
+  onMenu,
+  pulsoDe,
 }: {
   dnd?: DndTareas
   frente: Frente
@@ -277,6 +299,9 @@ function FrentePagina({
   onToggleColapso: () => void
   subsCol: Set<string>
   onToggleSub: (id: string) => void
+  /** #292: clic derecho sobre una fila de tarea, y el pulso de "Renombrar". */
+  onMenu: (e: React.MouseEvent, tareaId: string) => void
+  pulsoDe: (tareaId: string) => number
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -349,6 +374,8 @@ function FrentePagina({
               onToggleColapso={() => onToggleSub(sf.id)}
               actions={actions}
               onAbrirTarea={onAbrirTarea}
+              onMenu={onMenu}
+              pulsoDe={pulsoDe}
             />
           ))}
           {subs.length === 0 && <p className="vacio-inline">Sin sub frentes en este frente.</p>}
@@ -451,6 +478,8 @@ function SubFrenteTabla({
   realceId,
   colapsado,
   onToggleColapso,
+  onMenu,
+  pulsoDe,
   actions,
   onAbrirTarea,
 }: {
@@ -470,6 +499,9 @@ function SubFrenteTabla({
   realceId?: string | null
   colapsado: boolean
   onToggleColapso: () => void
+  /** #292: clic derecho sobre una fila de tarea, y el pulso de "Renombrar". */
+  onMenu: (e: React.MouseEvent, tareaId: string) => void
+  pulsoDe: (tareaId: string) => number
   actions: Actions
   onAbrirTarea: (id: string) => void
 }) {
@@ -589,6 +621,8 @@ function SubFrenteTabla({
               resaltar={t.id === realceId}
               actions={actions}
               onAbrirTarea={onAbrirTarea}
+              onMenu={onMenu}
+              pulsoRenombrar={pulsoDe(t.id)}
             />
           ))}
           {/* #320: la fila de "+ Tarea" se muestra TAMBIÉN con filtro puesto.
@@ -785,6 +819,8 @@ function TareaFila({
   resaltar,
   actions,
   onAbrirTarea,
+  onMenu,
+  pulsoRenombrar,
 }: {
   /** #293: arrastre activo en la vista (undefined = sin asa ni destinos). */
   dnd?: DndTareas
@@ -801,6 +837,10 @@ function TareaFila({
   resaltar?: boolean
   actions: Actions
   onAbrirTarea: (id: string) => void
+  /** #292: clic derecho sobre la fila. */
+  onMenu: (e: React.MouseEvent, tareaId: string) => void
+  /** #292: pulso de "Renombrar" (0 = no le toca a esta fila). */
+  pulsoRenombrar: number
 }) {
   const cat = categoriaDe(state, tarea, hoy)
   const color = colorTarea(state, tarea, hoy)
@@ -839,6 +879,9 @@ function TareaFila({
           : undefined
       }
       onDrop={dnd ? dnd.soltar : undefined}
+      // #292: el clic derecho abre el menú de la tarea en CUALQUIERA de sus
+      // celdas. En la tabla ese gesto estaba libre: ninguna celda lo usaba.
+      onContextMenu={(e) => onMenu(e, tarea.id)}
     >
       <td className="col-check">
         <CheckHecha
@@ -874,6 +917,7 @@ function TareaFila({
               onGuardar={(titulo) => actions.updateTarea(tarea.id, { titulo })}
               ariaLabel={`Editar título: ${tarea.titulo}`}
               wrapDisplay={(nodo) => <HoverCard card={tooltip}>{nodo}</HoverCard>}
+              abrirEdicion={pulsoRenombrar}
             />
           ) : (
             <HoverCard card={tooltip}>

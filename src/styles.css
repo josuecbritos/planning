@@ -1918,6 +1918,33 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 /* #213: el globo con el nombre completo. Va en un portal con position fixed,
    así que ningún `overflow` de la tabla puede recortarlo — que es justo lo que
    arruinó el menú de Vistas cuando se abría hacia arriba en la primera fila. */
+/* #292 — El menú contextual de una tarea (clic derecho).
+   Va en un portal con `position: fixed`, como la tarjeta flotante y los globos
+   de #327: nace dentro de una tabla con scroll y desde ahí cualquier `overflow`
+   lo recortaría. Por encima de los globos, porque puede caer sobre uno.
+   Toma prestado el aspecto del ⋯ de la barra lateral (`.nav-proyecto__menu`)
+   pero con los colores de la superficie clara: es el mismo tipo de objeto —una
+   lista corta de acciones sobre lo que acabas de apuntar— y no tenía por qué
+   inventarse otro. */
+.menu-tarea {
+  position: fixed; z-index: 2600; min-width: 168px;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--superficie); border: 1px solid var(--gris-borde);
+  border-radius: 8px; box-shadow: 0 12px 32px rgba(10, 10, 12, .28);
+}
+.menu-tarea__op {
+  border: none; background: none; color: var(--texto); text-align: left;
+  font: inherit; font-size: 13px; padding: 8px 12px; cursor: pointer;
+}
+.menu-tarea__op:hover { background: var(--superficie-3); }
+/* En el teléfono no existe: es un atajo de escritorio y la columna de acciones
+   sigue siendo el camino. La regla es un cinturón de seguridad — el menú ya no
+   se abre desde JS bajo 768px—, para que una pulsación larga no lo deje ver ni
+   por un instante. */
+@media (max-width: 768px) {
+  .menu-tarea { display: none; }
+}
+
 /* #327 — El globo de la Gantt, ya fuera del recuadro con scroll.
    Es la misma burbuja charcoal de siempre; lo único que cambió es dónde vive.
    `position: fixed` y un `z-index` por encima de la grilla y de su encabezado
