@@ -2793,3 +2793,142 @@ las tres vistas. Y contra la **primera versión del menú** —la que se corrigi
 sombra, sin animación), las opciones tampoco (otro relleno, sin esquina
 redondeada, sin separación para el ícono), no hay ningún ícono, no hay línea
 separadora, y Eliminar se ve del color del texto normal en los dos temas.
+
+### #328 · #333 · #334 — El espacio de la fila de la Gantt, crear en su sitio con filtro puesto, y renombrar en Mis Tareas
+
+#### #328 — El ⓘ sale de la fila de la Gantt, y "Agregar tarea debajo" entra al menú
+
+La columna de tarea de la Gantt mide 240; el nombre disponía de **164**, y el
+resto estaba reservado de forma permanente: 22 de aire para el asa de arrastre,
+20 de márgenes y **44 para los dos botones y su separación** — botones que solo
+aparecen al pasar el mouse.
+
+**Y lo que eso costaba no eran letras: eran filas.** El nombre no se corta,
+envuelve, así que cada nombre que no cabe sube el alto de su fila. En la Gantt la
+altura es lo escaso: la grilla ocupa lo que sobra de pantalla y ahí se cuenta
+cuántas tareas se ven de una vez.
+
+**El ⓘ hacía lo mismo que el clic sobre el nombre** —abrir el panel—, y esa
+función ya está en el menú del clic derecho, que llega a todos por igual: se va
+de la fila. El **"+" se queda**, igual que hoy. *Medido sobre el mismo plan a
+1440px: el nombre pasa de **164 a 184**, la grilla de **1048 a 1005px** con las
+mismas 27 filas, y los nombres de más de una línea de **21 a 15**.* Quien no
+puede crear tareas dispone de los **208 completos**: el envoltorio de acciones no
+se dibuja si no hay nada dentro, así que tampoco paga su separación.
+
+**El menú gana su quinta opción: "Agregar tarea debajo".** En la Gantt hace
+exactamente lo mismo que el "+" de la fila —son dos caminos al mismo gesto—; en
+la **tabla es una capacidad que no existía**, porque ahí solo se podía agregar al
+final del sub frente con la línea "+ Tarea". Llega **sin agregar ningún botón a
+la pantalla**. La fila de carga que se abre es la misma de siempre; lo que cambia
+es que arranca abierta y **se cierra al guardar**: una inserción es para *esa*
+posición, y encadenar debajo de ella diría otra cosa. La línea "+ Tarea" del
+final sigue igual, y sí encadena.
+
+*En Mis Tareas no aparece, en ninguna de sus dos vistas: ahí no se crean tareas.
+Y la columna de acciones de la tabla no se toca — el ⓘ se queda.*
+
+Insertar en el medio obliga a correr el orden de los hermanos posteriores, que es
+editar tareas ajenas: por eso lo hace solo quien tiene control total, y el resto
+crea al final. Esa regla vive ahora en **un solo lugar** (`lib/crear.ts`),
+compartida por la tabla y la Gantt en vez de escrita dos veces.
+
+#### #333 — Con un filtro puesto, lo que se crea aparecía fuera de su sitio
+
+En la Gantt, el "+" de una fila crea un hermano justo debajo. **Con la vista
+congelada eso dejaba de verse:** el elemento nuevo aparecía, pero no donde se lo
+había creado.
+
+**La causa:** con filtro y/u orden activo la vista queda congelada —una lista
+fija de elementos en un orden fijo—, y **esa foto solo tiene posición para los
+elementos que ya estaban cuando se tomó**. Al crear uno nuevo nadie lo ubicaba
+dentro de ella, así que caía donde el render lo dejara: al final del bloque. El
+arrastre sí lo resolvía —#293 dejó una forma de reubicar un elemento dentro de la
+foto y la usa al soltar—; **al crear no se llamaba a nada equivalente**.
+
+Ahora la tarea nueva **entra en la foto justo después de aquella sobre la que se
+creó**, por ese mismo camino, y como el arrastre enciende "Actualizar vista". *El
+orden guardado siempre fue el correcto: al recalcular la vista la tarea aparecía
+en su lugar. Lo que faltaba era decírselo a la foto.*
+
+**La foto se mueve solo si de verdad se insertó.** Quien no tiene control total
+crea al final aunque haya pedido "debajo de esta"; mirando la intención en vez
+del resultado, la foto la mostraba en el medio y el orden guardado la tenía al
+final — el mismo desencuentro que este pedido viene a cerrar. Lo encontró la
+prueba, en la corrida con permisos recortados.
+
+**Los contenedores era otra cosa, y hubo que decirlo.** El pedido daba por hecho
+que el frente y el sub frente nuevos aparecían fuera de sitio, como la tarea.
+Medido: **no aparecían en ninguna parte**. Nacen vacíos, y con filtro puesto la
+vista omite los contenedores sin coincidencias, así que el elemento nuevo no se
+veía ni en su sitio ni fuera de él hasta quitar el filtro. Su *posición* nunca
+estuvo mal —frentes y sub frentes se dibujan por su `orden` y no por la foto, que
+es solo de tareas—: lo que faltaba era que se vieran. Se muestran por la misma
+razón que la tarea recién creada, con "Actualizar vista" encendido.
+
+*Alcance: la Gantt y la tabla. En la tabla el defecto no se podía provocar antes
+—solo se creaba al final—, pero #328 le suma "Agregar tarea debajo" y con eso
+empieza a insertar en el medio: entra cubierta desde el primer día.*
+
+#### #334 — Renombrar desde el menú en la tabla de Mis Tareas
+
+Dentro de Mis Tareas las dos vistas no se comportaban igual: en la Gantt el clic
+sobre el nombre lo edita y el menú ofrece Renombrar; en la tabla el nombre es un
+enlace que abre el panel de detalle, **nunca fue editable**, y por eso #292 dejó
+Renombrar fuera de ese menú — ofrecerlo habría prometido algo que no ocurre.
+
+Ahora **Renombrar aparece también ahí**, con la misma condición que en las demás
+vistas: si la persona puede editar esa tarea. Al elegirlo el nombre queda en modo
+edición **en su propia celda**; Enter guarda y Escape cancela, igual que en la
+tabla de un proyecto. **El clic sobre el nombre no cambia: sigue abriendo el
+panel.**
+
+*Por qué así y no haciendo que el clic edite, como en la tabla de un proyecto: en
+Mis Tareas el clic al panel es la puerta más directa al detalle en la única
+pantalla donde no estás dentro de un proyecto, y cruzando proyectos es lo que más
+se usa. Renombrar se gana sin perderla.* La edición es **la misma pieza**
+(`InlineText`), no una copia: lo único que se agregó es poder dibujar otra cosa
+en su estado de reposo. La Gantt de Mis Tareas no se toca.
+
+#### Verificación
+
+`docs/prueba-328-333-334.mjs` — **57 comprobaciones en verde**.
+
+De #328: que la fila de la Gantt ya no tenga el ⓘ y sí el "+", los anchos medidos
+de la celda (240 · 208 útiles · 24 reservados · 184 para el nombre), el alto
+total de la grilla y cuántos nombres siguen ocupando más de una línea, que el
+menú abra con las cinco opciones y una sola línea separadora, que Información
+siga llevando al panel, que el clic sobre el nombre siga editando —o abriendo el
+panel, sin permiso—, que el "+" y la opción del menú dejen la tarea en el mismo
+lugar, que en la tabla la fila de carga se abra **justo debajo** y no encadene,
+que "+ Tarea" siga dejando al final y sí encadene, que la columna de acciones
+conserve sus tres botones, que Mis Tareas no ofrezca la opción en ninguna de sus
+dos vistas, y que el asa de arrastre siga en su sitio.
+
+De #333: los cuatro pasos del caso principal —crear entre la segunda y la
+tercera con filtro puesto, "Actualizar vista" encendido, la posición intacta al
+tocarlo y al quitar el filtro—, crear sobre la última visible, el sub frente y el
+frente nuevos, crear dentro de un sub frente sin filas visibles, que sin filtro
+ni orden todo siga igual, que el arrastre con la vista congelada no cambie, la
+tabla con "Agregar tarea debajo" y filtro puesto, y el caso sin control total —
+con el permiso de crear tareas dado desde el modal de miembros dentro de la misma
+prueba—, donde la tarea queda al final con filtro y sin él.
+
+De #334: que la opción aparezca, que abra la edición en la celda, que Enter
+guarde y Escape cancele, que el nombre cambiado se vea igual en el proyecto de
+esa tarea en sus dos vistas, que el clic sobre el nombre siga abriendo el panel y
+no la edición, que sin permiso de editar la opción no aparezca, y que la línea
+separadora siga quedando solo entre Renombrar y Archivar.
+
+*Control negativo:* corrida contra `main`, **24 comprobaciones fallan** — entre
+ellas la que muestra el defecto de #333 tal cual: creada entre la segunda y la
+tercera con filtro puesto, la tarea sale **al final del bloque**.
+
+**Dos pruebas anteriores cambian de contrato, y se actualizan en vez de
+tolerarse.** La de #292 esperaba cuatro opciones y la línea entre Renombrar y
+Archivar: ahora son cinco y la línea sigue **en el mismo sitio** —justo antes de
+lo destructivo—, que es exactamente lo que se declaró al escribirla; y su caso de
+la tabla de Mis Tareas pasa de "sin Renombrar" a "sin Agregar tarea debajo". La
+de #327 comprobaba dónde vive el globo usando el ⓘ de la fila de la Gantt, que ya
+no está: pasa a usar el "+", que tiene el mismo globo y sirve igual para lo que
+se mide ahí —dónde se dibuja, no cuál de los dos lo dispara—.

@@ -122,6 +122,17 @@ export const IconoInfo = (p: Props) => (
   </Svg>
 )
 
+/** #328 — Agregar tarea debajo. Dos renglones y el signo bajo ellos: lo que se
+ *  agrega va DEBAJO de lo que ya hay, que es justo lo que distingue a esta
+ *  opción de la línea "+ Tarea" del final del sub frente. */
+export const IconoAgregarDebajo = (p: Props) => (
+  <Svg {...p}>
+    <path d="M4 6.5h16" />
+    <path d="M4 11.5h16" />
+    <path d="M12 16v5.5M9.25 18.75h5.5" />
+  </Svg>
+)
+
 // #331 — Los dos primeros iconos que NO son de una acción sobre una fila: son
 // las dos secciones fijas de la barra que faltaban en la franja contraída
 // (Notificaciones ya estaba, con su campana, desde #159). Siguen la misma base

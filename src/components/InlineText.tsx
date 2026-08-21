@@ -17,9 +17,18 @@ interface Props {
    *  misma tarea vuelva a abrirlo. El gesto de siempre —clic sobre el texto— no
    *  cambia: esto es la MISMA edición, pedida desde otro lado. */
   abrirEdicion?: number
+  /**
+   * #334: qué dibujar cuando NO se está editando, en vez del texto que se abre
+   * al clic. Lo usa la tabla de Mis Tareas, donde el nombre es un enlace que
+   * abre el panel de detalle: es la puerta más directa al detalle en la única
+   * pantalla que no está dentro de un proyecto, y cruzando proyectos es lo que
+   * más se usa. Renombrar se gana sin perderla — la única entrada a la edición
+   * es el pulso—, y la edición en sí sigue siendo ESTA, no una copia.
+   */
+  display?: ReactNode
 }
 
-export function InlineText({ valor, onGuardar, wrapDisplay, className, inputClassName, ariaLabel, abrirEdicion = 0 }: Props) {
+export function InlineText({ valor, onGuardar, wrapDisplay, className, inputClassName, ariaLabel, abrirEdicion = 0, display: displayPropio }: Props) {
   const [editando, setEditando] = useState(false)
   const [borrador, setBorrador] = useState(valor)
 
@@ -67,6 +76,8 @@ export function InlineText({ valor, onGuardar, wrapDisplay, className, inputClas
       />
     )
   }
+
+  if (displayPropio !== undefined) return <>{displayPropio}</>
 
   const display = (
     <span

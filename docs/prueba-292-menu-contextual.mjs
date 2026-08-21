@@ -23,7 +23,13 @@ import { chromium } from 'playwright-core'
 const EXE = process.env.CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 const URL_APP = process.env.URL ?? 'http://localhost:4173/'
 
-const TODAS = ['Información', 'Renombrar', 'Archivar', 'Eliminar']
+// #328 sumó "Agregar tarea debajo" como quinta opción, y #334 llevó Renombrar
+// también a la tabla de Mis Tareas: el contrato de esta prueba se actualiza con
+// ellos. La línea separadora no se movió de sitio —sigue separando lo
+// destructivo del resto—, que es justo lo que se declaró al escribirla.
+const TODAS = ['Información', 'Renombrar', 'Agregar tarea debajo', 'Archivar', 'Eliminar']
+/** Las de Mis Tareas: ahí no se crean tareas (#328), pero sí se renombra (#334). */
+const MIS_TAREAS = ['Información', 'Renombrar', 'Archivar', 'Eliminar']
 
 const chk = (ok, m, extra = '') => {
   console.log(`${ok ? 'OK   ' : 'FALLA'} ${m}${extra ? ' — ' + extra : ''}`)
@@ -259,8 +265,9 @@ const bloques = () =>
 const conTodo = await bloques()
 chk(
   conTodo?.lineas === 1 &&
-    JSON.stringify(conTodo.hijos) === JSON.stringify(['Información', 'Renombrar', '—', 'Archivar', 'Eliminar']),
-  '5 hay UNA línea separadora, entre Renombrar y Archivar',
+    JSON.stringify(conTodo.hijos) ===
+      JSON.stringify(['Información', 'Renombrar', 'Agregar tarea debajo', '—', 'Archivar', 'Eliminar']),
+  '5 hay UNA línea separadora, justo antes de lo destructivo',
   conTodo?.hijos?.join(' ') ?? 'sin menú',
 )
 
@@ -541,31 +548,31 @@ await esperar(1000)
 await p.locator('table.tareas tbody tr').first().locator('td.tarea-cell').click({ button: 'right' })
 await esperar(400)
 chk(
-  JSON.stringify(await opciones()) === JSON.stringify(['Información', 'Archivar', 'Eliminar']),
-  '14 en la tabla de Mis Tareas trae las acciones, sin Renombrar',
+  JSON.stringify(await opciones()) === JSON.stringify(MIS_TAREAS),
+  '14 en la tabla de Mis Tareas trae las acciones, sin "Agregar tarea debajo"',
   (await opciones()).join(' · '),
 )
-// Y el motivo: en esta tabla el nombre NO es editable —abre el panel—, así que
-// ofrecer Renombrar prometería algo que no pasaría.
+// El clic sobre el nombre no cambió: sigue abriendo el panel, no la edición
+// (#334 gana Renombrar sin perder esa puerta).
 chk(
-  (await p.locator('table.tareas tbody .tarea-cell .inline-text').count()) === 0 &&
-    (await p.locator('table.tareas tbody .tarea-cell__link').count()) > 0,
-  '14 terreno: en la tabla de Mis Tareas el nombre abre el panel, no la edición',
+  (await p.locator('table.tareas tbody .tarea-cell__link').count()) > 0,
+  '14 terreno: en la tabla de Mis Tareas el nombre sigue abriendo el panel',
 )
-// 8 · sin Renombrar, la línea no queda suelta: sigue separando lo destructivo.
-const sinRenombrar = await bloques()
+// 8 · sin "Agregar tarea debajo", la línea no queda suelta: sigue separando lo
+// destructivo, y no se movió de sitio al crecer el menú.
+const sinAgregar = await bloques()
 chk(
-  sinRenombrar?.lineas === 1 &&
-    JSON.stringify(sinRenombrar.hijos) === JSON.stringify(['Información', '—', 'Archivar', 'Eliminar']),
-  '8 sin Renombrar la línea sigue en su sitio, sin quedar suelta',
-  sinRenombrar?.hijos?.join(' ') ?? 'sin menú',
+  sinAgregar?.lineas === 1 &&
+    JSON.stringify(sinAgregar.hijos) === JSON.stringify(['Información', 'Renombrar', '—', 'Archivar', 'Eliminar']),
+  '8 con una opción menos la línea sigue en su sitio, sin quedar suelta',
+  sinAgregar?.hijos?.join(' ') ?? 'sin menú',
 )
 await cerrarMenu()
 await verVista('Gantt')
 await p.locator('.gantt tbody td.fija--tarea').first().click({ button: 'right' })
 await esperar(400)
 chk(
-  JSON.stringify(await opciones()) === JSON.stringify(TODAS),
+  JSON.stringify(await opciones()) === JSON.stringify(MIS_TAREAS),
   '14 y en su Gantt también',
   (await opciones()).join(' · '),
 )
