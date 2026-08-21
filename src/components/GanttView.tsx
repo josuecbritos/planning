@@ -25,6 +25,7 @@ import { Marca } from './Marca'
 import { Avatar, RespPicker } from './RespPicker'
 import { HoverCard } from './HoverCard'
 import { GloboTip } from './GloboTip'
+import { MenuTarea, opcionesDeTarea, useMenuTarea } from './MenuTarea'
 import { TaskDetail } from './TaskDetail'
 import { InlineText } from './InlineText'
 
@@ -196,6 +197,26 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   const [aviso, setAviso] = useState<Aviso | null>(null)
   const avisoTimer = useRef<number | undefined>(undefined)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // #292: el menú contextual de la tarea. Igual que en la tabla, vive en la
+  // vista que sabe sobre qué fila se hizo clic derecho.
+  const {
+    menu,
+    abrir: abrirMenu,
+    cerrar: cerrarMenu,
+    pedirRenombrar,
+    pulsoDe,
+  } = useMenuTarea()
+  const tareaDelMenu = menu ? state.tareas.find((t) => t.id === menu.tareaId) : undefined
+  // #190/#243: en Mis Tareas los permisos son los del proyecto de ESA tarea
+  // (dueño vs invitado), no los de un proyecto activo — el mismo camino que
+  // usan las filas.
+  const canDeTarea = (t: Tarea): Can => {
+    if (!misTareas) return can
+    const sub = state.subFrentes.find((sf) => sf.id === t.subFrenteId)
+    const frente = sub ? state.frentes.find((f) => f.id === sub.frenteId) : undefined
+    return frente ? misTareas.canDe(frente.proyectoId) : can
+  }
 
   function mostrarAviso(e: React.MouseEvent, texto: string) {
     setAviso({ x: Math.min(e.clientX, window.innerWidth - 280), y: e.clientY + 14, texto })
@@ -850,6 +871,8 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                   permiteCrear={permiteCrear}
                   actions={actions}
                   onAbrirTarea={onAbrirTarea}
+                  onMenu={abrirMenu}
+                  pulsoRenombrar={pulsoDe}
                   abrirCrear={abrirCrear}
                   crearEn={crearEn}
                   onCrear={crearElemento}
@@ -909,6 +932,25 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           aparte por encima de la página. Colgando de su celda quedaban dentro
           del recuadro con scroll, y ese recuadro los recortaba. */}
       <GloboTip raiz={scrollRef} />
+
+      {/* #292: el mismo menú de la tabla, con las mismas opciones y las mismas
+          condiciones — acá es donde antes no había ninguna acción sobre la
+          tarea, así que desde la Gantt no se podía archivar ni eliminar. */}
+      <MenuTarea
+        menu={menu}
+        onCerrar={cerrarMenu}
+        opciones={
+          tareaDelMenu
+            ? opcionesDeTarea(
+                tareaDelMenu,
+                canDeTarea(tareaDelMenu),
+                actions,
+                onAbrirTarea,
+                () => pedirRenombrar(tareaDelMenu.id),
+              )
+            : []
+        }
+      />
 
       {aviso &&
         createPortal(
@@ -1014,6 +1056,8 @@ function FilaGanttRow({
   permiteCrear,
   actions,
   onAbrirTarea,
+  onMenu,
+  pulsoRenombrar,
   abrirCrear,
   crearEn,
   onCrear,
@@ -1041,6 +1085,11 @@ function FilaGanttRow({
   permiteCrear: boolean
   actions: Actions
   onAbrirTarea: (id: string) => void
+  /** #292: clic derecho sobre la celda del NOMBRE de la tarea, y el pulso de
+   *  "Renombrar". Solo esa celda: sobre la grilla el clic derecho ya significa
+   *  marcar la tarea como lista, y ese idioma no se toca. */
+  onMenu: (e: React.MouseEvent, tareaId: string) => void
+  pulsoRenombrar: (tareaId: string) => number
   abrirCrear: (e: React.MouseEvent, crear: CrearEn) => void
   crearEn: CrearEn | null
   onCrear: (nombre: string) => void
@@ -1353,7 +1402,12 @@ function FilaGanttRow({
       {fila.esInicioFrente && celdaFrente(fila.frente, fila.spanFrente)}
       {fila.esInicioSub && celdaSub(fila.frente, fila.sub, fila.spanSub)}
 
-      <td className={`fija fija--tarea tarea-cell--${color}`}>
+      <td
+        className={`fija fija--tarea tarea-cell--${color}`}
+        // #292: acá SÍ, y solo acá dentro de la grilla. Sobre las marcas y las
+        // celdas de días el clic derecho ya tiene dueño.
+        onContextMenu={(e) => onMenu(e, tarea.id)}
+      >
         {/* #293: el asa vive DENTRO de la celda del nombre, pegada a su borde
             izquierdo — mismo lugar y mismo aspecto que en la tabla. */}
         {dnd && (
@@ -1380,6 +1434,7 @@ function FilaGanttRow({
               onGuardar={(titulo) => actions.updateTarea(tarea.id, { titulo })}
               ariaLabel={`Editar título: ${tarea.titulo}`}
               wrapDisplay={(nodo) => <HoverCard card={tooltip}>{nodo}</HoverCard>}
+              abrirEdicion={pulsoRenombrar(tarea.id)}
             />
           ) : (
             <HoverCard card={tooltip}>

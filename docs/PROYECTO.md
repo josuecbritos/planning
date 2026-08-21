@@ -262,6 +262,45 @@ completo con creación y edición **inline** (sin formularios).
   tiene algún permiso sobre las tareas: quien solo mira no ve la columna ni su
   título. En mobile la columna mide 26px y lleva solo el ⓘ, así que ahí sigue
   sin encabezado.
+
+  **El clic derecho sobre una tarea abre sus acciones (#292).** Existían solo en
+  esa columna —Información, Archivar y Eliminar—, y **en la Gantt no había
+  ninguna**: desde ahí no se podía archivar ni eliminar. El menú las lleva a las
+  dos vistas sin crear **ninguna acción nueva ni ningún permiso nuevo**: son las
+  mismas, disponibles donde faltaban, y la columna se queda como está. Cuatro
+  opciones con sus condiciones de siempre: **Información** —que no depende de
+  ningún permiso, así que el menú siempre tiene al menos una y quien solo mira
+  también lo ve—, **Renombrar** si puede editar la tarea, y **Archivar** y
+  **Eliminar** si puede archivarlas o eliminarlas, con las mismas
+  confirmaciones. Renombrar no es una acción nueva: es el clic sobre el nombre,
+  pedido desde otro lado.
+  Se abre **sobre cualquier celda de la fila** en la tabla y **solo sobre la
+  celda del nombre** en la Gantt: ahí el clic derecho sobre la grilla ya
+  significa marcar la tarea como lista, y ese idioma no se toca. Sobre el
+  frente, el sub frente y las filas de carga no se abre. **En el teléfono no
+  existe** —es un atajo de escritorio, y no se agrega por pulsación larga—: ahí
+  la columna de acciones sigue siendo el camino.
+  *En la tabla de Mis Tareas el menú va sin **Renombrar**: en esa tabla el
+  nombre abre el panel de detalle y nunca fue editable, así que ofrecerlo
+  prometería algo que no pasaría. Su Gantt sí lo tiene, porque ahí el nombre
+  siempre se pudo editar.*
+
+  **Se ve como el menú de Filtrar, porque comparte sus reglas.** Fondo, borde,
+  esquina, sombra, relleno, tamaño y aire de cada opción, realce al pasar el
+  mouse y la animación corta de entrada **no son una copia de sus valores**: son
+  las mismas declaraciones, así que los dos menús no pueden separarse cuando
+  alguno cambie. Lo único propio es dónde se ancla. Cada opción lleva **su ícono
+  a la izquierda** —los cuatro ya existían en el juego del producto; el de
+  información no se usaba en ninguna parte— y toma el color del texto de su
+  opción. Una **línea separa lo destructivo del resto**: arriba lo que abre o
+  edita la tarea, abajo lo que la saca del plan. La línea se declara por el
+  **cambio de bloque** y no como "antes de Archivar", así que no se mueve de
+  sitio cuando el menú crezca, y no aparece cuando no hay nada de un lado — con
+  Información sola, o sin Renombrar. **Eliminar va en el rojo de la paleta**,
+  texto e ícono, por ser la única irreversible; **Archivar no**, porque se puede
+  restaurar.
+  *Anotado y sin corregir acá: la columna de acciones de la tabla no usa esos
+  íconos, dibuja los símbolos de texto ⓘ, ⤵ y 🗑. Es un cambio aparte.*
 - **Gantt** (grilla tipo Excel): planificación por clics, horizonte configurable,
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
 

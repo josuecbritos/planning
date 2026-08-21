@@ -14,6 +14,7 @@ import {
 } from '../lib/derive'
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { CAMPOS_MIS_TAREAS, GRAVEDAD, ordenarMulti, valorOrden, type OrdenMulti } from '../lib/orden'
+import { MenuTarea, opcionesDeTarea, useMenuTarea } from './MenuTarea'
 import { useVistaCongelada } from '../lib/vistaCongelada'
 import { escribirVistaActiva, estadoInicial, leerGuardados } from '../lib/vistas'
 import { FiltrosBar } from './FiltrosBar'
@@ -197,6 +198,16 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
     return () => ro.disconnect()
   }, [])
 
+  // #292: el menú contextual de la tarea, también acá. Sin "Renombrar": en
+  // ESTA tabla el nombre abre el panel de detalle, no la edición —el gesto de
+  // renombrar no existe—, así que ofrecerlo prometería algo que no pasaría. Su
+  // Gantt sí lo tiene, porque ahí el nombre siempre fue editable.
+  const { menu, abrir: abrirMenu, cerrar: cerrarMenu } = useMenuTarea()
+  const tareaDelMenu = menu ? state.tareas.find((t) => t.id === menu.tareaId) : undefined
+  const proyectoDelMenu = tareaDelMenu
+    ? misFilas.find((f) => f.tarea.id === tareaDelMenu.id)?.proyecto
+    : undefined
+
   return (
     <>
       {/* #324: el MISMO encabezado que la pantalla de proyecto — título con la
@@ -306,6 +317,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
               can={canPorProyecto.get(fila.proyecto.id) ?? makeCan(state, usuario, null)}
               actions={actions}
               onAbrirTarea={onAbrirTarea}
+              onMenu={abrirMenu}
             />
           ))}
           {mostradas.length === 0 && (
@@ -319,6 +331,21 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
       </table>
       </div>
       )}
+      <MenuTarea
+        menu={menu}
+        onCerrar={cerrarMenu}
+        opciones={
+          tareaDelMenu
+            ? opcionesDeTarea(
+                tareaDelMenu,
+                canDe(proyectoDelMenu?.id ?? ''),
+                actions,
+                onAbrirTarea,
+                null,
+              )
+            : []
+        }
+      />
       </div>
     </>
   )
@@ -331,6 +358,7 @@ function FilaTarea({
   can,
   actions,
   onAbrirTarea,
+  onMenu,
 }: {
   fila: FilaMisTareas
   state: AppState
@@ -338,6 +366,8 @@ function FilaTarea({
   can: Can
   actions: Actions
   onAbrirTarea: (id: string) => void
+  /** #292: clic derecho sobre la fila. */
+  onMenu: (e: React.MouseEvent, tareaId: string) => void
 }) {
   const { tarea, proyecto, ruta } = fila
   const color = colorTarea(state, tarea, hoy)
@@ -346,7 +376,10 @@ function FilaTarea({
   const nComentarios = state.comentarios.filter((c) => c.tareaId === tarea.id).length
 
   return (
-    <tr className={color !== 'ninguno' ? `fila--${color}` : undefined}>
+    <tr
+      className={color !== 'ninguno' ? `fila--${color}` : undefined}
+      onContextMenu={(e) => onMenu(e, tarea.id)}
+    >
       <td className="col-check">
         <CheckHecha
           hecha={tarea.hecha}

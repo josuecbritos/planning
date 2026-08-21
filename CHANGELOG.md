@@ -2673,3 +2673,123 @@ desempate por ↻ no se invierte, los sub frentes salen intercalados *(Operacion
 · Comerciales · Financieros · Configuración · Arquitectura)*, la separación entre
 sub frentes desplegados mide 8, la franja no tiene los dos botones, y el círculo
 del responsable está a **4** del centro.
+
+### #292 — Menú contextual con clic derecho sobre la tarea
+
+**Las acciones sobre una tarea existían solo en la tabla**, en su columna de
+acciones: Información, Archivar y Eliminar. **En la Gantt no había ninguna de las
+tres** — ahí la fila tiene el ⓘ y el "+", y nada más—, así que **desde la Gantt
+no se podía archivar ni eliminar una tarea**. Y renombrar no es un botón en
+ninguna parte: es un gesto, el clic sobre el nombre.
+
+**Ahora el clic derecho sobre una tarea abre un menú con sus acciones**, y la
+columna de acciones se queda como está. **No se crea ninguna acción nueva ni
+ningún permiso nuevo:** son las que ya existen, disponibles donde faltaban.
+
+| Opción | Cuándo aparece |
+|---|---|
+| **Información** | **Siempre**, sin depender de permisos |
+| **Renombrar** | Si puede editar esa tarea |
+| **Archivar** | Si puede archivar o eliminar esa tarea |
+| **Eliminar** | Si puede archivar o eliminar esa tarea |
+
+**Qué opciones aparecen lo decide un solo lugar** (`opcionesDeTarea`), así que la
+tabla y la Gantt no pueden separarse. Archivar y Eliminar piden **exactamente la
+misma confirmación** que los botones de la columna, palabra por palabra: es la
+misma acción, no una versión del menú. La prueba lo compara contra el texto que
+muestra el botón, no contra una copia escrita a mano.
+
+**Información no depende de ningún permiso, y eso cambia una cosa:** el menú
+**siempre** se abre. Un usuario sin ningún permiso sobre tareas —al que la
+columna de acciones ni siquiera se le muestra— ve el menú con **Información
+sola**. Verificado con el cliente de demo, que tiene los permisos vacíos.
+
+**Dónde se abre.** En la tabla, sobre **cualquier celda** de la fila. En la
+Gantt, **solo sobre la celda del nombre**: sobre la grilla el clic derecho ya
+significa marcar la tarea como lista y el izquierdo planifica, *y ese idioma no
+se toca*. Sobre el frente, el sub frente y las filas de carga por persona no se
+abre — el enganche va en la fila de la tarea, no en un selector genérico, porque
+las filas de carga usan la misma celda congelada que el nombre.
+
+**En el teléfono no existe.** Es un atajo de escritorio y no se agrega por
+pulsación larga: ahí la columna de acciones sigue siendo el camino, tal como
+está. El menú ni siquiera se abre bajo 768px, y una regla de CSS lo tapa como
+cinturón de seguridad.
+
+**El menú va en un portal, con `position: fixed`**, como la tarjeta flotante y
+los globos de #327: nace dentro de una tabla con scroll y desde ahí cualquier
+`overflow` lo recortaría. Se coloca donde está el cursor y **se corre solo si no
+cabe** contra un borde; se cierra al elegir, al hacer clic fuera, con Escape y al
+desplazar.
+
+*Duplicar irá en este menú cuando se defina #273. **No entra ahora, ni siquiera
+apagada:** una opción que no hace nada gasta la confianza del menú justo cuando
+la persona lo está descubriendo.*
+
+**En la tabla de Mis Tareas el menú va sin Renombrar.** Ahí el nombre **abre el
+panel de detalle** y nunca fue editable —el gesto de renombrar no existe en esa
+tabla—, así que ofrecerlo prometería algo que no pasaría. Su Gantt sí lo tiene,
+porque ahí el nombre siempre se pudo editar. *Es la única diferencia entre las
+tres vistas, y es la que ya existía.*
+
+**Un defecto que encontró la prueba, y que valía por sí solo.** "Renombrar" abre
+la edición con un **pulso**: un número que cambia y que la fila reconoce como
+suyo. La primera versión dejaba ese pulso encendido, y una fila puede
+**remontarse** por razones que no tienen nada que ver con renombrar — archivar
+una tarea y restaurarla, por ejemplo—. La tarea restaurada volvía a la tabla
+**con el nombre en modo edición sola**. El pulso ahora se **atiende una vez**: el
+campo recuerda cuál ya trató, empezando por el que trae al montarse.
+
+**El aspecto se corrigió antes de fusionar.** La primera versión funcionaba y
+aparecía donde correspondía, pero **se veía pobre al lado del resto del
+producto**. La vara es el **menú de Filtrar**, que ya existe y ya se ve bien —el
+del responsable sirve igual: los dos ya coincidían entre sí—, y la forma de
+igualarlo no fue copiar sus valores sino **compartir sus reglas**: fondo, borde,
+esquina, sombra, relleno, tamaño y aire de cada opción, realce al pasar el mouse
+y la animación corta de entrada salen ahora de las mismas declaraciones, así que
+los dos menús **no pueden separarse** cuando alguno cambie. Lo único propio del
+menú del clic derecho es dónde se ancla. *Medido: los ocho valores calculados de
+la caja y los cinco de la opción coinciden exactamente.*
+
+Además:
+
+- **Cada opción lleva su ícono a la izquierda.** Los cuatro ya existían en el
+  juego del producto y no hubo que crear ninguno — el de **información no se
+  usaba en ninguna parte**—. Van al tamaño y con el trazo de su base común (16 y
+  1.7) y toman el color del texto de su opción.
+- **Una línea separa lo destructivo del resto:** arriba lo que abre o edita la
+  tarea, abajo lo que la saca del plan. Se declara por el **cambio de bloque** y
+  no como "una línea antes de Archivar", y esa diferencia importa: cuando el
+  menú crezca —"Agregar tarea debajo", "Duplicar"— las nuevas entran arriba y la
+  línea no se mueve de sitio. Tampoco aparece cuando no hay nada de un lado:
+  verificado con **Información sola** (ninguna línea) y **sin Renombrar** (la
+  línea sigue en su sitio, sin quedar suelta).
+- **Eliminar se ve en el rojo de la paleta**, texto e ícono, por ser la única
+  irreversible. **Archivar no:** se puede restaurar. El rojo es la variable del
+  producto, que ya tiene su propio valor en modo oscuro — comprobado en los dos
+  temas.
+
+*Anotado y no corregido acá, como pidió el pedido:* la columna de acciones de la
+tabla **no usa esos íconos**, dibuja los símbolos de texto ⓘ, ⤵ y 🗑. Es un
+cambio aparte.
+
+**Verificado** con `docs/prueba-292-menu-contextual.mjs`: **54 comprobaciones en
+verde**. Recorre las cuatro opciones en la tabla y en la Gantt, que Información
+abra el mismo panel que el ⓘ, que Renombrar deje el campo abierto con el nombre
+puesto y que Enter guarde y Escape cancele, que Archivar y Eliminar pidan el
+texto exacto del botón y hagan lo mismo, que el clic derecho sobre una marca
+**siga marcando la tarea como lista sin abrir el menú**, que sobre una celda
+vacía, el frente, el sub frente y las filas de carga no pase nada, que el menú se
+vea entero abierto contra las cuatro esquinas, y que en mobile no aparezca y la
+columna de acciones siga mostrando solo el ⓘ. De los permisos, los dos extremos:
+un usuario sin ninguno ve **Información sola**, y uno con **solo** "marcar
+hechas" —dado desde el modal de miembros dentro de la misma prueba— sigue viendo
+Información sola, sin Archivar ni Eliminar.
+
+*Dos controles negativos.* Contra `main`, **22 comprobaciones fallan**: no
+existe ningún menú, así que ninguna de las opciones se puede elegir en ninguna de
+las tres vistas. Y contra la **primera versión del menú** —la que se corrigió—,
+**9 fallan**: la caja no comparte el aspecto de Filtrar (sin relleno, otra
+sombra, sin animación), las opciones tampoco (otro relleno, sin esquina
+redondeada, sin separación para el ícono), no hay ningún ícono, no hay línea
+separadora, y Eliminar se ve del color del texto normal en los dos temas.
