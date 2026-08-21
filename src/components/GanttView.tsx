@@ -15,7 +15,7 @@ import {
 } from '../lib/dates'
 import { colorTarea, fechaVigente, marcasDe } from '../lib/derive'
 import { filtraTareas, pasaFiltroCompleto, rangoDeFecha, type Filtro } from '../lib/filtros'
-import { abrirHueco } from '../lib/crear'
+import { abrirHueco, plantillaDe, type Plantilla } from '../lib/crear'
 import { referenciaEnFoto, useVistaCongelada } from '../lib/vistaCongelada'
 import { enMitadSuperior, useArrastreTareas, type DndTareas } from '../lib/arrastre'
 import { planMoverTarea } from '../lib/mover'
@@ -167,6 +167,13 @@ interface CrearEn {
   despuesDe?: { id: string; orden: number }
   /** Contenedor del nuevo elemento (proyecto/frente/sub segun tipo). */
   contenedorId: string
+  /**
+   * #273 — Presente = duplicar. Duplicar es crear con los campos de otra tarea
+   * ya puestos, así que pasa por el MISMO camino que "Agregar tarea debajo" en
+   * vez de por uno propio: misma posición, mismos permisos, misma foto. Y por
+   * eso la copia **no existe hasta confirmar**: con Escape no se crea nada.
+   */
+  plantilla?: Plantilla
 }
 
 /** Mini-aviso flotante (2.2): "No puedes eliminar tareas que ya pasaron". */
@@ -636,6 +643,15 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
 
   // -- Creacion inline (§6.4.25/26) --
 
+  /** Dónde inserta el menú: justo debajo de esa tarea, en su sub frente. Lo
+   *  comparten "Agregar tarea debajo" (#328) y "Duplicar" (#273), que se
+   *  diferencian solo en si llevan plantilla. */
+  const insercionDebajoDe = (t: Tarea): CrearEn => ({
+    tipo: 'tarea',
+    despuesDe: { id: t.id, orden: t.orden },
+    contenedorId: t.subFrenteId,
+  })
+
   /** `e` solo cuando lo dispara un botón de la grilla: el menú del clic derecho
    *  (#328) llama sin evento, y ya frenó la propagación al abrirse. */
   function abrirCrear(crear: CrearEn, e?: React.MouseEvent) {
@@ -645,7 +661,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
 
   async function crearElemento(nombre: string) {
     if (!crearEn) return
-    const { tipo, despuesDe, contenedorId } = crearEn
+    const { tipo, despuesDe, contenedorId, plantilla } = crearEn
     // Insertar justo debajo del hermano: se corren los ordenes siguientes.
     // (Los clientes crean al final: el corrimiento exige editar hermanos.)
     if (tipo === 'frente') {
@@ -665,7 +681,15 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
       const orden = await abrirHueco(hermanos, despuesDe, can.controlTotal, (id, o) =>
         actions.updateTarea(id, { orden: o }),
       )
-      const nueva = await actions.createTarea({ subFrenteId: contenedorId, titulo: nombre, orden })
+      // #273: duplicar aporta responsable y descripción; el título es lo que
+      // haya quedado en el campo, que arranca con el de la original.
+      const nueva = await actions.createTarea({
+        subFrenteId: contenedorId,
+        titulo: nombre,
+        responsableId: plantilla?.responsableId,
+        descripcion: plantilla?.descripcion,
+        orden,
+      })
       // #333: con la vista congelada, la foto solo tiene posición para lo que
       // ya estaba cuando se la tomó — la tarea nueva caía donde el render la
       // dejara, casi siempre al final del bloque. Entra en la foto justo
@@ -993,23 +1017,20 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         onCerrar={cerrarMenu}
         opciones={
           tareaDelMenu
-            ? opcionesDeTarea(
-                tareaDelMenu,
-                canDeTarea(tareaDelMenu),
-                actions,
+            ? opcionesDeTarea(tareaDelMenu, canDeTarea(tareaDelMenu), actions, {
                 onAbrirTarea,
-                () => pedirRenombrar(tareaDelMenu.id),
+                onRenombrar: () => pedirRenombrar(tareaDelMenu.id),
                 // #328: lo MISMO que el "+" de la fila, que se queda. En Mis
                 // Tareas no se crean tareas, así que ahí no se ofrece.
-                permiteCrear
-                  ? () =>
-                      abrirCrear({
-                        tipo: 'tarea',
-                        despuesDe: { id: tareaDelMenu.id, orden: tareaDelMenu.orden },
-                        contenedorId: tareaDelMenu.subFrenteId,
-                      })
+                onAgregarDebajo: permiteCrear
+                  ? () => abrirCrear(insercionDebajoDe(tareaDelMenu))
                   : null,
-              )
+                // #273: y duplicar es lo mismo con los campos de la original ya
+                // puestos — misma posición, mismo camino.
+                onDuplicar: permiteCrear
+                  ? () => abrirCrear({ ...insercionDebajoDe(tareaDelMenu), plantilla: plantillaDe(tareaDelMenu) })
+                  : null,
+              })
             : []
         }
       />
@@ -1071,16 +1092,33 @@ function FilaCarga({
 /** Input inline para crear frente/sub/tarea EN la grilla (patron de la tabla). */
 function CrearInput({
   placeholder,
+  inicial,
   onCrear,
   onCerrar,
 }: {
   placeholder: string
+  /** #273: al duplicar arranca con el título de la original, SELECCIONADO: se
+   *  ajusta escribiendo, o se deja igual con Enter. Así no hace falta inventar
+   *  un "Copia de…", y quien duplica para cambiar el nombre ya está donde tiene
+   *  que estar. */
+  inicial?: string
   onCrear: (nombre: string) => void
   onCerrar: () => void
 }) {
-  const [nombre, setNombre] = useState('')
+  const [nombre, setNombre] = useState(inicial ?? '')
+  const ref = useRef<HTMLInputElement>(null)
+  // El cerrojo de Escape. `onBlur` crea —es el gesto de siempre—, y salir con
+  // Escape desenfoca el campo: sin esto, cancelar una duplicación la habría
+  // creado igual. Con el campo vacío no se notaba (no hay nada que crear); con
+  // el título ya puesto, sí.
+  const cancelado = useRef(false)
+
+  useEffect(() => {
+    if (inicial) ref.current?.select()
+  }, [inicial])
 
   function confirmar() {
+    if (cancelado.current) return
     const limpio = nombre.trim()
     if (limpio) onCrear(limpio)
     onCerrar()
@@ -1088,6 +1126,7 @@ function CrearInput({
 
   return (
     <input
+      ref={ref}
       className="inline-input crear-inline"
       autoFocus
       placeholder={placeholder}
@@ -1095,7 +1134,10 @@ function CrearInput({
       onChange={(e) => setNombre(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === 'Enter') confirmar()
-        if (e.key === 'Escape') onCerrar()
+        if (e.key === 'Escape') {
+          cancelado.current = true
+          onCerrar()
+        }
       }}
       onBlur={confirmar}
     />
@@ -1294,7 +1336,14 @@ function FilaGanttRow({
         {fila.esInicioFrente && celdaFrente(fila.frente, fila.spanFrente)}
         {fila.esInicioSub && celdaSub(fila.frente, fila.sub, fila.spanSub)}
         <td className="fija fija--tarea fija--input">
-          <CrearInput placeholder="Nueva tarea… (Enter crea)" onCrear={onCrear} onCerrar={onCerrarCrear} />
+          {/* #273: duplicar entra por acá, con el título de la original ya
+              puesto. El input es el mismo; lo que cambia es con qué arranca. */}
+          <CrearInput
+            placeholder="Nueva tarea… (Enter crea)"
+            inicial={crearEn?.plantilla?.titulo}
+            onCrear={onCrear}
+            onCerrar={onCerrarCrear}
+          />
         </td>
         <td className="fija fija--resp" />
         {celdasVacias()}

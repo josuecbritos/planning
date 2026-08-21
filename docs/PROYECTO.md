@@ -267,21 +267,22 @@ completo con creación y edición **inline** (sin formularios).
   esa columna —Información, Archivar y Eliminar—, y **en la Gantt no había
   ninguna**: desde ahí no se podía archivar ni eliminar. El menú las lleva a las
   dos vistas sin crear **ninguna acción nueva ni ningún permiso nuevo**: son las
-  mismas, disponibles donde faltaban, y la columna se queda como está. Cinco
+  mismas, disponibles donde faltaban, y la columna se queda como está. Seis
   opciones con sus condiciones de siempre: **Información** —que no depende de
   ningún permiso, así que el menú siempre tiene al menos una y quien solo mira
   también lo ve—, **Renombrar** si puede editar la tarea, **Agregar tarea
-  debajo** (#328) si puede crear tareas, y **Archivar** y **Eliminar** si puede
-  archivarlas o eliminarlas, con las mismas confirmaciones. Renombrar no es una
-  acción nueva: es el clic sobre el nombre, pedido desde otro lado.
+  debajo** (#328) y **Duplicar** (#273) si puede crear tareas, y **Archivar** y
+  **Eliminar** si puede archivarlas o eliminarlas, con las mismas
+  confirmaciones. Renombrar no es una acción nueva: es el clic sobre el nombre,
+  pedido desde otro lado.
   Se abre **sobre cualquier celda de la fila** en la tabla y **solo sobre la
   celda del nombre** en la Gantt: ahí el clic derecho sobre la grilla ya
   significa marcar la tarea como lista, y ese idioma no se toca. Sobre el
   frente, el sub frente y las filas de carga no se abre. **En el teléfono no
   existe** —es un atajo de escritorio, y no se agrega por pulsación larga—: ahí
   la columna de acciones sigue siendo el camino.
-  *En **Mis Tareas** el menú va sin **Agregar tarea debajo**, en sus dos vistas:
-  ahí no se crean tareas —una creada desde ese módulo no sería del usuario hasta
+  *En **Mis Tareas** el menú va sin **Agregar tarea debajo** ni **Duplicar**, en
+  sus dos vistas: ahí no se crean tareas —una creada desde ese módulo no sería del usuario hasta
   asignársela—. **Renombrar sí está** (#334): #292 la había dejado fuera de esa
   tabla porque su nombre nunca fue editable, y ahora la opción abre la edición
   en la celda **sin tocar lo que hace el clic**, que sigue abriendo el panel de
@@ -301,6 +302,29 @@ completo con creación y edición **inline** (sin formularios).
   que es editar tareas ajenas: por eso lo hace solo quien tiene control total, y
   el resto crea al final, con menú o sin él. Esa regla vive en un solo lugar
   (`lib/crear.ts`), compartida por la tabla y la Gantt.*
+
+  **"Duplicar" es esa misma fila con los campos de la original puestos (#273).**
+  No se podía duplicar una tarea: para repetir una había que crearla de nuevo y
+  volver a escribir el título y el responsable a mano. Duplicar **es crear**, así
+  que pasa por el mismo camino que "Agregar tarea debajo" en vez de por uno
+  propio: **misma posición** —justo debajo de la original, en su sub frente—,
+  **mismo permiso** —crear tareas—, **misma foto congelada**. Y por eso **la
+  copia no existe hasta confirmar**: el nombre llega en modo edición con el
+  título copiado **seleccionado**, se ajusta escribiendo o se deja igual con
+  Enter, y **con Escape no se crea nada**. *Así no hace falta inventar un "Copia
+  de…", y quien duplica para cambiar el nombre ya está donde tiene que estar.*
+  **La copia nace limpia:** hereda el título, el responsable, el sub frente y la
+  descripción —si la tarea tiene—, y **no** la fecha objetivo, el historial de
+  replanificaciones, los comentarios, la marca de hecha ni la de archivada. No es
+  una omisión, es la definición, y por eso vive **en un solo lugar**
+  (`plantillaDe`, en `lib/crear.ts`): *el historial y los comentarios son
+  registro de lo que pasó con la original, no parte de qué es la tarea; y la
+  fecha no se copia porque duplicar suele significar "lo mismo, en otro momento",
+  y si viniera vencida **la copia nacería atrasada y ensuciaría los contadores**
+  por algo recién creado.*
+  *Sobre una tarea archivada no se plantea: las archivadas viven en su propio
+  bloque al pie del sub frente, como una lista de enlaces, y ese bloque no tiene
+  menú de clic derecho.*
 
   **Se ve como el menú de Filtrar, porque comparte sus reglas.** Fondo, borde,
   esquina, sombra, relleno, tamaño y aire de cada opción, realce al pasar el

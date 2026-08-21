@@ -340,17 +340,16 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
         onCerrar={cerrarMenu}
         opciones={
           tareaDelMenu
-            ? opcionesDeTarea(
-                tareaDelMenu,
-                canDe(proyectoDelMenu?.id ?? ''),
-                actions,
+            ? opcionesDeTarea(tareaDelMenu, canDe(proyectoDelMenu?.id ?? ''), actions, {
                 onAbrirTarea,
-                () => pedirRenombrar(tareaDelMenu.id),
-                // #328: en Mis Tareas no se crean tareas —una tarea creada acá
-                // no sería del usuario hasta asignársela—, así que la opción no
-                // aparece. Ya era así y no cambia.
-                null,
-              )
+                onRenombrar: () => pedirRenombrar(tareaDelMenu.id),
+                // #328/#273: en Mis Tareas no se crean tareas —una tarea creada
+                // acá no sería del usuario hasta asignársela—, así que ni
+                // "Agregar tarea debajo" ni "Duplicar" aparecen. Ya era así y no
+                // cambia.
+                onAgregarDebajo: null,
+                onDuplicar: null,
+              })
             : []
         }
       />

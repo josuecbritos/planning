@@ -2932,3 +2932,106 @@ la tabla de Mis Tareas pasa de "sin Renombrar" a "sin Agregar tarea debajo". La
 de #327 comprobaba dónde vive el globo usando el ⓘ de la fila de la Gantt, que ya
 no está: pasa a usar el "+", que tiene el mismo globo y sirve igual para lo que
 se mide ahí —dónde se dibuja, no cuál de los dos lo dispara—.
+
+### #273 — Duplicar tareas
+
+**No se podía duplicar una tarea.** Para repetir una había que crearla de nuevo y
+volver a escribir el título y el responsable a mano.
+
+**El menú del clic derecho gana "Duplicar"**, en la tabla y en la Gantt. Va junto
+a "Agregar tarea debajo" —las dos crean una tarea en esa misma posición— y lejos
+de archivar y eliminar, que son lo contrario:
+
+**Información · Renombrar · Agregar tarea debajo · Duplicar — Archivar · Eliminar**
+
+*La línea separadora sigue sin moverse: se declaró por el cambio de bloque y no
+como "antes de Archivar", justamente para que crecer no la corra de sitio.*
+
+#### Duplicar es crear, no una acción aparte
+
+Y por eso pasa por el **mismo camino** que "Agregar tarea debajo" (#328) en vez
+de por uno propio: misma posición —justo debajo de la original, en su sub
+frente—, mismo permiso —crear tareas, el del "+" de la Gantt—, misma foto
+congelada (#333). No hay una segunda forma de crear una tarea que pueda
+separarse de la primera.
+
+De ahí salen dos cosas que no hubo que decidir aparte:
+
+- **Con Escape la copia no se crea.** No es un "deshacer": es que la copia
+  **todavía no existe** — lo que se abre es la fila de carga con los campos ya
+  puestos, y confirmar es lo que la crea.
+- **Sin control total la copia queda al final**, como cualquier otra creación de
+  esa persona: insertar en el medio obliga a correr el orden de los hermanos, que
+  es editar tareas ajenas.
+
+**El nombre llega en modo edición, con el título copiado seleccionado:** se
+ajusta escribiendo, o se deja igual con Enter. *Así no hace falta inventar un
+"Copia de…", y quien duplica para cambiar el nombre ya está donde tiene que
+estar.*
+
+#### Qué se copia y qué no
+
+| Se copia | No se copia |
+|---|---|
+| El título | **La fecha objetivo: la copia nace sin fecha** |
+| El responsable | El historial de replanificaciones |
+| El sub frente | Los comentarios |
+| La descripción, si la tarea tiene | La marca de hecha y la de archivada |
+
+**La copia nace limpia. No es una omisión, es la definición**, y por eso vive en
+un solo lugar (`plantillaDe`, en `lib/crear.ts`) y no repartida por las dos
+vistas: *el historial y los comentarios son registro de lo que pasó con la
+original, no parte de qué es la tarea; y la fecha no se copia porque duplicar
+suele significar "lo mismo, en otro momento", y planificarla es un clic — si se
+copiara y ya estuviera vencida, **la copia nacería atrasada y ensuciaría los
+contadores** por algo recién creado.*
+
+*En **Mis Tareas** no aparece, en ninguna de sus dos vistas: ahí no se crean
+tareas. Y sobre una tarea **archivada** no se plantea — las archivadas viven en
+su propio bloque al pie del sub frente, como una lista de enlaces, y ese bloque
+no tiene menú de clic derecho.*
+
+**Un detalle que se cuidó a propósito.** La fila de carga guarda al perder el
+foco, y salir con Escape desenfoca el campo. Con el campo vacío eso no se notaba
+—no hay nada que crear—; con el título ya puesto, cancelar habría creado la copia
+igual. El campo de la Gantt lleva ahora un cerrojo explícito para eso, y la
+prueba lo comprueba en las dos vistas.
+
+**Las cuatro llamadas del menú viajan juntas.** Con Duplicar serían siete
+parámetros posicionales, tres de ellos `(() => void) | null` e indistinguibles
+entre sí desde quien llama: pasan a un objeto con nombre (`AccionesMenu`).
+
+#### Verificación
+
+`docs/prueba-273-duplicar.mjs` — **40 comprobaciones en verde**.
+
+Las seis opciones en su orden y una sola línea separadora; que el campo arranque
+con el título de la original y llegue **seleccionado**, con el mismo responsable
+y justo debajo; que Enter sin escribir deje las dos conviviendo con el mismo
+nombre; que Escape no cree nada, **en la tabla y en la Gantt**; que la copia no
+tenga fecha, ni color, ni ↻ ×N; que los contadores sumen una y la nueva caiga en
+la categoría sin color; que duplicar una tarea hecha no deje la copia marcada.
+
+De los comentarios y el historial se comprueban las dos caras —la copia sin
+ninguno de los dos y la original con los suyos intactos—, leyendo el estado
+guardado y también el panel, que es como lo mira una persona. La **descripción**
+se comprueba inyectándola en el estado: el campo existe en la tarea y el panel lo
+muestra, pero hoy no se escribe desde ninguna pantalla.
+
+Y los permisos: sin el de crear tareas la opción **no aparece**; con él —pero sin
+control total— **sí aparece**, y la copia queda al final. En Mis Tareas, tabla y
+Gantt, no aparece. Con filtro puesto, la copia sale justo debajo de la original y
+"Actualizar vista" queda encendido.
+
+*Control negativo:* corrida contra `main`, **22 comprobaciones fallan** — no
+existe la opción, así que no hay copia en ninguna vista, y la sección de
+comentarios e historial se queda sin terreno donde correr.
+
+**Dos pruebas anteriores cambian de contrato y se actualizan**, como en la tanda
+anterior: la de #292 y la de #328 esperaban cinco opciones. Ahora son seis, y
+**la línea separadora sigue en el mismo sitio** — es la segunda vez que el menú
+crece sin moverla, que es exactamente para lo que se declaró por bloque.
+
+Regresión en verde: #297, #298, #305/#305b, #305e, #306/#306b/#306c, #307, #310,
+#311, #313, #318, #319, #320, #321, #322, #324, #326, #327, #328, #329, #331,
+#332, #333, #334.

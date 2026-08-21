@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import type { Actions } from '../App'
 import type { Tarea } from '../types'
 import type { Can } from '../lib/permisos'
-import { IconoAgregarDebajo, IconoArchivar, IconoEditar, IconoInfo, IconoPapelera } from './Iconos'
+import { IconoAgregarDebajo, IconoArchivar, IconoDuplicar, IconoEditar, IconoInfo, IconoPapelera } from './Iconos'
 
 // #292 — El menú contextual de una tarea (clic derecho).
 //
@@ -22,9 +22,9 @@ import { IconoAgregarDebajo, IconoArchivar, IconoEditar, IconoInfo, IconoPapeler
 // capacidad que no existía —ahí solo se podía agregar al final del sub frente,
 // con la línea "+ Tarea"—, y llega sin agregar ningún botón a la pantalla.
 //
-// *Duplicar entrará acá cuando se defina #273. No entra ahora, ni siquiera
-// apagada: una opción que no hace nada gasta la confianza del menú justo cuando
-// la persona lo está descubriendo.*
+// #273: y se suma "Duplicar", que es lo mismo con los campos de otra tarea ya
+// puestos. Va junto a "Agregar tarea debajo" —las dos crean una tarea en esa
+// misma posición— y lejos de archivar y eliminar, que son lo contrario.
 
 const MARGEN = 8
 
@@ -105,11 +105,9 @@ export function useMenuTarea() {
  * permisos ve el menú con Información sola — a diferencia de la columna de
  * acciones de la tabla, que en ese caso no se muestra.
  */
-export function opcionesDeTarea(
-  tarea: Tarea,
-  can: Can,
-  actions: Actions,
-  onAbrirTarea: (id: string) => void,
+export interface AccionesMenu {
+  /** Abre el panel de detalle. No depende de ningún permiso. */
+  onAbrirTarea: (id: string) => void
   /**
    * Qué hacer al elegir "Renombrar", o `null` donde ese gesto no existe.
    *
@@ -119,14 +117,29 @@ export function opcionesDeTarea(
    * abre la edición en la celda sin tocar lo que hace el clic. Sigue siendo
    * `null` donde no haya dónde abrirla.
    */
-  onRenombrar: (() => void) | null,
+  onRenombrar: (() => void) | null
   /**
    * #328 — Qué hacer al elegir "Agregar tarea debajo", o `null` donde no se
    * crean tareas: **Mis Tareas**, en sus dos vistas. Una tarea creada desde ahí
    * no sería del usuario hasta asignársela, así que aparecería y desaparecería
    * sola; eso ya era así y no cambia.
    */
-  onAgregarDebajo: (() => void) | null,
+  onAgregarDebajo: (() => void) | null
+  /**
+   * #273 — Qué hacer al elegir "Duplicar", o `null` donde no se crean tareas.
+   * Va junto a "Agregar tarea debajo" porque las dos crean una tarea en esa
+   * misma posición, y lejos de archivar y eliminar, que son lo contrario.
+   */
+  onDuplicar: (() => void) | null
+}
+
+export function opcionesDeTarea(
+  tarea: Tarea,
+  can: Can,
+  actions: Actions,
+  // Las cuatro llegan juntas y no sueltas: tres de ellas son `() => void | null`
+  // y en fila serían indistinguibles entre sí desde quien llama.
+  { onAbrirTarea, onRenombrar, onAgregarDebajo, onDuplicar }: AccionesMenu,
 ): OpcionMenu[] {
   const ops: OpcionMenu[] = [
     { texto: 'Información', icono: <IconoInfo />, grupo: 'principal', onClick: () => onAbrirTarea(tarea.id) },
@@ -141,6 +154,9 @@ export function opcionesDeTarea(
       grupo: 'principal',
       onClick: onAgregarDebajo,
     })
+  }
+  if (onDuplicar && can.crearTareas) {
+    ops.push({ texto: 'Duplicar', icono: <IconoDuplicar />, grupo: 'principal', onClick: onDuplicar })
   }
   if (can.archivarEliminar(tarea)) {
     // Las mismas dos confirmaciones que la columna de acciones, palabra por
@@ -192,7 +208,7 @@ export function MenuTarea({
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
 
   // Se coloca DESPUÉS de medirlo: cuánto mide depende de cuántas opciones tenga
-  // —de una a cinco, según los permisos y la vista— y del largo de sus textos.
+  // —de una a seis, según los permisos y la vista— y del largo de sus textos.
   useLayoutEffect(() => {
     if (!menu || !cajaRef.current) return
     const c = cajaRef.current.getBoundingClientRect()

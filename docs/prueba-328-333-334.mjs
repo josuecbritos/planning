@@ -221,9 +221,11 @@ const PRIMERA_G = (await ganttFilas())[0].titulo
 await clicDerechoEn(filaGantt(PRIMERA_G))
 const opsGantt = await opciones()
 chk(
+  // #273 sumó "Duplicar" junto a "Agregar tarea debajo": el contrato crece, y la
+  // línea separadora sigue sin moverse de sitio.
   JSON.stringify(opsGantt) ===
-    JSON.stringify(['Información', 'Renombrar', 'Agregar tarea debajo', 'Archivar', 'Eliminar']),
-  '#328·3 el menú de la Gantt abre con CINCO opciones, en su orden',
+    JSON.stringify(['Información', 'Renombrar', 'Agregar tarea debajo', 'Duplicar', 'Archivar', 'Eliminar']),
+  '#328·3 el menú de la Gantt abre con SEIS opciones, en su orden',
   opsGantt.join(' · '),
 )
 chk(
@@ -294,8 +296,8 @@ await clicDerechoEn(filaTabla(antesT[1]))
 const opsTabla = await opciones()
 chk(
   JSON.stringify(opsTabla) ===
-    JSON.stringify(['Información', 'Renombrar', 'Agregar tarea debajo', 'Archivar', 'Eliminar']),
-  '#328·9 el menú de la tabla muestra las mismas cinco opciones',
+    JSON.stringify(['Información', 'Renombrar', 'Agregar tarea debajo', 'Duplicar', 'Archivar', 'Eliminar']),
+  '#328·9 el menú de la tabla muestra las mismas seis opciones',
   opsTabla.join(' · '),
 )
 await elegir('Agregar tarea debajo', 500)

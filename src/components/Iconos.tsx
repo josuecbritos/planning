@@ -133,6 +133,15 @@ export const IconoAgregarDebajo = (p: Props) => (
   </Svg>
 )
 
+/** #273 — Duplicar. Dos hojas iguales, una detrás de otra: lo que sale es otra
+ *  tarea igual, no una variante ni un vínculo con la original. */
+export const IconoDuplicar = (p: Props) => (
+  <Svg {...p}>
+    <rect x="8.5" y="8.5" width="12" height="12" rx="2" />
+    <path d="M15.5 5.5A2 2 0 0 0 13.5 3.5h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2" />
+  </Svg>
+)
+
 // #331 — Los dos primeros iconos que NO son de una acción sobre una fila: son
 // las dos secciones fijas de la barra que faltaban en la franja contraída
 // (Notificaciones ya estaba, con su campana, desde #159). Siguen la misma base

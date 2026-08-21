@@ -23,11 +23,12 @@ import { chromium } from 'playwright-core'
 const EXE = process.env.CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 const URL_APP = process.env.URL ?? 'http://localhost:4173/'
 
-// #328 sumó "Agregar tarea debajo" como quinta opción, y #334 llevó Renombrar
+// #328 sumó "Agregar tarea debajo", #273 sumó "Duplicar", y #334 llevó Renombrar
 // también a la tabla de Mis Tareas: el contrato de esta prueba se actualiza con
-// ellos. La línea separadora no se movió de sitio —sigue separando lo
-// destructivo del resto—, que es justo lo que se declaró al escribirla.
-const TODAS = ['Información', 'Renombrar', 'Agregar tarea debajo', 'Archivar', 'Eliminar']
+// ellos. La línea separadora NO se movió de sitio en ninguno de los dos
+// crecimientos —sigue separando lo destructivo del resto—, que es justo lo que
+// se declaró al escribirla.
+const TODAS = ['Información', 'Renombrar', 'Agregar tarea debajo', 'Duplicar', 'Archivar', 'Eliminar']
 /** Las de Mis Tareas: ahí no se crean tareas (#328), pero sí se renombra (#334). */
 const MIS_TAREAS = ['Información', 'Renombrar', 'Archivar', 'Eliminar']
 
@@ -266,7 +267,7 @@ const conTodo = await bloques()
 chk(
   conTodo?.lineas === 1 &&
     JSON.stringify(conTodo.hijos) ===
-      JSON.stringify(['Información', 'Renombrar', 'Agregar tarea debajo', '—', 'Archivar', 'Eliminar']),
+      JSON.stringify(['Información', 'Renombrar', 'Agregar tarea debajo', 'Duplicar', '—', 'Archivar', 'Eliminar']),
   '5 hay UNA línea separadora, justo antes de lo destructivo',
   conTodo?.hijos?.join(' ') ?? 'sin menú',
 )
