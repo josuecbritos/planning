@@ -2532,3 +2532,144 @@ que pasan a buscarlo ahí. Lo que se exige es lo mismo de antes —que aparezca 
 inmediato, con el nombre completo y entero—, y en #321 "entero" pasa a medirse
 contra la pantalla en vez de contra el borde del recuadro con scroll, que es
 contra lo que ahora tiene que caber.
+
+### #313 — El número de replanificaciones desempata dentro de cada estado
+
+El orden por **Estado** no es alfabético: usa la gravedad del modelo, de menos a
+más crítica (hecha → pendiente → pendiente replanificada → atrasada → atrasada
+replanificada). **Dentro de un mismo estado no había desempate:** el sort es
+estable, así que las empatadas quedaban en el orden en que venían. El número de
+replanificaciones ya existía y ya se mostraba —es el ↻ ×N de la tabla— pero no
+participaba del orden.
+
+**Ahora desempata**, y **el sentido acompaña a la flecha del Estado.** No es
+cosmético: estado y replanificaciones son **una sola escala de gravedad** —una
+tarea replanificada es más crítica que una que no lo está, y cuantas más veces se
+movió, más crítica es—, así que invertir la flecha invierte también el desempate.
+Aplica a **todos** los estados, incluidas las hechas: marcar hecha quita la
+condición de replanificada a efectos de color y contadores, pero *el rastro
+queda* — una tarea cerrada puede tener tres replanificaciones y otra ninguna.
+
+**Actúa al final de todo, no pegado a Estado.** Si alguien apila Estado con Fecha
+Objetivo, la fecha tiene que seguir mandando: el desempate es el último recurso
+antes de dejar las cosas como venían.
+
+**No se agrega ningún campo al menú de Ordenar**, y esa restricción es la que
+ordenó el diseño: el desempate no es un criterio que se elija, es la continuación
+del criterio que lo trae.
+
+### #319 — Ordenar por proyecto dejaba las tareas revueltas dentro del proyecto
+
+En Mis Tareas, el criterio **Proyecto** comparaba únicamente el nombre del
+proyecto. **Todas las tareas de un mismo proyecto empataban**, así que quedaban
+en el orden en que venían armadas, con frentes y sub frentes intercalados. Y no
+había forma de arreglarlo apilando criterios a mano: frente y sub frente no están
+entre los campos ordenables.
+
+**Ahora, dentro de cada proyecto, las tareas quedan agrupadas por frente y,
+dentro de cada frente, por sub frente**, respetando el orden con el que están
+armados —el mismo que se ve al entrar al proyecto—, **no el alfabético**.
+Verificado con el caso que lo distingue: los frentes salen *Levantamiento ·
+Diseño*, que es como están armados; alfabético sería al revés.
+
+**El sentido acompaña a la flecha del Proyecto**, y lo que se apile después manda
+**dentro del sub frente**. Tampoco se agregan campos al menú: *el caso real es
+querer ver las tareas de cada proyecto en su orden natural, y eso no debería
+exigir armar tres criterios.*
+
+**Los dos cambios viven en un solo lugar.** Las reglas del menú se traducen antes
+de comparar a la lista de comparaciones que de verdad se aplican
+(`clavesDeOrden`): ahí Proyecto se despliega en tres y ahí se agrega el desempate
+por replanificaciones al final. La tabla, la Gantt y Mis Tareas comparten esa
+traducción, así que no pueden separarse.
+
+### #329 — Los sub frentes desplegados quedaban pegados
+
+La separación entre un sub frente y el siguiente era **8, siempre**, contraído o
+desplegado. Ese valor lo fijó #306 al bajarlo de 26 a 8, para que los sub frentes
+de un frente se leyeran como un grupo. **Contraído funciona.** Desplegado no:
+entre la última fila de una tabla y el título del sub frente siguiente, 8 no
+alcanza para separar dos piezas distintas.
+
+**El desplegado pasa a separar 16** —`--aire-bloque`, el mismo valor único que
+dejó #306c— y **el contraído sigue en 8**, que es lo que agrupa. Con uno
+desplegado y el siguiente contraído manda el desplegado.
+
+**Los 8 de más van como relleno y no como margen, y ahí está el detalle que
+importa.** Los márgenes verticales de hermanos **colapsan** —toman el mayor, no
+la suma— y el del último sub frente además **se escapa de su sección** y colapsa
+con el `margin-top` que separa un frente del siguiente. *Medido: por eso la
+separación entre frentes vale **16 y no 24**, que es lo que suponía el pedido.*
+Subir este margen a 16 habría dejado la separación entre frentes **igual** a la
+que hay entre dos sub frentes desplegados, y se habría perdido el contraste que
+comunica la pertenencia — justo lo que el pedido pedía vigilar. El relleno vive
+**dentro** de la caja, así que suma con el margen sin tocar ninguno de los dos
+límites: la línea de "+ Sub Frente" sigue a 4 de su grupo (#306b) y la separación
+entre frentes sigue valiendo lo que fijó #306c.
+
+**Medido después:** con los sub frentes desplegados, **16** entre uno y otro
+contra **49** hasta el frente siguiente; contraídos, **8** contra **41**. El
+contraste se mantiene en los dos casos, así que no hizo falta tocar nada entre
+frentes.
+
+### #331 — Desde la barra lateral contraída no se podía ir a Mis Tareas ni a Resumen
+
+Con la barra plegada, la franja de íconos tenía el botón de fijar, la campana de
+notificaciones y un cuadrito de color por proyecto. **De las tres secciones fijas
+de la barra desplegada —Notificaciones, Resumen y Mis Tareas— solo la campana
+había llegado a la franja**, con #159.
+
+**Ahora están las tres, en el mismo orden que arriba:** campana · Resumen · Mis
+Tareas · proyectos. Llevan el nombre en globo al pasar el mouse, como la campana,
+y **se marcan como activos** cuando se está en esa pantalla, como ya hacían los
+cuadritos de proyecto.
+
+**Los dos íconos son nuevos, y son los primeros del juego propio que no son de
+una acción sobre una fila** — las otras diez lo son. Siguen la misma base: trazo,
+`currentColor` y viewBox de 24, y se dibujan con el trazo de la campana, que es
+su vecina en la franja.
+
+- **Resumen:** tres barras verticales de distinta altura sobre una misma línea de
+  base, la del medio la más alta.
+- **Mis Tareas:** una lista de tres renglones con un visto **solo en el primero**.
+  *El visto va solo ahí para que se lea como "cosas por hacer" y no como "todo
+  terminado".*
+
+La clase que daba forma al botón de la campana pasa a llamarse por lo que es
+—`sidebar-mini__seccion`— porque ahora la comparten los tres.
+
+### #332 — El responsable se veía descentrado en su columna
+
+El selector de responsable es un botón que contiene el círculo con las iniciales
+y, a su derecha, una flecha. La flecha está invisible en reposo **pero ocupaba su
+lugar siempre**, así que al centrar el botón entero en la celda **el círculo
+quedaba corrido a la izquierda** media flecha más su separación. Medido: **4**, en
+la tabla y en la Gantt.
+
+**La flecha sale del flujo**, el mismo recurso con el que #306 sacó el "+" de la
+Gantt: el botón mide lo que mide el círculo, así que centrarlo lo centra de
+verdad, y la flecha sigue apareciendo a su derecha al pasar el mouse **sin
+moverlo**. Medido después: **1** de desvío —el redondeo del ancho impar de la
+celda— en la tabla, en la Gantt y en Mis Tareas.
+
+Sigue siendo **hija del botón**, así que un clic sobre ella sigue abriendo el
+menú de responsables. En mobile la flecha no se dibuja y ahí ya estaba centrado.
+
+**Verificado** los cinco con `docs/prueba-313-319-329-331-332.mjs`: **51
+comprobaciones en verde**. De #313 no alcanza con comprobar que ascendente vaya
+"en el sentido correcto" —el orden estable puede dejarlo bien por casualidad—,
+así que se exige que la secuencia de ↻ dentro de cada estado **se dé vuelta** al
+invertir la flecha, que es lo que no puede pasar por azar. De #319 se comprueba
+que cada frente y cada sub frente aparezcan en **un solo tramo contiguo**, y que
+el orden de los frentes sea el armado y **no** el alfabético. De #329 se miden
+las separaciones como las ve el ojo —del final visible de un sub frente al título
+del siguiente— y se exige que el contraste con la separación entre frentes se
+mantenga. De #331, el orden de la franja, la navegación, el estado activo y que
+los dos íconos midan, tracen y coloreen como la campana. De #332, el desvío del
+círculo respecto del centro de su celda, con y sin mouse, en las cuatro vistas.
+
+*Control negativo:* corrida contra `main`, **17 comprobaciones fallan**: el
+desempate por ↻ no se invierte, los sub frentes salen intercalados *(Operacionales
+· Comerciales · Financieros · Configuración · Arquitectura)*, la separación entre
+sub frentes desplegados mide 8, la franja no tiene los dos botones, y el círculo
+del responsable está a **4** del centro.

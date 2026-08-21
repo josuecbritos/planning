@@ -216,6 +216,22 @@ completo con creación y edición **inline** (sin formularios).
   construcción: el mismo 16 de un lado y del otro, no dos números ajustados
   para que coincidan.
 
+  **El sub frente desplegado separa más que el contraído (#329).** El 8 que dejó
+  #306 es lo que agrupa, y contraído funciona; desplegado no, porque entre la
+  última fila de una tabla y el título del sub frente de abajo 8 no alcanza para
+  separar dos piezas distintas. Desplegado separa **16** —`--aire-bloque`, el
+  mismo valor de #306c— y contraído sigue en **8**; con uno desplegado y el
+  siguiente contraído manda el desplegado. Los 8 de más van como **relleno y no
+  como margen**, y no es un detalle: los márgenes verticales de hermanos
+  **colapsan** —toman el mayor, no la suma— y el del último sub frente además se
+  escapa de su sección y colapsa con el que separa un frente del siguiente.
+  *Medido: por eso la separación entre frentes vale 16 y no 24.* Subir el margen
+  a 16 habría dejado la separación entre frentes **igual** a la de dos sub
+  frentes desplegados, perdiendo el contraste que comunica la pertenencia; el
+  relleno vive dentro de la caja y suma sin tocar ninguno de los dos límites.
+  Medido después: 16 entre sub frentes desplegados contra 49 entre frentes, y 8
+  contra 41 con todo contraído.
+
   **El nombre de la tarea pesa lo mismo que lo que lo contiene (#326).** Iba en
   semi negrita (600) y su sub frente en 500 —perdió la negrita en #306, a
   propósito—, así que el hijo se leía **más pesado que su propio contenedor**.
@@ -381,7 +397,31 @@ títulos que separan **grupos dentro de un mismo menú** —"Aplicado" en Filtra
   grilla cuando se está en Gantt, los puntos de color cuando se está en tabla —
   dos representaciones del mismo modelo a la vez es justo lo que se eliminó.
 - **Ordenar** conserva su menú íntegro y suma contador y **×**, que reemplaza al
-  "Limpiar orden" que estaba suelto en la barra.
+  "Limpiar orden" que estaba suelto en la barra. Los campos son **Responsable ·
+  Estado · Fecha Objetivo · Atraso**, y **Proyecto** solo en Mis Tareas. Se
+  apilan por prioridad y **el último que se toca queda primero**.
+
+  **Dos criterios traen consigo una comparación que el menú no muestra**, porque
+  no son criterios que se elijan sino la continuación del que los trae:
+
+  - **Estado desempata por replanificaciones (#313).** Estado ordena por la
+    gravedad del modelo, y dentro de un mismo estado no desempataba nada: el
+    orden es estable, así que las empatadas quedaban como venían. Ahora desempata
+    el número de replanificaciones —el mismo ↻ ×N que ya se muestra—, **en el
+    sentido de la flecha del Estado**, porque es una sola escala: una tarea
+    replanificada es más crítica que una que no lo está, y cuantas más veces se
+    movió, más crítica es. Vale para **todos** los estados, incluidas las hechas:
+    marcar hecha quita la condición de replanificada a efectos de color y
+    contadores, pero el rastro queda. Actúa **al final de todo**, así que lo que
+    se apile encima sigue mandando.
+  - **Proyecto agrupa por frente y sub frente (#319).** Comparaba solo el nombre
+    del proyecto, así que **todas** sus tareas empataban y quedaban revueltas,
+    con frentes y sub frentes intercalados — y no había forma de arreglarlo a
+    mano, porque frente y sub frente no son campos ordenables. Ahora, dentro de
+    cada proyecto, agrupa por frente y dentro de cada frente por sub frente, en
+    el **orden con el que están armados** —el mismo que se ve al entrar al
+    proyecto—, no alfabético. Las tres comparaciones van juntas y en el lugar de
+    Proyecto: lo que se apile después manda **dentro del sub frente**.
 - **Rango** es el antiguo horizonte de la Gantt. **No lleva contador ni ×:** sus
   opciones siempre tienen valor. Dos grupos con título: **Días** (hábiles o
   semana completa) y **Horizonte** (alrededor de hoy, o todo el proyecto — en
@@ -616,6 +656,17 @@ la base **nunca se muestra vacía**: si esa persona ya no es candidata se ve
 **apagada**, con el motivo en el tooltip, y una **marca neutra «?»** cuando el
 cliente no dispone de su ficha. No cambia ningún dato existente ni la base.
 
+**El círculo del responsable va centrado en su columna (#332).** El selector es
+un botón con el círculo y, a su derecha, una flecha que aparece al pasar el
+mouse — pero que **ocupaba su lugar siempre**, invisible o no. Como el botón
+entero se centra en la celda, el círculo quedaba corrido a la izquierda media
+flecha más su separación: **4 medidos**, en la tabla y en la Gantt. La flecha
+sale del flujo, igual que el "+" de la Gantt en #306: el botón mide lo que mide
+el círculo, centrarlo lo centra de verdad, y la flecha sigue apareciendo a su
+derecha **sin moverlo**. Sigue siendo hija del botón, así que un clic sobre ella
+sigue abriendo el menú. En mobile la flecha no se dibuja y ahí ya estaba
+centrado.
+
 **Replanificación con historial:** mover una fecha que ya venció cuenta como
 replanificación (↻ ×N) y deja rastro; mover una fecha futura es planificación
 (sin rastro). La fecha original se conserva. Es el diferenciador del producto.
@@ -708,7 +759,17 @@ el usuario puede **ajustar su ancho arrastrando el borde derecho** (entre 244 y
 proyectos ni los frentes muestran contador de tareas (#188): la lista se navega
 por color, nombre y jerarquía. Los contadores de **Administración** (usuarios y
 proyectos activos) sí se conservan. El control de plegar la barra es un
-**chevron doble**, no un pin: contrae, no ancla (#187). Con la barra contraída
+**chevron doble**, no un pin: contrae, no ancla (#187). Contraída, la franja de
+íconos lleva las **tres secciones fijas** en el mismo orden que la barra
+desplegada —campana · **Resumen** · **Mis Tareas**— y después los cuadritos de
+proyecto (#331): antes solo había llegado la campana (#159). Los dos íconos
+nuevos son los primeros del juego propio que **no** son de una acción sobre una
+fila —Resumen, tres barras sobre una misma base con la del medio más alta; Mis
+Tareas, una lista de tres renglones con un visto **solo en el primero**, para
+que se lea como "cosas por hacer" y no como "todo terminado"— y siguen la base
+común: trazo, tamaño y color heredado, los de la campana con la que comparten
+columna. Llevan el nombre en globo y **se marcan como activos** cuando se está
+en su pantalla, como los cuadritos de proyecto. Con la barra contraída
 se ve solo el del riel y, al desplegarse, solo el de la cabecera: nunca los dos
 a la vez (#191). En modo escondido, **mientras el panel de notificaciones o un
 menú ⋯ (de proyecto o de frente) estén abiertos, la barra se sostiene
