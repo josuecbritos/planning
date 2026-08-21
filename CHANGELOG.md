@@ -2740,7 +2740,40 @@ una tarea y restaurarla, por ejemplo—. La tarea restaurada volvía a la tabla
 **con el nombre en modo edición sola**. El pulso ahora se **atiende una vez**: el
 campo recuerda cuál ya trató, empezando por el que trae al montarse.
 
-**Verificado** con `docs/prueba-292-menu-contextual.mjs`: **41 comprobaciones en
+**El aspecto se corrigió antes de fusionar.** La primera versión funcionaba y
+aparecía donde correspondía, pero **se veía pobre al lado del resto del
+producto**. La vara es el **menú de Filtrar**, que ya existe y ya se ve bien —el
+del responsable sirve igual: los dos ya coincidían entre sí—, y la forma de
+igualarlo no fue copiar sus valores sino **compartir sus reglas**: fondo, borde,
+esquina, sombra, relleno, tamaño y aire de cada opción, realce al pasar el mouse
+y la animación corta de entrada salen ahora de las mismas declaraciones, así que
+los dos menús **no pueden separarse** cuando alguno cambie. Lo único propio del
+menú del clic derecho es dónde se ancla. *Medido: los ocho valores calculados de
+la caja y los cinco de la opción coinciden exactamente.*
+
+Además:
+
+- **Cada opción lleva su ícono a la izquierda.** Los cuatro ya existían en el
+  juego del producto y no hubo que crear ninguno — el de **información no se
+  usaba en ninguna parte**—. Van al tamaño y con el trazo de su base común (16 y
+  1.7) y toman el color del texto de su opción.
+- **Una línea separa lo destructivo del resto:** arriba lo que abre o edita la
+  tarea, abajo lo que la saca del plan. Se declara por el **cambio de bloque** y
+  no como "una línea antes de Archivar", y esa diferencia importa: cuando el
+  menú crezca —"Agregar tarea debajo", "Duplicar"— las nuevas entran arriba y la
+  línea no se mueve de sitio. Tampoco aparece cuando no hay nada de un lado:
+  verificado con **Información sola** (ninguna línea) y **sin Renombrar** (la
+  línea sigue en su sitio, sin quedar suelta).
+- **Eliminar se ve en el rojo de la paleta**, texto e ícono, por ser la única
+  irreversible. **Archivar no:** se puede restaurar. El rojo es la variable del
+  producto, que ya tiene su propio valor en modo oscuro — comprobado en los dos
+  temas.
+
+*Anotado y no corregido acá, como pidió el pedido:* la columna de acciones de la
+tabla **no usa esos íconos**, dibuja los símbolos de texto ⓘ, ⤵ y 🗑. Es un
+cambio aparte.
+
+**Verificado** con `docs/prueba-292-menu-contextual.mjs`: **54 comprobaciones en
 verde**. Recorre las cuatro opciones en la tabla y en la Gantt, que Información
 abra el mismo panel que el ⓘ, que Renombrar deje el campo abierto con el nombre
 puesto y que Enter guarde y Escape cancele, que Archivar y Eliminar pidan el
@@ -2753,6 +2786,10 @@ un usuario sin ninguno ve **Información sola**, y uno con **solo** "marcar
 hechas" —dado desde el modal de miembros dentro de la misma prueba— sigue viendo
 Información sola, sin Archivar ni Eliminar.
 
-*Control negativo:* corrida contra `main`, **22 comprobaciones fallan**: no
+*Dos controles negativos.* Contra `main`, **22 comprobaciones fallan**: no
 existe ningún menú, así que ninguna de las opciones se puede elegir en ninguna de
-las tres vistas.
+las tres vistas. Y contra la **primera versión del menú** —la que se corrigió—,
+**9 fallan**: la caja no comparte el aspecto de Filtrar (sin relleno, otra
+sombra, sin animación), las opciones tampoco (otro relleno, sin esquina
+redondeada, sin separación para el ícono), no hay ningún ícono, no hay línea
+separadora, y Eliminar se ve del color del texto normal en los dos temas.

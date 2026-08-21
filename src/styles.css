@@ -974,12 +974,19 @@ table.tareas .col-desv { text-align: center; }
 .controles-btn--actualizar:hover { border-color: var(--hoy); background: rgba(21, 101, 192, 0.16); }
 
 /* Menus desplegables: radio amplio, sombra en capas, entrada animada */
-.filtro-menu {
-  position: absolute; top: calc(100% + 8px); left: 0; z-index: 1900;
+/* #292: el menú del clic derecho (`.menu-tarea`) comparte ESTAS declaraciones,
+   no una copia de sus valores. Puestos uno al lado del otro tienen que verse
+   como la misma pieza, y compartiendo la regla no pueden separarse cuando
+   alguna de las dos cambie. Lo único suyo es dónde se ancla, más abajo. */
+.filtro-menu,
+.menu-tarea {
   min-width: 244px; background: var(--superficie); border: 1px solid var(--gris-borde);
   border-radius: 8px; padding: 8px;
   box-shadow: var(--sombra-flotante);
   animation: filtro-menu-in .13s ease-out;
+}
+.filtro-menu {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 1900;
 }
 @keyframes filtro-menu-in {
   from { opacity: 0; transform: translateY(-5px) scale(.98); }
@@ -1008,13 +1015,17 @@ table.tareas .col-desv { text-align: center; }
   color: var(--gris-texto); padding: 8px 10px 3px;
 }
 .filtro-menu__vacio { font-size: 12.5px; color: var(--gris-texto); padding: 10px 12px; }
-.filtro-op {
+/* #292: la opción del menú del clic derecho comparte la misma regla, por lo
+   mismo que el contenedor. */
+.filtro-op,
+.menu-tarea__op {
   display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
   font: inherit; font-size: 13px; padding: 8px 10px; border: none; background: none;
   border-radius: 9px; cursor: pointer; color: var(--texto);
   transition: background .1s ease;
 }
-.filtro-op:hover { background: var(--velo); }
+.filtro-op:hover,
+.menu-tarea__op:hover { background: var(--velo); }
 .filtro-op:disabled { opacity: .4; cursor: default; }
 .filtro-op:disabled:hover { background: none; }
 .filtro-op--on { background: var(--velo-fuerte); font-weight: 700; }
@@ -1926,17 +1937,29 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
    pero con los colores de la superficie clara: es el mismo tipo de objeto —una
    lista corta de acciones sobre lo que acabas de apuntar— y no tenía por qué
    inventarse otro. */
+/* Lo propio del menú del clic derecho: dónde se ancla. El resto de su aspecto
+   —fondo, borde, esquina, sombra, relleno, tamaño y aire de cada opción, realce
+   al pasar el mouse y la animación de entrada— lo comparte con el menú de
+   Filtrar, arriba. Va por encima de los otros menús y de los globos porque
+   puede caer sobre cualquiera. */
 .menu-tarea {
-  position: fixed; z-index: 2600; min-width: 168px;
-  display: flex; flex-direction: column; overflow: hidden;
-  background: var(--superficie); border: 1px solid var(--gris-borde);
-  border-radius: 8px; box-shadow: 0 12px 32px rgba(10, 10, 12, .28);
+  position: fixed; z-index: 2600;
+  display: flex; flex-direction: column;
 }
-.menu-tarea__op {
-  border: none; background: none; color: var(--texto); text-align: left;
-  font: inherit; font-size: 13px; padding: 8px 12px; cursor: pointer;
+/* El ícono toma el color del texto de su opción (`currentColor`), así que en
+   Eliminar se pone rojo solo. */
+.menu-tarea__icono { display: inline-flex; flex: none; color: inherit; }
+/* La línea separa SIEMPRE lo destructivo del resto. Se estira sobre el relleno
+   del contenedor para que llegue de borde a borde, como una separación de menú
+   y no como un subrayado de la opción de arriba. */
+.menu-tarea__linea {
+  height: 1px; background: var(--gris-linea);
+  margin: 5px -8px;
 }
-.menu-tarea__op:hover { background: var(--superficie-3); }
+/* Eliminar es la única irreversible. Archivar no: se puede restaurar. El rojo
+   es el de la paleta, que ya tiene su valor propio en modo oscuro. */
+.menu-tarea__op--peligro { color: var(--rojo); }
+.menu-tarea__op--peligro:hover { background: var(--rojo-suave); }
 /* En el teléfono no existe: es un atajo de escritorio y la columna de acciones
    sigue siendo el camino. La regla es un cinturón de seguridad — el menú ya no
    se abre desde JS bajo 768px—, para que una pulsación larga no lo deje ver ni

@@ -71,6 +71,11 @@ const restaurarArchivada = async () => {
   return true
 }
 const hayMenu = async () => (await p.locator('.menu-tarea').count()) > 0
+/** Abre el menú de Filtrar, que es la vara de aspecto. */
+const ctrlFiltrar = async () => {
+  await p.locator('.controles-btn', { hasText: 'Filtrar' }).first().click()
+  await esperar(500)
+}
 const cerrarMenu = async () => {
   await p.keyboard.press('Escape')
   await esperar(300)
@@ -171,6 +176,131 @@ chk(
   '3 Información abre el mismo panel que el ⓘ de esa fila',
   `${porMenu}`,
 )
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Aspecto · La vara es el menú de Filtrar
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── Aspecto · Igual que el menú de Filtrar ──')
+/** Lo que tiene que coincidir entre los dos menús, del contenedor y de una
+ *  opción. Se comparan los valores CALCULADOS, no los declarados: así da igual
+ *  cómo estén escritos, lo que se exige es que se vean iguales. */
+const aspectoDe = (selMenu, selOp) =>
+  p.evaluate(
+    ([sm, so]) => {
+      const m = document.querySelector(sm)
+      if (!m) return null
+      const op = m.querySelector(so)
+      const c = getComputedStyle(m)
+      const o = op ? getComputedStyle(op) : null
+      return {
+        caja: [
+          c.backgroundColor,
+          c.borderTopWidth,
+          c.borderTopColor,
+          c.borderRadius,
+          c.padding,
+          c.boxShadow,
+          c.animationName,
+          c.animationDuration,
+        ].join(' | '),
+        op: o ? [o.fontSize, o.padding, o.borderRadius, o.gap, o.color].join(' | ') : null,
+      }
+    },
+    [selMenu, selOp],
+  )
+
+await ctrlFiltrar()
+const varaFiltrar = await aspectoDe('.filtro-menu--portal', '.filtro-op')
+await cerrarMenu()
+await clicDerechoEn(filaDe(PRIMERA))
+const elMenu = await aspectoDe('.menu-tarea', '.menu-tarea__op')
+chk(
+  varaFiltrar !== null && elMenu !== null && varaFiltrar.caja === elMenu.caja,
+  '1 y 2 la caja se ve igual que la del menú de Filtrar, animación de entrada incluida',
+  elMenu?.caja ?? 'sin menú',
+)
+chk(
+  varaFiltrar?.op === elMenu?.op,
+  '1 y 3 y cada opción también: mismo tamaño, mismo aire, mismo realce',
+  elMenu?.op ?? 'sin opción',
+)
+
+// 4 · cada opción con su ícono, todos del mismo tamaño.
+const iconos = await p.evaluate(() => {
+  const svgs = [...document.querySelectorAll('.menu-tarea__icono svg')]
+  return {
+    cuantos: svgs.length,
+    medidas: [...new Set(svgs.map((s) => `${s.getAttribute('width')}/${s.getAttribute('stroke-width')}`))],
+    // Todos alineados entre sí: el mismo borde izquierdo.
+    izquierdas: [...new Set(svgs.map((s) => Math.round(s.getBoundingClientRect().left)))],
+  }
+})
+chk(
+  iconos.cuantos === (await opciones()).length,
+  '4 cada opción muestra su ícono a la izquierda',
+  `${iconos.cuantos} íconos para ${(await opciones()).length} opciones`,
+)
+chk(
+  iconos.medidas.length === 1 && iconos.izquierdas.length === 1,
+  '4 todos del mismo tamaño y alineados entre sí',
+  `${iconos.medidas.join(' · ')} · borde izquierdo ${iconos.izquierdas.join(',')}`,
+)
+
+// 5 · una sola línea, entre Renombrar y Archivar.
+const bloques = () =>
+  p.evaluate(() => {
+    const m = document.querySelector('.menu-tarea')
+    if (!m) return null
+    return {
+      hijos: [...m.children].map((x) => (x.className.includes('linea') ? '—' : x.textContent.trim())),
+      lineas: m.querySelectorAll('.menu-tarea__linea').length,
+    }
+  })
+const conTodo = await bloques()
+chk(
+  conTodo?.lineas === 1 &&
+    JSON.stringify(conTodo.hijos) === JSON.stringify(['Información', 'Renombrar', '—', 'Archivar', 'Eliminar']),
+  '5 hay UNA línea separadora, entre Renombrar y Archivar',
+  conTodo?.hijos?.join(' ') ?? 'sin menú',
+)
+
+// 6 · Eliminar en rojo, Archivar no.
+const colores = await p.evaluate(() => {
+  const m = document.querySelector('.menu-tarea')
+  const de = (t) => [...m.querySelectorAll('.menu-tarea__op')].find((x) => x.textContent.includes(t))
+  const eliminar = de('Eliminar')
+  const archivar = de('Archivar')
+  const rojo = getComputedStyle(document.documentElement).getPropertyValue('--rojo').trim()
+  const aRgb = (c) => {
+    const d = document.createElement('span')
+    d.style.color = c
+    document.body.appendChild(d)
+    const v = getComputedStyle(d).color
+    d.remove()
+    return v
+  }
+  const svgEliminar = eliminar?.querySelector('svg')
+  return {
+    textoEliminar: eliminar ? getComputedStyle(eliminar).color : null,
+    // Sin ícono no hay nada que comparar: se devuelve null y la comprobación
+    // falla con su motivo, en vez de romper la prueba.
+    iconoEliminar: svgEliminar ? getComputedStyle(svgEliminar).color : null,
+    textoArchivar: archivar ? getComputedStyle(archivar).color : null,
+    rojoPaleta: aRgb(rojo),
+    textoNormal: getComputedStyle(document.body).color,
+  }
+})
+chk(
+  colores.textoEliminar === colores.rojoPaleta && colores.iconoEliminar === colores.rojoPaleta,
+  '6 Eliminar se ve en el rojo de la paleta, texto e ícono',
+  `texto ${colores.textoEliminar} · ícono ${colores.iconoEliminar ?? 'no tiene'}`,
+)
+chk(
+  colores.textoArchivar !== colores.rojoPaleta,
+  '6 y Archivar no: se puede restaurar',
+  colores.textoArchivar,
+)
+await cerrarMenu()
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 4 · Renombrar
@@ -422,6 +552,14 @@ chk(
     (await p.locator('table.tareas tbody .tarea-cell__link').count()) > 0,
   '14 terreno: en la tabla de Mis Tareas el nombre abre el panel, no la edición',
 )
+// 8 · sin Renombrar, la línea no queda suelta: sigue separando lo destructivo.
+const sinRenombrar = await bloques()
+chk(
+  sinRenombrar?.lineas === 1 &&
+    JSON.stringify(sinRenombrar.hijos) === JSON.stringify(['Información', '—', 'Archivar', 'Eliminar']),
+  '8 sin Renombrar la línea sigue en su sitio, sin quedar suelta',
+  sinRenombrar?.hijos?.join(' ') ?? 'sin menú',
+)
 await cerrarMenu()
 await verVista('Gantt')
 await p.locator('.gantt tbody td.fija--tarea').first().click({ button: 'right' })
@@ -432,6 +570,58 @@ chk(
   (await opciones()).join(' · '),
 )
 await cerrarMenu()
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 7 · En modo oscuro
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── 7 · En modo oscuro ──')
+await abrirProyecto()
+// El conmutador Tabla/Gantt se recuerda, y el bloque anterior lo dejó en Gantt.
+await verVista('Tabla')
+await p.locator('.sesion__tema').first().click()
+await esperar(800)
+await clicDerechoEn(filaDe(PRIMERA))
+const oscuro = await p.evaluate(() => {
+  const m = document.querySelector('.menu-tarea')
+  if (!m) return null
+  const de = (t) => [...m.querySelectorAll('.menu-tarea__op')].find((x) => x.textContent.includes(t))
+  const linea = m.querySelector('.menu-tarea__linea')
+  const c = getComputedStyle(m)
+  const rojo = getComputedStyle(document.documentElement).getPropertyValue('--rojo').trim()
+  const aRgb = (col) => {
+    const d = document.createElement('span')
+    d.style.color = col
+    document.body.appendChild(d)
+    const v = getComputedStyle(d).color
+    d.remove()
+    return v
+  }
+  const luz = (col) => col.match(/\d+/g).slice(0, 3).reduce((a, n) => a + Number(n), 0)
+  return {
+    fondoMenu: luz(c.backgroundColor),
+    fondoPagina: luz(getComputedStyle(document.body).backgroundColor),
+    textoNormal: luz(getComputedStyle(de('Archivar')).color),
+    rojoEliminar: getComputedStyle(de('Eliminar')).color,
+    rojoPaleta: aRgb(rojo),
+    lineaVisible: !!linea && luz(getComputedStyle(linea).backgroundColor) !== luz(c.backgroundColor),
+  }
+})
+chk(oscuro !== null, '7 terreno: en modo oscuro el menú sigue abriéndose')
+chk(
+  !!oscuro && oscuro.fondoMenu < 250 && oscuro.textoNormal > 400,
+  '7 el menú toma el fondo oscuro y su texto se lee claro sobre él',
+  `fondo ${oscuro.fondoMenu} · texto ${oscuro.textoNormal}`,
+)
+chk(
+  !!oscuro && oscuro.rojoEliminar === oscuro.rojoPaleta,
+  '7 y Eliminar usa el rojo de la paleta, que tiene su propio valor en oscuro',
+  oscuro?.rojoEliminar ?? 'sin menú',
+)
+chk(oscuro?.lineaVisible === true, '7 la línea separadora se distingue del fondo')
+await cerrarMenu()
+// Se vuelve al modo claro para lo que sigue.
+await p.locator('.sesion__tema').first().click()
+await esperar(800)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 15 · En mobile no existe
@@ -478,6 +668,12 @@ chk(
   JSON.stringify(await opciones()) === JSON.stringify(['Información']),
   '11 y muestra Información sola',
   (await opciones()).join(' · '),
+)
+const soloInfo = await bloques()
+chk(
+  soloInfo?.lineas === 0,
+  '8 con Información sola no hay ninguna línea: no sobra al principio ni al final',
+  soloInfo?.hijos?.join(' ') ?? 'sin menú',
 )
 await cerrarMenu()
 

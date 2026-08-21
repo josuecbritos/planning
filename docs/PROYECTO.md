@@ -284,6 +284,23 @@ completo con creación y edición **inline** (sin formularios).
   nombre abre el panel de detalle y nunca fue editable, así que ofrecerlo
   prometería algo que no pasaría. Su Gantt sí lo tiene, porque ahí el nombre
   siempre se pudo editar.*
+
+  **Se ve como el menú de Filtrar, porque comparte sus reglas.** Fondo, borde,
+  esquina, sombra, relleno, tamaño y aire de cada opción, realce al pasar el
+  mouse y la animación corta de entrada **no son una copia de sus valores**: son
+  las mismas declaraciones, así que los dos menús no pueden separarse cuando
+  alguno cambie. Lo único propio es dónde se ancla. Cada opción lleva **su ícono
+  a la izquierda** —los cuatro ya existían en el juego del producto; el de
+  información no se usaba en ninguna parte— y toma el color del texto de su
+  opción. Una **línea separa lo destructivo del resto**: arriba lo que abre o
+  edita la tarea, abajo lo que la saca del plan. La línea se declara por el
+  **cambio de bloque** y no como "antes de Archivar", así que no se mueve de
+  sitio cuando el menú crezca, y no aparece cuando no hay nada de un lado — con
+  Información sola, o sin Renombrar. **Eliminar va en el rojo de la paleta**,
+  texto e ícono, por ser la única irreversible; **Archivar no**, porque se puede
+  restaurar.
+  *Anotado y sin corregir acá: la columna de acciones de la tabla no usa esos
+  íconos, dibuja los símbolos de texto ⓘ, ⤵ y 🗑. Es un cambio aparte.*
 - **Gantt** (grilla tipo Excel): planificación por clics, horizonte configurable,
   filas de carga por persona, rastro de replanificaciones. (Oculta en mobile.)
 
