@@ -186,7 +186,7 @@ chk(
   celda.botones.join(' · ') || '(ninguno)',
 )
 chk(
-  celda.botones.length === 1 && celda.botones[0] === 'Agregar tarea debajo',
+  celda.botones.length === 1 && celda.botones[0] === 'Agregar tarea abajo',
   '#328·1 el "+" se queda, y es lo único que queda',
   celda.botones.join(' · '),
 )
@@ -221,10 +221,11 @@ const PRIMERA_G = (await ganttFilas())[0].titulo
 await clicDerechoEn(filaGantt(PRIMERA_G))
 const opsGantt = await opciones()
 chk(
-  // #273 sumó "Duplicar" junto a "Agregar tarea debajo": el contrato crece, y la
-  // línea separadora sigue sin moverse de sitio.
+  // #273 sumó "Duplicar tarea" junto a "Agregar tarea abajo": el contrato crece,
+  // y la línea separadora sigue sin moverse de sitio. El texto de la opción es
+  // el de la corrección posterior a #273.
   JSON.stringify(opsGantt) ===
-    JSON.stringify(['Información', 'Renombrar', 'Agregar tarea debajo', 'Duplicar', 'Archivar', 'Eliminar']),
+    JSON.stringify(['Información', 'Renombrar', 'Agregar tarea abajo', 'Duplicar tarea', 'Archivar', 'Eliminar']),
   '#328·3 el menú de la Gantt abre con SEIS opciones, en su orden',
   opsGantt.join(' · '),
 )
@@ -265,7 +266,7 @@ const antesA = await ganttDe(SUB_A)
 const fila2 = filaGantt(antesA[1])
 await fila2.locator('td.fija--tarea').hover()
 await esperar(250)
-await pulsarSiEsta(fila2.locator('button[aria-label="Agregar tarea debajo"]'))
+await pulsarSiEsta(fila2.locator('button[aria-label="Agregar tarea abajo"]'))
 await crearEnGantt('G-mas')
 const trasMas = await ganttDe(SUB_A)
 chk(
@@ -275,12 +276,12 @@ chk(
 )
 // 8 · la misma posición desde el menú.
 await clicDerechoEn(filaGantt(antesA[0]))
-await elegir('Agregar tarea debajo', 400)
+await elegir('Agregar tarea abajo', 400)
 await crearEnGantt('G-menu')
 const trasMenu = await ganttDe(SUB_A)
 chk(
   trasMenu[1] === 'G-menu',
-  '#328·8 "Agregar tarea debajo" del menú hace lo mismo que el "+"',
+  '#328·8 "Agregar tarea abajo" del menú hace lo mismo que el "+"',
   trasMenu.slice(0, 4).join(' · '),
 )
 
@@ -296,11 +297,11 @@ await clicDerechoEn(filaTabla(antesT[1]))
 const opsTabla = await opciones()
 chk(
   JSON.stringify(opsTabla) ===
-    JSON.stringify(['Información', 'Renombrar', 'Agregar tarea debajo', 'Duplicar', 'Archivar', 'Eliminar']),
+    JSON.stringify(['Información', 'Renombrar', 'Agregar tarea abajo', 'Duplicar tarea', 'Archivar', 'Eliminar']),
   '#328·9 el menú de la tabla muestra las mismas seis opciones',
   opsTabla.join(' · '),
 )
-await elegir('Agregar tarea debajo', 500)
+await elegir('Agregar tarea abajo', 500)
 const posFila = await p.evaluate(() => {
   const t = document.querySelector('table.tareas')
   return [...t.querySelectorAll('tbody tr')].findIndex((r) => r.className.includes('fila-nueva'))
@@ -348,7 +349,7 @@ chk(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
-// #328 · 12 · Mis Tareas no ofrece "Agregar tarea debajo"
+// #328 · 12 · Mis Tareas no ofrece "Agregar tarea abajo"
 // ═══════════════════════════════════════════════════════════════════════════
 console.log('\n── #328 · 12 · Mis Tareas ──')
 await p.getByText('Mis Tareas', { exact: true }).first().click()
@@ -356,8 +357,8 @@ await esperar(1200)
 await clicDerechoEn(p.locator('table.tareas tbody tr').first())
 const opsMT = await opciones()
 chk(
-  !opsMT.includes('Agregar tarea debajo'),
-  '#328·12 la tabla de Mis Tareas NO muestra "Agregar tarea debajo"',
+  !opsMT.includes('Agregar tarea abajo'),
+  '#328·12 la tabla de Mis Tareas NO muestra "Agregar tarea abajo"',
   opsMT.join(' · '),
 )
 await cerrarMenu()
@@ -365,7 +366,7 @@ await verVista('Gantt')
 await clicDerechoEn(p.locator('.gantt tbody tr', { has: p.locator('td.fija--tarea .con-mas') }).first())
 const opsMTG = await opciones()
 chk(
-  !opsMTG.includes('Agregar tarea debajo') && opsMTG.includes('Renombrar'),
+  !opsMTG.includes('Agregar tarea abajo') && opsMTG.includes('Renombrar'),
   '#328·12 la Gantt de Mis Tareas tampoco, y el resto se comporta igual',
   opsMTG.join(' · '),
 )
@@ -452,7 +453,7 @@ chk(!!SUB_4 && visibles4.length >= 4, '#333 terreno: hay un sub frente con cuatr
 const filaG2 = filaGantt(visibles4[1])
 await filaG2.locator('td.fija--tarea').hover()
 await esperar(250)
-await pulsarSiEsta(filaG2.locator('button[aria-label="Agregar tarea debajo"]'))
+await pulsarSiEsta(filaG2.locator('button[aria-label="Agregar tarea abajo"]'))
 await crearEnGantt('F-entremedio')
 const trasFiltro = await ganttDe(SUB_4)
 chk(
@@ -487,7 +488,7 @@ const ult = (await ganttDe(SUB_4)).slice(-1)[0]
 const filaUlt = filaGantt(ult)
 await filaUlt.locator('td.fija--tarea').hover()
 await esperar(250)
-await pulsarSiEsta(filaUlt.locator('button[aria-label="Agregar tarea debajo"]'))
+await pulsarSiEsta(filaUlt.locator('button[aria-label="Agregar tarea abajo"]'))
 await crearEnGantt('F-alfinal')
 const trasUlt = await ganttDe(SUB_4)
 chk(
@@ -557,7 +558,7 @@ const limpiasAntes = await ganttDe(SUB_S)
 const filaS = filaGantt(limpiasAntes[1])
 await filaS.locator('td.fija--tarea').hover()
 await esperar(250)
-await pulsarSiEsta(filaS.locator('button[aria-label="Agregar tarea debajo"]'))
+await pulsarSiEsta(filaS.locator('button[aria-label="Agregar tarea abajo"]'))
 await crearEnGantt('S-normal')
 const limpias = await ganttDe(SUB_S)
 chk(
@@ -593,7 +594,7 @@ if (arrastrables.length >= 2) {
   chk(false, '#333·10 terreno: no hubo dos filas visibles para arrastrar')
 }
 
-// 11 y 12 · la tabla, con "Agregar tarea debajo" y filtro puesto.
+// 11 y 12 · la tabla, con "Agregar tarea abajo" y filtro puesto.
 console.log('\n── #333 · 11 y 12 · La tabla con filtro puesto ──')
 await entrarComo('Daniela Vera')
 await abrirProyecto()
@@ -610,7 +611,7 @@ const iTabla = tablas.findIndex((n) => n >= 3)
 chk(iTabla >= 0, '#333 terreno: hay una tabla con tres o más tareas visibles', tablas.join(' · '))
 const visiblesT = await tablaTitulos(iTabla)
 await clicDerechoEn(p.locator('table.tareas').nth(iTabla).locator('tbody tr', { hasText: visiblesT[1] }).first())
-await elegir('Agregar tarea debajo', 500)
+await elegir('Agregar tarea abajo', 500)
 await crearEnFilaNueva('T-entremedio')
 const trasT = await tablaTitulos(iTabla)
 chk(
@@ -670,7 +671,7 @@ await p.keyboard.press('Escape')
 await esperar(500)
 await clicDerechoEn(p.locator('.gantt tbody tr', { has: p.locator('td.fija--tarea .con-mas') }).first())
 chk(
-  !(await opciones()).includes('Agregar tarea debajo'),
+  !(await opciones()).includes('Agregar tarea abajo'),
   '#328 terreno: y su menú tampoco ofrece crear',
   (await opciones()).join(' · '),
 )
@@ -705,10 +706,10 @@ const filaC = filaGantt(antesC[1])
 await filaC.locator('td.fija--tarea').hover()
 await esperar(250)
 chk(
-  (await filaC.locator('button[aria-label="Agregar tarea debajo"]').count()) > 0,
+  (await filaC.locator('button[aria-label="Agregar tarea abajo"]').count()) > 0,
   '#333·9 terreno: con permiso de crear tareas el "+" sí aparece',
 )
-await pulsarSiEsta(filaC.locator('button[aria-label="Agregar tarea debajo"]'))
+await pulsarSiEsta(filaC.locator('button[aria-label="Agregar tarea abajo"]'))
 await crearEnGantt('C-sin-total')
 const trasC = await ganttDe(SUB_C)
 chk(
@@ -722,7 +723,7 @@ if (antesCF.length >= 2) {
   const filaCF = filaGantt(antesCF[0])
   await filaCF.locator('td.fija--tarea').hover()
   await esperar(250)
-  await pulsarSiEsta(filaCF.locator('button[aria-label="Agregar tarea debajo"]'))
+  await pulsarSiEsta(filaCF.locator('button[aria-label="Agregar tarea abajo"]'))
   await crearEnGantt('C-filtro-final')
   const trasCF = await ganttDe(SUB_C)
   chk(

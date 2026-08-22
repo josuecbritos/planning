@@ -4,9 +4,14 @@
 // volver a escribir el título y el responsable a mano.
 //
 // Duplicar **es crear con los campos de otra tarea ya puestos**, así que pasa
-// por el MISMO camino que "Agregar tarea debajo" (#328) en vez de por uno
-// propio: misma posición, mismos permisos, misma foto congelada (#333). Y por
-// eso la copia **no existe hasta confirmar**: con Escape no se crea nada.
+// por el MISMO camino que "Agregar tarea abajo" (#328) en vez de por uno
+// propio: misma posición, mismos permisos, misma foto congelada (#333).
+//
+// La corrección posterior a #273 cambió dos cosas de esta prueba: los textos
+// —"Duplicar tarea", "Agregar tarea abajo"— y que **la copia aparece ya
+// creada**, con el mismo título y sin ningún campo abierto. Los criterios 2 y 5
+// originales —el nombre en edición con el título seleccionado, y Escape sin
+// crear nada— quedan revertidos por esa corrección.
 //
 // **La copia nace limpia:** sin fecha, sin replanificaciones, sin color, sin
 // comentarios y sin las marcas de hecha ni archivada. No es una omisión, es la
@@ -23,7 +28,9 @@ import { chromium } from 'playwright-core'
 const EXE = process.env.CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 const URL_APP = process.env.URL ?? 'http://localhost:4173/'
 
-const SEIS = ['Información', 'Renombrar', 'Agregar tarea debajo', 'Duplicar', 'Archivar', 'Eliminar']
+// Los textos son los de la corrección posterior a #273: "Duplicar tarea" y
+// "Agregar tarea abajo".
+const SEIS = ['Información', 'Renombrar', 'Agregar tarea abajo', 'Duplicar tarea', 'Archivar', 'Eliminar']
 
 const chk = (ok, m, extra = '') => {
   console.log(`${ok ? 'OK   ' : 'FALLA'} ${m}${extra ? ' — ' + extra : ''}`)
@@ -168,7 +175,7 @@ const ops = await opciones()
 chk(JSON.stringify(ops) === JSON.stringify(SEIS), '13 el menú muestra las seis opciones en su orden', ops.join(' · '))
 chk(
   (await p.locator('.menu-tarea__linea').count()) === 1,
-  '13 sigue habiendo UNA sola línea, y Duplicar queda arriba de ella, junto a "Agregar tarea debajo"',
+  '13 sigue habiendo UNA sola línea, y Duplicar queda arriba de ella, junto a "Agregar tarea abajo"',
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -189,53 +196,28 @@ chk(
   '1 terreno: la tarea elegida tiene responsable y fecha',
   `${original.titulo} · ${original.resp} · ${original.fecha}`,
 )
-chk((await opciones()).includes('Duplicar'), '1 el menú de esa tarea muestra Duplicar')
+chk((await opciones()).includes('Duplicar tarea'), '1 el menú de esa tarea muestra Duplicar tarea')
 
-// 5 · Escape no crea nada. Se comprueba ANTES para que el terreno sea el mismo.
-await elegir('Duplicar', 600)
-const abierta = await p.locator('tr.fila-nueva input.inline-input').count()
-await p.keyboard.press('Escape')
-await esperar(800)
-const trasEscape = await tablaTitulos(0)
-chk(
-  abierta > 0 && JSON.stringify(trasEscape) === JSON.stringify(antes),
-  '5 con Escape la copia NO se crea y la lista queda como estaba',
-  `${trasEscape.length} tareas (antes ${antes.length})`,
-)
-
-// 2 · el título copiado, en edición y seleccionado; el mismo responsable.
-await clicDerechoEn(filaTabla(antes[1]))
-await elegir('Duplicar', 600)
-const campo = await p.evaluate(() => {
-  const i = document.querySelector('tr.fila-nueva input.inline-input')
-  if (!i) return null
-  const tr = i.closest('tr')
-  const tabla = tr.closest('table')
-  return {
-    valor: i.value,
-    seleccion: [i.selectionStart, i.selectionEnd],
-    indice: [...tabla.querySelectorAll('tbody tr')].indexOf(tr),
-    resp: tr.querySelector('.col-resp')?.textContent.trim(),
-  }
-})
-chk(campo?.valor === original.titulo, '2 el campo arranca con el título de la original', campo?.valor ?? 'sin campo')
-chk(
-  campo && campo.seleccion[0] === 0 && campo.seleccion[1] === original.titulo.length,
-  '2 y llega SELECCIONADO: se ajusta escribiendo, o se deja igual con Enter',
-  campo ? `${campo.seleccion[0]}–${campo.seleccion[1]} de ${original.titulo.length}` : 'sin campo',
-)
-chk(campo?.indice === 2, '2 la fila aparece justo debajo de la original', `índice ${campo?.indice}`)
-chk(campo?.resp === original.resp, '2 con el mismo responsable', `${campo?.resp} vs ${original.resp}`)
-
-// 4 · Enter sin escribir nada: las dos conviven con el mismo nombre.
-await p.keyboard.press('Enter')
-await esperar(1000)
+// 2 y 4 · la copia aparece CREADA, sin ningún campo abierto.
+//
+// El criterio 2 original pedía el nombre en modo edición con el título
+// seleccionado, y el 5 que con Escape la copia no se creara. La corrección
+// posterior a #273 los revierte: la copia nace ya creada, con el mismo título
+// que la original y sin nada abierto. Renombrarla es un paso aparte.
+await elegir('Duplicar tarea', 1000)
 const trasEnter = await tablaTitulos(0)
+const campos = await p.locator('table.tareas input.inline-input, table.tareas tr.fila-nueva').count()
+chk(campos === 0, '2 la copia aparece creada, sin ningún campo en edición', `${campos} campos abiertos`)
 chk(
-  trasEnter[1] === original.titulo && trasEnter[2] === original.titulo,
-  '4 Enter sin escribir deja la copia con el mismo título, y las dos conviven',
+  trasEnter[2] === original.titulo && trasEnter[1] === original.titulo,
+  '2/4 con el mismo título que la original, justo debajo, y las dos conviven',
   trasEnter.slice(0, 4).join(' · '),
 )
+const respCopia = await p.evaluate(() => {
+  const f = document.querySelectorAll('table.tareas')[0].querySelectorAll('tbody tr')[2]
+  return f.querySelector('.col-resp')?.textContent.trim()
+})
+chk(respCopia === original.resp, '2 y con el mismo responsable', `${respCopia} vs ${original.resp}`)
 
 // 3 · la copia nace limpia.
 const copia = await p.evaluate(() => {
@@ -261,9 +243,7 @@ chk(
 console.log('\n── 8 · Los contadores ──')
 const totalDespues = await totalContadores()
 await clicDerechoEn(filaTabla(antes[3]))
-await elegir('Duplicar', 600)
-await p.keyboard.press('Enter')
-await esperar(1000)
+await elegir('Duplicar tarea', 1000)
 const totalMas = await totalContadores()
 chk(totalMas === totalDespues + 1, '8 los contadores suman una tarea', `${totalDespues} → ${totalMas}`)
 const categoria = await filaDespuesDe(antes[3])
@@ -291,9 +271,7 @@ const hechas = await p.evaluate(() => {
 chk(hechas.length > 0, '7 terreno: hay al menos una tarea hecha', hechas.slice(0, 2).join(' · '))
 if (hechas.length > 0) {
   await clicDerechoEn(filaTabla(hechas[0]))
-  await elegir('Duplicar', 600)
-  await p.keyboard.press('Enter')
-  await esperar(1000)
+  await elegir('Duplicar tarea', 1000)
   const dosIguales = await p.evaluate((titulo) => {
     const filas = [...document.querySelectorAll('table.tareas tbody tr')].filter((r) => {
       const n = r.querySelector('.tarea-cell__link, .tarea-cell .inline-text')
@@ -348,9 +326,7 @@ await esperar(1400)
 await abrirProyecto()
 const duplicoConDesc = await clicDerechoEn(filaTabla(inyectado.titulo))
 chk(duplicoConDesc, '6 terreno: la tarea con comentarios sigue a la vista tras recargar')
-await elegir('Duplicar', 600)
-await p.keyboard.press('Enter')
-await esperar(1000)
+await elegir('Duplicar tarea', 1000)
 
 const tras = await estadoGuardado()
 const orig = tras?.tareas.find((t) => t.id === inyectado.id)
@@ -429,18 +405,11 @@ const antesG = await ganttDe(SUB_G)
 await clicDerechoEn(filaGantt(antesG[1]))
 const opsG = await opciones()
 chk(JSON.stringify(opsG) === JSON.stringify(SEIS), '9 el menú de la Gantt muestra las mismas seis', opsG.join(' · '))
-await elegir('Duplicar', 600)
-const campoG = await p.evaluate(() => {
-  const i = document.querySelector('input.crear-inline')
-  return i ? { valor: i.value, seleccion: [i.selectionStart, i.selectionEnd] } : null
-})
+await elegir('Duplicar tarea', 1000)
 chk(
-  campoG?.valor === antesG[1] && campoG.seleccion[1] === antesG[1].length,
-  '9 el campo de la Gantt también arranca con el título de la original, seleccionado',
-  campoG ? `"${campoG.valor}" ${campoG.seleccion[0]}–${campoG.seleccion[1]}` : 'sin campo',
+  (await p.locator('input.crear-inline').count()) === 0,
+  '9 en la Gantt tampoco se abre ningún campo: la copia aparece creada',
 )
-await p.keyboard.press('Enter')
-await esperar(1000)
 const trasG = await ganttDe(SUB_G)
 chk(
   trasG[2] === antesG[1],
@@ -459,17 +428,15 @@ chk(
   '9 y sin ninguna marca en la grilla',
   marcasCopia.join(' · '),
 )
-// 5 en la Gantt: Escape tampoco crea. Acá importa más que en la tabla, porque
-// el campo llega con texto y el guardado por foco-fuera sí crearía.
+// Duplicar dos veces la misma tarea deja DOS copias, cada una debajo de la
+// anterior: la copia se crea de una, así que repetir el gesto repite el efecto.
 const cuantasG = (await ganttDe(SUB_G)).length
-await clicDerechoEn(filaGantt(antesG[0]))
-await elegir('Duplicar', 600)
-await p.keyboard.press('Escape')
-await esperar(900)
+await clicDerechoEn(filaGantt(antesG[1]))
+await elegir('Duplicar tarea', 1000)
 chk(
-  (await ganttDe(SUB_G)).length === cuantasG,
-  '5 en la Gantt, Escape tampoco crea la copia',
-  `${(await ganttDe(SUB_G)).length} tareas (antes ${cuantasG})`,
+  (await ganttDe(SUB_G)).length === cuantasG + 1,
+  '9 duplicar de nuevo vuelve a crear, sin ningún paso intermedio',
+  `${cuantasG} → ${(await ganttDe(SUB_G)).length} tareas`,
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -488,9 +455,7 @@ const SUB_F = Object.keys(cuentas).find((s) => cuentas[s] >= 3)
 const visiblesF = await ganttDe(SUB_F)
 chk(!!SUB_F, '12 terreno: hay un sub frente con tres o más tareas visibles', `${SUB_F}: ${visiblesF.length}`)
 await clicDerechoEn(filaGantt(visiblesF[1]))
-await elegir('Duplicar', 600)
-await p.keyboard.press('Enter')
-await esperar(1000)
+await elegir('Duplicar tarea', 1000)
 const trasF = await ganttDe(SUB_F)
 chk(
   trasF[2] === visiblesF[1] && trasF[1] === visiblesF[1],
@@ -507,12 +472,12 @@ await p.getByText('Mis Tareas', { exact: true }).first().click()
 await esperar(1200)
 await clicDerechoEn(p.locator('table.tareas tbody tr').first())
 const opsMT = await opciones()
-chk(!opsMT.includes('Duplicar'), '11 la tabla de Mis Tareas NO muestra Duplicar', opsMT.join(' · '))
+chk(!opsMT.includes('Duplicar tarea'), '11 la tabla de Mis Tareas NO muestra Duplicar tarea', opsMT.join(' · '))
 await cerrarMenu()
 await verVista('Gantt')
 await clicDerechoEn(p.locator('.gantt tbody tr', { has: p.locator('td.fija--tarea .con-mas') }).first())
 const opsMTG = await opciones()
-chk(!opsMTG.includes('Duplicar'), '11 y su Gantt tampoco', opsMTG.join(' · '))
+chk(!opsMTG.includes('Duplicar tarea'), '11 y su Gantt tampoco', opsMTG.join(' · '))
 await cerrarMenu()
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -524,8 +489,8 @@ await abrirProyecto()
 await clicDerechoEn(p.locator('table.tareas tbody tr').first())
 const opsCliente = await opciones()
 chk(
-  !opsCliente.includes('Duplicar') && opsCliente.includes('Información'),
-  '10 sin permiso de crear tareas, Duplicar no aparece',
+  !opsCliente.includes('Duplicar tarea') && opsCliente.includes('Información'),
+  '10 sin permiso de crear tareas, Duplicar tarea no aparece',
   opsCliente.join(' · '),
 )
 await cerrarMenu()
@@ -553,15 +518,13 @@ await abrirProyecto()
 await clicDerechoEn(p.locator('table.tareas tbody tr').first())
 const opsConPermiso = await opciones()
 chk(
-  opsConPermiso.includes('Duplicar'),
-  '10 con el permiso de crear tareas —y sin control total— Duplicar sí aparece',
+  opsConPermiso.includes('Duplicar tarea'),
+  '10 con el permiso de crear tareas —y sin control total— Duplicar tarea sí aparece',
   opsConPermiso.join(' · '),
 )
 // Y sin control total la copia queda al final, como cualquier creación suya.
 const antesC = await tablaTitulos(0)
-await elegir('Duplicar', 600)
-await p.keyboard.press('Enter')
-await esperar(1000)
+await elegir('Duplicar tarea', 1000)
 const trasC = await tablaTitulos(0)
 chk(
   trasC[trasC.length - 1] === antesC[0] && trasC.length === antesC.length + 1,

@@ -69,6 +69,9 @@
   /* Velo de hover sobre superficies (negro en claro, blanco en oscuro). */
   --velo: rgba(0, 0, 0, .05);
   --velo-fuerte: rgba(0, 0, 0, .08);
+  /* #335: el velo de la fila bajo el mouse — el DOBLE del de una opción de
+     menú. Al triple, el rojo de una fila atrasada se va a gris rosado. */
+  --velo-fila: rgba(0, 0, 0, .10);
 
   --semana-borde: #a1a1aa;
 
@@ -100,6 +103,7 @@
   --superficie-3: #26262b;
   --velo: rgba(255, 255, 255, .07);
   --velo-fuerte: rgba(255, 255, 255, .12);
+  --velo-fila: rgba(255, 255, 255, .14);
 
   --gris-frente: #34343c;
   --gris-sf: #26262b;
@@ -499,6 +503,38 @@ tr.fila--verde > td { background: var(--verde-suave); }
 tr.fila--rojo > td { background: var(--rojo-suave); }
 tr.fila--ambar > td { background: var(--ambar-suave); }
 tr.fila--morado > td { background: var(--morado-suave); }
+
+/* #335 — La fila bajo el mouse, en la tabla y en la Gantt. Nada indicaba sobre
+   qué fila estaba el mouse, y en la Gantt eso pesa más: la grilla es ancha, las
+   filas son bajas y hay que seguir una fila hacia la derecha por encima de
+   decenas de columnas de día.
+
+   Dos señales a la vez: un velo sobre TODA la fila y una línea de acento a su
+   izquierda.
+
+   El velo va POR ENCIMA del color de estado y NO lo reemplaza: es una capa de
+   `background-image` sobre el `background-color` que la celda ya tiene, así que
+   una fila atrasada resaltada se sigue leyendo roja. Verde, ámbar, rojo y
+   morado son el corazón del producto.
+
+   Solo con mouse: en el teléfono no aplica, así que va acotado igual que el
+   resto de lo que solo existe en escritorio. */
+@media (min-width: 769px) {
+  tr.fila-tarea:hover > td,
+  .gantt tbody tr.gfila-tarea:hover > td:not(.fija--rotula) {
+    background-image: linear-gradient(var(--velo-fila), var(--velo-fila));
+  }
+  /* La línea de acento. En la tabla, en el borde izquierdo de la fila. En la
+     Gantt, en el de la celda del NOMBRE: las celdas de proyecto, frente y sub
+     frente son combinadas sobre todas sus tareas —por eso quedan fuera del velo
+     con `:not(.fija--rotula)`—, así que la fila de una tarea empieza en la
+     columna del nombre. Queda un poco más adentro que en la tabla, y es el
+     mismo lugar en todas las filas. */
+  tr.fila-tarea:hover > td:first-child,
+  .gantt tbody tr.gfila-tarea:hover > td.fija--tarea {
+    box-shadow: inset 3px 0 0 0 var(--naranja);
+  }
+}
 .col-check { width: 44px; text-align: center; }
 .col-resp { width: 96px; }
 .col-fecha { width: 118px; white-space: nowrap; }

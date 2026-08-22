@@ -271,7 +271,7 @@ completo con creación y edición **inline** (sin formularios).
   opciones con sus condiciones de siempre: **Información** —que no depende de
   ningún permiso, así que el menú siempre tiene al menos una y quien solo mira
   también lo ve—, **Renombrar** si puede editar la tarea, **Agregar tarea
-  debajo** (#328) y **Duplicar** (#273) si puede crear tareas, y **Archivar** y
+  abajo** (#328) y **Duplicar tarea** (#273) si puede crear tareas, y **Archivar** y
   **Eliminar** si puede archivarlas o eliminarlas, con las mismas
   confirmaciones. Renombrar no es una acción nueva: es el clic sobre el nombre,
   pedido desde otro lado.
@@ -281,16 +281,23 @@ completo con creación y edición **inline** (sin formularios).
   frente, el sub frente y las filas de carga no se abre. **En el teléfono no
   existe** —es un atajo de escritorio, y no se agrega por pulsación larga—: ahí
   la columna de acciones sigue siendo el camino.
-  *En **Mis Tareas** el menú va sin **Agregar tarea debajo** ni **Duplicar**, en
-  sus dos vistas: ahí no se crean tareas —una creada desde ese módulo no sería del usuario hasta
+  *En **Mis Tareas** el menú va sin **Agregar tarea abajo** ni **Duplicar
+  tarea**, en sus dos vistas: ahí no se crean tareas —una creada desde ese módulo no sería del usuario hasta
   asignársela—. **Renombrar sí está** (#334): #292 la había dejado fuera de esa
   tabla porque su nombre nunca fue editable, y ahora la opción abre la edición
   en la celda **sin tocar lo que hace el clic**, que sigue abriendo el panel de
   detalle. Es la puerta más directa al detalle en la única pantalla que no está
   dentro de un proyecto, y cruzando proyectos es lo que más se usa: Renombrar se
-  gana sin perderla. Su Gantt no cambia.*
+  gana sin perderla. **Y desde #338 su Gantt hace lo mismo:** las dos vistas de
+  Mis Tareas respondían distinto al mismo gesto —la tabla abría el detalle, la
+  Gantt editaba el nombre—, porque la Gantt lo había heredado de compartir
+  componente con la de un proyecto. Manda la tabla: es la vista principal del
+  módulo y la única que existe en mobile. Renombrar sigue en el menú y abre la
+  edición en la celda; es la MISMA pieza (`InlineText`), con el enlace al panel
+  dibujado en su reposo. **En un proyecto no cambia nada:** el clic sobre el
+  nombre lo sigue editando, en tabla y en Gantt, para quien puede.*
 
-  **"Agregar tarea debajo" abre la fila de carga en el sitio (#328).** En la
+  **"Agregar tarea abajo" abre la fila de carga en el sitio (#328).** En la
   Gantt hace **exactamente lo mismo que el "+" de la fila**, que se queda: son
   dos caminos al mismo gesto. En la **tabla es una capacidad que no existía** —
   ahí solo se podía agregar al final del sub frente, con la línea "+ Tarea"—, y
@@ -303,16 +310,16 @@ completo con creación y edición **inline** (sin formularios).
   el resto crea al final, con menú o sin él. Esa regla vive en un solo lugar
   (`lib/crear.ts`), compartida por la tabla y la Gantt.*
 
-  **"Duplicar" es esa misma fila con los campos de la original puestos (#273).**
-  No se podía duplicar una tarea: para repetir una había que crearla de nuevo y
-  volver a escribir el título y el responsable a mano. Duplicar **es crear**, así
-  que pasa por el mismo camino que "Agregar tarea debajo" en vez de por uno
-  propio: **misma posición** —justo debajo de la original, en su sub frente—,
-  **mismo permiso** —crear tareas—, **misma foto congelada**. Y por eso **la
-  copia no existe hasta confirmar**: el nombre llega en modo edición con el
-  título copiado **seleccionado**, se ajusta escribiendo o se deja igual con
-  Enter, y **con Escape no se crea nada**. *Así no hace falta inventar un "Copia
-  de…", y quien duplica para cambiar el nombre ya está donde tiene que estar.*
+  **"Duplicar tarea" crea una copia justo debajo (#273).** No se podía duplicar
+  una tarea: para repetir una había que crearla de nuevo y volver a escribir el
+  título y el responsable a mano. Duplicar **es crear**, así que pasa por el
+  mismo camino que "Agregar tarea abajo" en vez de por uno propio: **misma
+  posición** —justo debajo de la original, en su sub frente—, **mismo permiso**
+  —crear tareas—, **misma foto congelada**.
+  **La copia aparece ya creada, sin ningún campo abierto**, con el mismo título
+  que la original. *Consecuencia declarada: las dos conviven con el mismo nombre
+  y sin nada que las distinga en la lista. Renombrar la copia es un paso aparte,
+  desde el clic sobre el nombre o desde el menú.*
   **La copia nace limpia:** hereda el título, el responsable, el sub frente y la
   descripción —si la tarea tiene—, y **no** la fecha objetivo, el historial de
   replanificaciones, los comentarios, la marca de hecha ni la de archivada. No es
@@ -417,6 +424,26 @@ filas, y los nombres de más de una línea de **21 a 15**. Quien no puede crear
 tareas dispone de los **208 completos**: el envoltorio no se dibuja, así que
 tampoco paga su separación.* La columna de acciones de la tabla **no se toca**:
 ahí el ⓘ se queda.
+
+**La fila bajo el mouse se resalta (#335).** Nada indicaba sobre qué fila estaba
+el mouse, ni en la tabla ni en la Gantt. En la Gantt eso pesa más: la grilla es
+ancha, las filas son bajas y hay que seguir una fila hacia la derecha por encima
+de decenas de columnas de día. Dos señales a la vez: **un velo sobre toda la
+fila** —del doble del que el producto ya usa al pasar el mouse por una opción de
+menú— y **una línea de acento en el naranja de marca, a la izquierda**.
+**El velo va POR ENCIMA del color de estado y nunca lo reemplaza:** es una capa
+sobre el fondo que la celda ya tiene, así que una fila atrasada resaltada **se
+sigue leyendo roja**. Verde, ámbar, rojo y morado son el corazón del producto.
+*Al triple, el rojo se va a gris rosado; por eso el doble.*
+El resaltado alcanza la fila entera **hasta el borde derecho de lo que se ve** —
+en la Gantt, las columnas congeladas y todas las celdas de día—. La línea de
+acento va en el borde izquierdo de la fila en la tabla, y en el de la **celda del
+nombre** en la Gantt: las celdas de proyecto, frente y sub frente son combinadas
+sobre todas sus tareas, así que la fila de una tarea empieza ahí; queda un poco
+más adentro que en la tabla y es el mismo lugar en todas las filas.
+*No se resaltan las franjas de frente y sub frente ni las filas de carga por
+persona: ahí no hay una fila que seguir. Y en el teléfono no aplica, porque no
+hay mouse.*
 
 **El bloque del frente ya no es negro (#321, cierra #323).** Era la superficie
 más oscura de la pantalla y competía con la grilla; pasa a un gris propio con el
@@ -605,6 +632,29 @@ solo lo segundo, y por eso "Hoy" mostraba tareas de cualquier día y hasta las
 que no tienen fecha. Las opciones que no son una ventana temporal —"Sin fecha",
 "Con fecha"— filtran sin tocar el horizonte, y "En horizonte visible" va al
 revés: deriva su rango del horizonte en vez de definirlo.
+
+**"En horizonte visible" dejó de ser la excepción (#336).** Mostraba las tareas
+con fecha dentro del horizonte **más todas las que no tienen fecha** — era el
+único filtro de fecha que sumaba una categoría aparte; "Hoy", "Esta semana",
+"Próxima semana", "Este mes" y el rango fijo muestran solo lo que cae en su
+rango. Ahora **filtra solo por rango**, y por eso ya no necesita su propio caso
+en el motor: cae en el camino general, que deja fuera lo que no tiene fecha
+salvo que se pida "Sin fecha". *El motivo original era que las tareas sin
+planificar no quedaran invisibles en la Gantt, pero "Sin fecha" ya existe como
+opción propia para verlas, y desde #322 las opciones de fecha son excluyentes:
+si se quieren las sin fecha, se piden.* **Costo aceptado y declarado:** con este
+filtro puesto dejan de verse en la grilla las tareas todavía sin planificar, que
+es donde uno las planifica; se recuperan quitando el filtro o cambiando a "Sin
+fecha".
+
+**Y existe también en Mis Tareas (#337).** Se excluía a propósito, con el motivo
+escrito en el código: *"cruza proyectos y no tiene un horizonte único"*. Eso
+**dejó de ser cierto cuando Mis Tareas tuvo su propia Gantt**, que tiene un
+horizonte —uno solo— con el mismo selector, "Alrededor de hoy" y "Todas mis
+tareas". Se comporta exactamente igual que en un proyecto: se activa solo desde
+la Gantt, desde la tabla aparece apagada con su ayuda "Se activa desde la
+Gantt", filtra las dos vistas, se desactiva desde cualquiera de ellas y es
+excluyente con las demás opciones de fecha.
 
 **Las cinco opciones del campo Fecha se excluyen entre sí (#322).** Faltaba una
 pareja: "Sin fecha" y una fecha —relativa o rango fijo— podían convivir, y

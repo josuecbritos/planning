@@ -258,7 +258,7 @@ const ladoRespectoDe = async (sel) =>
 // nombre y su función pasó al menú del clic derecho. El botón de la fila que
 // queda —el "+"— tiene el mismo globo y sirve igual para lo que se comprueba
 // acá, que es DÓNDE vive el globo, no cuál de los dos lo dispara.
-const info = await globoDe('.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]')
+const info = await globoDe('.gantt tbody .mas-btn[data-tip="Agregar tarea abajo"]')
 chk(info?.hay, '#327 terreno: el "+" de la grilla muestra su globo', info?.texto ?? 'sin globo')
 chk(
   info?.padre === 'BODY' && !info.dentroDelScroll,
@@ -274,7 +274,7 @@ await esperar(450)
 for (const [etiqueta, dentro, ms] of [
   // El criterio 1 era el globo del ⓘ; #328 lo sacó de la fila, así que el
   // primer botón con globo pasa a ser el "+", que es el criterio 2.
-  ['2 el globo del "+"', '.mas-btn[data-tip="Agregar tarea debajo"]', 500],
+  ['2 el globo del "+"', '.mas-btn[data-tip="Agregar tarea abajo"]', 500],
   ['3 el de una celda de la grilla', 'td.celda[data-tip]', 600],
 ]) {
   const hay = await marcarFila(dentro, 'primera', 'data-primera')
@@ -301,8 +301,8 @@ await p.evaluate(() => {
   s.scrollTop = s.scrollHeight
 })
 await esperar(500)
-const ultima = await marcarFila('.mas-btn[data-tip="Agregar tarea debajo"]', 'ultima', 'data-ultima')
-const abajo = ultima ? await globoDe('tr[data-ultima] .mas-btn[data-tip="Agregar tarea debajo"]') : null
+const ultima = await marcarFila('.mas-btn[data-tip="Agregar tarea abajo"]', 'ultima', 'data-ultima')
+const abajo = ultima ? await globoDe('tr[data-ultima] .mas-btn[data-tip="Agregar tarea abajo"]') : null
 chk(
   abajo?.hay && abajo.entero && !abajo.dentroDelScroll,
   '4 en la última fila visible el globo también se ve entero',
@@ -321,10 +321,10 @@ for (const [etiqueta, sel] of [
   chk(g?.hay === true && g.entero && !g.dentroDelScroll, `${etiqueta} se ve entero`, g?.texto ?? 'sin globo')
   chk((await ladoRespectoDe(sel)) === 'derecha', `9 ${etiqueta} sigue abriéndose hacia la derecha`)
 }
-const gBoton = await globoDe('.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]')
+const gBoton = await globoDe('.gantt tbody .mas-btn[data-tip="Agregar tarea abajo"]')
 chk(gBoton?.hay === true, '9 terreno: el globo del "+" está visible')
 chk(
-  (await ladoRespectoDe('.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]')) === 'arriba',
+  (await ladoRespectoDe('.gantt tbody .mas-btn[data-tip="Agregar tarea abajo"]')) === 'arriba',
   '9 el de los botones sigue abriéndose hacia arriba',
 )
 
@@ -340,7 +340,7 @@ const luegoCelda = await p.evaluate(() => !!document.querySelector('.globo-tip')
 chk(!prontoCelda && luegoCelda, '3 el globo de la celda conserva su retardo corto', `a los 70ms ${prontoCelda}, después ${luegoCelda}`)
 await p.mouse.move(4, 4)
 await esperar(250)
-await p.locator('.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]').first().hover()
+await p.locator('.gantt tbody .mas-btn[data-tip="Agregar tarea abajo"]').first().hover()
 await esperar(70)
 chk(
   await p.evaluate(() => !!document.querySelector('.globo-tip')),
@@ -382,7 +382,7 @@ chk(
   !(await p.evaluate(() => !!document.querySelector('.globo-tip'))),
   '10 al sacar el mouse el globo desaparece',
 )
-await p.locator('.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]').first().hover()
+await p.locator('.gantt tbody .mas-btn[data-tip="Agregar tarea abajo"]').first().hover()
 await esperar(300)
 chk(await p.evaluate(() => !!document.querySelector('.globo-tip')), '10 terreno: hay un globo visible')
 await p.evaluate(() => document.querySelector('.gantt-scroll').scrollBy(0, 90))
@@ -424,7 +424,7 @@ await p.setViewportSize({ width: 900, height: 600 })
 await esperar(700)
 for (const [etiqueta, sel, ms] of [
   ['8 el del frente', '.gantt .fija--frente .fija-tip', 500],
-  ['8 el del "+"', '.gantt tbody .mas-btn[data-tip="Agregar tarea debajo"]', 500],
+  ['8 el del "+"', '.gantt tbody .mas-btn[data-tip="Agregar tarea abajo"]', 500],
 ]) {
   const g = await globoDe(sel, ms)
   chk(g?.hay && g.entero, `${etiqueta} no queda cortado por el borde de la pantalla`, g?.rect?.join(',') ?? 'sin globo')

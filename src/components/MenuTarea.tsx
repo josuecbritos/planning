@@ -17,13 +17,13 @@ import { IconoAgregarDebajo, IconoArchivar, IconoDuplicar, IconoEditar, IconoInf
 // un atajo de escritorio: en el teléfono no existe, ni por pulsación larga —ahí
 // la columna de acciones sigue siendo el camino—.
 //
-// #328: se suma "Agregar tarea debajo". En la Gantt hace lo mismo que el "+"
+// #328: se suma "Agregar tarea abajo". En la Gantt hace lo mismo que el "+"
 // de la fila, que se queda: son dos caminos al mismo gesto. En la TABLA es una
 // capacidad que no existía —ahí solo se podía agregar al final del sub frente,
 // con la línea "+ Tarea"—, y llega sin agregar ningún botón a la pantalla.
 //
-// #273: y se suma "Duplicar", que es lo mismo con los campos de otra tarea ya
-// puestos. Va junto a "Agregar tarea debajo" —las dos crean una tarea en esa
+// #273: y se suma "Duplicar tarea", que crea una tarea con los campos de otra
+// ya puestos. Va junto a "Agregar tarea abajo" —las dos crean una tarea en esa
 // misma posición— y lejos de archivar y eliminar, que son lo contrario.
 
 const MARGEN = 8
@@ -38,7 +38,7 @@ export interface OpcionMenu {
   /**
    * A qué bloque pertenece. La línea separadora va SIEMPRE entre los dos, y por
    * eso se declara así y no como "una línea antes de Archivar": cuando el menú
-   * crece —"Agregar tarea debajo" en #328, y "Duplicar" cuando llegue— las
+   * crece —"Agregar tarea abajo" en #328, "Duplicar tarea" en #273— las
    * nuevas entran arriba y la línea no se mueve de sitio. Arriba lo que abre,
    * edita o continúa la tarea; abajo lo que la saca del plan.
    */
@@ -119,16 +119,19 @@ export interface AccionesMenu {
    */
   onRenombrar: (() => void) | null
   /**
-   * #328 — Qué hacer al elegir "Agregar tarea debajo", o `null` donde no se
+   * #328 — Qué hacer al elegir "Agregar tarea abajo", o `null` donde no se
    * crean tareas: **Mis Tareas**, en sus dos vistas. Una tarea creada desde ahí
    * no sería del usuario hasta asignársela, así que aparecería y desaparecería
    * sola; eso ya era así y no cambia.
    */
   onAgregarDebajo: (() => void) | null
   /**
-   * #273 — Qué hacer al elegir "Duplicar", o `null` donde no se crean tareas.
-   * Va junto a "Agregar tarea debajo" porque las dos crean una tarea en esa
-   * misma posición, y lejos de archivar y eliminar, que son lo contrario.
+   * #273 — Qué hacer al elegir "Duplicar tarea", o `null` donde no se crean
+   * tareas. Va junto a "Agregar tarea abajo" porque las dos crean una tarea en
+   * esa misma posición, y lejos de archivar y eliminar, que son lo contrario.
+   *
+   * Crea DIRECTO: la copia aparece ya creada, con el mismo título que la
+   * original y sin ningún campo abierto. Renombrarla es un paso aparte.
    */
   onDuplicar: (() => void) | null
 }
@@ -149,14 +152,14 @@ export function opcionesDeTarea(
   }
   if (onAgregarDebajo && can.crearTareas) {
     ops.push({
-      texto: 'Agregar tarea debajo',
+      texto: 'Agregar tarea abajo',
       icono: <IconoAgregarDebajo />,
       grupo: 'principal',
       onClick: onAgregarDebajo,
     })
   }
   if (onDuplicar && can.crearTareas) {
-    ops.push({ texto: 'Duplicar', icono: <IconoDuplicar />, grupo: 'principal', onClick: onDuplicar })
+    ops.push({ texto: 'Duplicar tarea', icono: <IconoDuplicar />, grupo: 'principal', onClick: onDuplicar })
   }
   if (can.archivarEliminar(tarea)) {
     // Las mismas dos confirmaciones que la columna de acciones, palabra por

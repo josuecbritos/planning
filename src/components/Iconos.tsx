@@ -122,7 +122,7 @@ export const IconoInfo = (p: Props) => (
   </Svg>
 )
 
-/** #328 — Agregar tarea debajo. Dos renglones y el signo bajo ellos: lo que se
+/** #328 — Agregar tarea abajo. Dos renglones y el signo bajo ellos: lo que se
  *  agrega va DEBAJO de lo que ya hay, que es justo lo que distingue a esta
  *  opción de la línea "+ Tarea" del final del sub frente. */
 export const IconoAgregarDebajo = (p: Props) => (

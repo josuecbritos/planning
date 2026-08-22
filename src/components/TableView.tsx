@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ordenarMulti, valorOrden, type ClaveOrden, type OrdenMulti } from '../lib/orden'
 import { MenuTarea, opcionesDeTarea, useMenuTarea } from './MenuTarea'
-import { abrirHueco, plantillaDe, type Plantilla } from '../lib/crear'
+import { abrirHueco, plantillaDe } from '../lib/crear'
 import { referenciaEnFoto, useVistaCongelada } from '../lib/vistaCongelada'
 import { enMitadSuperior, useArrastreTareas, type DndTareas } from '../lib/arrastre'
 import { planMoverTarea } from '../lib/mover'
@@ -201,10 +201,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   // solo sabía agregar AL FINAL del sub frente, con la línea "+ Tarea";
   // insertar en una posición concreta no se podía. Lleva el id y no un booleano
   // porque la fila se dibuja donde corresponde, no en un lugar fijo.
-  //
-  // #273: y, si viene de "Duplicar", con qué arranca. La copia no existe hasta
-  // confirmar: con Escape no se crea nada.
-  const [insercion, setInsercion] = useState<{ tareaId: string; plantilla?: Plantilla } | null>(null)
+  const [insertarTrasId, setInsertarTrasId] = useState<string | null>(null)
 
   /**
    * Crear una tarea desde la tabla. Vive acá, y no en la fila de carga, porque
@@ -271,8 +268,8 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           onMenu={abrir}
           pulsoDe={pulsoDe}
           crearTarea={crearTarea}
-          insercion={insercion}
-          onCerrarInsercion={() => setInsercion(null)}
+          insertarTrasId={insertarTrasId}
+          onCerrarInsercion={() => setInsertarTrasId(null)}
         />
       ))}
       {frentes.length === 0 && (
@@ -288,10 +285,16 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                 onRenombrar: () => pedirRenombrar(tareaDelMenu.id),
                 // #328: acá es una capacidad NUEVA — hasta ahora la tabla solo
                 // agregaba al final del sub frente.
-                onAgregarDebajo: () => setInsercion({ tareaId: tareaDelMenu.id }),
-                // #273: la misma fila, con los campos de la original puestos.
+                onAgregarDebajo: () => setInsertarTrasId(tareaDelMenu.id),
+                // #273: duplicar crea DIRECTO, sin abrir ningún campo — mismo
+                // camino que agregar debajo, con los campos de la original ya
+                // puestos.
                 onDuplicar: () =>
-                  setInsercion({ tareaId: tareaDelMenu.id, plantilla: plantillaDe(tareaDelMenu) }),
+                  void crearTarea(
+                    tareaDelMenu.subFrenteId,
+                    plantillaDe(tareaDelMenu),
+                    tareaDelMenu,
+                  ),
               })
             : []
         }
@@ -325,7 +328,7 @@ function FrentePagina({
   onMenu,
   pulsoDe,
   crearTarea,
-  insercion,
+  insertarTrasId,
   onCerrarInsercion,
 }: {
   dnd?: DndTareas
@@ -352,9 +355,8 @@ function FrentePagina({
   pulsoDe: (tareaId: string) => number
   /** #328/#333: crear una tarea, opcionalmente justo debajo de una hermana. */
   crearTarea: (subFrenteId: string, datos: DatosNuevaTarea, debajoDe?: Tarea) => void
-  /** #328/#273: bajo qué tarea está abierta la fila de carga, y con qué
-   *  arranca si viene de "Duplicar" (o `null` si no hay ninguna abierta). */
-  insercion: { tareaId: string; plantilla?: Plantilla } | null
+  /** #328: tarea bajo la cual está abierta la fila de carga (o `null`). */
+  insertarTrasId: string | null
   onCerrarInsercion: () => void
   actions: Actions
   onAbrirTarea: (id: string) => void
@@ -431,7 +433,7 @@ function FrentePagina({
               onMenu={onMenu}
               pulsoDe={pulsoDe}
               crearTarea={crearTarea}
-              insercion={insercion}
+              insertarTrasId={insertarTrasId}
               onCerrarInsercion={onCerrarInsercion}
             />
           ))}
@@ -538,7 +540,7 @@ function SubFrenteTabla({
   onMenu,
   pulsoDe,
   crearTarea,
-  insercion,
+  insertarTrasId,
   onCerrarInsercion,
   actions,
   onAbrirTarea,
@@ -564,9 +566,8 @@ function SubFrenteTabla({
   pulsoDe: (tareaId: string) => number
   /** #328/#333: crear una tarea, opcionalmente justo debajo de una hermana. */
   crearTarea: (subFrenteId: string, datos: DatosNuevaTarea, debajoDe?: Tarea) => void
-  /** #328/#273: bajo qué tarea está abierta la fila de carga, y con qué
-   *  arranca si viene de "Duplicar" (o `null` si no hay ninguna abierta). */
-  insercion: { tareaId: string; plantilla?: Plantilla } | null
+  /** #328: tarea bajo la cual está abierta la fila de carga (o `null`). */
+  insertarTrasId: string | null
   onCerrarInsercion: () => void
   actions: Actions
   onAbrirTarea: (id: string) => void
@@ -690,14 +691,14 @@ function SubFrenteTabla({
                 onMenu={onMenu}
                 pulsoRenombrar={pulsoDe(t.id)}
               />
-              {/* #328: "Agregar tarea debajo" abre la fila de carga JUSTO acá,
+              {/* #328: "Agregar tarea abajo" abre la fila de carga JUSTO acá,
                   no al final del sub frente. Es la misma fila de siempre; lo que
                   cambia es dónde se dibuja y qué orden le toca a lo que guarda. */}
-              {insercion?.tareaId === t.id && can.crearTareas && (
+              {insertarTrasId === t.id && can.crearTareas && (
                 <NuevaTareaFila
                   candidatos={candidatos}
                   crear={(datos) => crearTarea(sub.id, datos, t)}
-                  insercion={{ onCerrar: onCerrarInsercion, plantilla: insercion.plantilla }}
+                  insercion={{ onCerrar: onCerrarInsercion }}
                 />
               )}
             </Fragment>
@@ -766,8 +767,6 @@ export interface DatosNuevaTarea {
  * para ESA posición y encadenar debajo de ella diría otra cosa. Dónde va la
  * tarea lo decide quien llama (`crear`), que es el que conoce la foto.
  *
- * #273: y "Duplicar" es esa misma fila con los campos de la original puestos.
- * La copia NO existe hasta confirmar: con Escape no se crea nada.
  */
 function NuevaTareaFila({
   candidatos,
@@ -776,26 +775,17 @@ function NuevaTareaFila({
 }: {
   candidatos: Usuario[]
   crear: (datos: DatosNuevaTarea) => void
-  /** #328: presente = fila de inserción (abierta desde el menú). #273: con
-   *  `plantilla`, además, arranca con los campos de la tarea duplicada. */
-  insercion?: { onCerrar: () => void; plantilla?: Plantilla }
+  /** #328: presente = fila de inserción (abierta desde el menú). */
+  insercion?: { onCerrar: () => void }
 }) {
-  const plantilla = insercion?.plantilla
   const [activa, setActiva] = useState(!!insercion)
-  const [titulo, setTitulo] = useState(plantilla?.titulo ?? '')
-  const [responsableId, setResponsableId] = useState(plantilla?.responsableId ?? '')
+  const [titulo, setTitulo] = useState('')
+  const [responsableId, setResponsableId] = useState('')
   // La tarea nace SIN FECHA (1.2): el campo parte en blanco; la primera fecha
   // que se le asigne fijara su compromiso inicial.
   const [fechaObjetivo, setFechaObjetivo] = useState('')
   const filaRef = useRef<HTMLTableRowElement>(null)
   const tituloRef = useRef<HTMLInputElement>(null)
-
-  // #273: al duplicar, el título llega SELECCIONADO: se ajusta escribiendo, o
-  // se deja igual con Enter. Así no hace falta inventar un "Copia de…", y quien
-  // duplica para cambiar el nombre ya está donde tiene que estar.
-  useEffect(() => {
-    if (plantilla) tituloRef.current?.select()
-  }, [plantilla])
 
   /**
    * #259: la fila parte EN BLANCO cada vez que se abre con "+ Tarea".
@@ -827,8 +817,6 @@ function NuevaTareaFila({
       titulo: limpio,
       responsableId: responsableId || undefined,
       fechaObjetivo: fechaObjetivo || undefined,
-      // #273: la descripción viene de la original y no se toca acá.
-      descripcion: plantilla?.descripcion,
     })
     // #328: insertando no se encadena — la posición es de esta inserción.
     if (insercion) {
@@ -987,7 +975,10 @@ function TareaFila({
   return (
     <tr
       ref={filaRef}
-      className={`${color !== 'ninguno' ? `fila--${color}` : ''}${resaltar ? ' fila--resaltada' : ''}${clasesDnd}`.trim() || undefined}
+      // #335: `fila-tarea` es la que dice "esto es una fila que se puede
+      // seguir con el mouse". Va aparte del color de estado a propósito: el
+      // resaltado se pinta POR ENCIMA de ese color, no en su lugar.
+      className={`fila-tarea${color !== 'ninguno' ? ` fila--${color}` : ''}${resaltar ? ' fila--resaltada' : ''}${clasesDnd}`}
       onDragOver={
         dnd
           ? (e) => dnd.sobre(e, tarea.subFrenteId, enMitadSuperior(e) ? tarea.id : siguienteId ?? null)
