@@ -1502,7 +1502,6 @@ export default function App({ repo }: { repo: Repo }) {
               ref={contentRef}
             >
               <FiltrosBar
-                contexto={proyecto.id}
                 guardados={vistasDeProyecto}
                 onCrearVista={(nombre, f, o) => actions.crearVista(proyecto.id, nombre, f, o)}
                 onGuardarVista={actions.guardarVista}

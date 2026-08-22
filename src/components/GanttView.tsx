@@ -15,7 +15,7 @@ import {
 } from '../lib/dates'
 import { colorTarea, fechaVigente, marcasDe } from '../lib/derive'
 import { filtraTareas, pasaFiltroCompleto, rangoDeFecha, type Filtro } from '../lib/filtros'
-import { abrirHueco } from '../lib/crear'
+import { abrirHueco, plantillaDe } from '../lib/crear'
 import { referenciaEnFoto, useVistaCongelada } from '../lib/vistaCongelada'
 import { enMitadSuperior, useArrastreTareas, type DndTareas } from '../lib/arrastre'
 import { planMoverTarea } from '../lib/mover'
@@ -643,6 +643,36 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     setCrearEn(crear)
   }
 
+  /**
+   * Crear una tarea, opcionalmente justo debajo de una hermana. Lo comparten el
+   * campo inline —cuando confirma— y "Duplicar" (#273), que crea directo y sin
+   * campo: así los dos abren el hueco igual y entran igual en la foto.
+   */
+  async function crearTarea(
+    datos: { subFrenteId: string; titulo: string; responsableId?: string; descripcion?: string },
+    despuesDe?: { id: string; orden: number },
+  ) {
+    const hermanos = state.tareas.filter((t) => t.subFrenteId === datos.subFrenteId)
+    const orden = await abrirHueco(hermanos, despuesDe, can.controlTotal, (id, o) =>
+      actions.updateTarea(id, { orden: o }),
+    )
+    const nueva = await actions.createTarea({ ...datos, orden })
+    // #333: con la vista congelada, la foto solo tiene posición para lo que ya
+    // estaba cuando se la tomó — la tarea nueva caía donde el render la dejara,
+    // casi siempre al final del bloque. Entra en la foto justo después de su
+    // hermana, por el MISMO camino que ya usa el arrastre al soltar (#293), y
+    // como aquél enciende "Actualizar vista". El orden guardado ya era el
+    // correcto: lo que faltaba era decírselo a la foto.
+    //
+    // La condición es `orden`, no `despuesDe`: quien no tiene control total
+    // crea AL FINAL aunque haya pedido "debajo de esta". Mirando `despuesDe` la
+    // foto la mostraba en el medio y el orden guardado la tenía al final
+    // —medido—, que es el mismo desencuentro que #333 vino a cerrar.
+    if (nueva && congelada && despuesDe && orden !== undefined) {
+      moverEnFoto(nueva.id, { despuesDe: despuesDe.id })
+    }
+  }
+
   async function crearElemento(nombre: string) {
     if (!crearEn) return
     const { tipo, despuesDe, contenedorId } = crearEn
@@ -661,25 +691,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
       )
       await actions.createSubFrente({ frenteId: contenedorId, nombre, orden })
     } else {
-      const hermanos = state.tareas.filter((t) => t.subFrenteId === contenedorId)
-      const orden = await abrirHueco(hermanos, despuesDe, can.controlTotal, (id, o) =>
-        actions.updateTarea(id, { orden: o }),
-      )
-      const nueva = await actions.createTarea({ subFrenteId: contenedorId, titulo: nombre, orden })
-      // #333: con la vista congelada, la foto solo tiene posición para lo que
-      // ya estaba cuando se la tomó — la tarea nueva caía donde el render la
-      // dejara, casi siempre al final del bloque. Entra en la foto justo
-      // después de su hermana, por el MISMO camino que ya usa el arrastre al
-      // soltar (#293), y como aquél enciende "Actualizar vista". El orden
-      // guardado ya era el correcto: lo que faltaba era decírselo a la foto.
-      //
-      // La condición es `orden`, no `despuesDe`: quien no tiene control total
-      // crea AL FINAL aunque haya pedido "debajo de esta". Mirando `despuesDe`
-      // la foto la mostraba en el medio y el orden guardado la tenía al final
-      // —medido—, que es el mismo desencuentro que este pedido viene a cerrar.
-      if (nueva && congelada && despuesDe && orden !== undefined) {
-        moverEnFoto(nueva.id, { despuesDe: despuesDe.id })
-      }
+      await crearTarea({ subFrenteId: contenedorId, titulo: nombre }, despuesDe)
     }
   }
 
@@ -920,6 +932,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                       : undefined
                   }
                   conProyecto={!!misTareas}
+                  esMisTareas={!!misTareas}
                   permiteCrear={permiteCrear}
                   actions={actions}
                   onAbrirTarea={onAbrirTarea}
@@ -993,15 +1006,12 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         onCerrar={cerrarMenu}
         opciones={
           tareaDelMenu
-            ? opcionesDeTarea(
-                tareaDelMenu,
-                canDeTarea(tareaDelMenu),
-                actions,
+            ? opcionesDeTarea(tareaDelMenu, canDeTarea(tareaDelMenu), actions, {
                 onAbrirTarea,
-                () => pedirRenombrar(tareaDelMenu.id),
+                onRenombrar: () => pedirRenombrar(tareaDelMenu.id),
                 // #328: lo MISMO que el "+" de la fila, que se queda. En Mis
                 // Tareas no se crean tareas, así que ahí no se ofrece.
-                permiteCrear
+                onAgregarDebajo: permiteCrear
                   ? () =>
                       abrirCrear({
                         tipo: 'tarea',
@@ -1009,7 +1019,17 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                         contenedorId: tareaDelMenu.subFrenteId,
                       })
                   : null,
-              )
+                // #273: duplicar crea DIRECTO, sin campo — misma posición y
+                // mismo camino que agregar debajo, con los campos de la
+                // original ya puestos.
+                onDuplicar: permiteCrear
+                  ? () =>
+                      void crearTarea(
+                        { subFrenteId: tareaDelMenu.subFrenteId, ...plantillaDe(tareaDelMenu) },
+                        { id: tareaDelMenu.id, orden: tareaDelMenu.orden },
+                      )
+                  : null,
+              })
             : []
         }
       />
@@ -1095,6 +1115,8 @@ function CrearInput({
       onChange={(e) => setNombre(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === 'Enter') confirmar()
+        // Escape no crea: el campo se desmonta antes de que su `onBlur` llegue
+        // a `confirmar`. Medido, con el campo escrito y sin escribir.
         if (e.key === 'Escape') onCerrar()
       }}
       onBlur={confirmar}
@@ -1115,6 +1137,7 @@ function FilaGanttRow({
   can,
   proyecto,
   conProyecto,
+  esMisTareas,
   permiteCrear,
   actions,
   onAbrirTarea,
@@ -1143,6 +1166,9 @@ function FilaGanttRow({
   proyecto?: Proyecto
   /** #190: ¿se dibuja la columna de proyecto a la izquierda? */
   conProyecto?: boolean
+  /** #338: ¿es la Gantt de Mis Tareas? Ahí el clic sobre el nombre abre el
+   *  panel, no la edición — igual que en su tabla. */
+  esMisTareas?: boolean
   /** #190: en Mis Tareas no hay ninguna afordancia de creación. */
   permiteCrear: boolean
   actions: Actions
@@ -1375,6 +1401,21 @@ function FilaGanttRow({
 
   const sep = fila.esInicioSub && !fila.esPrimeraGlobal ? ' sep-sf' : ''
   const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
+  /** El nombre como enlace al panel, con su tarjeta flotante. Lo usan quien no
+   *  puede editar y, desde #338, TODA la Gantt de Mis Tareas. */
+  const enlaceAlPanel = (
+    <HoverCard card={tooltip}>
+      <span
+        className="tarea-cell__link"
+        role="button"
+        tabIndex={0}
+        onClick={() => onAbrirTarea(tarea.id)}
+        onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
+      >
+        {tarea.titulo}
+      </span>
+    </HoverCard>
+  )
 
   // -- Estandar de planificacion por clics (punto 2) --
   // #245: la misma regla que las otras tres vistas, ahora compartida.
@@ -1450,7 +1491,10 @@ function FilaGanttRow({
 
   return (
     <tr
-      className={`${sep.trim()}${clasesDnd}`.trim() || undefined}
+      // #335: `gfila-tarea` marca las filas que SÍ se resaltan al pasar el
+      // mouse. Las franjas de frente y sub frente y las filas de carga por
+      // persona no la llevan: ahí no hay una fila que seguir.
+      className={`gfila-tarea${sep}${clasesDnd}`}
       onDragOver={
         dnd
           ? (e) => dnd.sobre(e, tarea.subFrenteId, enMitadSuperior(e) ? tarea.id : dndSiguienteId ?? null)
@@ -1490,26 +1534,27 @@ function FilaGanttRow({
               lo lleva de título y aparece de inmediato, sin retardo—: agregarle
               un `data-tip` encima mostraría dos globos a la vez. */}
           <span className="fija-tip"><span className="fija-txt">
+          {/* #338: en Mis Tareas el clic sobre el nombre abre el PANEL, aunque
+              la persona pueda editar. Sus dos vistas respondían distinto al
+              mismo gesto —la tabla abría el detalle, la Gantt editaba—, y la
+              Gantt lo había heredado de compartir componente con la de un
+              proyecto. Manda la tabla: es la vista principal del módulo y la
+              única que existe en mobile, y es el mismo criterio de #334 —en Mis
+              Tareas el clic lleva al detalle y renombrar se gana por el menú—.
+              Renombrar sigue ahí, y abre la edición en la celda: es la MISMA
+              pieza, con el enlace dibujado en su reposo.
+              En un proyecto no cambia nada. */}
           {can.editarTareas(tarea) ? (
             <InlineText
               valor={tarea.titulo}
               onGuardar={(titulo) => actions.updateTarea(tarea.id, { titulo })}
               ariaLabel={`Editar título: ${tarea.titulo}`}
-              wrapDisplay={(nodo) => <HoverCard card={tooltip}>{nodo}</HoverCard>}
+              wrapDisplay={esMisTareas ? undefined : (nodo) => <HoverCard card={tooltip}>{nodo}</HoverCard>}
+              display={esMisTareas ? enlaceAlPanel : undefined}
               abrirEdicion={pulsoRenombrar(tarea.id)}
             />
           ) : (
-            <HoverCard card={tooltip}>
-              <span
-                className="tarea-cell__link"
-                role="button"
-                tabIndex={0}
-                onClick={() => onAbrirTarea(tarea.id)}
-                onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
-              >
-                {tarea.titulo}
-              </span>
-            </HoverCard>
+            enlaceAlPanel
           )}
           </span></span>
           {/* #328: el ⓘ salió de acá. Hacía lo mismo que el clic sobre el
@@ -1523,8 +1568,8 @@ function FilaGanttRow({
             <span className="con-mas__acciones">
               <button
                 className="mas-btn"
-                data-tip="Agregar tarea debajo"
-                aria-label="Agregar tarea debajo"
+                data-tip="Agregar tarea abajo"
+                aria-label="Agregar tarea abajo"
                 onClick={(e) =>
                   abrirCrear({ tipo: 'tarea', despuesDe: { id: tarea.id, orden: tarea.orden }, contenedorId: tarea.subFrenteId }, e)
                 }

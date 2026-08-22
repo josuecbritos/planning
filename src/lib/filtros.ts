@@ -25,8 +25,8 @@ type FiltroFecha =
   | { tipo: 'relativa'; valor: FechaRelativa }
   | { tipo: 'rango'; desde?: ISODate; hasta?: ISODate }
   // P4: "En horizonte visible (Gantt)" — el rango del horizonte actual de la
-  // Gantt (desde/hasta se sincronizan desde la Gantt); incluye además las
-  // tareas SIN fecha. Solo se activa desde la Gantt; filtra ambas vistas.
+  // Gantt (desde/hasta se sincronizan desde la Gantt). Solo se activa desde la
+  // Gantt; filtra ambas vistas. #336: filtra SOLO por rango, como los demás.
   | { tipo: 'horizonte'; desde?: ISODate; hasta?: ISODate }
 
 /** Valor especial del filtro de responsable: tareas SIN responsable. */
@@ -223,15 +223,17 @@ export function pasaFiltroCompleto(state: AppState, t: Tarea, f: Filtro, hoy: IS
   // #223: "Con fecha" es excluyente dentro del campo fecha, así que resuelve
   // sola: pasa todo lo que tenga fecha objetivo, sea cual sea.
   if (f.conFecha) return !!t.fechaObjetivo
-  // P4: "En horizonte visible" incluye SIEMPRE las tareas sin fecha, más las
-  // que caen dentro del rango del horizonte de la Gantt.
-  if (f.fecha?.tipo === 'horizonte') {
-    if (!t.fechaObjetivo) return true
-    const { desde, hasta } = rangoDeFecha(f.fecha, hoy)
-    if (desde && t.fechaObjetivo < desde) return false
-    if (hasta && t.fechaObjetivo > hasta) return false
-    return true
-  }
+  // #336: "En horizonte visible" ya NO suma las tareas sin fecha. Era el único
+  // filtro de fecha que agregaba una categoría aparte —los otros cinco muestran
+  // solo lo que cae en su rango—, y por eso este caso tenía su propio bloque
+  // acá. Al dejar de ser la excepción, deja de necesitarlo: cae en el camino
+  // general de más abajo, que ya compara contra `rangoDeFecha` y deja fuera lo
+  // que no tiene fecha salvo que se pida "Sin fecha".
+  //
+  // El motivo original era que las tareas sin planificar no quedaran invisibles
+  // en la Gantt, pero "Sin fecha" ya existe como opción propia para verlas, y
+  // desde el cierre de agosto las cinco opciones de fecha son excluyentes: si
+  // se quieren las sin fecha, se piden.
   if (f.fecha || f.sinFecha) {
     if (!t.fechaObjetivo) {
       // Sin fecha objetivo: solo pasa si el filtro pide "Sin fecha".

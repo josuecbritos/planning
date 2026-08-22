@@ -12,6 +12,36 @@ export interface Hermano {
 }
 
 /**
+ * #273 — Lo que "Duplicar" lleva de la tarea original a la copia, y por lo
+ * tanto también lo que NO lleva.
+ *
+ * **La copia nace limpia:** sin fecha, sin replanificaciones, sin color, sin
+ * comentarios, sin la marca de hecha y sin la de archivada. No es una omisión,
+ * es la definición, y por eso vive acá y no repartida por las dos vistas:
+ *
+ * - *El historial y los comentarios* son registro de lo que PASÓ con la tarea
+ *   original, no parte de qué es la tarea.
+ * - *La fecha* no se copia porque duplicar suele significar "lo mismo, en otro
+ *   momento", y planificarla es un clic. Si se copiara y ya estuviera vencida,
+ *   **la copia nacería atrasada y ensuciaría los contadores** por algo recién
+ *   creado.
+ */
+export interface Plantilla {
+  titulo: string
+  responsableId?: string
+  descripcion?: string
+}
+
+/** Los campos que la copia hereda de `t`. Ver `Plantilla`. */
+export function plantillaDe(t: {
+  titulo: string
+  responsableId?: string
+  descripcion?: string
+}): Plantilla {
+  return { titulo: t.titulo, responsableId: t.responsableId, descripcion: t.descripcion }
+}
+
+/**
  * Abre hueco justo debajo de `despuesDe` y devuelve el `orden` que le toca al
  * elemento nuevo — o `undefined`, que significa "al final del contenedor".
  *

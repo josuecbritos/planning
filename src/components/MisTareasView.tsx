@@ -239,7 +239,6 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
       {/* Filtros del sistema comun, con Proyecto en vez de Responsable.
           Los guardados viven en el contexto 'mis-tareas' (no por proyecto). */}
       <FiltrosBar
-        contexto="mis-tareas"
         guardados={vistasGuardadas}
         onCrearVista={(nombre, f, o) => actions.crearVista('mis-tareas', nombre, f, o)}
         onGuardarVista={actions.guardarVista}
@@ -340,17 +339,16 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
         onCerrar={cerrarMenu}
         opciones={
           tareaDelMenu
-            ? opcionesDeTarea(
-                tareaDelMenu,
-                canDe(proyectoDelMenu?.id ?? ''),
-                actions,
+            ? opcionesDeTarea(tareaDelMenu, canDe(proyectoDelMenu?.id ?? ''), actions, {
                 onAbrirTarea,
-                () => pedirRenombrar(tareaDelMenu.id),
-                // #328: en Mis Tareas no se crean tareas —una tarea creada acá
-                // no sería del usuario hasta asignársela—, así que la opción no
-                // aparece. Ya era así y no cambia.
-                null,
-              )
+                onRenombrar: () => pedirRenombrar(tareaDelMenu.id),
+                // #328/#273: en Mis Tareas no se crean tareas —una tarea creada
+                // acá no sería del usuario hasta asignársela—, así que ni
+                // "Agregar tarea abajo" ni "Duplicar tarea" aparecen. Ya era así y
+                // cambia.
+                onAgregarDebajo: null,
+                onDuplicar: null,
+              })
             : []
         }
       />
@@ -388,7 +386,8 @@ function FilaTarea({
 
   return (
     <tr
-      className={color !== 'ninguno' ? `fila--${color}` : undefined}
+      // #335: ver `fila-tarea` en la tabla de un proyecto.
+      className={`fila-tarea${color !== 'ninguno' ? ` fila--${color}` : ''}`}
       onContextMenu={(e) => onMenu(e, tarea.id)}
     >
       <td className="col-check">

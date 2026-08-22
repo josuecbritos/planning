@@ -2932,3 +2932,264 @@ la tabla de Mis Tareas pasa de "sin Renombrar" a "sin Agregar tarea debajo". La
 de #327 comprobaba dónde vive el globo usando el ⓘ de la fila de la Gantt, que ya
 no está: pasa a usar el "+", que tiene el mismo globo y sirve igual para lo que
 se mide ahí —dónde se dibuja, no cuál de los dos lo dispara—.
+
+### #273 — Duplicar tareas
+
+**No se podía duplicar una tarea.** Para repetir una había que crearla de nuevo y
+volver a escribir el título y el responsable a mano.
+
+**El menú del clic derecho gana "Duplicar"**, en la tabla y en la Gantt. Va junto
+a "Agregar tarea debajo" —las dos crean una tarea en esa misma posición— y lejos
+de archivar y eliminar, que son lo contrario:
+
+**Información · Renombrar · Agregar tarea debajo · Duplicar — Archivar · Eliminar**
+
+*La línea separadora sigue sin moverse: se declaró por el cambio de bloque y no
+como "antes de Archivar", justamente para que crecer no la corra de sitio.*
+
+#### Duplicar es crear, no una acción aparte
+
+Y por eso pasa por el **mismo camino** que "Agregar tarea debajo" (#328) en vez
+de por uno propio: misma posición —justo debajo de la original, en su sub
+frente—, mismo permiso —crear tareas, el del "+" de la Gantt—, misma foto
+congelada (#333). No hay una segunda forma de crear una tarea que pueda
+separarse de la primera.
+
+De ahí salen dos cosas que no hubo que decidir aparte:
+
+- **Sin control total la copia queda al final**, como cualquier otra creación de
+  esa persona: insertar en el medio obliga a correr el orden de los hermanos, que
+  es editar tareas ajenas.
+
+**La copia aparece ya creada, con el mismo título que la original y sin ningún
+campo abierto.** *Esta entrada se escribió con la copia naciendo en modo edición
+para ajustar el nombre; el dueño lo cambió al verificarlo, y la corrección está
+más abajo, en la entrada de #335 · #336 · #337 · #338. Lo demás de #273 quedó
+como se describe acá.*
+
+#### Qué se copia y qué no
+
+| Se copia | No se copia |
+|---|---|
+| El título | **La fecha objetivo: la copia nace sin fecha** |
+| El responsable | El historial de replanificaciones |
+| El sub frente | Los comentarios |
+| La descripción, si la tarea tiene | La marca de hecha y la de archivada |
+
+**La copia nace limpia. No es una omisión, es la definición**, y por eso vive en
+un solo lugar (`plantillaDe`, en `lib/crear.ts`) y no repartida por las dos
+vistas: *el historial y los comentarios son registro de lo que pasó con la
+original, no parte de qué es la tarea; y la fecha no se copia porque duplicar
+suele significar "lo mismo, en otro momento", y planificarla es un clic — si se
+copiara y ya estuviera vencida, **la copia nacería atrasada y ensuciaría los
+contadores** por algo recién creado.*
+
+*En **Mis Tareas** no aparece, en ninguna de sus dos vistas: ahí no se crean
+tareas. Y sobre una tarea **archivada** no se plantea — las archivadas viven en
+su propio bloque al pie del sub frente, como una lista de enlaces, y ese bloque
+no tiene menú de clic derecho.*
+
+**Un detalle que se cuidó a propósito.** La fila de carga guarda al perder el
+foco, y salir con Escape desenfoca el campo. Con el campo vacío eso no se notaba
+—no hay nada que crear—; con el título ya puesto, cancelar habría creado la copia
+igual. El campo de la Gantt lleva ahora un cerrojo explícito para eso, y la
+prueba lo comprueba en las dos vistas.
+
+**Las cuatro llamadas del menú viajan juntas.** Con Duplicar serían siete
+parámetros posicionales, tres de ellos `(() => void) | null` e indistinguibles
+entre sí desde quien llama: pasan a un objeto con nombre (`AccionesMenu`).
+
+#### Verificación
+
+`docs/prueba-273-duplicar.mjs` — **37 comprobaciones en verde** *(la prueba se
+actualizó con la corrección posterior: la copia aparece creada, sin campo)*.
+
+Las seis opciones en su orden y una sola línea separadora; que la copia aparezca
+con el mismo título y el mismo responsable, justo debajo, **sin ningún campo
+abierto**, en la tabla y en la Gantt; que la copia no tenga fecha, ni color, ni
+↻ ×N; que los contadores sumen una y la nueva caiga en
+la categoría sin color; que duplicar una tarea hecha no deje la copia marcada.
+
+De los comentarios y el historial se comprueban las dos caras —la copia sin
+ninguno de los dos y la original con los suyos intactos—, leyendo el estado
+guardado y también el panel, que es como lo mira una persona. La **descripción**
+se comprueba inyectándola en el estado: el campo existe en la tarea y el panel lo
+muestra, pero hoy no se escribe desde ninguna pantalla.
+
+Y los permisos: sin el de crear tareas la opción **no aparece**; con él —pero sin
+control total— **sí aparece**, y la copia queda al final. En Mis Tareas, tabla y
+Gantt, no aparece. Con filtro puesto, la copia sale justo debajo de la original y
+"Actualizar vista" queda encendido.
+
+*Control negativo:* corrida contra `main`, **22 comprobaciones fallan** — no
+existe la opción, así que no hay copia en ninguna vista, y la sección de
+comentarios e historial se queda sin terreno donde correr.
+
+**Dos pruebas anteriores cambian de contrato y se actualizan**, como en la tanda
+anterior: la de #292 y la de #328 esperaban cinco opciones. Ahora son seis, y
+**la línea separadora sigue en el mismo sitio** — es la segunda vez que el menú
+crece sin moverla, que es exactamente para lo que se declaró por bloque.
+
+Regresión en verde: #297, #298, #305/#305b, #305e, #306/#306b/#306c, #307, #310,
+#311, #313, #318, #319, #320, #321, #322, #324, #326, #327, #328, #329, #331,
+#332, #333, #334.
+
+### #335 · #336 · #337 · #338, y tres correcciones sobre el menú de la tarea
+
+*Cuatro cambios de pantalla y tres correcciones, independientes entre sí.
+Ninguno toca la base ni lleva migración.*
+
+#### Tres correcciones, levantadas al verificar en preview
+
+**"Duplicar" pasa a decir "Duplicar tarea"** (#273), y **"Agregar tarea debajo"
+pasa a decir "Agregar tarea abajo"** (#328) **en los dos sitios donde aparece**:
+la opción del menú y la ayuda del "+" de la Gantt. Salen de dos lugares
+distintos y decían lo mismo; tienen que seguir diciéndolo.
+
+**Y la copia ya no nace en modo edición.** Al duplicar, la tarea nueva **aparece
+ya creada**, con el mismo título que la original y **sin ningún campo abierto**.
+*Esto revierte lo definido en #273, donde la copia nacía en edición para ajustar
+el nombre sin inventar un "Copia de…". El dueño lo cambió al verificarlo.*
+**Consecuencia declarada:** la copia queda con el mismo nombre que la original y
+sin nada que la distinga en la lista; renombrarla es un paso aparte, desde el
+clic sobre el nombre o desde el menú. *El resto de #273 no cambia: qué se copia
+y qué no, que nace sin fecha, dónde queda y el permiso que exige.*
+
+Con eso, duplicar deja de pasar por la fila de carga y crea directo — el mismo
+camino que ya usaba al confirmar, extraído a una función que comparten las dos
+vistas. Se fueron con ello el campo con texto inicial y su selección.
+
+**Una duda que se midió antes de tocarla.** El campo de creación de la Gantt
+guarda al perder el foco, y salir con Escape lo desenfoca: con un título escrito,
+cancelar podía crear la tarea igual. Medido en la base: **no la creaba** —el
+campo se desmonta antes de que su `onBlur` llegue a guardar—, así que no hacía
+falta ningún cerrojo. La comprobación queda en la prueba para dejar constancia de
+la garantía.
+
+#### #335 — La fila bajo el mouse se resalta
+
+**Nada indicaba sobre qué fila estaba el mouse**, ni en la tabla ni en la Gantt.
+En la Gantt eso pesa más: la grilla es ancha, las filas son bajas y hay que
+seguir una fila hacia la derecha por encima de decenas de columnas de día.
+
+Dos señales a la vez: **un velo sobre toda la fila** —del doble del que el
+producto ya usa al pasar el mouse por una opción de menú— y **una línea de
+acento en el naranja de marca, a la izquierda**.
+
+**El velo va POR ENCIMA del color de estado y nunca lo reemplaza.** Es una capa
+de `background-image` sobre el `background-color` que la celda ya tiene, así que
+una fila atrasada resaltada **se sigue leyendo roja**. Verde, ámbar, rojo y
+morado son el corazón del producto. *Al triple, el rojo se va a gris rosado; por
+eso el doble.*
+
+El resaltado alcanza **la fila entera hasta el borde derecho de lo que se ve** —
+en la Gantt, las columnas congeladas y todas las celdas de día—. La línea de
+acento va en el borde izquierdo de la fila en la tabla, y en el de la celda del
+nombre en la Gantt: las celdas de proyecto, frente y sub frente son combinadas
+sobre todas sus tareas, así que la fila de una tarea empieza ahí. Queda un poco
+más adentro que en la tabla y es el mismo lugar en todas las filas.
+
+*No se resaltan las franjas de frente y sub frente ni las filas de carga por
+persona: ahí no hay una fila que seguir. Y en el teléfono no aplica, porque no
+hay mouse.*
+
+#### #336 — "En horizonte visible" deja de sumar las tareas sin fecha
+
+Mostraba las tareas con fecha dentro del horizonte **más todas las que no tienen
+fecha**. No era un defecto: estaba escrito así en la regla y en la ayuda del
+botón. Pero **era el único filtro de fecha que sumaba una categoría aparte** —
+"Hoy", "Esta semana", "Próxima semana", "Este mes" y el rango fijo muestran solo
+lo que cae en su rango.
+
+Ahora **filtra solo por rango**. Y al dejar de ser la excepción, deja de
+necesitar su propio caso en el motor del filtro: cae en el camino general, que ya
+compara contra el rango y deja fuera lo que no tiene fecha salvo que se pida
+"Sin fecha". *El motivo original era que las tareas sin planificar no quedaran
+invisibles en la Gantt, pero "Sin fecha" ya existe como opción propia para
+verlas, y desde #322 las opciones de fecha son excluyentes: si se quieren, se
+piden.*
+
+**Costo aceptado y declarado:** con este filtro puesto dejan de verse en la
+grilla las tareas todavía sin planificar, que es donde uno las planifica. Se
+recuperan quitando el filtro o cambiando a "Sin fecha". *Lo demás no cambia:
+sigue derivando su rango del horizonte, sigue activándose solo desde la Gantt,
+sigue filtrando también la tabla y sigue pudiendo apagarse desde las dos.*
+
+#### #337 — Y existe también en Mis Tareas
+
+Se excluía a propósito, con el motivo escrito en el código: *"cruza proyectos y
+no tiene un horizonte único"*. **Eso dejó de ser cierto cuando Mis Tareas tuvo su
+propia Gantt**, que tiene un horizonte —uno solo— con el mismo selector,
+"Alrededor de hoy" y "Todas mis tareas".
+
+Se comporta exactamente igual que en un proyecto: se activa solo desde la Gantt,
+desde la tabla aparece apagada con su ayuda "Se activa desde la Gantt", filtra
+las dos vistas, se desactiva desde cualquiera de ellas y es excluyente con las
+demás opciones de fecha. Y respeta #336: deja fuera las tareas sin fecha.
+
+*Con la condición fuera, `contexto` dejó de usarse en la barra de filtros y se
+retiró: las vistas guardadas ya llegaban filtradas por su contexto desde quien
+llama.*
+
+#### #338 — En la Gantt de Mis Tareas, el clic en el nombre abre el detalle
+
+Las dos vistas de Mis Tareas respondían distinto al mismo gesto: la tabla abría
+el panel de detalle, la Gantt **editaba el nombre**. La Gantt lo había heredado
+de compartir componente con la de un proyecto.
+
+**Manda la tabla:** es la vista principal del módulo y la única que existe en
+mobile. Y es el mismo criterio de #334 —en Mis Tareas el clic lleva al detalle y
+renombrar se gana por el menú—; esto lo aplica a la otra vista. **No se pierde
+nada:** Renombrar sigue en el menú y abre la edición en su celda. Es la **misma
+pieza** (`InlineText`), con el enlace al panel dibujado en su estado de reposo —
+el mismo mecanismo que #334 estrenó en la tabla. **En un proyecto no cambia
+nada.**
+
+#### Verificación
+
+`docs/prueba-335-336-337-338.mjs` — **57 comprobaciones en verde**.
+
+De **#335**: que el velo cubra todas las celdas de la fila y solo con el mouse
+encima; que la línea naranja quede en el borde izquierdo de la fila en la tabla y
+en el de la celda del nombre en la Gantt, **también en la primera fila de un
+bloque**, que es la que lleva las celdas combinadas; que esas celdas combinadas y
+las filas de carga **no** se resalten; que el velo mida el doble que el de una
+opción de menú; que las cuatro categorías de color **conserven su fondo exacto**
+al resaltarse; que solo una fila quede resaltada a la vez; que con la grilla
+desplazada a lo ancho el resaltado acompañe; que en oscuro el velo **aclare** en
+vez de oscurecer; y que en Mis Tareas, tabla y Gantt, se comporte igual.
+
+De **#336**: que la tarea sin fecha desaparezca al activarlo y las de dentro del
+horizonte se queden, que la ayuda ya no la mencione, que el selector de horizonte
+siga disponible y el filtro lo siga, que la tabla muestre el mismo conjunto, y
+que "Sin fecha" lo apague y las traiga de vuelta.
+
+De **#337**: que la opción exista en Mis Tareas, deshabilitada desde la tabla con
+su ayuda y activable desde la Gantt; que deje fuera las sin fecha; que siga al
+horizonte de esa Gantt; que se pueda desactivar desde la tabla; que "Hoy" la
+apague; y que una vista guardada con ella vuelva a cargarla.
+
+De **#338**: que el clic abra el panel y no la edición, que la tarjeta flotante
+siga apareciendo, que Renombrar siga en el menú con Enter y Escape, que la tabla
+de Mis Tareas no cambie y que en un proyecto —tabla y Gantt— el clic siga
+editando.
+
+Y de las correcciones: los dos textos, el del menú y el del "+" de la Gantt; que
+la copia aparezca creada sin ningún campo abierto, con el mismo título y justo
+debajo; que su nombre se pueda editar con el clic como cualquier otra; y que lo
+demás de duplicar siga igual.
+
+*Control negativo:* corrida contra la base de la rama, **40 comprobaciones
+fallan**.
+
+**Cinco pruebas anteriores cambian de contrato y se actualizan.** Las de #292,
+#328 y #273 llevaban los textos viejos del menú; la de #327 medía el globo del
+"+" por su ayuda, que también cambió; y la de #305 comprobaba que "En horizonte
+visible" **no** apareciera en Mis Tareas, que es justo lo que #337 revierte —
+ahora comprueba que aparezca, y deshabilitada desde la tabla—. En la de #273,
+además, los criterios 2 y 5 originales quedan revertidos por la corrección: el
+nombre ya no llega en edición y no hay nada que cancelar con Escape.
+
+Regresión en verde: #292, #297, #298, #305/#305b, #305e, #306/#306b/#306c,
+#307, #310, #311, #313, #318, #319, #320, #321, #322, #324, #326, #327, #328,
+#329, #331, #332, #333, #334.

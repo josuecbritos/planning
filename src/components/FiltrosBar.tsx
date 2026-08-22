@@ -85,9 +85,6 @@ export interface RangoProps {
 }
 
 interface Props {
-  /** Contexto de guardado: el id del proyecto, o 'mis-tareas' (los filtros
-   *  guardados son privados por usuario Y por contexto; no se mezclan). */
-  contexto: string
   /** #289: las vistas de ESTA pantalla, ya filtradas por usuario y contexto.
    *  Vienen del estado cargado (base de datos), no de localStorage. */
   guardados: FiltroGuardado[]
@@ -122,7 +119,6 @@ interface Props {
 }
 
 export function FiltrosBar({
-  contexto,
   guardados,
   onCrearVista,
   onGuardarVista,
@@ -282,7 +278,6 @@ export function FiltrosBar({
               ‹ {campoActual.nombre}
             </button>
             {campo === 'fecha' && <OpcionesFecha
-              contexto={contexto}
               filtro={filtro}
               onCambiar={onCambiar}
               vistaGantt={vistaGantt}
@@ -686,12 +681,10 @@ export function FiltrosBar({
  * opciones ni sus reglas de exclusión entre sí.
  */
 function OpcionesFecha({
-  contexto,
   filtro,
   onCambiar,
   vistaGantt,
 }: {
-  contexto: string
   filtro: Filtro
   onCambiar: (f: Filtro) => void
   vistaGantt: boolean
@@ -799,31 +792,34 @@ function OpcionesFecha({
       >
         Sin fecha
       </button>
-      {/* P4: "En horizonte visible (Gantt)" — solo en contexto de proyecto
-          (no en Mis Tareas, que cruza proyectos y no tiene un horizonte único).
-          Solo se ACTIVA desde la Gantt; desde la tabla puede desactivarse si ya
-          está activa. Excluyente: reemplaza cualquier otra selección de fecha. */}
-      {contexto !== 'mis-tareas' && (
-        <button
-          className={`filtro-op${filtro.fecha?.tipo === 'horizonte' ? ' filtro-op--on' : ''}`}
-          disabled={!vistaGantt && filtro.fecha?.tipo !== 'horizonte'}
-          title={
-            !vistaGantt && filtro.fecha?.tipo !== 'horizonte'
-              ? 'Se activa desde la Gantt'
-              : 'Tareas con fecha dentro del horizonte visible de la Gantt, más las sin fecha'
-          }
-          onClick={() =>
-            onCambiar({
-              ...filtro,
-              sinFecha: undefined,
-              conFecha: undefined,
-              fecha: filtro.fecha?.tipo === 'horizonte' ? undefined : { tipo: 'horizonte' },
-            })
-          }
-        >
-          En horizonte visible (Gantt)
-        </button>
-      )}
+      {/* P4: "En horizonte visible (Gantt)". Solo se ACTIVA desde la Gantt;
+          desde la tabla puede desactivarse si ya está activa. Excluyente:
+          reemplaza cualquier otra selección de fecha.
+          #337: también en Mis Tareas. Se excluía porque "cruza proyectos y no
+          tiene un horizonte único", y eso dejó de ser cierto cuando Mis Tareas
+          tuvo su propia Gantt: tiene un horizonte, uno solo, con el mismo
+          selector —"Alrededor de hoy" y "Todas mis tareas"—.
+          #336: la ayuda ya no menciona las tareas sin fecha, porque ya no las
+          incluye. */}
+      <button
+        className={`filtro-op${filtro.fecha?.tipo === 'horizonte' ? ' filtro-op--on' : ''}`}
+        disabled={!vistaGantt && filtro.fecha?.tipo !== 'horizonte'}
+        title={
+          !vistaGantt && filtro.fecha?.tipo !== 'horizonte'
+            ? 'Se activa desde la Gantt'
+            : 'Tareas con fecha dentro del horizonte visible de la Gantt'
+        }
+        onClick={() =>
+          onCambiar({
+            ...filtro,
+            sinFecha: undefined,
+            conFecha: undefined,
+            fecha: filtro.fecha?.tipo === 'horizonte' ? undefined : { tipo: 'horizonte' },
+          })
+        }
+      >
+        En horizonte visible (Gantt)
+      </button>
     </>
   )
 }
