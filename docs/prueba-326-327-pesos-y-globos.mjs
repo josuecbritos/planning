@@ -411,9 +411,13 @@ const alPasarPorElNombre = await p.evaluate(() => ({
   globos: document.querySelectorAll('.globo-tip').length,
   tarjetas: document.querySelectorAll('.hovercard').length,
 }))
+// #340 quitó la tarjeta flotante del producto. Lo que este criterio protegía
+// —que el nombre de la tarea NO declare un globo propio, para no mostrar dos
+// cosas a la vez sobre el mismo texto— sigue valiendo: ahora no aparece ninguna
+// de las dos.
 chk(
-  alPasarPorElNombre.tarjetas === 1 && alPasarPorElNombre.globos === 0,
-  '11 al pasar el mouse aparece la tarjeta flotante de siempre, una sola',
+  alPasarPorElNombre.tarjetas === 0 && alPasarPorElNombre.globos === 0,
+  '11 al pasar el mouse por el nombre de la tarea no aparece nada: ni globo ni tarjeta (#340)',
   `tarjetas ${alPasarPorElNombre.tarjetas} · globos ${alPasarPorElNombre.globos}`,
 )
 

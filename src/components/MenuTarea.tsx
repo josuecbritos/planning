@@ -93,7 +93,14 @@ export function useMenuTarea() {
   /** El pulso que le toca a una fila: 0 si no es la que hay que renombrar. */
   const pulsoDe = (tareaId: string) => (renombrar.tareaId === tareaId ? renombrar.pulso : 0)
 
-  return { menu, abrir, cerrar, pedirRenombrar, pulsoDe }
+  /**
+   * #335 — La tarea sobre la que está abierto el menú, o `null`. Su fila queda
+   * resaltada mientras el menú lo está: al ir a elegir una opción el mouse se
+   * va de la fila, y sin esto se dejaba de ver sobre qué tarea se iba a actuar.
+   */
+  const tareaDelMenuId = menu?.tareaId ?? null
+
+  return { menu, abrir, cerrar, pedirRenombrar, pulsoDe, tareaDelMenuId }
 }
 
 /**
@@ -222,6 +229,19 @@ export function MenuTarea({
     // `pos` fuera de las dependencias a propósito: el efecto lo escribe y volver
     // a correr por eso sería un ciclo. Lo dispara la apertura del menú.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menu])
+
+  // #335 — Mientras el menú está abierto, el resaltado de fila deja de seguir al
+  // mouse: manda la fila del menú. Sin esto, al mover el mouse a otra fila las
+  // dos quedaban iguales y no se entendía sobre cuál estaba abierto. Se marca en
+  // el documento —igual que el tema— porque el menú vive en un portal y las dos
+  // vistas comparten las mismas reglas de resaltado.
+  useEffect(() => {
+    if (!menu) return
+    document.documentElement.dataset.menuTarea = '1'
+    return () => {
+      delete document.documentElement.dataset.menuTarea
+    }
   }, [menu])
 
   useEffect(() => {

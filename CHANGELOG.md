@@ -3193,3 +3193,143 @@ nombre ya no llega en edición y no hay nada que cancelar con Escape.
 Regresión en verde: #292, #297, #298, #305/#305b, #305e, #306/#306b/#306c,
 #307, #310, #311, #313, #318, #319, #320, #321, #322, #324, #326, #327, #328,
 #329, #331, #332, #333, #334.
+
+### #340 · #341 · #342, y dos correcciones de #335
+
+#### Correcciones de #335 — el resaltado de fila
+
+**El velo de modo claro baja de 10% a 6%.** Al 10%, sobre una celda blanca el
+velo dejaba un gris **casi idéntico al de las líneas de la grilla**: se perdían
+las líneas y la fila se leía como una franja gris maciza; y en una fila sin
+color el salto era brusco. *Medido: al 10% el fondo compuesto queda en **230** y
+la línea de la grilla está en **228** — separación de **2**. Al 6%, el fondo
+queda en **240**: separación de **12**.* **El de modo oscuro no cambia** — ahí el
+velo aclara y las líneas son oscuras, así que el contraste nunca se perdió. El
+peso del resaltado lo lleva la línea de acento naranja, que tampoco cambia.
+
+**Y la fila del menú abierto queda marcada.** Al abrir el menú del clic derecho,
+el resaltado se perdía en cuanto el mouse se iba de la fila para elegir una
+opción, así que mientras se elegía no se veía sobre qué tarea se iba a actuar.
+Ahora la fila queda resaltada **mientras el menú está abierto**, con el mismo
+velo y la misma línea, y al cerrarse —eligiendo, con Escape o con un clic
+fuera— vuelve a mandar el mouse.
+
+*Y mientras el menú está abierto, el mouse deja de resaltar otras filas.* Sin
+eso, con el menú sobre una fila y el mouse sobre otra las dos quedaban iguales y
+no se entendía sobre cuál estaba abierto. Se marca en el documento —igual que el
+tema— porque el menú vive en un portal y las dos vistas comparten las mismas
+reglas de resaltado.
+
+#### #340 — Se quita la tarjeta flotante de la tarea
+
+Al pasar el mouse por el nombre de una tarea —en la tabla y en la Gantt— y por
+la marca de fecha en la grilla, aparecía una tarjeta que seguía al cursor con
+título, estado, responsable, fecha original, fecha vigente y la cadena de fechas
+por las que pasó la tarea. **Se va del producto**, en las dos vistas y en Mis
+Tareas.
+
+*Por qué:* **casi todo lo que mostraba ya está a la vista.** En la tabla, estado,
+responsable y fecha objetivo son columnas. En la Gantt, **la cadena de fechas ya
+está dibujada en la grilla** —son las marcas de "fecha anterior", que hasta
+tienen su propia caja en los contadores—, así que la tarjeta repetía en texto lo
+que la grilla muestra en su lugar. *Y desde #335 hay un costo nuevo: la tarjeta
+sigue al cursor y **tapa la grilla justo cuando se está recorriendo una fila**,
+que es lo que #335 vino a facilitar. Compiten.*
+
+**Costo aceptado y declarado:** se pierde ver la fecha original y la cadena de
+replanificaciones de un vistazo. Las dos siguen en el panel de detalle, que está
+a un gesto con el menú del clic derecho.
+
+*No se toca nada más:* el panel de detalle, los globos de texto corto de #327 —el
+nombre del frente, del sub frente, el rótulo del proyecto, la ayuda de los
+botones y el detalle del día en las celdas— y los contadores, incluida la caja
+de "Fecha anterior".
+
+Con la tarjeta se fueron sus dos componentes (`HoverCard` y `TaskDetail`), su
+bloque de CSS —salvo la pastilla de estado, que el panel de detalle usa por su
+cuenta— y el `wrapDisplay` de `InlineText`, que existía solo para envolver el
+nombre con ella.
+
+#### #341 — La fila de creación deja de pintarse de verde
+
+Al abrir la fila para crear una tarea —con "+ Tarea", con "Agregar tarea abajo"
+o con el "+" de la Gantt— **se dibujaba con el verde suave de las tareas
+hechas**: un color puesto a mano, no una consecuencia del estado. **Choca de
+frente con el lenguaje de colores del producto:** el verde significa "tarea
+terminada", y esa fila es una tarea que todavía no existe.
+
+Ahora va **sin color**, que es exactamente donde cae una tarea recién creada:
+pendiente y sin fecha. Lo demás de la fila no cambia.
+
+#### #342 — Informe: por qué una tarea creada se colaba en un filtro que no cumple
+
+**Reproducido**, y no solo duplicando.
+
+**La causa.** Tres cosas se muestran **a la fuerza** aunque el filtro las deje
+fuera: la tarea a la que se llega desde una notificación (#137), las tareas
+recién creadas (#253) y los contenedores recién creados (#333). Las tres valen
+**mientras la foto sea la misma** — se fuerzan para que lo que acabas de hacer no
+desaparezca bajo el filtro que YA estaba puesto.
+
+En cuanto la foto se vuelve a tomar —al cambiar el filtro, el orden, el frente o
+la pantalla— esa razón se acaba: **la foto nueva ya se tomó filtrada**, así que
+forzar otra vez mete en la vista algo que no cumple.
+
+**Y ahí estaba el desajuste.** La tarea de la notificación **sí** se soltaba en
+esos cuatro sitios (#173, #158). Las recién creadas se soltaban **solo** en
+"Actualizar vista". #253 las sumó al mismo mecanismo de forzado y no las sumó a
+la misma limpieza; #333 repitió el patrón con los contenedores. Por eso "pasa en
+algunos casos y no en todos": solo se ve cuando la copia **no cumple** el filtro
+que se pone después.
+
+**El síntoma no era de duplicar.** Medido con los tres caminos de creación
+—"Duplicar tarea", "Agregar tarea abajo" y el "+" de la Gantt—: **los tres se
+colaban igual**. Que duplicar haya cambiado de camino en la tanda anterior no
+tuvo nada que ver.
+
+**La corrección**, sin ninguna bifurcación de las que el pedido reserva al dueño:
+las tres se sueltan juntas, en los mismos cuatro sitios, por una sola función
+(`soltarForzadas`). No se decide que la copia se quede visible, no se cambia
+cuándo aparece "Actualizar vista", y **#320 y #333 no cambian**: crear **con** un
+filtro ya puesto sigue dejando la tarea a la vista, debajo de la original y con
+"Actualizar vista" encendido, porque ahí el filtro no cambia.
+
+#### Verificación
+
+`docs/prueba-340-341-342-y-335b.mjs` — **44 comprobaciones en verde**.
+
+De **#335b**: que el velo sea 6% en claro y siga en 14% en oscuro; que dentro de
+la fila resaltada la línea de la grilla se distinga del fondo, con la separación
+medida; que las cuatro categorías conserven su color exacto; que la fila del menú
+quede resaltada con velo y línea mientras el menú está abierto, en la tabla, en
+la Gantt y en Mis Tareas; que pasar el mouse por otra fila no la resalte; y que
+los tres modos de cerrar el menú suelten el resaltado fijo.
+
+De **#340**: que no aparezca ninguna tarjeta sobre el nombre en las cuatro
+vistas ni sobre la marca de la grilla; que los globos de texto corto sigan; que
+el panel de detalle siga con la fecha original y el historial; y que la caja
+"Fecha anterior" de los contadores siga ahí.
+
+De **#341**: que la fila de creación se vea en blanco desde los tres caminos y al
+crear un sub frente; que la tarea guardada quede sin color; y que escribir,
+guardar y cancelar sigan igual.
+
+De **#342**: crear sin filtro y filtrar después por estado, por fecha y por
+responsable, con los tres caminos de creación — la nueva **no aparece** y
+"Actualizar vista" **no se enciende**; crear **con** el filtro ya puesto sigue
+dejándola visible con el aviso encendido; y tocar "Actualizar vista" recalcula y
+deja solo lo que cumple.
+
+*Control negativo:* corrida contra la base de la rama, **22 comprobaciones
+fallan** — entre ellas la separación de la línea de la grilla, que ahí mide **2**
+en vez de 12, y el caso de #342 tal cual lo reportó el dueño: una tarea pendiente
+y sin fecha dentro del filtro "Atrasadas".
+
+**Tres pruebas anteriores cambian de contrato por #340 y se actualizan:** la de
+#327 y la de #321 comprobaban que la tarjeta apareciera sobre el nombre de la
+tarea —ahora comprueban que **no aparezca nada**, ni tarjeta ni globo, que es lo
+que ese criterio protegía—, y la de #335 exigía que el velo fuera el doble del de
+una opción de menú, cosa que la corrección revierte. Regresión en verde: #273,
+#292, #297, #298, #305/#305b, #305e, #306, #307, #310, #311, #313, #318, #319,
+#320, #321, #322, #324, #326, #327, #328, #329, #331, #332, #333, #334, #335,
+#336, #337, #338.

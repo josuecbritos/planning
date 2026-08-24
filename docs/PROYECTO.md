@@ -401,8 +401,7 @@ bajo el encabezado congelado y solo asomaba una franja. **Un globo que se abre
 hacia afuera dentro de un contenedor con `overflow` se recorta sin importar el
 z-index**, así que el arreglo no es subirle la capa sino sacarlo del árbol: se
 dibujan en una **capa aparte por encima de la página**, el mismo camino que ya
-usaban la tarjeta flotante de la tarea y el nombre completo en administración de
-usuarios (#213). Cada uno **se sigue abriendo hacia donde se abría** —los de
+usaba el nombre completo en administración de usuarios (#213). Cada uno **se sigue abriendo hacia donde se abría** —los de
 nombre hacia la derecha, los de botones y celdas hacia arriba— y conserva su
 inmediatez o su retardo; solo **se corre al lado contrario cuando no cabe**
 contra un borde de la pantalla. Al desplazar la grilla el globo se suelta, para
@@ -425,16 +424,42 @@ tareas dispone de los **208 completos**: el envoltorio no se dibuja, así que
 tampoco paga su separación.* La columna de acciones de la tabla **no se toca**:
 ahí el ⓘ se queda.
 
+**La tarjeta flotante de la tarea se fue (#340).** Al pasar el mouse por el
+nombre de una tarea —en las dos vistas y en Mis Tareas— y por la marca de fecha
+en la grilla aparecía una tarjeta que seguía al cursor, con título, estado,
+responsable, fecha original, fecha vigente y la cadena de fechas por las que pasó
+la tarea. **Casi todo eso ya está a la vista:** en la tabla, estado, responsable
+y fecha objetivo son columnas; en la Gantt **la cadena de fechas ya está dibujada
+en la grilla** —son las marcas de "fecha anterior", que hasta tienen su caja en
+los contadores—, así que la tarjeta repetía en texto lo que la grilla muestra en
+su lugar. *Y desde #335 competían: la tarjeta sigue al cursor y tapa la grilla
+justo cuando se está recorriendo una fila.*
+**Costo aceptado y declarado:** se pierde ver la fecha original y la cadena de
+replanificaciones de un vistazo; las dos siguen en el panel de detalle, a un
+gesto con el menú del clic derecho. *Los globos de texto corto de #327 no se
+tocan —nombre del frente, del sub frente, rótulo del proyecto, ayuda de los
+botones y detalle del día—, ni los contadores, ni el panel.*
+
 **La fila bajo el mouse se resalta (#335).** Nada indicaba sobre qué fila estaba
 el mouse, ni en la tabla ni en la Gantt. En la Gantt eso pesa más: la grilla es
 ancha, las filas son bajas y hay que seguir una fila hacia la derecha por encima
 de decenas de columnas de día. Dos señales a la vez: **un velo sobre toda la
-fila** —del doble del que el producto ya usa al pasar el mouse por una opción de
-menú— y **una línea de acento en el naranja de marca, a la izquierda**.
+fila** y **una línea de acento en el naranja de marca, a la izquierda**.
 **El velo va POR ENCIMA del color de estado y nunca lo reemplaza:** es una capa
 sobre el fondo que la celda ya tiene, así que una fila atrasada resaltada **se
 sigue leyendo roja**. Verde, ámbar, rojo y morado son el corazón del producto.
-*Al triple, el rojo se va a gris rosado; por eso el doble.*
+*El velo es del **6%** en claro y del **14%** en oscuro. Empezó siendo el doble
+del de una opción de menú (10%), y en claro eso resultó demasiado: sobre una
+celda blanca dejaba un gris casi idéntico al de las líneas de la grilla —fondo
+compuesto 230 contra una línea de 228: separación de **2**— y las líneas
+desaparecían. Al 6% el fondo queda en 240: separación de **12**. En oscuro nunca
+pasó, porque ahí el velo aclara y las líneas son oscuras. El peso del resaltado
+lo lleva la línea naranja.*
+**La fila del menú abierto queda marcada.** Al abrir el menú del clic derecho el
+resaltado se perdía en cuanto el mouse se iba de la fila para elegir, así que no
+se veía sobre qué tarea se iba a actuar. Queda resaltada mientras el menú lo
+esté, y **mientras tanto el mouse no resalta otras**: si las dos quedaran
+iguales, no se entendería sobre cuál está abierto.
 El resaltado alcanza la fila entera **hasta el borde derecho de lo que se ve** —
 en la Gantt, las columnas congeladas y todas las celdas de día—. La línea de
 acento va en el borde izquierdo de la fila en la tabla, y en el de la **celda del
@@ -726,6 +751,20 @@ desde una notificación, con el aviso encendido. La lista **no se reordena sola*
 frente y todo lo demás se queda donde está hasta tocar "Actualizar vista", que
 entonces recalcula y la manda a su lugar. Encadenando con Enter, todas aparecen.
 
+**Pero solo mientras la foto sea la misma (#342).** Tres cosas se muestran a la
+fuerza aunque el filtro las deje fuera: la tarea a la que se llega desde una
+notificación (#137), las **recién creadas** (#253) y los **contenedores** recién
+creados (#333). Las tres valen para que lo que acabas de hacer no desaparezca
+bajo el filtro **que ya estaba puesto**. En cuanto la foto se vuelve a tomar —al
+cambiar el filtro, el orden, el frente o la pantalla— esa razón se acaba: la foto
+nueva ya se tomó filtrada, así que forzar otra vez mete en la vista algo que no
+cumple. *Ese era el defecto: la tarea de la notificación sí se soltaba en esos
+cuatro sitios (#173, #158), y las otras dos solo en "Actualizar vista" — #253 las
+sumó al mecanismo de forzado y no a la limpieza, y #333 repitió el patrón. Se
+veía como una tarea recién creada colada dentro de un filtro que no cumple, y
+pasaba con los tres caminos de creación, no solo al duplicar.* Ahora las tres se
+sueltan juntas, en los mismos sitios, desde una sola función.
+
 **Y aparece EN SU SITIO (#333).** Creando debajo de una hermana con filtro u
 orden puestos, la tarea aparecía pero **no donde se la había creado**: la foto
 solo tiene posición para lo que ya estaba cuando se la tomó, así que la nueva
@@ -770,6 +809,11 @@ responsable y fecha (cargar varias tareas de la misma persona para el mismo día
 es un caso real), mientras que cerrarla —clic fuera, Escape, cambiar de
 pantalla— y volver a abrirla con "+ Tarea" empieza de cero. Antes esos valores
 sobrevivían al cierre y se asignaban tareas a alguien sin querer.
+**Y va sin color (#341).** Se dibujaba con el verde suave de las tareas hechas —un
+color puesto a mano, no una consecuencia del estado—, y eso choca de frente con
+el lenguaje de colores del producto: el verde significa "tarea terminada" y esa
+fila es una tarea que todavía no existe. Sin color es donde cae una tarea recién
+creada: pendiente y sin fecha.
 
 **Modelo de estados (derivado, no editable a mano):** cada tarea cae en una de
 cinco categorías excluyentes — Hecha (verde), Pendiente (sin color), Pendiente
@@ -1062,7 +1106,7 @@ también en el teléfono (el flotante de tema se retiró).
 hereda por accidente del navegador. Los `<button>` no heredan el color del texto
 —la regla base los pone en `inherit`— y todo campo de formulario fija su
 `color` y su `background` de tema. Las zonas que son **oscuras en los dos
-temas** —barra lateral, globos de tooltip, tarjeta flotante de la Gantt— usan
+temas** —barra lateral, globos de tooltip— usan
 colores fijos **a propósito** y no deben "corregirse" a variables de tema; para
 eso la barra lateral tiene su propia `--sidebar-acento`. Una variable
 inexistente invalida la declaración completa: `var()` sin respaldo no cae al

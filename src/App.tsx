@@ -1015,16 +1015,38 @@ export default function App({ repo }: { repo: Repo }) {
     setProyectoActivoId(null)
   }, [auth])
 
-  // P1: "Actualizar vista" recalcula la foto (nuevo snapshot) y baja el flag.
-  // #158: también suelta la tarea resaltada/forzada — al recalcular, si el
-  // filtro la excluye, deja de mostrarse.
-  const actualizarVista = useCallback(() => {
-    setSnapshotNonce((n) => n + 1)
-    setVistaStale(false)
+  /**
+   * #342 — Soltar TODO lo que se está mostrando a la fuerza.
+   *
+   * Tres cosas se fuerzan a la vista aunque el filtro las deje fuera: la tarea
+   * a la que se llegó desde una notificación (#137), las recién creadas (#253)
+   * y los contenedores recién creados (#333). Las tres valen **mientras la foto
+   * sea la misma**: se fuerzan para que lo que acabas de hacer no desaparezca
+   * bajo el filtro que YA estaba puesto.
+   *
+   * En cuanto la foto se vuelve a tomar —al cambiar el filtro, el orden, el
+   * frente o la pantalla— esa razón se acaba: la foto nueva ya se tomó
+   * filtrada, así que forzar de nuevo mete en la vista algo que no cumple.
+   *
+   * **Ese era el defecto de #342**, y era de las tres, no solo de las copias:
+   * `tareaResaltada` sí se soltaba en los cuatro sitios (#173, #158), y las
+   * otras dos solo en "Actualizar vista". Van juntas de acá en adelante para
+   * que no puedan volver a separarse.
+   */
+  const soltarForzadas = useCallback(() => {
     setTareaResaltada(null)
     setTareasNuevas([])
     setContenedoresNuevos([])
   }, [])
+
+  // P1: "Actualizar vista" recalcula la foto (nuevo snapshot) y baja el flag.
+  // #158: también suelta lo forzado — al recalcular, si el filtro lo excluye,
+  // deja de mostrarse.
+  const actualizarVista = useCallback(() => {
+    setSnapshotNonce((n) => n + 1)
+    setVistaStale(false)
+    soltarForzadas()
+  }, [soltarForzadas])
 
   // Cambiar de vista/proyecto recalcula la foto naturalmente (no cuenta como
   // "edición"): se baja el flag de desactualizada por si venía de la anterior.
@@ -1041,9 +1063,9 @@ export default function App({ repo }: { repo: Repo }) {
     // entrada a la pantalla, que restaura la vista guardada o deja limpio.
     setVistaStale(false)
     setMovilSidebar(false)
-    setTareaResaltada(null) // #158: navegar suelta el resaltado
+    soltarForzadas() // #158/#342: navegar suelta lo forzado
     setPeekProyectoId(null) // #179
-  }, [])
+  }, [soltarForzadas])
 
   // #221: al ENTRAR a la pantalla de un proyecto se carga su vista guardada, y
   // nada más. Salir descarta lo no guardado, y cambiar de proyecto es salir:
@@ -1075,34 +1097,44 @@ export default function App({ repo }: { repo: Repo }) {
     },
     [proyectoActivoId, sesionId],
   )
-  const setFiltro = useCallback((f: Filtro) => {
-    // Cambiar el filtro recalcula la foto (no es una "edición" de datos).
-    setVistaStale(false)
-    // #173: cambiar el filtro suelta la tarea insertada por una notificación,
-    // para que la foto vuelva a ser consistente con el filtro (no persiste).
-    setTareaResaltada(null)
-    setVistaActiva((cur) => ({ ...cur, filtro: f }))
-  }, [])
-  const setOrden = useCallback((o: OrdenMulti) => {
-    setVistaStale(false)
-    setTareaResaltada(null) // #173
-    setVistaActiva((cur) => ({ ...cur, orden: o }))
-  }, [])
+  const setFiltro = useCallback(
+    (f: Filtro) => {
+      // Cambiar el filtro recalcula la foto (no es una "edición" de datos).
+      setVistaStale(false)
+      // #173/#342: cambiar el filtro suelta lo que se estaba forzando —la tarea
+      // insertada por una notificación y las recién creadas—, para que la foto
+      // vuelva a ser consistente con el filtro. Nada de eso persiste.
+      soltarForzadas()
+      setVistaActiva((cur) => ({ ...cur, filtro: f }))
+    },
+    [soltarForzadas],
+  )
+  const setOrden = useCallback(
+    (o: OrdenMulti) => {
+      setVistaStale(false)
+      soltarForzadas() // #173/#342
+      setVistaActiva((cur) => ({ ...cur, orden: o }))
+    },
+    [soltarForzadas],
+  )
 
-  const onSelectFrente = useCallback((f: FrenteSel) => {
-    setFrenteSel(f)
-    setVistaStale(false)
-    setMovilSidebar(false)
-    setTareaResaltada(null) // #158
-  }, [])
+  const onSelectFrente = useCallback(
+    (f: FrenteSel) => {
+      setFrenteSel(f)
+      setVistaStale(false)
+      setMovilSidebar(false)
+      soltarForzadas() // #158/#342
+    },
+    [soltarForzadas],
+  )
 
   const onSelectPantalla = useCallback((p: Pantalla) => {
     setPantalla(p)
     setTareaDetalleId(null)
     setMovilSidebar(false)
-    setTareaResaltada(null) // #158
+    soltarForzadas() // #158/#342
     setPeekProyectoId(null) // #179
-  }, [])
+  }, [soltarForzadas])
 
   const abrirDetalle = useCallback((tareaId: string) => setTareaDetalleId(tareaId), [])
 

@@ -900,17 +900,22 @@ for (const [sel, etiqueta] of [
     globo.contenido,
   )
 }
-// La columna de tarea: su tarjeta ya lleva el título completo y es inmediata,
-// así que no se le encima un segundo globo.
+// La columna de tarea NO declara globo propio: cuando existía la tarjeta
+// flotante habría mostrado dos cosas a la vez sobre el mismo texto. #340 quitó
+// la tarjeta, y lo que queda comprobado es que el nombre de la tarea sigue sin
+// globo — donde se ve entero es en el panel de detalle.
 const tareaCel = d.locator('.gantt td.fija--tarea .tarea-cell__link, .gantt td.fija--tarea .inline-text').first()
 await tareaCel.hover()
-await d.waitForTimeout(120)
-const tarjeta = await d.evaluate(() => {
-  const hc = document.querySelector('.hovercard')
-  return { hay: !!hc, titulo: hc?.querySelector('.hovercard__title')?.textContent?.trim() ?? null }
-})
-chk(tarjeta.hay, 'D14 en la columna de tarea la tarjeta aparece de inmediato')
-chk(!!tarjeta.titulo, 'D14 y lleva el nombre completo de la tarea', tarjeta.titulo ?? '')
+await d.waitForTimeout(300)
+const sobreElNombre = await d.evaluate(() => ({
+  tarjetas: document.querySelectorAll('.hovercard').length,
+  globos: document.querySelectorAll('.globo-tip').length,
+}))
+chk(
+  sobreElNombre.tarjetas === 0 && sobreElNombre.globos === 0,
+  'D14 sobre el nombre de la tarea no aparece nada: ni tarjeta ni globo (#340)',
+  `tarjetas ${sobreElNombre.tarjetas} · globos ${sobreElNombre.globos}`,
+)
 chk(
   (await d.locator('.gantt td.fija--tarea .fija-tip[data-tip]').count()) === 0,
   'D14 sin un segundo globo encima de la tarjeta',

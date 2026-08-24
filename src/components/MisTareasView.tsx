@@ -21,8 +21,6 @@ import { escribirVistaActiva, estadoInicial, leerGuardados } from '../lib/vistas
 import { FiltrosBar } from './FiltrosBar'
 import { Header } from './Header'
 import { GanttView, type ModoHorizonte } from './GanttView'
-import { HoverCard } from './HoverCard'
-import { TaskDetail } from './TaskDetail'
 import { CheckHecha } from './CheckHecha'
 import { FechaEditable } from './FechaEditable'
 
@@ -205,7 +203,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
   // nombre queda en edición en su propia celda. El clic al panel se queda: es
   // la puerta más directa al detalle en la única pantalla que no está dentro de
   // un proyecto, y cruzando proyectos es lo que más se usa.
-  const { menu, abrir: abrirMenu, cerrar: cerrarMenu, pedirRenombrar, pulsoDe } = useMenuTarea()
+  const { menu, abrir: abrirMenu, cerrar: cerrarMenu, pedirRenombrar, pulsoDe, tareaDelMenuId } = useMenuTarea()
   const tareaDelMenu = menu ? state.tareas.find((t) => t.id === menu.tareaId) : undefined
   const proyectoDelMenu = tareaDelMenu
     ? misFilas.find((f) => f.tarea.id === tareaDelMenu.id)?.proyecto
@@ -321,6 +319,7 @@ export function MisTareasView({ state, usuario, proyectos, hoy, actions, onAbrir
               onAbrirTarea={onAbrirTarea}
               onMenu={abrirMenu}
               pulsoRenombrar={pulsoDe(fila.tarea.id)}
+              conMenu={tareaDelMenuId === fila.tarea.id}
             />
           ))}
           {mostradas.length === 0 && (
@@ -366,6 +365,7 @@ function FilaTarea({
   onAbrirTarea,
   onMenu,
   pulsoRenombrar,
+  conMenu,
 }: {
   fila: FilaMisTareas
   state: AppState
@@ -377,6 +377,8 @@ function FilaTarea({
   onMenu: (e: React.MouseEvent, tareaId: string) => void
   /** #334: pulso de "Renombrar" — la ÚNICA entrada a la edición en esta tabla. */
   pulsoRenombrar: number
+  /** #335: el menú del clic derecho está abierto sobre ESTA fila. */
+  conMenu?: boolean
 }) {
   const { tarea, proyecto, ruta } = fila
   const color = colorTarea(state, tarea, hoy)
@@ -387,7 +389,7 @@ function FilaTarea({
   return (
     <tr
       // #335: ver `fila-tarea` en la tabla de un proyecto.
-      className={`fila-tarea${color !== 'ninguno' ? ` fila--${color}` : ''}`}
+      className={`fila-tarea${conMenu ? ' fila-tarea--menu' : ''}${color !== 'ninguno' ? ` fila--${color}` : ''}`}
       onContextMenu={(e) => onMenu(e, tarea.id)}
     >
       <td className="col-check">
@@ -413,17 +415,15 @@ function FilaTarea({
             ariaLabel={`Editar título: ${tarea.titulo}`}
             abrirEdicion={can.editarTareas(tarea) ? pulsoRenombrar : 0}
             display={
-              <HoverCard card={<TaskDetail state={state} tarea={tarea} hoy={hoy} />}>
-                <span
-                  className="tarea-cell__link"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onAbrirTarea(tarea.id)}
-                  onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
-                >
-                  {tarea.titulo}
-                </span>
-              </HoverCard>
+              <span
+                className="tarea-cell__link"
+                role="button"
+                tabIndex={0}
+                onClick={() => onAbrirTarea(tarea.id)}
+                onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
+              >
+                {tarea.titulo}
+              </span>
             }
           />
           {nReplan > 0 && (

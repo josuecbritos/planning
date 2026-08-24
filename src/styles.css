@@ -69,9 +69,14 @@
   /* Velo de hover sobre superficies (negro en claro, blanco en oscuro). */
   --velo: rgba(0, 0, 0, .05);
   --velo-fuerte: rgba(0, 0, 0, .08);
-  /* #335: el velo de la fila bajo el mouse — el DOBLE del de una opción de
-     menú. Al triple, el rojo de una fila atrasada se va a gris rosado. */
-  --velo-fila: rgba(0, 0, 0, .10);
+  /* #335: el velo de la fila bajo el mouse. Empezó en el DOBLE del de una
+     opción de menú (10%), y en claro eso resultó demasiado: sobre una celda
+     blanca dejaba un gris casi idéntico al de las líneas de la grilla, así que
+     las líneas desaparecían y la fila se leía como una franja gris maciza; y en
+     una fila sin color el salto era brusco. Baja a 6%. El peso del resaltado lo
+     lleva la línea de acento naranja. En oscuro NO cambia: ahí el velo aclara y
+     las líneas son oscuras, así que el contraste se conserva. */
+  --velo-fila: rgba(0, 0, 0, .06);
 
   --semana-borde: #a1a1aa;
 
@@ -520,8 +525,17 @@ tr.fila--morado > td { background: var(--morado-suave); }
    Solo con mouse: en el teléfono no aplica, así que va acotado igual que el
    resto de lo que solo existe en escritorio. */
 @media (min-width: 769px) {
-  tr.fila-tarea:hover > td,
-  .gantt tbody tr.gfila-tarea:hover > td:not(.fija--rotula) {
+  /* La fila sobre la que se abrió el menú del clic derecho queda resaltada
+     MIENTRAS el menú está abierto: al ir a elegir una opción el mouse se va de
+     la fila, y sin esto se dejaba de ver sobre qué tarea se iba a actuar. Es el
+     mismo velo y la misma línea; al cerrarse el menú vuelve a mandar el mouse.
+     Y mientras está abierto el mouse NO resalta otras filas (`data-menu-tarea`
+     en el documento): si las dos quedaran iguales, no se entendería sobre cuál
+     está abierto el menú. */
+  html:not([data-menu-tarea]) tr.fila-tarea:hover > td,
+  tr.fila-tarea--menu > td,
+  html:not([data-menu-tarea]) .gantt tbody tr.gfila-tarea:hover > td:not(.fija--rotula),
+  .gantt tbody tr.gfila-tarea--menu > td:not(.fija--rotula) {
     background-image: linear-gradient(var(--velo-fila), var(--velo-fila));
   }
   /* La línea de acento. En la tabla, en el borde izquierdo de la fila. En la
@@ -530,8 +544,10 @@ tr.fila--morado > td { background: var(--morado-suave); }
      con `:not(.fija--rotula)`—, así que la fila de una tarea empieza en la
      columna del nombre. Queda un poco más adentro que en la tabla, y es el
      mismo lugar en todas las filas. */
-  tr.fila-tarea:hover > td:first-child,
-  .gantt tbody tr.gfila-tarea:hover > td.fija--tarea {
+  html:not([data-menu-tarea]) tr.fila-tarea:hover > td:first-child,
+  tr.fila-tarea--menu > td:first-child,
+  html:not([data-menu-tarea]) .gantt tbody tr.gfila-tarea:hover > td.fija--tarea,
+  .gantt tbody tr.gfila-tarea--menu > td.fija--tarea {
     box-shadow: inset 3px 0 0 0 var(--naranja);
   }
 }
@@ -740,7 +756,12 @@ table.tareas .col-desv { text-align: center; }
 .resp-menu__check { margin-left: auto; color: var(--verde-check); font-weight: 700; }
 
 /* Fila de creacion inline */
-.fila-nueva td { background: var(--verde-suave); }
+/* #341: la fila de creación se dibujaba con el verde suave de las tareas
+   hechas —un color puesto a mano, no una consecuencia del estado—, y el verde
+   significa "terminada" mientras esa fila es una tarea que todavía no existe.
+   Va sin color, que es exactamente donde cae una tarea recién creada: pendiente
+   y sin fecha. */
+.fila-nueva td { background: var(--superficie); }
 .fila-nueva .mudo { color: var(--gris-texto); }
 
 /* Boton fantasma para crear sub frente. #306: solo cuando el frente está
@@ -1524,15 +1545,11 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 .gantt .celda .mark { cursor: default; }
 
-/* ---------- HoverCard / Tooltip ---------- */
+/* ---------- La pastilla de estado ----------
+   #340: la tarjeta flotante de la tarea se fue del producto, y con ella todo lo
+   suyo. De este bloque sobrevive SOLO su pastilla de estado, que el panel de
+   detalle usa por su cuenta. */
 
-.hovercard {
-  position: fixed; z-index: 1000; max-width: 340px;
-  background: #1a1a1b; color: #e7e7ea; border-radius: 8px;
-  padding: 12px 14px; font-size: 12.5px; line-height: 1.5;
-  box-shadow: 0 8px 28px rgba(0,0,0,.32); pointer-events: none;
-}
-.hovercard__title { font-weight: 700; font-size: 13.5px; margin-bottom: 6px; color: #fff; }
 .hovercard__estado {
   display: inline-block; font-size: 11px; font-weight: 700; border-radius: 5px;
   padding: 2px 8px; margin-bottom: 8px;
@@ -1542,25 +1559,6 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .hc-estado--ambar { background: var(--ambar-suave); color: var(--ambar-texto); }
 .hc-estado--morado { background: var(--morado-suave); color: var(--morado-texto); }
 .hc-estado--ninguno { background: #2f2f34; color: #d4d4d8; }
-
-.hovercard__row { display: flex; justify-content: space-between; gap: 18px; }
-.hovercard__row span:first-child { color: #9f9fa6; }
-/* #242: responsable que ya no está disponible. Colores fijos como el resto de
-   la tarjeta, que es oscura en los dos temas a propósito. */
-.hovercard__apagado { color: #8e8e96; }
-.hovercard__motivo { color: #8e8e96; font-size: 11.5px; font-style: italic; margin-top: 2px; }
-/* Registro de auditoria del marcado (punto 1) */
-.hovercard__marcada { margin-top: 4px; font-size: 12px; color: #9ccc9c; }
-.hovercard__hist { margin-top: 8px; border-top: 1px solid #2f2f34; padding-top: 8px; }
-.hovercard__hist-title { color: #9f9fa6; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
-.hovercard__chain { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
-.hovercard__chain .fecha { background: #27272a; border-radius: 4px; padding: 1px 6px; }
-.hovercard__chain .fecha--tachada { color: var(--rojo-tenue); text-decoration: line-through; }
-.hovercard__chain .fecha--vigente { background: #333338; color: #fff; font-weight: 600; }
-.hovercard__chain .flecha { color: #607d8b; }
-
-/* pequeña ayuda visual de que hay tooltip */
-.trigger { cursor: help; }
 
 /* ---------- Estados de carga / vacio / error ---------- */
 

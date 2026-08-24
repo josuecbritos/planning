@@ -24,10 +24,8 @@ import { miembrosDeProyecto, puedeEditarFecha, responsableDeTarea, type Can } fr
 import { EmptyFrentes } from './EmptyFrentes'
 import { Marca } from './Marca'
 import { Avatar, RespPicker } from './RespPicker'
-import { HoverCard } from './HoverCard'
 import { GloboTip } from './GloboTip'
 import { MenuTarea, opcionesDeTarea, useMenuTarea } from './MenuTarea'
-import { TaskDetail } from './TaskDetail'
 import { InlineText } from './InlineText'
 
 // Vista Gantt — grilla tipo Excel (4.3). Estandar de planificacion por
@@ -211,6 +209,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     cerrar: cerrarMenu,
     pedirRenombrar,
     pulsoDe,
+    tareaDelMenuId,
   } = useMenuTarea()
   const tareaDelMenu = menu ? state.tareas.find((t) => t.id === menu.tareaId) : undefined
   // #190/#243: en Mis Tareas los permisos son los del proyecto de ESA tarea
@@ -938,6 +937,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                   onAbrirTarea={onAbrirTarea}
                   onMenu={abrirMenu}
                   pulsoRenombrar={pulsoDe}
+                  tareaDelMenuId={tareaDelMenuId}
                   abrirCrear={abrirCrear}
                   crearEn={crearEn}
                   onCrear={crearElemento}
@@ -1143,6 +1143,7 @@ function FilaGanttRow({
   onAbrirTarea,
   onMenu,
   pulsoRenombrar,
+  tareaDelMenuId,
   abrirCrear,
   crearEn,
   onCrear,
@@ -1178,6 +1179,9 @@ function FilaGanttRow({
    *  marcar la tarea como lista, y ese idioma no se toca. */
   onMenu: (e: React.MouseEvent, tareaId: string) => void
   pulsoRenombrar: (tareaId: string) => number
+  /** #335: la tarea con el menú abierto — su fila queda resaltada mientras lo
+   *  esté, para no perder de vista sobre cuál se va a actuar. */
+  tareaDelMenuId?: string | null
   abrirCrear: (crear: CrearEn, e?: React.MouseEvent) => void
   crearEn: CrearEn | null
   onCrear: (nombre: string) => void
@@ -1400,21 +1404,18 @@ function FilaGanttRow({
   for (const mk of marcasDe(state, tarea, hoy)) marcas.set(mk.fecha, mk.tipo)
 
   const sep = fila.esInicioSub && !fila.esPrimeraGlobal ? ' sep-sf' : ''
-  const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
-  /** El nombre como enlace al panel, con su tarjeta flotante. Lo usan quien no
-   *  puede editar y, desde #338, TODA la Gantt de Mis Tareas. */
+  /** El nombre como enlace al panel. Lo usan quien no puede editar y, desde
+   *  #338, TODA la Gantt de Mis Tareas. */
   const enlaceAlPanel = (
-    <HoverCard card={tooltip}>
-      <span
-        className="tarea-cell__link"
-        role="button"
-        tabIndex={0}
-        onClick={() => onAbrirTarea(tarea.id)}
-        onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
-      >
-        {tarea.titulo}
-      </span>
-    </HoverCard>
+    <span
+      className="tarea-cell__link"
+      role="button"
+      tabIndex={0}
+      onClick={() => onAbrirTarea(tarea.id)}
+      onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
+    >
+      {tarea.titulo}
+    </span>
   )
 
   // -- Estandar de planificacion por clics (punto 2) --
@@ -1494,7 +1495,7 @@ function FilaGanttRow({
       // #335: `gfila-tarea` marca las filas que SÍ se resaltan al pasar el
       // mouse. Las franjas de frente y sub frente y las filas de carga por
       // persona no la llevan: ahí no hay una fila que seguir.
-      className={`gfila-tarea${sep}${clasesDnd}`}
+      className={`gfila-tarea${tareaDelMenuId === tarea.id ? ' gfila-tarea--menu' : ''}${sep}${clasesDnd}`}
       onDragOver={
         dnd
           ? (e) => dnd.sobre(e, tarea.subFrenteId, enMitadSuperior(e) ? tarea.id : dndSiguienteId ?? null)
@@ -1529,10 +1530,9 @@ function FilaGanttRow({
           </button>
         )}
         <span className="con-mas">
-          {/* #321: mismo corte con "…" que en frente y sub frente. Acá el
-              nombre completo ya lo muestra la tarjeta al pasar el mouse —que
-              lo lleva de título y aparece de inmediato, sin retardo—: agregarle
-              un `data-tip` encima mostraría dos globos a la vez. */}
+          {/* #321: mismo corte con "…" que en frente y sub frente. #340: el
+              nombre completo lo mostraba la tarjeta flotante, que se fue; el
+              nombre entero sigue a un gesto, en el panel de detalle. */}
           <span className="fija-tip"><span className="fija-txt">
           {/* #338: en Mis Tareas el clic sobre el nombre abre el PANEL, aunque
               la persona pueda editar. Sus dos vistas respondían distinto al
@@ -1549,7 +1549,6 @@ function FilaGanttRow({
               valor={tarea.titulo}
               onGuardar={(titulo) => actions.updateTarea(tarea.id, { titulo })}
               ariaLabel={`Editar título: ${tarea.titulo}`}
-              wrapDisplay={esMisTareas ? undefined : (nodo) => <HoverCard card={tooltip}>{nodo}</HoverCard>}
               display={esMisTareas ? enlaceAlPanel : undefined}
               abrirEdicion={pulsoRenombrar(tarea.id)}
             />
@@ -1615,17 +1614,15 @@ function FilaGanttRow({
             onClick={puedeEditar ? (e) => clickCelda(e, d) : undefined}
           >
             {tipo && (
-              <HoverCard card={tooltip}>
-                <span
-                  className={`marca-wrap${puedeEditar || can.marcarHechas(tarea) ? ' marca-wrap--click' : ''}`}
-                  role="button"
-                  tabIndex={-1}
-                  onClick={(e) => clickMarca(e, tipo)}
-                  onContextMenu={(e) => clickDerechoMarca(e, tipo)}
-                >
-                  <Marca tipo={tipo} />
-                </span>
-              </HoverCard>
+              <span
+                className={`marca-wrap${puedeEditar || can.marcarHechas(tarea) ? ' marca-wrap--click' : ''}`}
+                role="button"
+                tabIndex={-1}
+                onClick={(e) => clickMarca(e, tipo)}
+                onContextMenu={(e) => clickDerechoMarca(e, tipo)}
+              >
+                <Marca tipo={tipo} />
+              </span>
             )}
           </td>
         )

@@ -232,14 +232,18 @@ chk(
   '#335·1 y la línea naranja va en el borde izquierdo de la fila',
   conMouse?.acento.join(' · ') ?? 'sin acento',
 )
-// El velo es el DOBLE del de una opción de menú, y va encima del color.
+// El velo va encima del color y tiene su propio valor. Nació siendo el DOBLE
+// del de una opción de menú (10%), y la corrección posterior a #335 lo bajó a
+// 6% en claro: al 10% se perdían las líneas de la grilla. Lo que se comprueba
+// acá es que exista y sea distinto del de menú; el valor y su efecto sobre la
+// grilla los mide `prueba-340-341-342-y-335b.mjs`.
 const velos = await p.evaluate(() => {
   const cs = getComputedStyle(document.documentElement)
   return { menu: cs.getPropertyValue('--velo').trim(), fila: cs.getPropertyValue('--velo-fila').trim() }
 })
 chk(
-  /0?\.1\b|0?\.10\b/.test(velos.fila) && /0?\.05\b/.test(velos.menu),
-  '#335·1 el velo de la fila es el doble del de una opción de menú',
+  !!velos.fila && velos.fila !== velos.menu,
+  '#335·1 la fila tiene su propio velo, distinto del de una opción de menú',
   `menú ${velos.menu} · fila ${velos.fila}`,
 )
 chk(
@@ -589,11 +593,12 @@ chk(
 )
 await p.keyboard.press('Escape')
 await esperar(500)
-// 5 · la tarjeta flotante sigue apareciendo.
+// 5 · la tarjeta flotante. #340 la quitó del producto entero, así que el
+// criterio se da vuelta: lo que se comprueba es que NO aparezca.
 await pasarMouse(nombreG, 700)
 chk(
-  (await p.locator('.hovercard').count()) > 0,
-  '#338·5 la tarjeta flotante sigue apareciendo al pasar el mouse por el nombre',
+  (await p.locator('.hovercard').count()) === 0,
+  '#338·5 no aparece ninguna tarjeta flotante al pasar el mouse por el nombre (#340)',
 )
 await p.mouse.move(4, 4)
 await esperar(400)
