@@ -1206,19 +1206,49 @@ export default function App({ repo }: { repo: Repo }) {
 
   // Punto 2: mide el alto de la barra de filtros (sticky) y lo publica en
   // --filtros-h para que el thead de la tabla se congele justo debajo.
+  //
+  // #330: y el del título del sub frente, en --sf-titulo-h, para que los
+  // encabezados se congelen debajo de ÉL. Los dos se miden en vivo y no se
+  // escriben a mano: dependen de la fuente y del zoom. Donde no hay título de
+  // sub frente —la Gantt, Mis Tareas— la variable se borra y vale 0, así que
+  // los encabezados vuelven a congelarse justo debajo de la barra.
   useEffect(() => {
     const content = contentRef.current
     if (!content) return
     const bar = content.querySelector<HTMLElement>('.controles-bar')
     if (!bar) {
       content.style.removeProperty('--filtros-h')
+      content.style.removeProperty('--sf-titulo-h')
       return
     }
-    const update = () => content.style.setProperty('--filtros-h', `${bar.offsetHeight}px`)
+    // Se escribe SOLO cuando el valor cambia: el observador de contenido se
+    // dispara con cada tecla de una edición inline, y una escritura por tecla
+    // ensuciaría el estilo del contenedor para nada.
+    const poner = (nombre: string, valor: string | null) => {
+      if (content.style.getPropertyValue(nombre) === (valor ?? '')) return
+      if (valor === null) content.style.removeProperty(nombre)
+      else content.style.setProperty(nombre, valor)
+    }
+    const update = () => {
+      poner('--filtros-h', `${bar.offsetHeight}px`)
+      // Todos los títulos miden lo mismo: alcanza con uno. Si no hay ninguno
+      // —la Gantt, o un proyecto sin sub frentes— la variable se suelta.
+      const titulo = content.querySelector<HTMLElement>('.subfrente__titulo')
+      poner('--sf-titulo-h', titulo ? `${titulo.offsetHeight}px` : null)
+    }
     update()
     const ro = new ResizeObserver(update)
     ro.observe(bar)
-    return () => ro.disconnect()
+    // El título llega DESPUÉS del primer render —con los datos— y aparece y
+    // desaparece con lo que se está mirando: filtros, frentes plegados, sub
+    // frentes creados. Por eso se vuelve a medir cuando cambia el contenido y
+    // no solo cuando cambia la barra.
+    const mo = new MutationObserver(update)
+    mo.observe(content, { childList: true, subtree: true })
+    return () => {
+      ro.disconnect()
+      mo.disconnect()
+    }
   }, [pantalla, vista, proyectoActivoId])
 
   const tareasVisibles = useMemo<Tarea[]>(() => {

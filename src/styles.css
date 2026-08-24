@@ -464,6 +464,18 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
   font-size: 13.5px; font-weight: 500; color: var(--texto);
   padding: 8px 10px; background: var(--gris-sf); border: 1px solid var(--gris-borde);
   border-bottom: none; border-radius: 8px 8px 0 0;
+  /* #330 — El título se queda fijo mientras dura su bloque, igual que ya hacían
+     sus encabezados de columna. Se iba hacia arriba con sus filas, así que al
+     recorrer un bloque largo se dejaba de saber en qué sub frente se estaba
+     mientras los títulos de columna sí seguían a la vista.
+     Va JUSTO debajo de la barra de controles, y los encabezados pasan a
+     congelarse debajo de él (ver `table.tareas th`): las tres franjas viajan en
+     el mismo orden en que están en la pantalla.
+     No hace falta acotarlo a mano para que no se apilen dos títulos: un `sticky`
+     no sale de su contenedor, y el bloque de un sub frente termina antes de que
+     empiece el del siguiente. El `z-index` lo deja por encima de sus propios
+     encabezados, que al terminar el bloque se le pasan por debajo. */
+  position: sticky; top: var(--filtros-h, 0); z-index: 11;
 }
 .subfrente__count { font-weight: 400; color: var(--gris-texto); font-size: 12px; }
 
@@ -483,8 +495,11 @@ table.tareas th {
   background: var(--superficie-2); font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em;
   color: var(--gris-texto); font-weight: 700;
   /* Encabezados congelados JUSTO debajo de la barra de filtros sticky
-     (--filtros-h la mide App); sin la barra, se congelan al tope. */
-  position: sticky; top: var(--filtros-h, 0); z-index: 10;
+     (--filtros-h la mide App); sin la barra, se congelan al tope.
+     #330: y debajo del título del sub frente, que ahora también se congela.
+     `--sf-titulo-h` la mide App igual que la otra; donde no hay título —Mis
+     Tareas— vale 0 y esto queda exactamente como estaba. */
+  position: sticky; top: calc(var(--filtros-h, 0px) + var(--sf-titulo-h, 0px)); z-index: 10;
 }
 
 /* Contenido centrado en Hecha, responsable y fechas.
