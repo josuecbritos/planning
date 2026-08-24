@@ -122,7 +122,7 @@ export const IconoInfo = (p: Props) => (
   </Svg>
 )
 
-/** #328 — Agregar tarea debajo. Dos renglones y el signo bajo ellos: lo que se
+/** #328 — Agregar tarea abajo. Dos renglones y el signo bajo ellos: lo que se
  *  agrega va DEBAJO de lo que ya hay, que es justo lo que distingue a esta
  *  opción de la línea "+ Tarea" del final del sub frente. */
 export const IconoAgregarDebajo = (p: Props) => (
@@ -130,6 +130,15 @@ export const IconoAgregarDebajo = (p: Props) => (
     <path d="M4 6.5h16" />
     <path d="M4 11.5h16" />
     <path d="M12 16v5.5M9.25 18.75h5.5" />
+  </Svg>
+)
+
+/** #273 — Duplicar. Dos hojas iguales, una detrás de otra: lo que sale es otra
+ *  tarea igual, no una variante ni un vínculo con la original. */
+export const IconoDuplicar = (p: Props) => (
+  <Svg {...p}>
+    <rect x="8.5" y="8.5" width="12" height="12" rx="2" />
+    <path d="M15.5 5.5A2 2 0 0 0 13.5 3.5h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2" />
   </Svg>
 )
 

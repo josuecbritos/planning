@@ -23,11 +23,12 @@ import { chromium } from 'playwright-core'
 const EXE = process.env.CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 const URL_APP = process.env.URL ?? 'http://localhost:4173/'
 
-// #328 sumó "Agregar tarea debajo" como quinta opción, y #334 llevó Renombrar
+// #328 sumó "Agregar tarea abajo", #273 sumó "Duplicar tarea", y #334 llevó Renombrar
 // también a la tabla de Mis Tareas: el contrato de esta prueba se actualiza con
-// ellos. La línea separadora no se movió de sitio —sigue separando lo
-// destructivo del resto—, que es justo lo que se declaró al escribirla.
-const TODAS = ['Información', 'Renombrar', 'Agregar tarea debajo', 'Archivar', 'Eliminar']
+// ellos. La línea separadora NO se movió de sitio en ninguno de los dos
+// crecimientos —sigue separando lo destructivo del resto—, que es justo lo que
+// se declaró al escribirla.
+const TODAS = ['Información', 'Renombrar', 'Agregar tarea abajo', 'Duplicar tarea', 'Archivar', 'Eliminar']
 /** Las de Mis Tareas: ahí no se crean tareas (#328), pero sí se renombra (#334). */
 const MIS_TAREAS = ['Información', 'Renombrar', 'Archivar', 'Eliminar']
 
@@ -266,7 +267,7 @@ const conTodo = await bloques()
 chk(
   conTodo?.lineas === 1 &&
     JSON.stringify(conTodo.hijos) ===
-      JSON.stringify(['Información', 'Renombrar', 'Agregar tarea debajo', '—', 'Archivar', 'Eliminar']),
+      JSON.stringify(['Información', 'Renombrar', 'Agregar tarea abajo', 'Duplicar tarea', '—', 'Archivar', 'Eliminar']),
   '5 hay UNA línea separadora, justo antes de lo destructivo',
   conTodo?.hijos?.join(' ') ?? 'sin menú',
 )
@@ -549,7 +550,7 @@ await p.locator('table.tareas tbody tr').first().locator('td.tarea-cell').click(
 await esperar(400)
 chk(
   JSON.stringify(await opciones()) === JSON.stringify(MIS_TAREAS),
-  '14 en la tabla de Mis Tareas trae las acciones, sin "Agregar tarea debajo"',
+  '14 en la tabla de Mis Tareas trae las acciones, sin "Agregar tarea abajo"',
   (await opciones()).join(' · '),
 )
 // El clic sobre el nombre no cambió: sigue abriendo el panel, no la edición
@@ -558,7 +559,7 @@ chk(
   (await p.locator('table.tareas tbody .tarea-cell__link').count()) > 0,
   '14 terreno: en la tabla de Mis Tareas el nombre sigue abriendo el panel',
 )
-// 8 · sin "Agregar tarea debajo", la línea no queda suelta: sigue separando lo
+// 8 · sin "Agregar tarea abajo", la línea no queda suelta: sigue separando lo
 // destructivo, y no se movió de sitio al crecer el menú.
 const sinAgregar = await bloques()
 chk(

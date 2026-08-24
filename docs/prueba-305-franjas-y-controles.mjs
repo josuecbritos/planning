@@ -605,9 +605,13 @@ const camposMT = (await menu(mt).locator('.filtro-op--campo .filtro-op__nombre')
 chk(camposMT.join(' · ') === 'Fecha · Proyecto · Estado', 'C15 con Proyecto entre los campos de Filtrar', camposMT.join(' · '))
 await menu(mt).locator('.filtro-op--campo', { hasText: 'Fecha' }).click()
 await mt.waitForTimeout(350)
+// #337 revierte esto: la opción se excluía porque Mis Tareas "cruza proyectos y
+// no tiene un horizonte único", y eso dejó de ser cierto cuando tuvo su propia
+// Gantt. Desde la TABLA aparece, deshabilitada, igual que en un proyecto.
 chk(
-  !(await menu(mt).innerText()).includes('En horizonte visible'),
-  'C7 en Mis Tareas "En horizonte visible" no aparece',
+  (await menu(mt).innerText()).includes('En horizonte visible') &&
+    (await menu(mt).locator('.filtro-op', { hasText: 'En horizonte visible' }).first().isDisabled()),
+  'C7 en Mis Tareas "En horizonte visible" aparece, y desde la tabla deshabilitada (#337)',
 )
 await cerrarMenu(mt)
 await verVista(mt, 'Gantt')

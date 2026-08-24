@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ordenarMulti, valorOrden, type ClaveOrden, type OrdenMulti } from '../lib/orden'
 import { MenuTarea, opcionesDeTarea, useMenuTarea } from './MenuTarea'
-import { abrirHueco } from '../lib/crear'
+import { abrirHueco, plantillaDe } from '../lib/crear'
 import { referenciaEnFoto, useVistaCongelada } from '../lib/vistaCongelada'
 import { enMitadSuperior, useArrastreTareas, type DndTareas } from '../lib/arrastre'
 import { planMoverTarea } from '../lib/mover'
@@ -12,8 +12,6 @@ import { CATEGORIA_LABEL, categoriaDe, colorTarea, esAtrasada, nReplanificacione
 import { filtroVacio, pasaFiltroCompleto, type Filtro } from '../lib/filtros'
 import { formatoFecha } from '../lib/dates'
 import { EmptyFrentes } from './EmptyFrentes'
-import { HoverCard } from './HoverCard'
-import { TaskDetail } from './TaskDetail'
 import { InlineText } from './InlineText'
 import { FechaEditable } from './FechaEditable'
 import { Avatar, RespPicker } from './RespPicker'
@@ -194,12 +192,12 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
   // #292: el menú contextual de la tarea. Vive acá y no en App porque es esta
   // vista la que sabe sobre qué fila se hizo clic derecho; la Gantt tiene el
   // suyo, y las dos arman sus opciones con la MISMA función.
-  const { menu, abrir, cerrar, pedirRenombrar, pulsoDe } = useMenuTarea()
+  const { menu, abrir, cerrar, pedirRenombrar, pulsoDe, tareaDelMenuId } = useMenuTarea()
   const tareaDelMenu = menu ? state.tareas.find((t) => t.id === menu.tareaId) : undefined
 
-  // #328: tarea bajo la cual está abierta la fila de carga. Hasta ahora la
-  // tabla solo sabía agregar AL FINAL del sub frente, con la línea "+ Tarea";
-  // insertar en una posición concreta no se podía. Es un id y no un booleano
+  // #328: bajo qué tarea está abierta la fila de carga. Hasta ahora la tabla
+  // solo sabía agregar AL FINAL del sub frente, con la línea "+ Tarea";
+  // insertar en una posición concreta no se podía. Lleva el id y no un booleano
   // porque la fila se dibuja donde corresponde, no en un lugar fijo.
   const [insertarTrasId, setInsertarTrasId] = useState<string | null>(null)
 
@@ -267,6 +265,7 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           onAbrirTarea={onAbrirTarea}
           onMenu={abrir}
           pulsoDe={pulsoDe}
+          tareaDelMenuId={tareaDelMenuId}
           crearTarea={crearTarea}
           insertarTrasId={insertarTrasId}
           onCerrarInsercion={() => setInsertarTrasId(null)}
@@ -280,16 +279,22 @@ export function TableView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         onCerrar={cerrar}
         opciones={
           tareaDelMenu
-            ? opcionesDeTarea(
-                tareaDelMenu,
-                can,
-                actions,
+            ? opcionesDeTarea(tareaDelMenu, can, actions, {
                 onAbrirTarea,
-                () => pedirRenombrar(tareaDelMenu.id),
+                onRenombrar: () => pedirRenombrar(tareaDelMenu.id),
                 // #328: acá es una capacidad NUEVA — hasta ahora la tabla solo
                 // agregaba al final del sub frente.
-                () => setInsertarTrasId(tareaDelMenu.id),
-              )
+                onAgregarDebajo: () => setInsertarTrasId(tareaDelMenu.id),
+                // #273: duplicar crea DIRECTO, sin abrir ningún campo — mismo
+                // camino que agregar debajo, con los campos de la original ya
+                // puestos.
+                onDuplicar: () =>
+                  void crearTarea(
+                    tareaDelMenu.subFrenteId,
+                    plantillaDe(tareaDelMenu),
+                    tareaDelMenu,
+                  ),
+              })
             : []
         }
       />
@@ -321,6 +326,7 @@ function FrentePagina({
   onAbrirTarea,
   onMenu,
   pulsoDe,
+  tareaDelMenuId,
   crearTarea,
   insertarTrasId,
   onCerrarInsercion,
@@ -347,6 +353,9 @@ function FrentePagina({
   /** #292: clic derecho sobre una fila de tarea, y el pulso de "Renombrar". */
   onMenu: (e: React.MouseEvent, tareaId: string) => void
   pulsoDe: (tareaId: string) => number
+  /** #335: la tarea con el menú abierto — su fila queda resaltada mientras lo
+   *  esté. */
+  tareaDelMenuId: string | null
   /** #328/#333: crear una tarea, opcionalmente justo debajo de una hermana. */
   crearTarea: (subFrenteId: string, datos: DatosNuevaTarea, debajoDe?: Tarea) => void
   /** #328: tarea bajo la cual está abierta la fila de carga (o `null`). */
@@ -426,6 +435,7 @@ function FrentePagina({
               onAbrirTarea={onAbrirTarea}
               onMenu={onMenu}
               pulsoDe={pulsoDe}
+              tareaDelMenuId={tareaDelMenuId}
               crearTarea={crearTarea}
               insertarTrasId={insertarTrasId}
               onCerrarInsercion={onCerrarInsercion}
@@ -533,6 +543,7 @@ function SubFrenteTabla({
   onToggleColapso,
   onMenu,
   pulsoDe,
+  tareaDelMenuId,
   crearTarea,
   insertarTrasId,
   onCerrarInsercion,
@@ -558,6 +569,9 @@ function SubFrenteTabla({
   /** #292: clic derecho sobre una fila de tarea, y el pulso de "Renombrar". */
   onMenu: (e: React.MouseEvent, tareaId: string) => void
   pulsoDe: (tareaId: string) => number
+  /** #335: la tarea con el menú abierto — su fila queda resaltada mientras lo
+   *  esté. */
+  tareaDelMenuId: string | null
   /** #328/#333: crear una tarea, opcionalmente justo debajo de una hermana. */
   crearTarea: (subFrenteId: string, datos: DatosNuevaTarea, debajoDe?: Tarea) => void
   /** #328: tarea bajo la cual está abierta la fila de carga (o `null`). */
@@ -684,8 +698,9 @@ function SubFrenteTabla({
                 onAbrirTarea={onAbrirTarea}
                 onMenu={onMenu}
                 pulsoRenombrar={pulsoDe(t.id)}
+                conMenu={tareaDelMenuId === t.id}
               />
-              {/* #328: "Agregar tarea debajo" abre la fila de carga JUSTO acá,
+              {/* #328: "Agregar tarea abajo" abre la fila de carga JUSTO acá,
                   no al final del sub frente. Es la misma fila de siempre; lo que
                   cambia es dónde se dibuja y qué orden le toca a lo que guarda. */}
               {insertarTrasId === t.id && can.crearTareas && (
@@ -740,11 +755,14 @@ function SubFrenteTabla({
   )
 }
 
-/** Lo que la fila de carga recoge antes de crear la tarea. */
+/** Lo que la fila de carga recoge antes de crear la tarea. #273: la descripción
+ *  no tiene campo en la fila —hoy no se escribe desde ninguna pantalla—, pero
+ *  viaja igual cuando la copia la hereda de la original. */
 export interface DatosNuevaTarea {
   titulo: string
   responsableId?: string
   fechaObjetivo?: string
+  descripcion?: string
 }
 
 /**
@@ -757,6 +775,7 @@ export interface DatosNuevaTarea {
  * gesto ya ocurrió, en el menú— y se cierra al guardar, porque una inserción es
  * para ESA posición y encadenar debajo de ella diría otra cosa. Dónde va la
  * tarea lo decide quien llama (`crear`), que es el que conoce la foto.
+ *
  */
 function NuevaTareaFila({
   candidatos,
@@ -914,6 +933,7 @@ function TareaFila({
   onAbrirTarea,
   onMenu,
   pulsoRenombrar,
+  conMenu,
 }: {
   /** #293: arrastre activo en la vista (undefined = sin asa ni destinos). */
   dnd?: DndTareas
@@ -934,6 +954,8 @@ function TareaFila({
   onMenu: (e: React.MouseEvent, tareaId: string) => void
   /** #292: pulso de "Renombrar" (0 = no le toca a esta fila). */
   pulsoRenombrar: number
+  /** #335: el menú del clic derecho está abierto sobre ESTA fila. */
+  conMenu?: boolean
 }) {
   const cat = categoriaDe(state, tarea, hoy)
   const color = colorTarea(state, tarea, hoy)
@@ -943,7 +965,6 @@ function TareaFila({
   const nComentarios = state.comentarios.filter((c) => c.tareaId === tarea.id).length
   const nReplan = nReplanificaciones(state, tarea.id)
 
-  const tooltip = <TaskDetail state={state} tarea={tarea} hoy={hoy} />
 
   // #157/#186: al llegar desde una notificación se centra la fila. El realce es
   // un CONTORNO (no cambia el fondo, así no choca con el color de categoría) y
@@ -965,7 +986,10 @@ function TareaFila({
   return (
     <tr
       ref={filaRef}
-      className={`${color !== 'ninguno' ? `fila--${color}` : ''}${resaltar ? ' fila--resaltada' : ''}${clasesDnd}`.trim() || undefined}
+      // #335: `fila-tarea` es la que dice "esto es una fila que se puede
+      // seguir con el mouse". Va aparte del color de estado a propósito: el
+      // resaltado se pinta POR ENCIMA de ese color, no en su lugar.
+      className={`fila-tarea${conMenu ? ' fila-tarea--menu' : ''}${color !== 'ninguno' ? ` fila--${color}` : ''}${resaltar ? ' fila--resaltada' : ''}${clasesDnd}`}
       onDragOver={
         dnd
           ? (e) => dnd.sobre(e, tarea.subFrenteId, enMitadSuperior(e) ? tarea.id : siguienteId ?? null)
@@ -1009,21 +1033,18 @@ function TareaFila({
               valor={tarea.titulo}
               onGuardar={(titulo) => actions.updateTarea(tarea.id, { titulo })}
               ariaLabel={`Editar título: ${tarea.titulo}`}
-              wrapDisplay={(nodo) => <HoverCard card={tooltip}>{nodo}</HoverCard>}
               abrirEdicion={pulsoRenombrar}
             />
           ) : (
-            <HoverCard card={tooltip}>
-              <span
-                className="tarea-cell__link"
-                role="button"
-                tabIndex={0}
-                onClick={() => onAbrirTarea(tarea.id)}
-                onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
-              >
-                {tarea.titulo}
-              </span>
-            </HoverCard>
+            <span
+              className="tarea-cell__link"
+              role="button"
+              tabIndex={0}
+              onClick={() => onAbrirTarea(tarea.id)}
+              onKeyDown={(e) => e.key === 'Enter' && onAbrirTarea(tarea.id)}
+            >
+              {tarea.titulo}
+            </span>
           )}
           {nReplan > 0 && (
             <span className="replan-count" title={`Se replanificó ${nReplan} ${nReplan === 1 ? 'vez' : 'veces'}`}>

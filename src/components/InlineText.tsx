@@ -6,8 +6,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 interface Props {
   valor: string
   onGuardar: (nuevo: string) => void
-  /** Envuelve la vista no-editable (p. ej. con HoverCard); el input queda fuera. */
-  wrapDisplay?: (nodo: ReactNode) => ReactNode
   className?: string
   inputClassName?: string
   ariaLabel?: string
@@ -28,7 +26,7 @@ interface Props {
   display?: ReactNode
 }
 
-export function InlineText({ valor, onGuardar, wrapDisplay, className, inputClassName, ariaLabel, abrirEdicion = 0, display: displayPropio }: Props) {
+export function InlineText({ valor, onGuardar, className, inputClassName, ariaLabel, abrirEdicion = 0, display: displayPropio }: Props) {
   const [editando, setEditando] = useState(false)
   const [borrador, setBorrador] = useState(valor)
 
@@ -100,5 +98,5 @@ export function InlineText({ valor, onGuardar, wrapDisplay, className, inputClas
     </span>
   )
 
-  return <>{wrapDisplay ? wrapDisplay(display) : display}</>
+  return display
 }
