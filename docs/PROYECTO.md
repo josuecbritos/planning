@@ -742,6 +742,33 @@ NO entra en el filtro — cada opción muestra su rango literal.
 En la Tabla, frentes y sub frentes se **colapsan** con un chevron (▸/▾) para
 enfocar; el colapso es momentáneo (no se guarda).
 
+**El título del sub frente se queda fijo mientras dura su bloque (#330).** Al
+desplazar quedaban fijas dos franjas —la barra de controles arriba y los
+encabezados de columna justo debajo—, pero **el título del sub frente se iba con
+sus filas**: al recorrer un bloque largo se dejaba de saber en qué sub frente se
+estaba, mientras los títulos de columna sí seguían a la vista. Ahora **las tres
+viajan juntas y en el mismo orden en que están en la pantalla**: barra · título
+del sub frente · encabezados. Cuando el bloque termina se van juntas y las
+reemplazan las del sub frente siguiente. *No hace falta acotar nada a mano para
+que no se apilen dos títulos: un `sticky` no sale de su contenedor, y el bloque
+de un sub frente termina antes de que empiece el del siguiente.*
+Los dos altos —el de la barra y el del título— **se miden en vivo** y se publican
+como variables (`--filtros-h` y `--sf-titulo-h`), porque dependen de la fuente y
+del zoom. Donde no hay título de sub frente —la Gantt, Mis Tareas— la variable
+queda suelta y vale 0, así que los encabezados se congelan justo debajo de la
+barra como siempre.
+**Costo aceptado y declarado:** al bajar hay tres franjas fijas en vez de dos, así
+que la parte visible de la lista se acorta el alto del título — **medido: 45**, no
+los ~34 estimados, porque el chevron de plegar levanta la línea. *Se evaluó fundir
+el nombre del sub frente dentro de la franja de encabezados para no perder altura
+y se descartó: no cabe, la columna del nombre arranca a los 44 y ahí ya está
+"TAREA".*
+*Solo en la tabla de un proyecto.* En la Gantt no hace falta —el rótulo del sub
+frente es una celda combinada que ya se centra en la parte visible de su bloque y
+acompaña al desplazar (#108)—, y **el título del frente no se fija**: una cuarta
+franja empezaría a comerse la pantalla, y el sub frente es el que dice dónde se
+está.
+
 **Al crear una tarea, la tarea aparece (#253).** Con un orden (o un filtro)
 aplicado, la vista congelada dejaba fuera a la recién creada: salía el aviso
 "↻ Actualizar vista" y nada más, y eso se lee como que la tarea no se guardó.

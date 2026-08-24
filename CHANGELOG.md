@@ -3333,3 +3333,70 @@ una opción de menú, cosa que la corrección revierte. Regresión en verde: #27
 #292, #297, #298, #305/#305b, #305e, #306, #307, #310, #311, #313, #318, #319,
 #320, #321, #322, #324, #326, #327, #328, #329, #331, #332, #333, #334, #335,
 #336, #337, #338.
+
+### #330 — El título del sub frente se queda fijo
+
+En la vista tabla, al desplazar quedaban fijas **dos franjas**: la barra de
+controles arriba y los **encabezados de columna** justo debajo. **El título del
+sub frente no**: se iba hacia arriba con sus filas, así que **al recorrer un
+bloque largo se dejaba de saber en qué sub frente se estaba**, mientras los
+títulos de columna sí seguían a la vista.
+
+Ahora el título se comporta igual que sus encabezados, y **las tres franjas
+viajan juntas y en el mismo orden en que están en la pantalla**:
+
+```
+Barra de controles
+Título del sub frente
+Encabezados de columna
+    (las filas del sub frente pasan por debajo)
+```
+
+Cuando el bloque termina se van juntas y las reemplazan las del sub frente
+siguiente. *No hubo que acotar nada a mano para que no se apilen dos títulos: un
+`sticky` no sale de su contenedor, y el bloque de un sub frente termina antes de
+que empiece el del siguiente. Comprobado recorriendo la lista entera de a 90px:
+en **17 muestras** nunca hay dos títulos pegados al tope, y el título se releva
+al cambiar de bloque.*
+
+**Los dos altos se miden en vivo.** El de la barra ya se publicaba como
+`--filtros-h`; el del título se suma como `--sf-titulo-h`, y los encabezados
+pasan a congelarse en `calc(--filtros-h + --sf-titulo-h)`. Ninguno se escribe a
+mano: dependen de la fuente y del zoom. **Donde no hay título de sub frente —la
+Gantt, Mis Tareas— la variable queda suelta y vale 0**, así que ahí todo queda
+exactamente como estaba. *El título llega después del primer render, con los
+datos, así que se vuelve a medir cuando cambia el contenido y no solo cuando
+cambia la barra; y solo se escribe cuando el valor cambia, para que el observador
+no ensucie el estilo con cada tecla de una edición inline.*
+
+**Costo aceptado y declarado:** al bajar hay tres franjas fijas en vez de dos, y
+la parte visible de la lista se acorta el alto del título. *El pedido lo estimaba
+en unos 34; **medido: 45** — el chevron de plegar levanta la línea por encima del
+texto. Es la diferencia entre una fila y media de tarea, no una.* Se evaluó
+fundir el nombre del sub frente dentro de la franja de encabezados para no perder
+altura y se descartó: no cabe.
+
+*Solo en la tabla de un proyecto. En la Gantt no hace falta —el rótulo es una
+celda combinada que ya se centra en la parte visible de su bloque (#108)— y el
+título del **frente** no se fija: una cuarta franja empezaría a comerse la
+pantalla, y el sub frente es el que dice dónde se está.*
+
+#### Verificación
+
+`docs/prueba-330-subfrente-fijo.mjs` — **24 comprobaciones en verde**.
+
+Que el título quede pegado al borde de abajo de la barra y los encabezados al
+borde de abajo del título, con los tres bordes medidos y comparados entre sí —no
+contra números escritos a mano—; que en la franja del título lo que pinta el
+punto sea el título y no una fila, y que las dos franjas tengan fondo propio; el
+recorrido completo de la lista buscando títulos apilados y contando relevos; que
+el chevron de plegar funcione **con el título fijo** y que el sub frente
+contraído se comporte como hoy; las tres franjas con un filtro puesto y con un
+orden activo; que el título del **frente** siga sin fijarse; que en la Gantt y en
+Mis Tareas no cambie nada —incluida la variable suelta y el `top` de sus
+encabezados, que sigue siendo el alto de la barra—; y que en mobile la tabla se
+siga viendo y desplazando.
+
+*Control negativo:* corrida contra `main`, **12 comprobaciones fallan**, con el
+defecto medido tal cual: con la lista desplazada 200, los encabezados están fijos
+en 56 y **el título quedó en 267**, fuera de su sitio.
