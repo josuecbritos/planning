@@ -377,6 +377,12 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
 - **La compuerta gana `probarAgregarColega`**, con sus dos lados —que el dueño
   SÍ puede con un colega de su organización y NO con uno de otra ni sin
   organización—, y restituye siempre lo que toca.
+- **Hallazgo anotado, para que no se repita:** una función que declara
+  `returns setof <vista>` queda registrada como DEPENDIENTE de esa vista, y desde
+  ahí la migración que la recrea con `drop view` deja de poder aplicarse de
+  nuevo. Volver a correr una migración para REPONER una vista es lo que hicieron
+  la 22 y la 24; ese camino no se puede perder por un tipo de retorno. Las
+  columnas se declaran una por una y el cuerpo sigue leyendo de la vista.
 
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,

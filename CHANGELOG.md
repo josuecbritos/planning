@@ -3928,7 +3928,7 @@ ejecutar ninguna de las tres.
 *Control negativo:* la misma prueba sin la migración 33, **18 comprobaciones
 fallan**.
 
-**`docs/prueba-353-agregar-colega.mjs` — 43 comprobaciones en verde.** La otra
+**`docs/prueba-353-agregar-colega.mjs` — 51 comprobaciones en verde.** La otra
 mitad, que es la que #339 no tenía: que **la pantalla llegue a hacerlo**. Recorre
 el objetivo de punta a punta con dos cuentas —la consultora suma a su colega,
 abre sus permisos, y él ve el proyecto en su barra; después lo quita y deja de
@@ -3937,10 +3937,33 @@ escrito no existe, los dos nombres de permiso, que sin el permiso no aparezca el
 botón, y que no quede **ningún** `<select>` nativo en la pantalla, con el menú
 propio midiendo igual en los dos temas.
 
-*Control negativo:* contra `main`, **28 comprobaciones fallan**.
+*Control negativo:* contra `main`, **30 comprobaciones fallan**.
 
 **`scripts/validar-rls.mjs`** suma `probarAgregarColega` para la corrida contra
 producción, con sus dos lados y restituyendo siempre lo que toca.
+
+#### Un defecto que encontró la regresión, y dos suites que cambiaron de contrato
+
+**El defecto era mío y lo atrapó la prueba de #339, no la de #353.**
+`usuarios_agregables` se había escrito como `returns setof usuario_visible`, y
+ese tipo de retorno deja la función **registrada como dependiente de la vista**:
+desde ahí, la migración 32 —que la recrea con `drop view`— dejaba de poder
+aplicarse de nuevo. No es teórico: **volver a correr una migración para reponer
+una vista es exactamente lo que hicieron la 22 y la 24** cuando la definición
+viva se había separado del repo, y perder ese camino no es aceptable. Las
+columnas pasan a declararse una por una; el cuerpo sigue leyendo de la vista, así
+que el enmascarado es el mismo, y lo que se evita es la dependencia guardada en
+el catálogo. *Comprobado: con el cambio, la 32 y la 33 se aplican una detrás de
+otra, en cualquier orden, sin romperse.*
+
+**`docs/prueba-339-organizacion.mjs` se recortó** en vez de arreglarse. Sus
+criterios 1 y 2 probaban el campo sobre un administrador y un cliente —a quienes
+#353 ya no se lo ofrece— y a través de "Escribir una nueva…", que #353 eliminó.
+Los tres criterios que seguían valiendo (1, 2 y 10) **están comprobados en la
+suite de #353**, con el control nuevo y sobre consultores; en la de #339 se queda
+lo que este pedido no movió (que un no administrador no vea el campo, y que el
+correo siga igual). Se prefiere eso a mantener dos suites probando la misma
+pantalla con contratos distintos.
 
 #### Para cerrar la solicitud
 

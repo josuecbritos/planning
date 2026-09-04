@@ -165,6 +165,50 @@ chk(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
+// #339-10 · una organización que se queda sin nadie deja de aparecer
+// ═══════════════════════════════════════════════════════════════════════════
+// Se comprueba acá y no en la suite de #339: allá pasaba por el desplegable con
+// "Escribir una nueva…", que este pedido reemplazó. La regla no cambió —la
+// lista se llena sola y se vacía sola—, cambió el control con el que se toca.
+console.log('\n── #339-10 · la organización sin nadie desaparece ──')
+chk(await abrirEditar('Bruno Vega'), 'terreno: se le pone una organización propia a un consultor')
+await escribirOrg('Solo Suya')
+await elegirOpcionOrg('Crear')
+await guardarModal()
+chk(await abrirEditar('Carla Soto'), 'terreno: se mira desde otro consultor')
+await escribirOrg('')
+const conSolo = await opcionesOrg()
+chk(
+  conSolo.includes('Solo Suya'),
+  '#339-10 · está en la lista mientras alguien la tiene',
+  conSolo.join(' | '),
+)
+await pulsarSiEsta(p.locator('.modal-acciones .btn', { hasText: 'Cancelar' }), 400)
+chk(await abrirEditar('Bruno Vega'), 'terreno: se le quita al único que la tenía')
+await escribirOrg('')
+await elegirOpcionOrg('Sin organización')
+await guardarModal()
+chk(await abrirEditar('Carla Soto'), 'terreno: se vuelve a mirar')
+await escribirOrg('')
+const sinSolo = await opcionesOrg()
+chk(
+  !sinSolo.includes('Solo Suya'),
+  '#339-10 · al quitársela al último que la tenía, deja de aparecer en la lista',
+  sinSolo.join(' | '),
+)
+chk(
+  sinSolo.includes('Andotek'),
+  '#339-10 · control de vida: la que sí tiene gente sigue apareciendo',
+  sinSolo.join(' | '),
+)
+await pulsarSiEsta(p.locator('.modal-acciones .btn', { hasText: 'Cancelar' }), 400)
+// Y a Bruno se le devuelve la suya, que es el terreno del objetivo.
+chk(await abrirEditar('Bruno Vega'), 'terreno: se le devuelve Andotek')
+await escribirOrg('Andotek')
+await elegirOpcionOrg('Andotek')
+await guardarModal()
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Criterio 11b · el cliente no tiene campo Organización
 // ═══════════════════════════════════════════════════════════════════════════
 console.log('\n── Criterio 11b · solo para consultores ──')

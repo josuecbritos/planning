@@ -180,10 +180,32 @@ create policy acceso_delete on acceso_proyecto for delete using (
  *  enmascarado: la organización de otro sigue siendo un dato del
  *  administrador (#339), y el navegador no la necesita para armar la lista.
  *
- *  La condición es, literalmente, la de `acceso_insert`. */
+ *  La condición es, literalmente, la de `acceso_insert`.
+ *
+ *  Las columnas se declaran UNA POR UNA en vez de `returns setof
+ *  usuario_visible`. Con el tipo de la vista como tipo de retorno, la función
+ *  queda registrada como DEPENDIENTE de ella, y entonces la migración 32 —que
+ *  la recrea con `drop view`— deja de poder aplicarse de nuevo. Eso importa:
+ *  volver a correr una migración para REPONER una vista es exactamente lo que
+ *  hicieron la 22 y la 24 cuando la definición viva se había separado del
+ *  repo, y no se quiere perder ese camino. El cuerpo sigue leyendo de la
+ *  vista, así que el enmascarado es el mismo; lo que se evita es la
+ *  dependencia guardada en el catálogo. */
 create or replace function usuarios_agregables(p_proyecto uuid)
-returns setof usuario_visible language sql stable security definer set search_path = public as $$
-  select v.*
+returns table (
+  id uuid,
+  nombre text,
+  iniciales text,
+  iniciales_manual boolean,
+  rol text,
+  activo boolean,
+  auth_id uuid,
+  email text,
+  permisos_proyecto jsonb,
+  organizacion text
+) language sql stable security definer set search_path = public as $$
+  select v.id, v.nombre, v.iniciales, v.iniciales_manual, v.rol, v.activo, v.auth_id,
+         v.email, v.permisos_proyecto, v.organizacion
   from usuario_visible v
   where v.activo
     and v.id <> coalesce((select creado_por from proyecto where id = p_proyecto), '00000000-0000-0000-0000-000000000000'::uuid)
