@@ -3400,3 +3400,320 @@ siga viendo y desplazando.
 *Control negativo:* corrida contra `main`, **12 comprobaciones fallan**, con el
 defecto medido tal cual: con la lista desplazada 200, los encabezados están fijos
 en 56 y **el título quedó en 267**, fuera de su sitio.
+
+### #343 · #345 · #344 · #347 — Esquinas, franja de semana, calendario y un atajo
+
+Cuatro arreglos de interfaz. Ninguno toca la base de datos, los permisos ni las
+reglas de negocio: no llevan migración.
+
+#### #343 — Por las esquinas del título congelado no asoma nada
+
+El título del sub frente se congela bajo la barra de controles desde #330, y
+lleva **las dos esquinas de arriba redondeadas**. Esas dos muescas quedaban
+**transparentes**: el fondo del título se recorta contra su caja redondeada, así
+que en esos dos cuadraditos de 8×8 se veía lo que hubiera detrás. Quieto no se
+nota —detrás está el fondo de la pantalla—, pero **congelado desfilan las filas
+por ahí**, y con una fila de color asomaba una franjita de ese color en cada
+esquina mientras la fila cruzaba.
+
+*El defecto se midió antes de tocarlo, leyendo pixeles de una captura: con el
+título congelado el pixel (1,1) de la esquina daba **240,228,247** con una fila
+morada detrás, **255,246,224** con una ámbar y **253,236,234** con una roja,
+contra los **236,236,238** del propio título. La franjita rosada que reportó el
+dueño está medida.*
+
+Las dos muescas pasan a llevar **el mismo fondo que hay detrás cuando el título
+no está congelado** (`--fondo`, el de la pantalla), así que el congelado y el que
+todavía no llegó al tope se ven idénticos. **No cambia** el redondeo, ni el
+color, ni el borde, ni el alto de la franja, ni el orden de las tres franjas
+fijas que dejó #330: el relleno es **exterior** a la caja y deja intacto todo lo
+que el título ya pintaba.
+
+*Va como pseudo-elemento y no como sombra con extensión: un `box-shadow` habría
+pintado también un anillo abajo, sobre las primeras filas de la tabla. Cada
+esquina se rellena con un círculo del radio del redondeo anclado a su vértice
+interior —transparente hasta 8px, que es exactamente la silueta de la caja, y
+opaco desde ahí—, de modo que el relleno no toca ni un pixel de lo que el título
+dibuja.*
+
+*Solo pasaba en la tabla de un proyecto: Mis Tareas no tiene título de sub
+frente, y la prueba lo comprueba en vez de suponerlo.*
+
+#### #345 — La franja de la semana deja de deformar el ancho de la Gantt
+
+La banda superior del encabezado agrupa los días por semana y mostraba **el rango
+de la semana completa** —"31 ago – 4 sep"— aunque de esa semana se viera un solo
+día. Ese texto no se corta ni se parte, así que cuando la semana tenía pocos días
+visibles **era el texto el que imponía el ancho de la columna** y los días se
+estiraban.
+
+*Medido en `main`: sin filtro un día mide **30**; con un rango fijo de dos días la
+columna pasaba a **52**, y con un rango que deja un solo día visible, a **97**.*
+
+La regla, que resuelve todos los casos con una sola frase: **cuando el rango
+completo de la semana no cabe en el ancho de sus días visibles, esa franja
+muestra solo el mes de su primer día visible** ("oct"). Cuando cabe, se muestra
+como siempre.
+
+- **Se decide semana por semana**, no para toda la Gantt: en un mismo horizonte
+  una semana completa conserva su rango y la de al lado, con un día, muestra el
+  mes. *Comprobado con un rango que deja una semana entera y una de un solo día.*
+- **El mes es el del primer día visible de esa semana**, así que con un rango que
+  cruza dos meses cada semana parcial muestra el suyo: "oct" y "nov".
+- **La franja no desaparece ni cambia de alto** (21 en todos los casos medidos).
+- **Ni siquiera el mes puede ensanchar la columna:** el texto vive en un bloque
+  sin ancho propio, de modo que no aporta nada al ancho mínimo de la celda
+  combinada —que es por donde el rango se colaba— y ocupa el hueco recién cuando
+  los días ya decidieron cuánto mide.
+
+*Se mide en lugar de estimarse: el ancho del texto depende de la fuente y del
+zoom. Y se mide contra una **regla** que lleva siempre el rango completo y vive
+fuera del flujo, para que la medición no cambie según lo que se esté mostrando —
+si se midiera el texto visible, mostrar el mes haría que "cupiera" y las dos
+decisiones se perseguirían entre sí.*
+
+Vale igual en la Gantt de un proyecto y en la de Mis Tareas: es el mismo
+componente. **No cambia nada del horizonte** (#250) ni las excepciones de "Con
+fecha" y "En horizonte visible".
+
+#### #344 — El calendario deja de cortar la semana en el cambio de mes
+
+Dibujaba **solo los días del mes visible**: las casillas de la primera semana que
+pertenecen al mes anterior quedaban vacías y la última se cortaba donde terminaba
+el mes. Para tomar un día que estaba a dos o tres de distancia pero al otro lado
+del cambio de mes había que navegar, aunque esa semana ya estuviera medio en
+pantalla; y el calendario **cambiaba de alto** según el mes.
+
+*Medido en `main`: recorriendo trece meses seguidos, entre **28 y 31** casillas
+de día, hasta 4 huecos vacíos y **dos altos distintos** (233 y 259).*
+
+Ahora la grilla arranca en el **lunes de la semana en que cae el día 1** y son
+siempre **seis semanas de corrida**:
+
+- Las casillas que sobran al principio y al final se llenan con los **días del
+  mes vecino, en gris más claro** (el mismo gris apagado que ya usan los nombres
+  de los días de la semana en esa grilla).
+- **Esos días se eligen igual que cualquier otro**: un clic asigna esa fecha y
+  cierra el calendario. Por eso conservan la caja, el hover y las marcas.
+- **La marca de "hoy" se dibuja también** cuando hoy cae en uno de ellos.
+- **El calendario dejó de cambiar de alto**: 259 en los trece meses probados.
+
+*Seis semanas son 42 casillas y un mes ocupa 37 como máximo —31 días empezando
+domingo—, así que siempre quedan a la vista al menos cinco días del mes
+siguiente. Se descartó mostrar siete: no lo hace nadie y sube el alto sin
+necesidad. Es lo que hacen React DayPicker, React Aria, HeroUI y DayPilot.*
+
+**No cambia** la regla central de #262 —navegar de mes solo cambia lo que se ve,
+y solo el clic en un día concreto confirma y cierra— ni el botón "Hoy" del pie
+(#285), que sigue navegando sin asignar. Los campos *desde/hasta* del filtro de
+fecha usan el calendario del navegador, que es otro, y quedaron fuera de alcance.
+
+*De paso, el alto de referencia con que el calendario decide si abrirse hacia
+abajo o hacia arriba volvió a ser exacto. Describía un mes de seis filas y
+sobraba en los de cinco; ahora el alto no depende del mes, y el número pasó de
+**330** a los **259** medidos — 71px que hacían saltar el calendario hacia arriba
+antes de tiempo.*
+
+#### #347 — "Todas menos hechas", en un clic
+
+El filtro de Estado tenía las cinco categorías como casillas y, debajo, una línea
+"Seleccionar todos". Dejar a la vista todo menos lo hecho **ya se podía** —se
+marcan las cuatro que no son "hecha"—, pero son cuatro clics y es la consulta más
+frecuente: faltaba el atajo, no la capacidad.
+
+Se suma una **segunda línea, "Todas menos hechas"**, inmediatamente debajo de
+"Seleccionar todos" y con el mismo formato. Al tocarla quedan marcadas las cuatro
+categorías que no son "hecha" y desmarcada "hecha".
+
+**No es una sexta categoría.** Escribe exactamente los mismos cuatro estados que
+se marcarían a mano: la ficha dice **"Estado: 4"**, su × los borra igual que hoy y
+una vista guardada con eso guarda cuatro estados, no un modo nuevo.
+
+Cuando esas cuatro ya están puestas, la línea pasa a **"Quitar todas menos
+hechas"** y tocarla **deja el campo Estado vacío**, igual que hace "Seleccionar
+todos" cuando ya está todo marcado. *El texto del segundo estado no venía
+resuelto en el pedido y lo eligió el dueño: conserva el nombre del atajo y
+anuncia qué hará el clic, en vez de repetir "Deseleccionar todos" en dos líneas.*
+
+Está en el filtro de Estado **de un proyecto y de Mis Tareas**, en tabla y en
+Gantt: es el mismo control. **No cambia** nada del resto del filtro.
+
+*Se descartó un botón de invertir la selección: el mercado siempre lo resuelve
+como un atajo con nombre propio —Asana con "Incomplete tasks", Linear con un
+interruptor de esconder las completadas— y no como una operación sobre lo ya
+marcado.*
+
+#### Verificación
+
+`docs/prueba-343-344-345-347.mjs` — **54 comprobaciones en verde**.
+
+**#343** lee **pixeles de una captura**, que es lo único que responde la pregunta
+del pedido —qué se ve—: la esquina del título sin congelar como referencia, y
+después **26 posiciones de scroll** recorriendo el bloque con filas roja, ámbar y
+morada pasando por detrás, midiendo en cada una cuánto se aparta del fondo el
+pixel más desviado y cuánto **tiñe** (un color asomando desvía los tres canales de
+forma despareja, y eso es lo que se ve). También que el relleno del título siga
+siendo el suyo en cada posición, que el redondeo y el alto no se muevan, y que
+las tres franjas de #330 sigan en el mismo orden.
+
+**#345** mide el ancho de columna y el texto de cada franja sin filtro, con un
+rango de dos días, con uno que cruza dos meses, con dos semanas enteras y con una
+mezcla de semana entera + semana de un día; más el alto de la franja en todos los
+casos, lo mismo en la Gantt de Mis Tareas, y que el horizonte de #250 siga
+imponiéndose con filtro y volviendo a elegirse sin él.
+
+**#344** cuenta casillas y huecos, comprueba que la grilla empiece en lunes,
+recorre **trece meses seguidos** verificando que el alto no cambie, que navegar no
+asigne ni cierre y que "Hoy" solo navegue, que hoy se vea marcado cayendo en un
+día vecino, que elegir uno de esos días asigne y cierre con la fecha correcta, y
+que abierto en una tarea de abajo del todo el calendario se vea completo. Lo
+mismo en la tabla de Mis Tareas.
+
+**#347** comprueba las dos líneas y su orden, el resultado sobre las cinco
+casillas, el cambio de texto, la ficha "Estado: 4", que no queden tareas verdes
+ni en tabla ni en Gantt, el segundo toque que vacía el campo, la × de la ficha,
+guardar la vista y volver a cargarla, y las tres pantallas donde vive el control.
+
+*Nota sobre el criterio 5 de #344:* el pedido lo plantea con hoy a fin de mes,
+visto desde el mes siguiente. Con la fecha de hoy eso no se puede recorrer, así
+que la prueba comprueba **la misma regla por la otra mitad**: hoy cae en la
+primera semana de su mes, y es el mes **anterior** el que lo muestra como día
+vecino en su última fila, marcado.
+
+*Nota sobre el criterio 2 de #345:* con el filtro "Hoy" este proyecto de ejemplo
+no deja **ningún** día visible —no hay tareas con esa fecha—, así que el caso de
+un solo día se recorre con rangos fijos, que es el otro camino que el propio
+pedido reconoce.
+
+*Control negativo:* la misma prueba corrida contra `main`, **26 comprobaciones
+fallan**, con los defectos medidos tal cual: tinte 31 en la esquina del título
+congelado contra 1 en el no congelado; columnas de 52 y de [34, 97] donde debían
+medir 30; 30 casillas con 4 huecos y dos altos distintos en el calendario; y una
+sola línea de atajo en el filtro de Estado.
+
+### Correcciones de #345, #344 y #347, más #351
+
+Sobre la misma rama, con #343 ya verificado y sin tocar.
+
+#### #345b — El mes no cabía porque los márgenes se comían la columna
+
+La regla de #345 quedó bien: cuando el rango completo no cabe, la franja muestra
+solo el mes. **Pero el mes tampoco cabía.** La causa no era el ancho de la
+columna sino lo que la rodea: el rótulo conservaba su relleno lateral (6+6) y el
+borde de inicio de semana (2) también cuando mostraba solo el mes. Entre los dos
+se llevaban **14 de los 30** y al texto le quedaban **15**.
+
+*Medido: el mes mide **18,91**. Con 15 disponibles se cortaba; el espacio existía
+y se lo comían los márgenes.*
+
+Ahora, cuando la franja muestra solo el mes, **el relleno lateral cede** y el
+texto usa el ancho completo de sus días visibles: **27 contra 18,91**, con ocho
+de sobra. **El borde se queda** —es la marca de inicio de semana, y sin el
+relleno ya sobra sitio—. Solo cede el relleno **horizontal**, así que el alto de
+la franja no se mueve, y solo en las franjas que muestran el mes: la que muestra
+su rango conserva relleno y borde como siempre. El ancho de la columna tampoco
+cambia: el relleno vive dentro de la caja.
+
+#### #344b — Los días del mes vecino, más apagados
+
+Usaban **exactamente el mismo gris** que los rótulos lu·ma·mi del encabezado del
+calendario. Al ser el mismo tono que un elemento que sí es texto normal de la
+pantalla, se leían como días del mes un poco más apagados y no como relleno de la
+semana: costaba ver dónde empieza y dónde termina el mes.
+
+Pasan a un gris **más apagado que esos rótulos**, en los dos temas. *Los dos
+valores salen de la propia paleta —son el `--gris-texto` del OTRO tema—, así que
+no se inventa ningún color. Medido contra la superficie: en claro **2,56:1**
+frente a los **4,83:1** de lu·ma·mi; en oscuro **3,67:1** frente a **6,91:1**.
+El dueño eligió este nivel sobre uno más apagado todavía —tipo Monday, 1,9:1 y
+2,3:1—, que hacía saltar más el bloque del mes pero dejaba el número al borde de
+lo legible.*
+
+Se mantiene todo lo demás: siguen siendo elegibles, conservan su caja y su
+realce, la marca de hoy se sigue dibujando sobre ellos y el día elegido se sigue
+viendo como elegido cuando cae ahí.
+
+#### #347b — El texto del atajo y su posición
+
+Dos cambios, nada más. **El texto pasa a "Seleccionar todos menos Hecha"**, y a
+**"Deseleccionar todos menos Hecha"** cuando las cuatro ya están marcadas —queda
+en paralelo con "Seleccionar todos / Deseleccionar todos", que es su vecina, y
+nombra la categoría con el mismo nombre exacto que usa la lista de arriba—. Y
+**la línea sube por encima de "Seleccionar todos"**, que pasa a ser la última.
+
+Nada de su comportamiento cambia.
+
+#### #351 — El nombre del sub frente ya no se desborda de su celda en la Gantt
+
+*Solicitud nueva, levantada de una captura del dueño.*
+
+El nombre **se salía de su celda por abajo** y quedaba montado sobre la fila
+siguiente. El nombre no vive dentro de la celda: se dibuja en un envoltorio
+**flotante**, para poder acompañar el desplazamiento y quedar centrado en la
+parte visible del bloque (#108/#321). **Al flotar, nada lo recortaba.** Y el alto
+del bloque **lo dan sus tareas**: una son 30, dos son 60, mientras que el nombre
+ocupa las líneas que necesite. Ocurría entonces con **nombre largo y pocas
+tareas**; ese mismo nombre con cuatro tareas cabía sin problema.
+
+*Medido antes de tocarlo, en el caso peor —un nombre de tres líneas en un sub
+frente de una sola tarea—: el rótulo medía **76** en una celda de **36**. **22
+pixeles** montados sobre la fila de abajo, en el frente y en el sub frente.*
+
+Ahora el nombre **se recorta a las líneas que caben, con puntos suspensivos**, y
+el nombre completo sigue disponible al pasar el mouse, en el globo que estas
+celdas ya tienen (#305d/#327). **El recorte se activa solo cuando hace falta:** si
+el nombre cabe, se ve entero y sin puntitos.
+
+Cuántas líneas caben **lo pone el mismo efecto que ya centraba el rótulo**, que
+es el único que conoce el alto real de la celda; se calcula contra la caja de
+**relleno** de la celda y no contra su rectángulo, porque el envoltorio se
+posiciona ahí y con el rectángulo sobraba un pixel. Además el envoltorio **no
+puede superar su celda**, que es lo que cierra el caso extremo: en una fila de 30
+ni siquiera una línea entra con el relleno (15 de línea más 16), y ahí la cuenta
+sola no alcanzaba. *Es el mismo par —tope de alto y recorte— que ya usaba el
+rótulo del proyecto desde #321, así que la garantía no depende del cálculo.*
+
+**No cambia** el alto del bloque —se descartó que la fila creciera hasta que el
+nombre quepa: eso separaría las tareas de esa fila y descuadraría la grilla—, ni
+el hecho de que el rótulo siga acompañando el desplazamiento y centrándose en la
+parte visible, ni el recorte a lo ancho de #321, ni el ancho de las columnas
+congeladas.
+
+*Sobre el rótulo del **proyecto** en Mis Tareas: el pedido lo daba por afectado
+por el mismo mecanismo. **Comprobado que no lo está:** va en escritura vertical
+con tope de alto y recorte propio desde #321, y ya no podía desbordar. Se
+comprueba igual, para que siga sin poder.*
+
+#### Verificación
+
+`docs/prueba-345b-344b-347b-351.mjs` — **35 comprobaciones en verde**.
+
+**#345b** mide el ancho REAL del texto renderizado con un `Range` sobre el nodo
+de texto —`scrollWidth` no sirve acá: el bloque que lleva el texto tiene ancho
+cero y mínimo del 100%, justo lo que impide que ensanche la columna, así que
+devuelve siempre el disponible—. Se comprueban dos días, tres días y el caso peor
+de una semana de un solo día; que lo que cede sea el relleno y no el borde; y que
+ni el alto de la franja ni el ancho de la columna se muevan.
+
+**#344b** calcula la **luminancia relativa (WCAG)** de los tres colores —día
+vecino, rótulo lu·ma·mi y día del mes visible— contra el fondo del calendario y
+exige que el vecino contraste MENOS que el rótulo, en los dos temas. Más que
+sigue siendo un botón habilitado, que la marca de hoy se dibuja sobre un día
+vecino y que el elegido se sigue viendo elegido cuando cae ahí.
+
+**#351** construye el caso peor **con los gestos del producto** —un frente nuevo
+de nombre largo, un sub frente de nombre largo dentro y una sola tarea— y mide,
+para **cada** rótulo de la grilla, cuánto sobresale de su celda. Más el recorte
+efectivo del largo, el globo con el nombre completo, que uno corto se siga viendo
+entero sin puntitos, que desplazada la Gantt nada se salga y el rótulo siga
+centrándose en la parte visible, el ancho de las columnas congeladas y lo mismo
+en Mis Tareas.
+
+*Control negativo:* la misma prueba contra la rama antes de estas correcciones,
+**15 comprobaciones fallan**, con los defectos medidos tal cual: el mes con 15
+disponibles para 18,91; el mismo gris exacto en los dos temas (4,83:1 contra
+4,83:1 en claro, 6,91:1 contra 6,91:1 en oscuro); y el rótulo de **76** en una
+celda de **36**, desbordando **22**.
+
+`docs/prueba-343-344-345-347.mjs` se actualizó al contrato nuevo de #347 —los dos
+textos y el orden— y sigue en **54 comprobaciones en verde**.

@@ -130,6 +130,12 @@ function etiquetaCorta(iso: ISODate): string {
   return `${d.getUTCDate()} ${NOMBRE_MES[d.getUTCMonth()]}`
 }
 
+/** "sep" — solo el mes de una fecha, con el mismo nombre corto que usan el
+ *  rango de la semana y el resto de la interfaz (#345). */
+export function etiquetaMesCorto(iso: ISODate): string {
+  return NOMBRE_MES[parse(iso).getUTCMonth()]
+}
+
 /** "7 oct – 11 oct" (lunes a viernes; con finSemana=6, lunes a domingo). */
 export function etiquetaSemana(lunes: ISODate, finOffset = 4): string {
   const fin = addDays(lunes, finOffset)

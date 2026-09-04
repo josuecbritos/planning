@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ISODate } from '../types'
-import { etiquetaMes, formatoFecha, hoyISO } from '../lib/dates'
+import { addDays, etiquetaMes, formatoFecha, hoyISO, inicioSemana } from '../lib/dates'
 
 // Fecha editable inline (N4): un solo click abre el calendario de inmediato y
 // elegir un día guarda y cierra al instante.
@@ -24,7 +24,22 @@ interface Props {
 
 const DIAS_SEMANA = ['lu', 'ma', 'mi', 'ju', 'vi', 'sa', 'do']
 const ANCHO_CAL = 248
-const ALTO_CAL = 330
+/**
+ * #344: la grilla es SIEMPRE de seis semanas, así que el alto del calendario
+ * dejó de depender del mes y este número volvió a ser exacto. Se usa para
+ * decidir si el calendario se abre hacia abajo o hacia arriba; antes describía
+ * un mes de seis filas y sobraba en los de cinco, con lo que en una tarea del
+ * medio de la pantalla se abría hacia arriba sin necesidad. Medido sobre la
+ * grilla nueva —259 en los trece meses seguidos que se probaron—, no estimado:
+ * el 330 anterior sobraba 71px y hacía saltar el calendario hacia arriba antes
+ * de tiempo.
+ */
+const ALTO_CAL = 259
+/** #344: seis semanas de corrida = 42 casillas. Un mes ocupa 37 como máximo
+ *  (31 días empezando domingo), así que siempre quedan a la vista al menos
+ *  cinco días del mes siguiente. Se descartó mostrar siete semanas: no lo hace
+ *  nadie y sube el alto sin necesidad. */
+const CELDAS = 42
 
 /** Año y mes (0-11) del mes que el calendario muestra. */
 interface Mes {
@@ -119,12 +134,21 @@ export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
     if (iso !== valor) onCambiar(iso)
   }
 
-  // Celdas del mes visible: huecos hasta el primer día (semana inicia lunes).
-  const primerDow = new Date(Date.UTC(mes.anio, mes.mes0, 1)).getUTCDay() // 0=do
-  const huecos = (primerDow + 6) % 7
-  const nDias = new Date(Date.UTC(mes.anio, mes.mes0 + 1, 0)).getUTCDate()
+  // #344 — Seis semanas de corrida desde el lunes de la semana en que cae el
+  // día 1. Antes se dibujaban huecos vacíos hasta el día 1 y se cortaba al
+  // terminar el mes: para tomar un día que estaba a dos o tres de distancia
+  // pero al otro lado del cambio de mes había que navegar, aunque esa semana ya
+  // estuviera medio en pantalla; y el calendario cambiaba de alto entre un mes
+  // de cinco filas y uno de seis. Los días del mes vecino son días como
+  // cualquier otro —se eligen igual—, solo que en gris más claro.
+  const celdas = useMemo(() => {
+    const inicio = inicioSemana(isoDe(mes.anio, mes.mes0, 1))
+    return Array.from({ length: CELDAS }, (_, i) => addDays(inicio, i))
+  }, [mes.anio, mes.mes0])
+  const prefijoVisible = `${mes.anio}-${String(mes.mes0 + 1).padStart(2, '0')}`
   // #285: hoy se marca SIEMPRE (con borde; el elegido va relleno; si coinciden,
-  // relleno con borde). Si el mes visible es otro, hoy simplemente no aparece.
+  // relleno con borde). #344: y también cuando cae en un día del mes vecino,
+  // que ahora se dibuja.
   const hoy = hoyISO()
 
   return (
@@ -178,26 +202,20 @@ export function FechaEditable({ valor, onCambiar, ariaLabel }: Props) {
                   {d}
                 </span>
               ))}
-              {Array.from({ length: huecos }, (_, i) => (
-                <span key={`h${i}`} />
+              {celdas.map((iso) => (
+                <button
+                  key={iso}
+                  type="button"
+                  className={`fecha-cal__dia${iso.startsWith(prefijoVisible) ? '' : ' fecha-cal__dia--fuera'}${
+                    iso === valor ? ' fecha-cal__dia--sel' : ''
+                  }${iso === hoy ? ' fecha-cal__dia--hoy' : ''}`}
+                  data-fecha={iso}
+                  aria-label={formatoFecha(iso)}
+                  onClick={() => elegir(iso)}
+                >
+                  {Number(iso.slice(8))}
+                </button>
               ))}
-              {Array.from({ length: nDias }, (_, i) => {
-                const iso = isoDe(mes.anio, mes.mes0, i + 1)
-                return (
-                  <button
-                    key={iso}
-                    type="button"
-                    className={`fecha-cal__dia${iso === valor ? ' fecha-cal__dia--sel' : ''}${
-                      iso === hoy ? ' fecha-cal__dia--hoy' : ''
-                    }`}
-                    data-fecha={iso}
-                    aria-label={formatoFecha(iso)}
-                    onClick={() => elegir(iso)}
-                  >
-                    {i + 1}
-                  </button>
-                )
-              })}
             </div>
             {/* #285: "Hoy" SOLO navega al mes actual — no asigna ni cierra,
                 igual que las flechas (la regla central de #262 no se toca). */}

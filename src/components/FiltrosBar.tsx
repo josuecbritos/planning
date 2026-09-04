@@ -206,6 +206,19 @@ export function FiltrosBar({
   const toggleTodosProy = () => onCambiar({ ...filtro, proyectos: allProy ? undefined : todosProy })
   const allEstados = ESTADOS.every((c) => filtro.estados?.includes(c))
   const toggleTodosEstados = () => onCambiar({ ...filtro, estados: allEstados ? undefined : [...ESTADOS] })
+  // #347 — "Todas menos hechas": el atajo a la consulta más frecuente. Se podía
+  // desde siempre marcando las cuatro casillas a mano; lo que faltaba era el
+  // atajo, no la capacidad. Por eso NO es una sexta categoría: escribe las
+  // mismas cuatro que se escribirían a mano, la ficha dice "Estado: 4" y su ×
+  // las borra igual que hoy. Una vista guardada con esto guarda cuatro estados,
+  // no un modo nuevo.
+  // Se descartó un botón de "invertir la selección": el mercado siempre lo
+  // resuelve como un atajo CON NOMBRE (Asana: "Incomplete tasks"; Linear:
+  // esconder las completadas) y no como una operación sobre lo ya marcado.
+  const SIN_HECHAS = ESTADOS.filter((c) => c !== 'hecha')
+  const soloSinHechas =
+    filtro.estados?.length === SIN_HECHAS.length && SIN_HECHAS.every((c) => filtro.estados?.includes(c))
+  const toggleSinHechas = () => onCambiar({ ...filtro, estados: soloSinHechas ? undefined : [...SIN_HECHAS] })
   const toggleProyecto = (id: string) => {
     const set = new Set(filtro.proyectos ?? [])
     if (set.has(id)) set.delete(id)
@@ -344,6 +357,13 @@ export function FiltrosBar({
                     <span>{CATEGORIA_LABEL[c]}</span>
                   </label>
                 ))}
+                {/* #347: el atajo va ARRIBA de "Seleccionar todos", que pasa a
+                    ser la última línea. Su texto queda en paralelo con el de su
+                    vecina y nombra la categoría con el mismo nombre exacto que
+                    usa la lista de arriba ("Hecha"), no con una variante. */}
+                <button className="filtro-op filtro-op--todos" onClick={toggleSinHechas}>
+                  {soloSinHechas ? 'Deseleccionar todos menos Hecha' : 'Seleccionar todos menos Hecha'}
+                </button>
                 {/* Punto 5: marcar/desmarcar todos los estados de una vez. */}
                 <button className="filtro-op filtro-op--todos" onClick={toggleTodosEstados}>
                   {allEstados ? 'Deseleccionar todos' : 'Seleccionar todos'}
