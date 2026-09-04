@@ -60,9 +60,11 @@ export interface NuevoUsuario {
   iniciales?: string
   email: string
   rol: Rol
+  /** #339: opcional. Solo la manda quien puede configurar usuarios. */
+  organizacion?: string
 }
 export type PatchUsuario = Partial<
-  Pick<Usuario, 'nombre' | 'iniciales' | 'activo' | 'rol' | 'permisosProyecto' | 'inicialesManual'>
+  Pick<Usuario, 'nombre' | 'iniciales' | 'activo' | 'rol' | 'permisosProyecto' | 'inicialesManual' | 'organizacion'>
 >
 
 /**
@@ -74,6 +76,20 @@ export type PatchUsuario = Partial<
  */
 export function derivarIniciales(nombre: string): string {
   return nombre.trim().split(/\s+/).filter(Boolean).map((p) => p[0]).join('').slice(0, 2).toUpperCase()
+}
+
+/**
+ * Organización normalizada: sin espacios al borde, y vacía = sin organización
+ * (#339). Espejo del trigger `normalizar_organizacion` de la base.
+ *
+ * Vive acá y no en cada repo por la misma razón que `derivarIniciales` (#239):
+ * escrita a mano, "Andotek" y "Andotek " son dos organizaciones distintas, y
+ * dos personas de la misma empresa no se verían entre sí sin nada en pantalla
+ * que lo explique. La regla tiene que ser UNA.
+ */
+export function normalizarOrganizacion(valor?: string | null): string | undefined {
+  const limpio = (valor ?? '').trim()
+  return limpio || undefined
 }
 
 export interface NuevaVista {

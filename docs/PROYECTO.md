@@ -64,6 +64,46 @@ del principio: hace todo en cualquier proyecto.
 **Los permisos se hacen cumplir en la base de datos** (RLS + triggers), no solo
 en la interfaz. Ver `SEGURIDAD.md`.
 
+**Quién ve a quién, y la Organización (#339).** Un usuario ve a otro si comparte
+un proyecto con él, si él mismo es administrador, o si el otro es
+administrador. Eso dejaba a **dos consultores de la misma consultora que no
+comparten ningún proyecto sin verse entre sí**, así que ninguno podía agregar al
+otro a un proyecto nuevo: había que pasar por el administrador. Y no existía
+ningún campo que dijera a qué empresa pertenece una persona.
+
+El usuario gana un campo **Organización**, opcional y vacío en todos los
+existentes, y a la regla se le suma **un** caso: **dos usuarios se ven si los
+dos son consultores y tienen la misma organización**.
+
+- **Solo consultores.** Un cliente sigue viendo únicamente a quien comparte
+  proyecto con él. *Si esto alcanzara a los clientes, los de una misma empresa
+  empezarían a verse entre ellos sin compartir nada, y eso cambiaría lo que ven
+  los clientes actuales sin que nadie lo haya pedido.*
+- **Sin organización no cambia nada,** y **dos usuarios sin organización no se
+  ven entre sí** por el hecho de estar los dos vacíos.
+- **Verse no da acceso a nada:** los proyectos y las tareas siguen protegidos
+  por membresía. Aparecer en una lista de responsables no abre ningún dato.
+- **La asigna solo quien puede configurar usuarios** —el administrador—, con la
+  misma regla que el resto de la configuración. El candado no es la pantalla: el
+  trigger de auto-edición enumera la organización entre las columnas que uno no
+  puede tocar en su propia fila, junto al rol y los permisos, *porque cambiarla
+  amplía lo que uno ve*.
+- **Se elige de una lista, no se escribe suelto:** un desplegable con las
+  organizaciones que ya están en uso, más la opción de escribir una nueva.
+  *Escrita a mano, "Andotek" y "Andotek " serían dos organizaciones distintas y
+  dos personas de la misma empresa no se verían entre sí sin nada en pantalla
+  que lo explique.* No hay pantalla de administración de organizaciones: **la
+  lista se llena sola** —se calcula de los usuarios— y una organización que se
+  queda sin nadie deja de aparecer. La base además recorta los espacios
+  (`normalizar_organizacion`), así que ningún camino de escritura puede partir
+  una organización en dos.
+- **La regla vive en dos lugares** —la política de lectura de `usuario` y la
+  vista `usuario_visible`— y **los dos dicen lo mismo**. La migración lo
+  comprueba al aplicarse y deja una vista, `regla_visibilidad_usuario`, para que
+  la compuerta lo vuelva a comprobar contra lo que la base tiene vivo.
+- **El correo no cambia** y la organización se entrega con la misma regla que
+  los permisos: al administrador y a cada quien la suya.
+
 **"Hoy" es el día de Chile, para la aplicación y para la base (#291).** El
 navegador siempre usó la hora local; la base usaba `current_date`, que en
 Supabase es UTC, así que desde las 20:00 de Chile creía que era el día

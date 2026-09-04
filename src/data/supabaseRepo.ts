@@ -14,7 +14,7 @@ import type {
 } from '../types'
 import type { VistaGuardada } from '../lib/filtros'
 import { getClient } from './client'
-import { derivarIniciales } from './repo'
+import { derivarIniciales, normalizarOrganizacion } from './repo'
 import type {
   NuevaTarea,
   NuevoFrente,
@@ -48,6 +48,7 @@ const toUsuario = (r: Row): Usuario => ({
   inicialesManual: r.iniciales_manual ?? undefined, // #207
   activo: r.activo, authId: r.auth_id ?? undefined,
   permisosProyecto: r.permisos_proyecto ?? undefined,
+  organizacion: r.organizacion ?? undefined, // #339
 })
 const toAcceso = (r: Row): Acceso => ({
   usuarioId: r.usuario_id, proyectoId: r.proyecto_id, fechaAsignacion: r.fecha_asignacion,
@@ -305,6 +306,15 @@ export class SupabaseRepo implements Repo {
         })
         .single(),
     )
+    // #339: la organización va en un segundo paso y no en la RPC de alta. La
+    // RPC es la puerta por la que un consultor con permiso crea CLIENTES, y
+    // ampliarla habría metido un campo que solo el administrador puede escribir
+    // en un camino que no es solo suyo. Este UPDATE pasa por `usuario_update`,
+    // donde la regla ya existe.
+    const organizacion = normalizarOrganizacion(input.organizacion)
+    if (organizacion) {
+      return this.updateUsuario(toUsuario(row).id, { organizacion })
+    }
     return toUsuario(row)
   }
 
@@ -364,6 +374,10 @@ export class SupabaseRepo implements Repo {
     if ('activo' in patch) upd.activo = patch.activo
     if ('rol' in patch) upd.rol = patch.rol
     if ('permisosProyecto' in patch) upd.permisos_proyecto = patch.permisosProyecto ?? {}
+    // #339: vaciarla se guarda como NULL. La base además recorta los espacios
+    // (trigger `normalizar_organizacion`), así que "Andotek " y "Andotek" no
+    // pueden convertirse en dos organizaciones distintas por ningún camino.
+    if ('organizacion' in patch) upd.organizacion = normalizarOrganizacion(patch.organizacion) ?? null
     // Aplica el cambio y relee por la vista (solo admin llega aquí) para traer
     // email/permisos ya desenmascarados; la tabla base no expone esas columnas.
     unwrap(await this.db.from('usuario').update(upd).eq('id', id).select('id').single())

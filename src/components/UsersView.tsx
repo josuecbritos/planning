@@ -150,7 +150,7 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
    */
   async function guardarUsuario(
     usuario: Usuario,
-    d: { nombre: string; iniciales?: string; rol: Rol },
+    d: { nombre: string; iniciales?: string; rol: Rol; organizacion?: string },
   ): Promise<boolean> {
     const cambiaPerfil =
       esAdminActor && usuario.id !== usuarioActual.id && usuario.rol !== 'admin' && d.rol !== usuario.rol
@@ -164,8 +164,33 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
       const ok = await actions.cambiarRolUsuario(usuario.id, d.rol)
       if (!ok) return false
     }
-    return actions.updateUsuario(usuario.id, { nombre: d.nombre, iniciales: d.iniciales })
+    // #339: la organización viaja en el mismo guardado que el nombre. Solo
+    // llega con valor cuando el formulario pudo ofrecerla (`puedeOrganizacion`),
+    // así que vaciarla es un cambio deliberado y no un descuido del que no la
+    // ve.
+    return actions.updateUsuario(usuario.id, {
+      nombre: d.nombre,
+      iniciales: d.iniciales,
+      ...('organizacion' in d ? { organizacion: d.organizacion } : {}),
+    })
   }
+
+  /**
+   * #339 — Las organizaciones QUE YA ESTÁN EN USO. No hay pantalla de
+   * administración de organizaciones: la lista se calcula de los usuarios, así
+   * que se llena sola al asignar gente y una organización que se queda sin
+   * nadie deja de aparecer, sin que nadie tenga que borrarla.
+   * Se mira `state.usuarios` y no la lista filtrada de la pantalla: esconder
+   * los desactivados no debería hacer desaparecer su organización del
+   * desplegable.
+   */
+  const organizaciones = useMemo(
+    () =>
+      [...new Set(state.usuarios.map((u) => u.organizacion).filter(Boolean) as string[])].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [state.usuarios],
+  )
 
   return (
     <div className="usuarios-wrap">
@@ -234,6 +259,8 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
       {modal?.tipo === 'nuevo' && (
         <UsuarioModal
           soloCliente={!esAdminActor}
+          organizaciones={organizaciones}
+          puedeOrganizacion={esAdminActor}
           onSubmit={(d) => void crearEInvitar(d)}
           onClose={() => setModal(null)}
         />
@@ -257,6 +284,12 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
           puedeCambiarPerfil={
             esAdminActor && modal.usuario.id !== usuarioActual.id && modal.usuario.rol !== 'admin'
           }
+          /* #339: la asigna quien puede configurar usuarios, con la misma
+             regla que el resto de la configuración — el administrador, y
+             también sobre sí mismo o sobre otro administrador, que es donde
+             `puedeCambiarPerfil` sí se apaga. */
+          organizaciones={organizaciones}
+          puedeOrganizacion={esAdminActor}
           onSubmit={(d) => guardarUsuario(modal.usuario, d)}
           onClose={() => setModal(null)}
         />
