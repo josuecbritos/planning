@@ -392,6 +392,26 @@ es inmediata: no se le encima un segundo globo. Que la columna
 no se ensanche lo garantiza que el recorte va en un bloque con mínimo cero, que
 aporta cero al ancho mínimo de la celda.
 
+**Y tampoco se salen por abajo (#351).** El nombre se dibuja en un envoltorio
+**flotante** dentro de su celda —así puede acompañar el desplazamiento y
+centrarse en la parte visible del bloque (#108/#321)—, y al flotar **nada lo
+recortaba**: tomaba las líneas que necesitara y se montaba sobre la fila
+siguiente. El alto del bloque, en cambio, **lo dan sus tareas**: una son 30, dos
+son 60. Pasaba entonces con **nombre largo y pocas tareas**; el mismo nombre con
+cuatro tareas cabía. *Medido antes de tocarlo: un nombre de tres líneas en un sub
+frente de una sola tarea daba un rótulo de **76** en una celda de **36** — 22
+pixeles montados sobre la fila de abajo.* Ahora el nombre **se recorta a las
+líneas que caben, con puntos suspensivos**, y el completo sigue en el globo. El
+recorte se activa solo: si el nombre cabe, no aparece ningún puntito. Cuántas
+líneas caben lo pone un efecto —es el único que conoce el alto real de la
+celda—, y el envoltorio además **no puede superar su celda**, que es lo que
+cierra el caso extremo en que ni una línea entra con el relleno. **El alto del
+bloque no cambia:** se descartó que la fila creciera hasta que el nombre quepa,
+porque eso separaría las tareas de esa fila y descuadraría la grilla. Vale para
+el nombre del **frente** y el del **sub frente**; el rótulo del **proyecto** en
+Mis Tareas ya estaba acotado desde #321 —va en escritura vertical, con tope de
+alto y recorte propio—, y se comprueba que sigue estándolo.
+
 **Los globos de la Gantt no se recortan (#327).** Los cuatro que tiene la
 grilla —el nombre completo del frente y del sub frente, el rótulo del proyecto
 en Mis Tareas, "Información" y "Agregar tarea debajo", y el detalle del día—
@@ -542,14 +562,16 @@ títulos que separan **grupos dentro de un mismo menú** —"Aplicado" en Filtra
   **Estado sigue la misma regla que los contadores**: las marcas reales de la
   grilla cuando se está en Gantt, los puntos de color cuando se está en tabla —
   dos representaciones del mismo modelo a la vez es justo lo que se eliminó.
-  Bajo las cinco casillas hay **dos líneas de atajo**: "Seleccionar todos" y,
-  desde #347, **"Todas menos hechas"** — la consulta más frecuente, que se podía
-  desde siempre marcando cuatro casillas a mano. **No es una sexta categoría:**
+  Bajo las cinco casillas hay **dos líneas de atajo**: desde #347,
+  **"Seleccionar todos menos Hecha"** —la consulta más frecuente, que se podía
+  desde siempre marcando cuatro casillas a mano— y debajo "Seleccionar todos". **No es una sexta categoría:**
   escribe exactamente los mismos cuatro estados que se marcarían a mano, la
   ficha dice "Estado: 4", su × los borra y una vista guardada con eso guarda
   cuatro estados, no un modo nuevo. Cuando esas cuatro ya están puestas, la
-  línea pasa a **"Quitar todas menos hechas"** y tocarla deja el campo vacío,
-  igual que "Seleccionar todos" cuando ya está todo marcado. *Se descartó un
+  línea pasa a **"Deseleccionar todos menos Hecha"** y tocarla deja el campo
+  vacío, igual que "Seleccionar todos" cuando ya está todo marcado. *El texto
+  queda en paralelo con el de su vecina y nombra la categoría con el mismo
+  nombre exacto que usa la lista de arriba (#347b).* *Se descartó un
   botón de "invertir la selección": el mercado siempre lo resuelve como un atajo
   con nombre propio —Asana con "Incomplete tasks", Linear con un interruptor de
   esconder las completadas— y no como una operación sobre lo ya marcado.*
@@ -681,7 +703,13 @@ primer día visible** ("oct"); cuando cabe, no cambia nada. Se decide **semana p
 semana**, así que en un mismo horizonte una semana completa conserva su rango
 mientras la de al lado, con dos días, muestra el mes. La franja no desaparece ni
 cambia de alto, y **ni siquiera el mes puede ensanchar la columna**: ahí manda
-siempre el ancho de los días. *Se mide en lugar de estimarse —el ancho del texto
+siempre el ancho de los días. **Y cuando muestra el mes, el texto usa el ancho
+completo de sus días visibles (#345b):** el relleno lateral cede. *El mes tampoco
+cabía, y la causa no era el ancho de la columna sino lo que la rodea — el relleno
+(6+6) y el borde de inicio de semana (2) se llevaban 14 de los 30 y al texto le
+quedaban 16, para un mes que mide 18,91. El borde se queda —es la marca de inicio
+de semana— porque sin el relleno ya sobra sitio: 27 contra 18,91, medido.* *Se
+mide en lugar de estimarse —el ancho del texto
 depende de la fuente y del zoom— y se mide contra una **regla** que lleva siempre
 el rango completo y vive fuera del flujo, para que la medición no dependa de lo
 que se esté mostrando y decidir no se persiga a sí mismo.* Vale igual en la Gantt
@@ -873,8 +901,14 @@ que navegar, aunque esa semana ya estuviera medio en pantalla; y el calendario
 **cambiaba de alto** entre un mes de cinco filas y uno de seis. Ahora la grilla
 arranca en el **lunes de la semana en que cae el día 1** y son siempre seis
 semanas: las casillas que sobran al principio y al final se llenan con los días
-del mes vecino, **en gris más claro**, y **se eligen igual que cualquier otro
-día** — un clic asigna y cierra. La marca de "hoy" se dibuja también cuando hoy
+del mes vecino, **en un gris más apagado que los rótulos lu·ma·mi de esa misma
+grilla** (#344b), y **se eligen igual que cualquier otro día** — un clic asigna y
+cierra. *Con el mismo `--gris-texto` de esos rótulos se leían como días del mes un
+poco más tenues y no como relleno de la semana, y costaba ver dónde empieza y
+dónde termina el mes. Los dos valores salen de la propia paleta —son el
+`--gris-texto` del otro tema—, así que no se inventa ningún color: contra la
+superficie dan 2,6:1 en claro frente a los 4,8:1 de lu·ma·mi, y 3,7:1 en oscuro
+frente a 6,9:1.* La marca de "hoy" se dibuja también cuando hoy
 cae en uno de ellos. *Seis semanas son 42 casillas y un mes ocupa 37 como máximo
 —31 días empezando domingo—, así que siempre quedan a la vista al menos cinco
 días del mes siguiente. Se descartó mostrar siete: no lo hace nadie y sube el

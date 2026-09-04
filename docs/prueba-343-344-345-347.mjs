@@ -21,7 +21,8 @@
 //   filas. Ahora son siempre seis semanas de corrida desde el lunes de la semana
 //   del día 1, con los días del mes vecino en gris más claro y elegibles.
 //
-// #347 — Segunda línea de atajo en el filtro de Estado, "Todas menos hechas",
+// #347 — Segunda línea de atajo en el filtro de Estado, "Seleccionar todos
+//   menos Hecha" (#347b: así se llama y va ARRIBA de "Seleccionar todos"),
 //   que marca las cuatro categorías que no son "hecha". No es una sexta
 //   categoría: escribe los mismos cuatro estados que se marcarían a mano.
 //
@@ -505,7 +506,12 @@ chk(
 await p.keyboard.press('Escape')
 await esperar(250)
 
-// ── #347 · "Todas menos hechas" ────────────────────────────────────────────
+// ── #347 · "Seleccionar todos menos Hecha" ────────────────────────────────
+// El atajo se localiza por texto EXACTO y no por subcadena: "Seleccionar
+// todos" es prefijo de "Seleccionar todos menos Hecha" y `hasText` casaría con
+// los dos.
+const atajoExacto = (texto) =>
+  p.locator('.filtro-menu .filtro-op--todos').filter({ hasText: new RegExp(`^${texto}$`) })
 const atajos = () =>
   p.evaluate(() => [...document.querySelectorAll('.filtro-menu .filtro-op--todos')].map((x) => x.textContent.trim()))
 const casillas = () =>
@@ -525,14 +531,14 @@ await desplazar(0)
 await abrirCampoFiltro('Estado')
 const at0 = await atajos()
 chk(
-  at0.length === 2 && at0[0] === 'Seleccionar todos' && at0[1] === 'Todas menos hechas',
-  '#347 · bajo las cinco categorías hay dos líneas de atajo, en ese orden',
+  at0.length === 2 && at0[0] === 'Seleccionar todos menos Hecha' && at0[1] === 'Seleccionar todos',
+  '#347 · bajo las cinco categorías están las dos líneas de atajo, en ese orden',
   at0.join(' | '),
 )
 const cajas0 = await casillas()
 chk(cajas0.length === 5, '#347 · las cinco casillas siguen estando', `${cajas0.length}`)
 
-await pulsarSiEsta(p.locator('.filtro-menu .filtro-op--todos', { hasText: 'Todas menos hechas' }), 450)
+await pulsarSiEsta(atajoExacto('Seleccionar todos menos Hecha'), 450)
 const cajas1 = await casillas()
 const hecha = cajas1.find((c) => c.nombre === 'Hecha')
 chk(
@@ -541,8 +547,8 @@ chk(
   cajas1.map((c) => `${c.nombre}=${c.on ? 1 : 0}`).join(' '),
 )
 chk(
-  (await atajos())[1] === 'Quitar todas menos hechas',
-  '#347 · con esas cuatro puestas la línea anuncia que el clic las quita',
+  (await atajos())[0] === 'Deseleccionar todos menos Hecha',
+  '#347 · con esas cuatro puestas la línea pasa a "Deseleccionar todos menos Hecha"',
   (await atajos()).join(' | '),
 )
 await p.keyboard.press('Escape')
@@ -598,7 +604,7 @@ chk(
 )
 
 // Segundo toque: el campo Estado queda vacío.
-await pulsarSiEsta(p.locator('.filtro-menu .filtro-op--todos', { hasText: 'Quitar todas menos hechas' }), 450)
+await pulsarSiEsta(atajoExacto('Deseleccionar todos menos Hecha'), 450)
 const cajas3 = await casillas()
 chk(cajas3.every((c) => !c.on), '#347 · tocarla de nuevo deja el campo Estado vacío', cajas3.map((c) => (c.on ? 1 : 0)).join(''))
 await p.keyboard.press('Escape')
@@ -612,7 +618,7 @@ chk(verdes2 > 0, '#347 · vuelven a verse todas las tareas', `${verdes2} verdes`
 
 // La × de la ficha borra el filtro completo.
 await abrirCampoFiltro('Estado')
-await pulsarSiEsta(p.locator('.filtro-menu .filtro-op--todos', { hasText: 'Todas menos hechas' }), 400)
+await pulsarSiEsta(atajoExacto('Seleccionar todos menos Hecha'), 400)
 await p.keyboard.press('Escape')
 await esperar(400)
 await pulsarSiEsta(p.locator('.controles-bar').getByText('Filtrar', { exact: true }), 300)
@@ -647,11 +653,11 @@ await limpiarFiltros()
 await abrirCampoFiltro('Estado')
 const atMT = await atajos()
 chk(
-  atMT.length === 2 && atMT[1] === 'Todas menos hechas',
+  atMT.length === 2 && atMT[0] === 'Seleccionar todos menos Hecha',
   '#347 · el atajo está también en el filtro de Estado de Mis Tareas (Gantt)',
   atMT.join(' | '),
 )
-await pulsarSiEsta(p.locator('.filtro-menu .filtro-op--todos', { hasText: 'Todas menos hechas' }), 450)
+await pulsarSiEsta(atajoExacto('Seleccionar todos menos Hecha'), 450)
 const cajasMT = await casillas()
 chk(
   cajasMT.filter((c) => c.on).length === 4 && !cajasMT.find((c) => c.nombre === 'Hecha')?.on,
@@ -666,7 +672,7 @@ await verVista('Tabla')
 await abrirCampoFiltro('Estado')
 const atMTt = await atajos()
 chk(
-  atMTt.length === 2 && atMTt[1] === 'Todas menos hechas',
+  atMTt.length === 2 && atMTt[0] === 'Seleccionar todos menos Hecha',
   '#347 · y en la tabla de Mis Tareas',
   atMTt.join(' | '),
 )

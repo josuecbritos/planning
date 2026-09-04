@@ -357,16 +357,16 @@ export function FiltrosBar({
                     <span>{CATEGORIA_LABEL[c]}</span>
                   </label>
                 ))}
+                {/* #347: el atajo va ARRIBA de "Seleccionar todos", que pasa a
+                    ser la última línea. Su texto queda en paralelo con el de su
+                    vecina y nombra la categoría con el mismo nombre exacto que
+                    usa la lista de arriba ("Hecha"), no con una variante. */}
+                <button className="filtro-op filtro-op--todos" onClick={toggleSinHechas}>
+                  {soloSinHechas ? 'Deseleccionar todos menos Hecha' : 'Seleccionar todos menos Hecha'}
+                </button>
                 {/* Punto 5: marcar/desmarcar todos los estados de una vez. */}
                 <button className="filtro-op filtro-op--todos" onClick={toggleTodosEstados}>
                   {allEstados ? 'Deseleccionar todos' : 'Seleccionar todos'}
-                </button>
-                {/* #347: segunda línea de atajo, con el mismo formato y justo
-                    debajo. Cuando esas cuatro ya están puestas anuncia que el
-                    clic las quita —igual que "Seleccionar todos" pasa a
-                    "Deseleccionar todos"—, conservando el nombre del atajo. */}
-                <button className="filtro-op filtro-op--todos" onClick={toggleSinHechas}>
-                  {soloSinHechas ? 'Quitar todas menos hechas' : 'Todas menos hechas'}
                 </button>
               </>
             )}

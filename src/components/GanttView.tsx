@@ -758,6 +758,25 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
         const label = td.firstElementChild as HTMLElement | null
         if (!label) return
         const cr = td.getBoundingClientRect()
+        // #351: cuántas líneas del nombre caben en el alto de la celda. Va
+        // ANTES de medir el envoltorio: recortar cambia su alto, y ese alto es
+        // el que centra el rótulo. Solo se escribe cuando el número cambia,
+        // para no ensuciar el estilo en cada cuadro del desplazamiento.
+        const txt = td.querySelector<HTMLElement>('.fija-txt')
+        if (txt) {
+          const csTxt = getComputedStyle(txt)
+          const csLabel = getComputedStyle(label)
+          const alto = parseFloat(csTxt.lineHeight) || parseFloat(csTxt.fontSize) * 1.3
+          const relleno = parseFloat(csLabel.paddingTop) + parseFloat(csLabel.paddingBottom)
+          // `clientHeight` y no el rectángulo: el envoltorio se posiciona contra
+          // la caja de RELLENO de la celda, que no incluye sus bordes. Medido:
+          // con el rectángulo sobraba un pixel y el rótulo asomaba.
+          const lineas = String(Math.max(1, Math.floor((td.clientHeight - relleno) / alto)))
+          if (txt.style.getPropertyValue('-webkit-line-clamp') !== lineas) {
+            txt.style.setProperty('-webkit-line-clamp', lineas)
+            txt.style.setProperty('line-clamp', lineas)
+          }
+        }
         const labelH = label.offsetHeight
         // Corrección #108 — dos casos según la altura del bloque:
         //  - Bloque que CABE en la banda visible: título centrado en el
@@ -901,8 +920,16 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                 <th className="fija fija--resp" rowSpan={2}>Resp.</th>
                 {semanas.map((s) => {
                   const rango = etiquetaSemana(s.lunes, finOffsetSemana)
+                  const corta = semanasCortas.has(s.lunes)
                   return (
-                    <th key={s.lunes} className="semana-lbl lunes" colSpan={s.dias.length} data-lunes={s.lunes}>
+                    <th
+                      key={s.lunes}
+                      /* #345b: cuando la franja muestra solo el mes, el texto
+                         puede usar el ancho COMPLETO de sus días visibles. */
+                      className={`semana-lbl lunes${corta ? ' semana-lbl--mes' : ''}`}
+                      colSpan={s.dias.length}
+                      data-lunes={s.lunes}
+                    >
                       {/* #345: la regla. Lleva SIEMPRE el rango completo y está
                           fuera del flujo, así que no ocupa ancho y su medida no
                           cambia según lo que se muestre: es lo que evita que
@@ -910,9 +937,7 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                       <span className="semana-lbl__regla" aria-hidden="true">
                         {rango}
                       </span>
-                      <span className="semana-lbl__txt">
-                        {semanasCortas.has(s.lunes) ? etiquetaMesCorto(s.dias[0]) : rango}
-                      </span>
+                      <span className="semana-lbl__txt">{corta ? etiquetaMesCorto(s.dias[0]) : rango}</span>
                     </th>
                   )
                 })}

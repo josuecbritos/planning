@@ -3590,3 +3590,130 @@ fallan**, con los defectos medidos tal cual: tinte 31 en la esquina del título
 congelado contra 1 en el no congelado; columnas de 52 y de [34, 97] donde debían
 medir 30; 30 casillas con 4 huecos y dos altos distintos en el calendario; y una
 sola línea de atajo en el filtro de Estado.
+
+### Correcciones de #345, #344 y #347, más #351
+
+Sobre la misma rama, con #343 ya verificado y sin tocar.
+
+#### #345b — El mes no cabía porque los márgenes se comían la columna
+
+La regla de #345 quedó bien: cuando el rango completo no cabe, la franja muestra
+solo el mes. **Pero el mes tampoco cabía.** La causa no era el ancho de la
+columna sino lo que la rodea: el rótulo conservaba su relleno lateral (6+6) y el
+borde de inicio de semana (2) también cuando mostraba solo el mes. Entre los dos
+se llevaban **14 de los 30** y al texto le quedaban **15**.
+
+*Medido: el mes mide **18,91**. Con 15 disponibles se cortaba; el espacio existía
+y se lo comían los márgenes.*
+
+Ahora, cuando la franja muestra solo el mes, **el relleno lateral cede** y el
+texto usa el ancho completo de sus días visibles: **27 contra 18,91**, con ocho
+de sobra. **El borde se queda** —es la marca de inicio de semana, y sin el
+relleno ya sobra sitio—. Solo cede el relleno **horizontal**, así que el alto de
+la franja no se mueve, y solo en las franjas que muestran el mes: la que muestra
+su rango conserva relleno y borde como siempre. El ancho de la columna tampoco
+cambia: el relleno vive dentro de la caja.
+
+#### #344b — Los días del mes vecino, más apagados
+
+Usaban **exactamente el mismo gris** que los rótulos lu·ma·mi del encabezado del
+calendario. Al ser el mismo tono que un elemento que sí es texto normal de la
+pantalla, se leían como días del mes un poco más apagados y no como relleno de la
+semana: costaba ver dónde empieza y dónde termina el mes.
+
+Pasan a un gris **más apagado que esos rótulos**, en los dos temas. *Los dos
+valores salen de la propia paleta —son el `--gris-texto` del OTRO tema—, así que
+no se inventa ningún color. Medido contra la superficie: en claro **2,56:1**
+frente a los **4,83:1** de lu·ma·mi; en oscuro **3,67:1** frente a **6,91:1**.
+El dueño eligió este nivel sobre uno más apagado todavía —tipo Monday, 1,9:1 y
+2,3:1—, que hacía saltar más el bloque del mes pero dejaba el número al borde de
+lo legible.*
+
+Se mantiene todo lo demás: siguen siendo elegibles, conservan su caja y su
+realce, la marca de hoy se sigue dibujando sobre ellos y el día elegido se sigue
+viendo como elegido cuando cae ahí.
+
+#### #347b — El texto del atajo y su posición
+
+Dos cambios, nada más. **El texto pasa a "Seleccionar todos menos Hecha"**, y a
+**"Deseleccionar todos menos Hecha"** cuando las cuatro ya están marcadas —queda
+en paralelo con "Seleccionar todos / Deseleccionar todos", que es su vecina, y
+nombra la categoría con el mismo nombre exacto que usa la lista de arriba—. Y
+**la línea sube por encima de "Seleccionar todos"**, que pasa a ser la última.
+
+Nada de su comportamiento cambia.
+
+#### #351 — El nombre del sub frente ya no se desborda de su celda en la Gantt
+
+*Solicitud nueva, levantada de una captura del dueño.*
+
+El nombre **se salía de su celda por abajo** y quedaba montado sobre la fila
+siguiente. El nombre no vive dentro de la celda: se dibuja en un envoltorio
+**flotante**, para poder acompañar el desplazamiento y quedar centrado en la
+parte visible del bloque (#108/#321). **Al flotar, nada lo recortaba.** Y el alto
+del bloque **lo dan sus tareas**: una son 30, dos son 60, mientras que el nombre
+ocupa las líneas que necesite. Ocurría entonces con **nombre largo y pocas
+tareas**; ese mismo nombre con cuatro tareas cabía sin problema.
+
+*Medido antes de tocarlo, en el caso peor —un nombre de tres líneas en un sub
+frente de una sola tarea—: el rótulo medía **76** en una celda de **36**. **22
+pixeles** montados sobre la fila de abajo, en el frente y en el sub frente.*
+
+Ahora el nombre **se recorta a las líneas que caben, con puntos suspensivos**, y
+el nombre completo sigue disponible al pasar el mouse, en el globo que estas
+celdas ya tienen (#305d/#327). **El recorte se activa solo cuando hace falta:** si
+el nombre cabe, se ve entero y sin puntitos.
+
+Cuántas líneas caben **lo pone el mismo efecto que ya centraba el rótulo**, que
+es el único que conoce el alto real de la celda; se calcula contra la caja de
+**relleno** de la celda y no contra su rectángulo, porque el envoltorio se
+posiciona ahí y con el rectángulo sobraba un pixel. Además el envoltorio **no
+puede superar su celda**, que es lo que cierra el caso extremo: en una fila de 30
+ni siquiera una línea entra con el relleno (15 de línea más 16), y ahí la cuenta
+sola no alcanzaba. *Es el mismo par —tope de alto y recorte— que ya usaba el
+rótulo del proyecto desde #321, así que la garantía no depende del cálculo.*
+
+**No cambia** el alto del bloque —se descartó que la fila creciera hasta que el
+nombre quepa: eso separaría las tareas de esa fila y descuadraría la grilla—, ni
+el hecho de que el rótulo siga acompañando el desplazamiento y centrándose en la
+parte visible, ni el recorte a lo ancho de #321, ni el ancho de las columnas
+congeladas.
+
+*Sobre el rótulo del **proyecto** en Mis Tareas: el pedido lo daba por afectado
+por el mismo mecanismo. **Comprobado que no lo está:** va en escritura vertical
+con tope de alto y recorte propio desde #321, y ya no podía desbordar. Se
+comprueba igual, para que siga sin poder.*
+
+#### Verificación
+
+`docs/prueba-345b-344b-347b-351.mjs` — **35 comprobaciones en verde**.
+
+**#345b** mide el ancho REAL del texto renderizado con un `Range` sobre el nodo
+de texto —`scrollWidth` no sirve acá: el bloque que lleva el texto tiene ancho
+cero y mínimo del 100%, justo lo que impide que ensanche la columna, así que
+devuelve siempre el disponible—. Se comprueban dos días, tres días y el caso peor
+de una semana de un solo día; que lo que cede sea el relleno y no el borde; y que
+ni el alto de la franja ni el ancho de la columna se muevan.
+
+**#344b** calcula la **luminancia relativa (WCAG)** de los tres colores —día
+vecino, rótulo lu·ma·mi y día del mes visible— contra el fondo del calendario y
+exige que el vecino contraste MENOS que el rótulo, en los dos temas. Más que
+sigue siendo un botón habilitado, que la marca de hoy se dibuja sobre un día
+vecino y que el elegido se sigue viendo elegido cuando cae ahí.
+
+**#351** construye el caso peor **con los gestos del producto** —un frente nuevo
+de nombre largo, un sub frente de nombre largo dentro y una sola tarea— y mide,
+para **cada** rótulo de la grilla, cuánto sobresale de su celda. Más el recorte
+efectivo del largo, el globo con el nombre completo, que uno corto se siga viendo
+entero sin puntitos, que desplazada la Gantt nada se salga y el rótulo siga
+centrándose en la parte visible, el ancho de las columnas congeladas y lo mismo
+en Mis Tareas.
+
+*Control negativo:* la misma prueba contra la rama antes de estas correcciones,
+**15 comprobaciones fallan**, con los defectos medidos tal cual: el mes con 15
+disponibles para 18,91; el mismo gris exacto en los dos temas (4,83:1 contra
+4,83:1 en claro, 6,91:1 contra 6,91:1 en oscuro); y el rótulo de **76** en una
+celda de **36**, desbordando **22**.
+
+`docs/prueba-343-344-345-347.mjs` se actualizó al contrato nuevo de #347 —los dos
+textos y el orden— y sigue en **54 comprobaciones en verde**.
