@@ -3844,3 +3844,106 @@ esos dos consultores **ya** se ven porque comparten proyecto, el caso se marca
 2. Aplicar la migración `20260707000032_organizacion_usuario.sql`.
 3. Correr `scripts/validar-rls.mjs` contra producción, con las dos cuentas de
    consultor, y verla en verde (criterio 11).
+
+### #353 — Un consultor suma a un colega de su organización a un proyecto suyo
+
+**Toca la base: tres políticas de acceso y la lista de agregables. Lleva
+migración (la 33), y por lo tanto respaldo previo del dueño y la compuerta en
+verde antes de cerrar.**
+
+#### El objetivo
+
+> Un consultor con el permiso correspondiente puede sumar a un colega de su
+> misma organización a un proyecto suyo, quitarlo, y configurar sus permisos en
+> ese proyecto — sin pasar por el administrador.
+
+**#339 había dejado el trabajo a medias, y es un hueco del pedido anterior, no
+de su implementación.** Abrió la visibilidad —dos consultores de la misma
+organización se ven entre sí— pero **no tocó ninguna de las reglas que gobiernan
+la acción para la que esa visibilidad servía**: las tres políticas de
+`acceso_proyecto` seguían diciendo "solo clientes" dentro de la rama del
+dueño-consultor. Consecuencia: un consultor no notaba ninguna diferencia.
+
+#### Lo que se hizo
+
+**El permiso pasa a llamarse "Agregar usuarios a sus proyectos"** y habilita
+sumar a un proyecto propio a un cliente, como hasta hoy, **y a un consultor de
+la misma organización**. A nadie más. **Quitar sigue la misma regla que
+agregar**, y **"Configurar permisos de los usuarios de sus proyectos"** alcanza a
+las mismas personas — sin eso, un consultor podría sumar a un colega y quedarse
+sin poder ajustarle nada.
+
+*El nombre del permiso en la BASE no cambia (`invitarClientes`): renombrarlo
+obligaría a reescribir cada fila de `permisos_proyecto` sin ganar nada. Lo que
+cambia es lo que dice la pantalla y lo que habilita.*
+
+**La lista de a quién se puede agregar la entrega la base** (`usuarios_agregables`),
+con la misma condición que la política que autoriza la operación. La pantalla la
+calculaba por su cuenta filtrando a "solo clientes": la regla estaba escrita en
+dos lugares.
+
+**La organización queda acotada a los consultores**, en la base y no solo en la
+pantalla. Se ofrecía para cualquier perfil, también para los clientes, donde no
+hace nada. La que hubiera quedado en un no-consultor **se borra**, no se ignora:
+guardada e invisible, cambiar después su perfil a consultor **activaría esa
+organización sola**, dándole una visibilidad que nadie decidió. Por lo mismo,
+pasar a alguien a cliente se la quita — el trigger pasa a dispararse también con
+`rol`. Y **la lista de organizaciones en uso se calcula solo sobre consultores**.
+
+**El campo se escribe directo, sin paso previo.** Ya no hay que elegir "Escribir
+una nueva…" antes de poder escribir: se escribe, la lista se filtra, y si lo
+escrito no existe la última opción ofrece **`Crear "Andotek"`**. Sigue habiendo
+una opción para dejarlo sin organización.
+
+**Una columna Organización en Administración → Usuarios**, junto al Rol, del que
+depende. Sin organización, el mismo vacío que usa el producto en esas tablas.
+
+**Los tres desplegables del navegador pasan al menú del producto** —Organización,
+Perfil y el de agregar en Miembros—. Comparten las **declaraciones** de estilo
+con los menús de Filtrar, Ordenar y Vistas, no una copia de sus valores: es lo
+único que impide que se separen (#292). Van en portal y con alto calculado
+contra el espacio que queda, por la misma razón que los de la barra (#310): dentro
+de un modal, un menú absoluto lo recortaría la caja.
+
+#### Verificación
+
+**`docs/prueba-353-agregar-colega-base.mjs` — 34 comprobaciones en verde.**
+Levanta un PostgreSQL local, aplica las 33 migraciones del repo en orden y
+pregunta entrando como cada usuario, con dos consultores de la misma
+organización **sin ningún proyecto en común**.
+
+El objetivo: que A sume a B, que B vea **ese** proyecto y **ningún otro de A**,
+que A pueda configurar sus permisos y quitarlo, y que al quitarlo B deje de
+verlo. Los límites: que no pueda con un consultor de otra organización, ni con
+uno sin organización, ni sin el permiso —ni siquiera con un cliente—, ni sobre un
+proyecto que no es suyo; que un cliente no pueda con nadie; y que el
+administrador siga pudiendo con cualquiera. Más la lista que entrega la base
+—para A solo su colega, para el admin cualquiera, para un cliente nadie, y quien
+ya es miembro sale de ella—, la organización acotada a consultores en los dos
+sentidos del cambio de perfil, y los invariantes: la regla de visibilidad
+diciendo lo mismo en los dos lugares, que un consultor **no** vea la organización
+ajena, que ninguna función nueva quede abierta a `PUBLIC` y que `anon` no pueda
+ejecutar ninguna de las tres.
+
+*Control negativo:* la misma prueba sin la migración 33, **18 comprobaciones
+fallan**.
+
+**`docs/prueba-353-agregar-colega.mjs` — 43 comprobaciones en verde.** La otra
+mitad, que es la que #339 no tenía: que **la pantalla llegue a hacerlo**. Recorre
+el objetivo de punta a punta con dos cuentas —la consultora suma a su colega,
+abre sus permisos, y él ve el proyecto en su barra; después lo quita y deja de
+verlo—, más la columna, el campo solo para consultores, el `Crear "…"` cuando lo
+escrito no existe, los dos nombres de permiso, que sin el permiso no aparezca el
+botón, y que no quede **ningún** `<select>` nativo en la pantalla, con el menú
+propio midiendo igual en los dos temas.
+
+*Control negativo:* contra `main`, **28 comprobaciones fallan**.
+
+**`scripts/validar-rls.mjs`** suma `probarAgregarColega` para la corrida contra
+producción, con sus dos lados y restituyendo siempre lo que toca.
+
+#### Para cerrar la solicitud
+
+1. **Respaldo del dueño** (`pg_dump`).
+2. Aplicar `20260707000033_agregar_colega_organizacion.sql`.
+3. Correr la compuerta contra producción con las dos cuentas de consultor.

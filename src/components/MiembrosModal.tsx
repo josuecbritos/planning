@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { AppState, Proyecto, Usuario } from '../types'
 import type { Actions } from '../App'
 import {
-  puedeConfigurarClientesEn,
-  puedeInvitarClientesEn,
+  puedeConfigurarUsuariosEn,
+  puedeAgregarUsuariosEn,
 } from '../lib/permisos'
 import { IconoLlave } from './Iconos'
 import { Modal } from './Modal'
 import { Avatar } from './RespPicker'
 import { PermisosModal } from './PermisosModal'
+import { Selector } from './Selector'
 
 // Miembros de un proyecto (roles punto 7). El dueño ve QUIENES estan
 // asignados, pero NO sus permisos: la configuracion solo la ve quien puede
@@ -33,8 +34,8 @@ const ROL_LABEL: Record<Usuario['rol'], string> = {
 
 export function MiembrosModal({ state, proyecto, sesion, actions, onClose }: Props) {
   const esAdmin = sesion.rol === 'admin'
-  const puedeInvitar = puedeInvitarClientesEn(state, sesion, proyecto.id)
-  const puedeConfigurar = puedeConfigurarClientesEn(state, sesion, proyecto.id)
+  const puedeInvitar = puedeAgregarUsuariosEn(state, sesion, proyecto.id)
+  const puedeConfigurar = puedeConfigurarUsuariosEn(state, sesion, proyecto.id)
   const [permisosDe, setPermisosDe] = useState<Usuario | null>(null)
   const [creando, setCreando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState('')
@@ -49,17 +50,38 @@ export function MiembrosModal({ state, proyecto, sesion, actions, onClose }: Pro
     .filter((u): u is Usuario => Boolean(u) && u!.activo)
     .sort((a, b) => (a.rol === b.rol ? a.nombre.localeCompare(b.nombre) : a.rol.localeCompare(b.rol)))
 
-  // #164: el admin puede sumar a cualquiera, INCLUIDO él mismo (para unirse y
-  // que el proyecto aparezca en su barra). El consultor dueño, SOLO clientes.
-  const yaDentro = new Set([proyecto.duenoId, ...accesos.map((a) => a.usuarioId)])
-  const agregables = state.usuarios.filter(
-    (u) => u.activo && !yaDentro.has(u.id) && (esAdmin || u.rol === 'cliente'),
-  )
+  // #353 — La lista de agregables la entrega LA BASE, no esta pantalla.
+  //
+  // Antes se calculaba acá filtrando `state.usuarios` a "solo clientes" cuando
+  // quien miraba no era administrador. Esa condición es exactamente la de la
+  // política `acceso_insert`, así que estaba escrita en dos lugares; ahora se
+  // pide. #164 sigue valiendo: el admin puede sumar a cualquiera, incluido él
+  // mismo, y eso lo decide la misma función de la base.
+  const [agregables, setAgregables] = useState<Usuario[]>([])
+  useEffect(() => {
+    let vivo = true
+    if (!puedeInvitar) {
+      setAgregables([])
+      return
+    }
+    void actions.usuariosAgregables(proyecto.id).then((l) => {
+      if (vivo) setAgregables(l)
+    })
+    return () => {
+      vivo = false
+    }
+    // Se vuelve a pedir cuando cambian los accesos del proyecto: quien acaba de
+    // entrar tiene que salir de la lista sin recargar la pantalla.
+  }, [actions, proyecto.id, puedeInvitar, accesos.length, state.usuarios.length])
 
-  // El acceso configurable: solo CLIENTES para el dueño; cualquiera para admin.
-  const puedeConfigurarA = (u: Usuario) =>
-    esAdmin || (puedeConfigurar && u.rol === 'cliente')
-  const puedeQuitarA = (u: Usuario) => esAdmin || (puedeInvitar && u.rol === 'cliente')
+  // Quitar y configurar siguen la MISMA regla que agregar (#353): quien puede
+  // sumar a alguien puede quitarlo y puede configurarlo. Se pregunta contra la
+  // misma lista, más los que ya están dentro y calzan con la regla.
+  const esColega = (u: Usuario) =>
+    u.rol === 'consultor' && sesion.rol === 'consultor' && !!sesion.organizacion && u.organizacion === sesion.organizacion
+  const alcanzable = (u: Usuario) => u.rol === 'cliente' || esColega(u)
+  const puedeConfigurarA = (u: Usuario) => esAdmin || (puedeConfigurar && alcanzable(u))
+  const puedeQuitarA = (u: Usuario) => esAdmin || (puedeInvitar && alcanzable(u))
 
   async function crearCliente(e: React.FormEvent) {
     e.preventDefault()
@@ -142,20 +164,21 @@ export function MiembrosModal({ state, proyecto, sesion, actions, onClose }: Pro
         {puedeInvitar && (
           <div className="miembros-agregar">
             {agregables.length > 0 && (
-              <select
+              /* #353: el desplegable del producto, no el del navegador. Mismo
+                 contenido y mismo efecto; lo que cambia es cómo se ve. */
+              <Selector
                 className="asignar-select"
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) actions.asignarAcceso(e.target.value, proyecto.id)
+                ariaLabel="Agregar usuario al proyecto"
+                valor=""
+                vacio="+ Agregar usuario…"
+                opciones={agregables.map((u) => ({
+                  valor: u.id,
+                  etiqueta: `${u.nombre} (${ROL_LABEL[u.rol]})`,
+                }))}
+                onCambiar={(id) => {
+                  if (id) void actions.asignarAcceso(id, proyecto.id)
                 }}
-              >
-                <option value="">{esAdmin ? '+ Agregar usuario…' : '+ Invitar cliente…'}</option>
-                {agregables.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre} ({ROL_LABEL[u.rol]})
-                  </option>
-                ))}
-              </select>
+              />
             )}
             {!creando ? (
               <button className="btn btn--ghost btn--sm" onClick={() => setCreando(true)}>

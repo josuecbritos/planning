@@ -385,6 +385,17 @@ export class SupabaseRepo implements Repo {
     return toUsuario(row)
   }
 
+  async usuariosAgregables(proyectoId: string, _actorId?: string): Promise<Usuario[]> {
+    // #353: la lista la arma la BASE, con la misma condición que la política
+    // `acceso_insert`. Devuelve filas de `usuario_visible`, así que llega con el
+    // mismo enmascarado de siempre — la organización de otro sigue siendo un
+    // dato del administrador (#339) y el navegador no la necesita para esto.
+    // `_actorId` no se usa: acá quien pregunta es el JWT de la sesión.
+    void _actorId
+    const rows = unwrap(await this.db.rpc('usuarios_agregables', { p_proyecto: proyectoId }))
+    return (rows ?? []).map(toUsuario)
+  }
+
   async asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso> {
     const row = unwrap(
       await this.db

@@ -1362,6 +1362,135 @@ async function probarOrganizacion(admin) {
   }
 }
 
+
+/**
+ * #353 — El dueño de un proyecto suma a un colega de su misma organización.
+ *
+ * Es la ACCIÓN para la que servía la visibilidad que abrió #339, y por eso
+ * tiene caso propio con sus dos lados: que el dueño SÍ puede darle acceso a un
+ * consultor de su misma organización, y que NO puede dárselo a uno de otra ni a
+ * uno sin organización.
+ *
+ * Toca las filas de las dos cuentas de consultor —les pone una organización de
+ * prueba— y las RESTITUYE siempre, también si algo falla en el medio, igual que
+ * el caso de #339. El proyecto de prueba lo limpia `limpiarProyectosDePrueba`.
+ */
+async function probarAgregarColega(admin) {
+  const rotulo = 'colega'
+  const emailA = process.env.RLS_CONSULTOR_A_EMAIL
+  const passA = process.env.RLS_CONSULTOR_A_PASS
+  const emailB = process.env.RLS_CONSULTOR_B_EMAIL
+  const passB = process.env.RLS_CONSULTOR_B_PASS
+  if (!emailA || !passA || !emailB || !passB) {
+    console.log('  SKIP  [colega] hacen falta LAS DOS cuentas de consultor para el caso de #353')
+    return
+  }
+
+  const sello = `__prueba_rls_353_${Date.now()}`
+  let idA = null
+  let idB = null
+  let previoA = null
+  let previoB = null
+  let permisosA = null
+  const restituir = async () => {
+    if (idA) await admin.from('usuario').update({ organizacion: previoA }).eq('id', idA)
+    if (idB) await admin.from('usuario').update({ organizacion: previoB }).eq('id', idB)
+    if (idA && permisosA) await admin.from('usuario').update({ permisos_proyecto: permisosA }).eq('id', idA)
+  }
+
+  try {
+    const a = await sesion(emailA, passA)
+    const yoA = await perfilDe(a)
+    const b = await sesion(emailB, passB)
+    const yoB = await perfilDe(b)
+    await b.auth.signOut()
+    if (!yoA || !yoB || yoA.rol !== 'consultor' || yoB.rol !== 'consultor') {
+      marcaNoConcluyente(rotulo, '#353 el dueño suma a un colega de su organización', 'las cuentas A y B no son dos consultores activos')
+      return
+    }
+    idA = yoA.id
+    idB = yoB.id
+
+    const { data: filas } = await admin.from('usuario_visible').select('id, organizacion, permisos_proyecto').in('id', [idA, idB])
+    previoA = (filas ?? []).find((f) => f.id === idA)?.organizacion ?? null
+    previoB = (filas ?? []).find((f) => f.id === idB)?.organizacion ?? null
+    permisosA = (filas ?? []).find((f) => f.id === idA)?.permisos_proyecto ?? null
+
+    // Un proyecto DEL CONSULTOR A: la regla es sobre proyectos propios.
+    const { data: proy, error: errProy } = await a
+      .from('proyecto').insert({ nombre: `${sello}` }).select().single()
+    if (errProy || !proy) {
+      marcaNoConcluyente(rotulo, '#353 el dueño suma a un colega de su organización', `el consultor A no pudo crear un proyecto (${errProy?.message ?? ''})`)
+      return
+    }
+    // Y el permiso puesto. Se anota el valor previo y se restituye.
+    await admin
+      .from('usuario')
+      .update({ permisos_proyecto: { ...(permisosA ?? {}), invitarClientes: true } })
+      .eq('id', idA)
+
+    // (1) Misma organización → SÍ puede.
+    await admin.from('usuario').update({ organizacion: sello }).eq('id', idA)
+    await admin.from('usuario').update({ organizacion: sello }).eq('id', idB)
+    const suma = await a.from('acceso_proyecto').insert({ usuario_id: idB, proyecto_id: proy.id }).select('usuario_id')
+    marca(
+      !bloqueado(suma),
+      rotulo,
+      '#353 el dueño SÍ puede dar acceso a un consultor de su misma organización',
+      suma.error?.message ?? '',
+    )
+    // Y la lista que entrega la base decía lo mismo ANTES de agregarlo.
+    await a.from('acceso_proyecto').delete().eq('usuario_id', idB).eq('proyecto_id', proy.id)
+    const { data: lista, error: errLista } = await a.rpc('usuarios_agregables', { p_proyecto: proy.id })
+    if (errLista) {
+      marcaNoConcluyente(rotulo, '#353 la lista de agregables la entrega la base', `${errLista.code ?? ''} ${errLista.message} — ¿migración 33 aplicada?`)
+    } else {
+      marca(
+        (lista ?? []).some((u) => u.id === idB),
+        rotulo,
+        '#353 la lista de agregables que entrega la base incluye al colega',
+        `${(lista ?? []).length} agregable(s)`,
+      )
+    }
+
+    // (2) Otra organización → NO puede.
+    await admin.from('usuario').update({ organizacion: `${sello}_otra` }).eq('id', idB)
+    const otra = await a.from('acceso_proyecto').insert({ usuario_id: idB, proyecto_id: proy.id }).select('usuario_id')
+    marca(
+      bloqueado(otra),
+      rotulo,
+      '#353 y NO puede dárselo a un consultor de OTRA organización',
+      bloqueado(otra) ? '' : 'lo agregó igual',
+    )
+
+    // (3) Sin organización → tampoco.
+    await admin.from('usuario').update({ organizacion: null }).eq('id', idB)
+    const sinOrg = await a.from('acceso_proyecto').insert({ usuario_id: idB, proyecto_id: proy.id }).select('usuario_id')
+    marca(
+      bloqueado(sinOrg),
+      rotulo,
+      '#353 ni a uno SIN organización',
+      bloqueado(sinOrg) ? '' : 'lo agregó igual',
+    )
+
+    // (4) Criterio 16c: la organización solo vive en consultores.
+    const { data: sobran } = await admin.from('usuario_visible').select('id, rol, organizacion').not('organizacion', 'is', null)
+    const noConsultores = (sobran ?? []).filter((u) => u.rol !== 'consultor')
+    marca(
+      noConsultores.length === 0,
+      rotulo,
+      '#353 ningún usuario que no sea consultor tiene organización guardada',
+      noConsultores.length ? `${noConsultores.length} con organización` : '',
+    )
+
+    await a.auth.signOut()
+  } catch (e) {
+    marcaNoConcluyente(rotulo, '#353 el dueño suma a un colega de su organización', e.message)
+  } finally {
+    await restituir()
+  }
+}
+
 async function probarExecutePublico(admin) {
   const rotulo = 'execute'
   const { data, error } = await admin.from('permiso_ejecucion_abierto').select('funcion, es_security_definer')
@@ -1710,6 +1839,9 @@ async function main() {
 
   // ---------- #339: la organización del usuario ----------
   await probarOrganizacion(admin)
+
+  // ---------- #353: el dueño suma a un colega de su organización ----------
+  await probarAgregarColega(admin)
 
   // ---------- #290: el permiso de ejecución universal quedó cerrado ----------
   await probarExecutePublico(admin)

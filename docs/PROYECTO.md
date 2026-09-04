@@ -104,6 +104,42 @@ dos son consultores y tienen la misma organización**.
 - **El correo no cambia** y la organización se entrega con la misma regla que
   los permisos: al administrador y a cada quien la suya.
 
+**Y el colega se puede sumar a un proyecto (#353).** #339 abrió la visibilidad
+pero **no tocó ninguna de las reglas que gobiernan la acción para la que esa
+visibilidad servía**: las tres políticas de acceso seguían diciendo "solo
+clientes", así que un consultor no notaba ninguna diferencia. Ahora:
+
+- El permiso **"Agregar usuarios a sus proyectos"** —que antes se llamaba
+  "Invitar clientes"— habilita sumar a un proyecto **propio** a un cliente,
+  como hasta hoy, **y a un consultor de la misma organización**. A nadie más:
+  uno de otra organización, o sin organización, no aparece y no se puede
+  agregar. **Quitar sigue la misma regla que agregar.**
+- **"Configurar permisos de los usuarios de sus proyectos"** alcanza a las
+  mismas personas. *Sin eso, un consultor podría sumar a un colega y quedarse
+  sin poder ajustarle nada, teniendo que pedírselo al administrador — que es
+  justo lo que esto viene a evitar.*
+- **La lista de a quién se puede agregar la entrega la base**
+  (`usuarios_agregables`), con la misma condición que la política que autoriza
+  la operación. *Si además el navegador la calculara por su cuenta, la regla
+  quedaría escrita en dos lugares y tarde o temprano se separan.*
+- **La organización solo se ofrece para consultores**, y la base tampoco la
+  acepta en otro perfil. Una que hubiera quedado en un cliente **se borra**:
+  guardada e invisible, cambiar después su perfil a consultor le activaría esa
+  organización sola. Por lo mismo, pasar a alguien a cliente se la quita.
+- **La lista de organizaciones en uso se calcula solo sobre consultores.**
+- El campo **se escribe directo**: al escribir la lista se filtra, y si lo
+  escrito no existe la última opción ofrece **crearlo**. Ya no hay que declarar
+  antes que se va a escribir algo nuevo.
+- En **Administración → Usuarios** hay una **columna Organización**, junto al
+  Rol, del que depende.
+- Los tres desplegables que quedaban del navegador —Organización, Perfil y el de
+  agregar en Miembros— **usan el menú del producto**, el mismo de Filtrar,
+  Ordenar y Vistas: comparten sus declaraciones de estilo, no una copia.
+
+*El nombre del permiso en la BASE no cambia (`invitarClientes`): renombrarlo
+obligaría a reescribir cada fila de permisos sin ganar nada. Lo que cambia es lo
+que dice la pantalla y lo que habilita.*
+
 **"Hoy" es el día de Chile, para la aplicación y para la base (#291).** El
 navegador siempre usó la hora local; la base usaba `current_date`, que en
 Supabase es UTC, así que desde las 20:00 de Chile creía que era el día

@@ -1097,7 +1097,8 @@ table.tareas .col-desv { text-align: center; }
    como la misma pieza, y compartiendo la regla no pueden separarse cuando
    alguna de las dos cambie. Lo único suyo es dónde se ancla, más abajo. */
 .filtro-menu,
-.menu-tarea {
+.menu-tarea,
+.selector-menu {
   min-width: 244px; background: var(--superficie); border: 1px solid var(--gris-borde);
   border-radius: 8px; padding: 8px;
   box-shadow: var(--sombra-flotante);
@@ -1136,17 +1137,20 @@ table.tareas .col-desv { text-align: center; }
 /* #292: la opción del menú del clic derecho comparte la misma regla, por lo
    mismo que el contenedor. */
 .filtro-op,
-.menu-tarea__op {
+.menu-tarea__op,
+.selector-op {
   display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
   font: inherit; font-size: 13px; padding: 8px 10px; border: none; background: none;
   border-radius: 9px; cursor: pointer; color: var(--texto);
   transition: background .1s ease;
 }
 .filtro-op:hover,
-.menu-tarea__op:hover { background: var(--velo); }
+.menu-tarea__op:hover,
+.selector-op:hover { background: var(--velo); }
 .filtro-op:disabled { opacity: .4; cursor: default; }
 .filtro-op:disabled:hover { background: none; }
-.filtro-op--on { background: var(--velo-fuerte); font-weight: 700; }
+.filtro-op--on,
+.selector-op--on { background: var(--velo-fuerte); font-weight: 700; }
 .filtro-op--check input[type='checkbox'] { width: 15px; height: 15px; accent-color: var(--primario); flex: none; cursor: pointer; }
 .filtro-dot { width: 12px; height: 12px; border-radius: 4px; flex: none; }
 /* #305b: en Gantt el filtro de Estado muestra las marcas REALES de la grilla,
@@ -2040,6 +2044,9 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
   .col-estado-adm { width: 112px; }
   .col-mini { width: 92px; }
   .col-rol { width: 116px; }
+  /* #353: pegada al Rol, del que depende. El nombre de una empresa puede ser
+     largo, así que se corta con "…" en vez de ensanchar la tabla. */
+  .col-org { width: 150px; }
   .col-dueno { width: 160px; }
   .col-email { width: 230px; }
 }
@@ -2704,6 +2711,7 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .usuarios-tabla td:first-child { width: 170px; min-width: 170px; max-width: 170px; }
   .usuarios-tabla .col-email { width: 170px; }
   .usuarios-tabla .col-rol { width: 96px; }
+  .usuarios-tabla .col-org { width: 120px; }
   .usuarios-tabla .col-estado-adm { width: 92px; }
   .usuarios-tabla .col-dueno { width: 130px; }
   .usuarios-tabla .col-mini { width: 76px; }
@@ -3044,3 +3052,39 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   table.tareas--drop { outline: 2px solid var(--naranja); outline-offset: -2px; }
   .gantt tr.gfila--drop-vacio td.fija--tarea { box-shadow: inset 0 0 0 2px var(--naranja); }
 }
+
+td.col-org { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- #353 · el desplegable del producto ---------- */
+/* Los tres `<select>` nativos que quedaban vivían en modales, junto a controles
+   que sí llevan el estilo de la aplicación: se veían como una pieza ajena, con
+   el fondo y la tipografía del sistema. El menú es el MISMO que ya usan
+   Filtrar, Ordenar y Vistas — se comparten las declaraciones en vez de
+   copiarlas, que es lo único que impide que se separen (#292). */
+.selector-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; box-sizing: border-box;
+  background: var(--superficie); border: 1px solid var(--gris-borde); border-radius: 8px;
+  padding: 7px 10px; font: inherit; font-size: 13px; color: var(--texto);
+  text-align: left; cursor: pointer;
+}
+.selector-btn:hover { border-color: var(--borde-input); }
+.selector-btn--abierto { border-color: var(--primario); }
+.selector-btn:disabled { cursor: default; opacity: .6; }
+.selector-btn__txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selector-btn__txt--vacio { color: var(--gris-texto); }
+.selector-btn__caret { color: var(--gris-texto); font-size: 10px; flex: none; }
+/* El menú comparte las declaraciones del de la barra: mismo fondo, mismo
+   borde, misma sombra y la misma entrada. */
+.selector-menu { z-index: 2400; overflow-y: auto; }
+.selector-op--separada { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--gris-linea); }
+.selector-op--crear { font-weight: 600; }
+.selector-vacio { margin: 0; padding: 6px 10px; font-size: 12.5px; color: var(--gris-texto); }
+/* El campo de Organización: se escribe encima, y la lista es el mismo menú. */
+.combo-org { position: relative; }
+.combo-org__campo {
+  width: 100%; box-sizing: border-box;
+  background: var(--superficie); border: 1px solid var(--gris-borde); border-radius: 8px;
+  padding: 7px 10px; font: inherit; font-size: 13px; color: var(--texto);
+}
+.combo-org__campo:focus { outline: none; border-color: var(--primario); }

@@ -96,6 +96,8 @@ export interface Actions {
   cambiarRolUsuario: (id: string, rol: Rol) => Promise<boolean>
   /** #136: eliminar = desactivar + invisible (no hard delete). */
   eliminarUsuario: (id: string) => Promise<boolean>
+  /** #353: la lista de agregables la entrega la base, no la pantalla. */
+  usuariosAgregables: (proyectoId: string) => Promise<Usuario[]>
   asignarAcceso: (usuarioId: string, proyectoId: string) => Promise<boolean>
   quitarAcceso: (usuarioId: string, proyectoId: string) => Promise<boolean>
   /** Configura el set de ocho DE UN ACCESO (usuario × proyecto). */
@@ -928,6 +930,7 @@ export default function App({ repo }: { repo: Repo }) {
           // como miembro de proyectos de los que ya no lo es.
           return (s) => apply.removeUsuario(s, id)
         }),
+      usuariosAgregables: (proyectoId) => repo.usuariosAgregables(proyectoId, sesion?.id),
       asignarAcceso: (usuarioId, proyectoId) =>
         run(async () => {
           const a = await repo.asignarAcceso(usuarioId, proyectoId)
