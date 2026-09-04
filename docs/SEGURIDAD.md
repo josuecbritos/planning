@@ -310,6 +310,44 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   permiso universal, sin depender de que nadie intente explotarlo. Si la vista
   no existe, la corrida se declara NO CONCLUYENTE (#295), no aprobada.
 
+### #339 — Organización del usuario (migración 32)
+
+- **Columna nueva `usuario.organizacion`**, opcional y vacía en todos los
+  existentes. **No se agrega al grant por columnas de la tabla** (invariante 3):
+  se lee por `usuario_visible`, igual que `email`, y con la misma regla que
+  `permisos_proyecto` — al administrador y a cada quien la suya.
+- **Un caso más en la regla de visibilidad**, escrito en los DOS lugares donde
+  vive (la política `usuario_select` y el `where` de `usuario_visible`): dos
+  usuarios se ven si los **dos** son consultores y tienen la **misma**
+  organización. Solo consultores; sin organización no cambia nada; dos vacíos no
+  se juntan (`organizacion is not null` explícito además de la igualdad).
+  **Verse no da acceso a nada:** la migración no toca ninguna política que no sea
+  la de `usuario`.
+- **La organización entra en el candado de auto-edición.** `usuario_update` deja
+  que uno toque SU fila y el trigger `validar_autoedicion_usuario` enumera qué
+  no puede tocar: sin sumarla ahí, cualquiera podría ponerse una organización y
+  ganar visibilidad sobre los consultores de esa empresa. Está junto al rol y a
+  los permisos, y por la misma razón.
+- **Normalización en la base** (`normalizar_organizacion`): sin espacios al
+  borde, vacío = NULL. La pantalla ofrece un desplegable, pero la garantía no
+  puede depender de la pantalla.
+- **Trampa reincidente, ya conocida (#290): una función NUEVA nace con EXECUTE
+  para PUBLIC**, y `revoke ... from anon` **no la cierra** —anon lo conserva por
+  la vía de PUBLIC—. Medido al implementar esta migración: sin el
+  `revoke ... from public`, `permiso_ejecucion_abierto` devolvía las dos
+  funciones nuevas. **Toda migración que cree una función tiene que revocar a
+  PUBLIC**, y esta se auto-comprueba en la misma transacción.
+- **`regla_visibilidad_usuario`**: vista que entrega UN booleano —si la política
+  y la vista dicen lo mismo—, para que la compuerta lo verifique contra lo que la
+  base tiene vivo. Mismo patrón que `permiso_ejecucion_abierto` (#290), y por la
+  misma razón: la compuerta habla por REST y no puede leer el catálogo. Entrega
+  el veredicto y no los textos.
+- **Verificación local sin producción:** `docs/prueba-339-organizacion-base.mjs`
+  levanta un PostgreSQL, replica el andamiaje de Supabase, aplica las migraciones
+  del repo en orden y comprueba la regla entrando como cada usuario. Es la única
+  forma de comprobar quién ve a quién: el repo de memoria devuelve todos los
+  usuarios a todo el mundo.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.
@@ -340,6 +378,8 @@ reintroduce un hallazgo de la auditoría.
    pedir de vuelta la fila que acaba de marcar `eliminado`** — `eliminarUsuario`
    comprueba el efecto releyendo `usuario_visible`. La compuerta trae un caso
    nuevo que compara tabla contra vista, rol por rol.
+   #339 suma `organizacion` a la vista con la regla de `permisos_proyecto`, y
+   **no** al grant por columnas de la tabla.
    La app (`supabaseRepo`, `supabaseAuth`) y la compuerta (`perfilDe` y la
    consulta base del admin) ya usan la vista. El alta que reactiva a un
    `eliminado` (por correo, invisible para el cliente) va por el RPC

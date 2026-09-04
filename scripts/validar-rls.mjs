@@ -14,6 +14,11 @@
 //   RLS_CLIENTE_EMAIL=... RLS_CLIENTE_PASS=... \
 //   node scripts/validar-rls.mjs
 //
+// #339: el caso de la organización necesita LAS DOS cuentas de consultor y
+// toca sus filas —les pone una organización de prueba y las restituye—. Si
+// falta alguna, ese caso se salta con aviso; si las dos ya se ven porque
+// comparten un proyecto, se marca NO CONCLUYENTE en vez de aprobar de casualidad.
+//
 // El admin es obligatorio (es la línea base: ve todo). Los demás roles son
 // opcionales: los que falten se omiten con aviso. Para probar el modelo
 // completo, crear en Usuarios: un consultor A (con proyecto propio), un
@@ -1194,6 +1199,169 @@ async function probarEliminarCorta(admin) {
   }
 }
 
+/**
+ * #339 — Organización del usuario.
+ *
+ * Dos partes. La primera se puede comprobar siempre: que la regla de
+ * visibilidad diga LO MISMO en los dos lugares donde está escrita (la política
+ * de lectura de `usuario` y la vista `usuario_visible`). La compuerta habla por
+ * la API REST y no puede leer el catálogo, así que la migración 32 deja una
+ * vista —`regla_visibilidad_usuario`— que entrega solo el veredicto.
+ *
+ * La segunda es de comportamiento: dos consultores de la misma organización se
+ * ven aunque no compartan proyecto. Necesita las dos cuentas de consultor y
+ * TOCA DATOS REALES, así que se hace con cuidado: se anota lo que tenían, se
+ * les pone una organización de prueba, se mide, y se restituye SIEMPRE —también
+ * si algo falla en el medio—.
+ *
+ * Y necesita un control de vida al revés que los demás (#295): si esos dos
+ * consultores YA se ven —porque comparten un proyecto—, el caso no demuestra
+ * nada y se marca NO CONCLUYENTE en vez de aprobar por casualidad.
+ */
+async function probarOrganizacion(admin) {
+  const rotulo = 'organización'
+
+  // ---- Criterio 12: la regla dice lo mismo en los dos lugares ----
+  const { data: regla, error: errRegla } = await admin
+    .from('regla_visibilidad_usuario')
+    .select('coinciden')
+    .maybeSingle()
+  if (errRegla) {
+    marcaNoConcluyente(
+      rotulo,
+      '#339 la regla de visibilidad dice lo mismo en la política y en la vista',
+      `no se pudo leer regla_visibilidad_usuario (${errRegla.code ?? ''} ${errRegla.message}) — ¿migración 32 aplicada?`,
+    )
+  } else {
+    marca(
+      regla?.coinciden === true,
+      rotulo,
+      '#339 la regla de visibilidad dice lo mismo en la política y en la vista',
+      regla?.coinciden === true ? '' : 'la política y la vista divergieron',
+    )
+  }
+
+  // ---- La columna llega por la vista, y solo por ella ----
+  const { error: errCol } = await admin.from('usuario_visible').select('id, organizacion').limit(1)
+  marca(!errCol, rotulo, '#339 `organizacion` se lee por `usuario_visible`', errCol?.message ?? '')
+  const { error: errTabla } = await admin.from('usuario').select('organizacion').limit(1)
+  marca(
+    !!errTabla,
+    rotulo,
+    '#339 y NO por la tabla `usuario` (invariante 3, igual que `email`)',
+    errTabla ? '' : 'la tabla la devolvió: el grant por columnas se amplió sin querer',
+  )
+
+  // ---- El comportamiento, con las dos cuentas de consultor ----
+  const emailA = process.env.RLS_CONSULTOR_A_EMAIL
+  const passA = process.env.RLS_CONSULTOR_A_PASS
+  const emailB = process.env.RLS_CONSULTOR_B_EMAIL
+  const passB = process.env.RLS_CONSULTOR_B_PASS
+  if (!emailA || !passA || !emailB || !passB) {
+    console.log('  SKIP  [organización] hacen falta LAS DOS cuentas de consultor para el caso de #339')
+    return
+  }
+
+  const sello = `__prueba_rls_339_${Date.now()}`
+  let previoA = null
+  let previoB = null
+  let idA = null
+  let idB = null
+  const restituir = async () => {
+    if (idA) await admin.from('usuario').update({ organizacion: previoA }).eq('id', idA)
+    if (idB) await admin.from('usuario').update({ organizacion: previoB }).eq('id', idB)
+  }
+
+  try {
+    const a = await sesion(emailA, passA)
+    const b = await sesion(emailB, passB)
+    const yoA = await perfilDe(a)
+    const yoB = await perfilDe(b)
+    if (!yoA || !yoB || yoA.rol !== 'consultor' || yoB.rol !== 'consultor') {
+      marcaNoConcluyente(rotulo, '#339 dos consultores de la misma organización se ven', 'las cuentas A y B no son dos consultores activos')
+      return
+    }
+    idA = yoA.id
+    idB = yoB.id
+
+    // Control de vida AL REVÉS: si ya se ven, el caso no puede demostrar nada.
+    const { data: antes } = await a.from('usuario_visible').select('id').eq('id', idB)
+    if ((antes ?? []).length > 0) {
+      marcaNoConcluyente(
+        rotulo,
+        '#339 dos consultores de la misma organización se ven',
+        'A ya ve a B sin organización (comparten proyecto): el caso no demostraría nada',
+      )
+      return
+    }
+
+    const { data: filas } = await admin.from('usuario_visible').select('id, organizacion').in('id', [idA, idB])
+    previoA = (filas ?? []).find((f) => f.id === idA)?.organizacion ?? null
+    previoB = (filas ?? []).find((f) => f.id === idB)?.organizacion ?? null
+
+    // Misma organización → se ven.
+    await admin.from('usuario').update({ organizacion: sello }).eq('id', idA)
+    await admin.from('usuario').update({ organizacion: sello }).eq('id', idB)
+    const { data: conMisma } = await a.from('usuario_visible').select('id').eq('id', idB)
+    marca(
+      (conMisma ?? []).length === 1,
+      rotulo,
+      '#339 dos consultores de la misma organización se ven, sin compartir proyecto',
+      (conMisma ?? []).length === 1 ? '' : 'no se vieron',
+    )
+
+    // Distinta organización → dejan de verse.
+    await admin.from('usuario').update({ organizacion: `${sello}_otra` }).eq('id', idB)
+    const { data: conDistinta } = await a.from('usuario_visible').select('id').eq('id', idB)
+    marca(
+      (conDistinta ?? []).length === 0,
+      rotulo,
+      '#339 y al cambiarle la organización a uno, dejan de verse',
+      (conDistinta ?? []).length === 0 ? '' : 'siguieron viéndose',
+    )
+
+    // Verse no da acceso a NADA: los proyectos siguen protegidos por membresía.
+    await admin.from('usuario').update({ organizacion: sello }).eq('id', idB)
+    const { data: proyDeB } = await admin.from('proyecto').select('id').eq('creado_por', idB).limit(1)
+    if (proyDeB?.length) {
+      const { data: loVe } = await a.from('proyecto').select('id').eq('id', proyDeB[0].id)
+      marca(
+        (loVe ?? []).length === 0,
+        rotulo,
+        '#339 verse por organización NO da acceso a los proyectos del otro',
+        (loVe ?? []).length === 0 ? '' : 'vio un proyecto ajeno',
+      )
+    }
+
+    // Sin organización, nada cambia: dos vacíos no se juntan.
+    await admin.from('usuario').update({ organizacion: null }).eq('id', idA)
+    await admin.from('usuario').update({ organizacion: null }).eq('id', idB)
+    const { data: sinNada } = await a.from('usuario_visible').select('id').eq('id', idB)
+    marca(
+      (sinNada ?? []).length === 0,
+      rotulo,
+      '#339 dos consultores SIN organización siguen sin verse',
+      (sinNada ?? []).length === 0 ? '' : 'se vieron estando los dos vacíos',
+    )
+
+    // Y un no administrador no puede tocar la suya.
+    const intento = await a.from('usuario').update({ organizacion: sello }).eq('id', idA).select('id')
+    marca(
+      bloqueado(intento),
+      rotulo,
+      '#339 un consultor no puede cambiar NI SU PROPIA organización',
+      bloqueado(intento) ? '' : 'pudo cambiarla: se ganaría visibilidad a voluntad',
+    )
+
+    await a.auth.signOut()
+    await b.auth.signOut()
+  } catch (e) {
+    marcaNoConcluyente(rotulo, '#339 dos consultores de la misma organización se ven', e.message)
+  } finally {
+    await restituir()
+  }
+}
+
 async function probarExecutePublico(admin) {
   const rotulo = 'execute'
   const { data, error } = await admin.from('permiso_ejecucion_abierto').select('funcion, es_security_definer')
@@ -1539,6 +1707,9 @@ async function main() {
 
   // ---------- #301: eliminar suelta accesos e identidad ----------
   await probarEliminarCorta(admin)
+
+  // ---------- #339: la organización del usuario ----------
+  await probarOrganizacion(admin)
 
   // ---------- #290: el permiso de ejecución universal quedó cerrado ----------
   await probarExecutePublico(admin)

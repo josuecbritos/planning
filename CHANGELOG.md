@@ -3717,3 +3717,130 @@ celda de **36**, desbordando **22**.
 
 `docs/prueba-343-344-345-347.mjs` se actualizó al contrato nuevo de #347 —los dos
 textos y el orden— y sigue en **54 comprobaciones en verde**.
+
+### #339 — Organización del usuario
+
+**Toca la base: una columna nueva y un caso más en la regla de visibilidad.**
+Lleva migración (la **32**), y por lo tanto **respaldo previo del dueño** y la
+compuerta de permisos en verde antes de cerrar.
+
+#### El problema
+
+Un usuario veía a otro si compartía un proyecto con él, si él mismo era
+administrador o si el otro lo era. Nada más. **Consecuencia:** dos consultores
+de la misma consultora que no comparten ningún proyecto **no se ven entre sí**,
+así que ninguno puede agregar al otro a un proyecto nuevo y hay que pasar por el
+administrador. Y no había ningún campo que dijera a qué empresa pertenece una
+persona.
+
+#### Lo que se hizo
+
+**El usuario gana un campo Organización**, opcional y vacío en todos los
+existentes: el pedido no asigna ninguna a nadie, se van llenando caso a caso
+desde la pantalla de administración.
+
+**Se elige de una lista, no se escribe suelto.** Un desplegable con las
+organizaciones que ya están en uso, más "Escribir una nueva…". *No hay pantalla
+de administración de organizaciones: la lista se calcula de los usuarios, así que
+se llena sola al asignar gente y una organización que se queda sin nadie deja de
+aparecer, sin que nadie tenga que borrarla.* La normalización —recortar espacios,
+vacío = sin organización— vive **en la base** (`normalizar_organizacion`) y no
+solo en la pantalla: escrita a mano, "Andotek" y "Andotek " serían dos
+organizaciones distintas y dos personas de la misma empresa no se verían entre sí
+sin nada en pantalla que lo explique. El desplegable evita el caso normal; el
+trigger lo cierra para cualquier camino de escritura.
+
+**A la regla de visibilidad se le suma un caso:** dos usuarios se ven si los
+**dos** son consultores y tienen la **misma** organización.
+
+- **Solo consultores.** Un cliente con la misma organización que un consultor no
+  gana nada.
+- **Sin organización no cambia nada,** y dos usuarios sin organización **no se
+  ven** por estar los dos vacíos.
+- **Verse no da acceso a nada:** los proyectos y las tareas siguen protegidos por
+  membresía. La migración no toca ninguna política que no sea la de `usuario`.
+- **La regla vive en dos lugares** y los dos quedan diciendo lo mismo.
+
+**Quién puede asignarla:** solo quien ya puede configurar usuarios. Y el candado
+no es la pantalla: **la organización entra en la lista de columnas que el trigger
+de auto-edición prohíbe tocar en la propia fila**, junto al rol y los permisos.
+*Sin eso, cualquiera podría ponerse "Andotek" y pasar a ver a todos los
+consultores de Andotek: la política de actualización deja que uno toque SU fila.*
+
+**La organización se entrega con la misma regla que los permisos** —al
+administrador y a cada quien la suya—, y no se agrega a las columnas que la tabla
+`usuario` le concede al cliente: se lee por `usuario_visible`, como `email`.
+
+#### Dos hallazgos de la implementación
+
+**1 · Las funciones nuevas nacen abiertas a PUBLIC.** Es exactamente la trampa
+que cerró #290, y vuelve a aparecer **con cada función nueva**: un
+`revoke ... from anon` no la cierra, porque anon conserva el permiso por la vía
+de PUBLIC. *Medido: sin el `revoke ... from public`, la vista
+`permiso_ejecucion_abierto` devolvía las dos funciones nuevas y
+`has_function_privilege('anon', 'misma_organizacion(uuid)', 'execute')` daba
+cierto.* La migración ahora revoca a PUBLIC primero y **se auto-comprueba en la
+misma transacción**: si algo queda abierto, falla en vez de dejar el agujero.
+
+**2 · La visibilidad no se puede comprobar desde la interfaz.** El repo de
+memoria —el que usa la demo y todas las pruebas de Playwright— devuelve **todos**
+los usuarios a todo el mundo: la regla vive solo en la base. Pedirle a una prueba
+de pantalla que compruebe los criterios 3 a 7 habría sido comprobar nada. Por eso
+esta solicitud trae **dos** pruebas y no una.
+
+#### Verificación
+
+**`docs/prueba-339-organizacion-base.mjs` — 29 comprobaciones en verde.** Levanta
+un PostgreSQL local, le pone el andamiaje mínimo de Supabase —los roles de la
+API, el esquema `auth` con `auth.uid()` y los permisos por defecto que Supabase
+concede—, **aplica las 32 migraciones del repo en orden** y después interroga la
+regla entrando como cada usuario. No toca producción ni necesita credenciales.
+
+Comprueba, con un escenario donde **nadie comparte proyecto con nadie**: que dos
+consultores de la misma organización se ven; que no ven al de otra organización
+ni a los que no tienen; que dos sin organización siguen sin verse; que un cliente
+con la misma organización no gana nada; que al cambiarle la organización a uno
+dejan de verse y al devolvérsela vuelven; que verse **no** da acceso a los
+proyectos ni a las tareas del otro (con su dueño como control de vida); que el
+correo mantiene su regla; que un no administrador no puede cambiar **ni su
+propia** organización y que el administrador sí; la normalización; que la tabla
+no le abre `organizacion` ni `email` a `authenticated`; que `anon` no puede
+ejecutar el predicado nuevo; y que ninguna función quedó con el permiso
+universal.
+
+Y el criterio 12 **dos veces**: la comparación estricta —volviendo a deparsar la
+expresión de la política dentro de una vista, para que el mismo código de
+PostgreSQL escriba las dos y la igualdad no dependa de los paréntesis— y la vista
+que mira la compuerta.
+
+*Control negativo:* la misma prueba sin la migración 32, **17 comprobaciones
+fallan** — entre ellas, C1 no ve a nadie y la regla no incluye el caso nuevo.
+
+**`docs/prueba-339-organizacion.mjs` — 26 comprobaciones en verde.** La parte de
+pantalla: que el campo aparece al crear y al editar con el desplegable vacío la
+primera vez; que "Escribir una nueva…" abre el campo de texto y lo escrito queda
+disponible para el resto; que la guardada vuelve elegida y no se duplica; que
+"  Andotek  " no crea una segunda organización; que al quitársela al último que
+la tenía deja de aparecer (con la que sí tiene gente como control de vida); que
+un no administrador **no ve el campo**; y que los correos se siguen mostrando
+igual.
+
+*Control negativo:* contra `main`, **12 comprobaciones fallan**.
+
+**`scripts/validar-rls.mjs`** suma el caso de #339 para la corrida contra
+producción: la regla que dice lo mismo en los dos lugares, que `organizacion` se
+lee por la vista y **no** por la tabla, y el comportamiento con las dos cuentas de
+consultor —misma organización se ven, distinta dejan de verse, verse no abre sus
+proyectos, sin organización no se ven, y un consultor no puede cambiar ni la
+suya—. Toca datos reales, así que anota lo que había y **restituye siempre**,
+también si algo falla en el medio. Y lleva un control de vida al revés (#295): si
+esos dos consultores **ya** se ven porque comparten proyecto, el caso se marca
+**no concluyente** en vez de aprobar por casualidad.
+
+#### Para cerrar la solicitud
+
+1. **Respaldo del dueño** (`pg_dump`) — el plan gratuito no tiene respaldos
+   automáticos.
+2. Aplicar la migración `20260707000032_organizacion_usuario.sql`.
+3. Correr `scripts/validar-rls.mjs` contra producción, con las dos cuentas de
+   consultor, y verla en verde (criterio 11).

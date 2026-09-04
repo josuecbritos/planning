@@ -60,6 +60,15 @@ export interface Usuario {
   /** Permisos de nivel proyecto (solo rol consultor; 3.1). */
   permisosProyecto?: PermisosProyecto
   /**
+   * #339: empresa a la que pertenece la persona. Opcional y vacía en todos los
+   * usuarios existentes. Dos CONSULTORES con la misma organización se ven entre
+   * sí aunque no compartan ningún proyecto — la regla vive en la base, en la
+   * política de lectura de `usuario` y en la vista `usuario_visible`, no acá.
+   * La vista la entrega con la misma regla que `permisosProyecto`: al
+   * administrador y a cada quien la suya.
+   */
+  organizacion?: string
+  /**
    * #136: tercer nivel de baja = desactivado + invisible. Un eliminado no
    * entra ni aparece en la UI (la vista usuario_visible lo filtra); su fila e
    * historial quedan intactos. Reactivable dando de alta el mismo correo.

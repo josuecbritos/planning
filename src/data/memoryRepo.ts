@@ -4,7 +4,7 @@ import { hoyISO } from '../lib/dates'
 import { idsMencionados } from '../lib/menciones'
 import { DEFAULT_PERMISOS_PROYECTO, defaultPermisosTareas } from '../lib/permisos'
 import { initialState, proyectoConsultor } from './seed'
-import { derivarIniciales } from './repo'
+import { derivarIniciales, normalizarOrganizacion } from './repo'
 import type {
   NuevaTarea,
   NuevoFrente,
@@ -357,6 +357,7 @@ export class MemoryRepo implements Repo {
       existente.nombre = input.nombre
       existente.iniciales = iniciales
       existente.inicialesManual = manual
+      existente.organizacion = normalizarOrganizacion(input.organizacion) // #339
       this.persist()
       return clone(existente)
     }
@@ -370,6 +371,7 @@ export class MemoryRepo implements Repo {
       activo: true,
       // Defaults por rol (4): el consultor nace con sus permisos de proyecto.
       permisosProyecto: input.rol === 'consultor' ? { ...DEFAULT_PERMISOS_PROYECTO } : undefined,
+      organizacion: normalizarOrganizacion(input.organizacion), // #339
     }
     this.state.usuarios.push(u)
     this.persist()
@@ -389,6 +391,10 @@ export class MemoryRepo implements Repo {
       if (patch.inicialesManual !== false) u.inicialesManual = true
     }
     if (!u.inicialesManual) u.iniciales = derivarIniciales(u.nombre)
+    // #339: espejo del trigger `normalizar_organizacion`. Sin esto, "Andotek" y
+    // "Andotek " serían dos organizaciones distintas y dos personas de la misma
+    // empresa no se verían entre sí sin nada en pantalla que lo explique.
+    if ('organizacion' in patch) u.organizacion = normalizarOrganizacion(patch.organizacion)
     this.persist()
     return clone(u)
   }
