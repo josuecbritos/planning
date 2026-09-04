@@ -542,6 +542,17 @@ títulos que separan **grupos dentro de un mismo menú** —"Aplicado" en Filtra
   **Estado sigue la misma regla que los contadores**: las marcas reales de la
   grilla cuando se está en Gantt, los puntos de color cuando se está en tabla —
   dos representaciones del mismo modelo a la vez es justo lo que se eliminó.
+  Bajo las cinco casillas hay **dos líneas de atajo**: "Seleccionar todos" y,
+  desde #347, **"Todas menos hechas"** — la consulta más frecuente, que se podía
+  desde siempre marcando cuatro casillas a mano. **No es una sexta categoría:**
+  escribe exactamente los mismos cuatro estados que se marcarían a mano, la
+  ficha dice "Estado: 4", su × los borra y una vista guardada con eso guarda
+  cuatro estados, no un modo nuevo. Cuando esas cuatro ya están puestas, la
+  línea pasa a **"Quitar todas menos hechas"** y tocarla deja el campo vacío,
+  igual que "Seleccionar todos" cuando ya está todo marcado. *Se descartó un
+  botón de "invertir la selección": el mercado siempre lo resuelve como un atajo
+  con nombre propio —Asana con "Incomplete tasks", Linear con un interruptor de
+  esconder las completadas— y no como una operación sobre lo ya marcado.*
 - **Ordenar** conserva su menú íntegro y suma contador y **×**, que reemplaza al
   "Limpiar orden" que estaba suelto en la barra. Los campos son **Responsable ·
   Estado · Fecha Objetivo · Atraso**, y **Proyecto** solo en Mis Tareas. Se
@@ -658,6 +669,25 @@ que no tienen fecha. Las opciones que no son una ventana temporal —"Sin fecha"
 "Con fecha"— filtran sin tocar el horizonte, y "En horizonte visible" va al
 revés: deriva su rango del horizonte en vez de definirlo.
 
+**La franja de la semana no puede ensanchar la columna (#345).** La banda
+superior del encabezado agrupa los días por semana y mostraba **el rango
+completo** —"31 ago – 4 sep"— aunque de esa semana se viera un solo día; ese
+texto no se corta ni se parte, así que era **él** el que imponía el ancho de la
+columna y los días se estiraban. *Medido en `main`: un día mide 30, pero con un
+rango fijo de dos días la columna pasaba a **52** y con un solo día visible a
+**97**.* La regla que lo cierra es una sola frase: **cuando el rango completo no
+cabe en el ancho de sus días visibles, esa franja muestra solo el mes de su
+primer día visible** ("oct"); cuando cabe, no cambia nada. Se decide **semana por
+semana**, así que en un mismo horizonte una semana completa conserva su rango
+mientras la de al lado, con dos días, muestra el mes. La franja no desaparece ni
+cambia de alto, y **ni siquiera el mes puede ensanchar la columna**: ahí manda
+siempre el ancho de los días. *Se mide en lugar de estimarse —el ancho del texto
+depende de la fuente y del zoom— y se mide contra una **regla** que lleva siempre
+el rango completo y vive fuera del flujo, para que la medición no dependa de lo
+que se esté mostrando y decidir no se persiga a sí mismo.* Vale igual en la Gantt
+de un proyecto y en la de Mis Tareas: es el mismo componente. **El horizonte no
+cambia**: lo sigue definiendo el filtro de fecha tal como quedó en #250.
+
 **"En horizonte visible" dejó de ser la excepción (#336).** Mostraba las tareas
 con fecha dentro del horizonte **más todas las que no tienen fecha** — era el
 único filtro de fecha que sumaba una categoría aparte; "Hoy", "Esta semana",
@@ -757,6 +787,16 @@ como variables (`--filtros-h` y `--sf-titulo-h`), porque dependen de la fuente y
 del zoom. Donde no hay título de sub frente —la Gantt, Mis Tareas— la variable
 queda suelta y vale 0, así que los encabezados se congelan justo debajo de la
 barra como siempre.
+**Y por sus esquinas no asoma nada (#343).** El título lleva las dos esquinas de
+arriba redondeadas, y esas dos muescas quedaban **transparentes**: quieto no se
+notaba —detrás está el fondo de la pantalla—, pero congelado desfilaban las filas
+por ahí y cada fila de color asomaba una franjita. *Medido: con el título
+congelado el pixel de la esquina daba 240,228,247 con una fila morada detrás,
+255,246,224 con una ámbar y 253,236,234 con una roja, contra los 236,236,238 del
+propio título.* Ahora las dos muescas llevan **el mismo fondo que hay detrás
+cuando el título no está congelado**, así que los dos se ven idénticos. No cambia
+el redondeo, ni el color, ni el borde, ni el alto de la franja: el relleno es
+exterior a la caja y deja intacto todo lo que el título ya pintaba.
 **Costo aceptado y declarado:** al bajar hay tres franjas fijas en vez de dos, así
 que la parte visible de la lista se acorta el alto del título — **medido: 45**, no
 los ~34 estimados, porque el chevron de plegar levanta la línea. *Se evaluó fundir
@@ -825,6 +865,23 @@ cuatro puntos donde se edita fecha (fila de tabla, fila de creación, Mis Tareas
 y panel de detalle), se monta como popover que sigue a su celda al hacer scroll
 y no roba el foco (en la fila de creación, elegir día devuelve el foco al
 título, como siempre).
+**Y muestra siempre seis semanas de corrida (#344).** Dibujaba solo los días del
+mes visible: las casillas de la primera semana que pertenecen al mes anterior
+quedaban vacías y la última se cortaba donde terminaba el mes. Para tomar un día
+que estaba a dos o tres de distancia pero al otro lado del cambio de mes había
+que navegar, aunque esa semana ya estuviera medio en pantalla; y el calendario
+**cambiaba de alto** entre un mes de cinco filas y uno de seis. Ahora la grilla
+arranca en el **lunes de la semana en que cae el día 1** y son siempre seis
+semanas: las casillas que sobran al principio y al final se llenan con los días
+del mes vecino, **en gris más claro**, y **se eligen igual que cualquier otro
+día** — un clic asigna y cierra. La marca de "hoy" se dibuja también cuando hoy
+cae en uno de ellos. *Seis semanas son 42 casillas y un mes ocupa 37 como máximo
+—31 días empezando domingo—, así que siempre quedan a la vista al menos cinco
+días del mes siguiente. Se descartó mostrar siete: no lo hace nadie y sube el
+alto sin necesidad.* **No cambia** la regla central de #262 —navegar solo cambia
+lo que se ve— ni el botón "Hoy" del pie (#285). *De paso, el alto de referencia
+con que el calendario decide si abrirse hacia abajo o hacia arriba volvió a ser
+exacto: dejó de depender del mes y pasó de 330 a los **259** medidos.*
 
 **La fila de creación (#256/#259).** La fecha se pone con el botón
 **"Planificar"**, la misma pieza que en una tarea sin fecha: planificar tiene

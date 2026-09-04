@@ -477,6 +477,34 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
      encabezados, que al terminar el bloque se le pasan por debajo. */
   position: sticky; top: var(--filtros-h, 0); z-index: 11;
 }
+/* #343 — Las dos muescas que deja el redondeo superior quedaban TRANSPARENTES:
+   el fondo del título se recorta contra la caja redondeada, así que en esos dos
+   cuadraditos de 8x8 se veía lo que hubiera detrás. Quieto no se nota —detrás
+   está el fondo de la pantalla—, pero congelado desfilan las filas por ahí y
+   cada fila de color asoma una franjita. Medido en `main`: con el título
+   congelado el pixel (1,1) de la esquina daba 240,228,247 (morada),
+   255,246,224 (ámbar) y 253,236,234 (roja), contra los 236,236,238 del propio
+   título.
+   Se rellenan las dos muescas con el MISMO fondo que hay detrás cuando el
+   título no está congelado (`--fondo`, el de `.content`), así que el título
+   congelado y el que todavía no llegó al tope se ven idénticos. No se toca ni
+   el redondeo, ni el color, ni el borde, ni el alto: la capa es exterior a la
+   caja y deja intacto todo lo que el título ya pintaba.
+   Va como pseudo-elemento y no como borde/sombra: un `box-shadow` con extensión
+   pintaría también un anillo abajo, sobre las primeras filas de la tabla. Cada
+   degradado es un círculo del radio del redondeo anclado al vértice interior de
+   su esquina: transparente hasta 8px —exactamente la silueta de la caja, que no
+   se retoca— y opaco desde ahí. */
+.subfrente__titulo::before {
+  content: '';
+  position: absolute;
+  /* -1px: la muesca se mide contra la caja de BORDE, no contra la de relleno. */
+  inset: -1px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 100% 100%, transparent 8px, var(--fondo) 8.6px) left top / 8px 8px no-repeat,
+    radial-gradient(circle at 0 100%, transparent 8px, var(--fondo) 8.6px) right top / 8px 8px no-repeat;
+}
 .subfrente__count { font-weight: 400; color: var(--gris-texto); font-size: 12px; }
 
 /* border-collapse: separate para que los encabezados sticky conserven sus
@@ -688,6 +716,15 @@ table.tareas .col-desv { text-align: center; }
   padding: 4px 0; border-radius: 6px;
 }
 .fecha-cal__dia:hover { background: var(--gris-linea); }
+/* #344: los días del mes vecino se distinguen por el color del NÚMERO —el mismo
+   gris apagado que ya usan los nombres de los días de la semana en esta misma
+   grilla—, no por una casilla distinta: se eligen igual que cualquier otro día
+   y por eso conservan la caja, el hover y las marcas de hoy y de elegido.
+   Se atenúa el color y no la opacidad de la casilla entera: con `opacity` el
+   anillo de "hoy" también se apagaba, y el pedido pide justo lo contrario —que
+   la marca se dibuje siempre, también cuando hoy cae en un día vecino. La regla
+   de "elegido" va después y le gana el color, como debe. */
+.fecha-cal__dia--fuera { color: var(--gris-texto); }
 .fecha-cal__dia--sel { background: var(--primario); color: var(--sobre-primario); font-weight: 700; }
 .fecha-cal__dia--sel:hover { background: var(--primario); }
 /* #285: hoy SIEMPRE marcado — borde sin relleno (anillo interior, no corre el
@@ -1470,7 +1507,17 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 
 .gantt th.dia { min-width: 30px; width: 30px; padding: 2px; font-weight: 600; line-height: 1.25; }
 .gantt th.dia small { display: block; font-size: 9.5px; color: #90a0ad; font-weight: 500; }
-.gantt th.semana-lbl { font-size: 10.5px; color: var(--gris-texto); border-left: 2px solid var(--semana-borde); white-space: nowrap; padding: 3px 6px; }
+.gantt th.semana-lbl { font-size: 10.5px; color: var(--gris-texto); border-left: 2px solid var(--semana-borde); white-space: nowrap; padding: 3px 6px; overflow: hidden; }
+/* #345 — El texto de la franja NUNCA puede ensanchar la columna: manda el ancho
+   de los días. `width: 0` deja al bloque sin ancho propio —así no aporta nada al
+   ancho mínimo de la celda combinada, que es por donde el rango se colaba— y
+   `min-width: 100%` lo hace ocupar todo el hueco disponible una vez que ese
+   ancho ya quedó decidido por los días. Sigue siendo un bloque con su línea de
+   texto, así que el alto de la franja no cambia. */
+.gantt .semana-lbl__txt { display: block; width: 0; min-width: 100%; overflow: hidden; white-space: nowrap; }
+/* La regla con la que se decide: el rango completo, fuera del flujo y sin
+   pintar, solo para medir cuánto mediría si se mostrara. */
+.gantt .semana-lbl__regla { position: absolute; top: 0; left: 0; visibility: hidden; white-space: nowrap; pointer-events: none; }
 
 .gantt th.col-hoy, .gantt td.col-hoy { background: var(--hoy-col); }
 .gantt th.col-hoy { color: var(--hoy); }

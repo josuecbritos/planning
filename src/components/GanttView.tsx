@@ -9,6 +9,7 @@ import {
   diasHabiles,
   esFinDeSemana,
   etiquetaDia,
+  etiquetaMesCorto,
   etiquetaSemana,
   esLunes,
   inicioSemana,
@@ -591,6 +592,43 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     return grupos
   }, [dias])
 
+  // #345 — Qué semanas muestran solo el mes. La franja mostraba el rango
+  // completo de la semana —"31 ago – 4 sep"— aunque de esa semana se viera un
+  // solo día, y ese texto no se corta: era ÉL el que imponía el ancho de la
+  // columna. Medido en `main`: un día mide 30, pero con un rango fijo de dos
+  // días la columna pasaba a 52 y con un solo día visible a 97.
+  // La regla: cuando el rango completo no cabe en el ancho de sus días
+  // visibles, esa franja muestra solo el mes de su primer día visible. Se
+  // decide SEMANA POR SEMANA, así que en un mismo horizonte una semana completa
+  // conserva su rango mientras la de al lado, con dos días, muestra el mes.
+  // Se mide en lugar de estimar porque el ancho del texto depende de la fuente
+  // y del zoom; y se mide contra la REGLA —el rango, siempre presente y fuera
+  // del flujo— para que el resultado no dependa de lo que se esté mostrando.
+  const [semanasCortas, setSemanasCortas] = useState<Set<string>>(() => new Set())
+  useLayoutEffect(() => {
+    const scroll = scrollRef.current
+    if (!scroll) return
+    const medir = () => {
+      const cortas = new Set<string>()
+      scroll.querySelectorAll<HTMLElement>('th.semana-lbl').forEach((th) => {
+        const lunes = th.dataset.lunes
+        const regla = th.querySelector<HTMLElement>('.semana-lbl__regla')
+        const txt = th.querySelector<HTMLElement>('.semana-lbl__txt')
+        if (!lunes || !regla || !txt) return
+        // Medio pixel de tolerancia: los anchos son fraccionarios y un empate
+        // exacto no debe contar como "no cabe".
+        if (regla.getBoundingClientRect().width > txt.clientWidth + 0.5) cortas.add(lunes)
+      })
+      setSemanasCortas((prev) =>
+        prev.size === cortas.size && [...cortas].every((k) => prev.has(k)) ? prev : cortas,
+      )
+    }
+    medir()
+    const ro = new ResizeObserver(medir)
+    ro.observe(scroll)
+    return () => ro.disconnect()
+  }, [semanas])
+
   // §6.5: carga por persona. Reglas: cada celda persona x dia cuenta las
   // tareas cuya fecha VIGENTE cae ese dia (la misma fecha donde la Gantt
   // dibuja la marca principal); incluye hechas y no hechas; cada tarea
@@ -861,11 +899,23 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                 <th className="fija fija--sf" rowSpan={2}>Sub Frente</th>
                 <th className="fija fija--tarea" rowSpan={2}>Tarea</th>
                 <th className="fija fija--resp" rowSpan={2}>Resp.</th>
-                {semanas.map((s) => (
-                  <th key={s.lunes} className="semana-lbl lunes" colSpan={s.dias.length}>
-                    {etiquetaSemana(s.lunes, finOffsetSemana)}
-                  </th>
-                ))}
+                {semanas.map((s) => {
+                  const rango = etiquetaSemana(s.lunes, finOffsetSemana)
+                  return (
+                    <th key={s.lunes} className="semana-lbl lunes" colSpan={s.dias.length} data-lunes={s.lunes}>
+                      {/* #345: la regla. Lleva SIEMPRE el rango completo y está
+                          fuera del flujo, así que no ocupa ancho y su medida no
+                          cambia según lo que se muestre: es lo que evita que
+                          medir y decidir se persigan entre sí. */}
+                      <span className="semana-lbl__regla" aria-hidden="true">
+                        {rango}
+                      </span>
+                      <span className="semana-lbl__txt">
+                        {semanasCortas.has(s.lunes) ? etiquetaMesCorto(s.dias[0]) : rango}
+                      </span>
+                    </th>
+                  )
+                })}
               </tr>
               <tr>
                 {dias.map((d) => {
