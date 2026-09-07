@@ -73,8 +73,18 @@ const abrirEditar = async (nombre) => {
   return ok && (await p.locator('.modal-card').count()) > 0
 }
 /** El campo Organización del formulario: se escribe y se elige de la lista. */
+/**
+ * Escribir en el campo Organización. #354: si ya hay una elegida, el campo se
+ * ve como ETIQUETA y no acepta que se escriba encima — para cambiarla hay que
+ * quitarla primero con su ×, que es exactamente el gesto del producto.
+ */
 const escribirOrg = async (texto) => {
   try {
+    const x = p.locator('.modal-card .combo-org__quitar')
+    if (await x.count()) {
+      await x.first().click({ timeout: 2500 })
+      await esperar(300)
+    }
     const campo = p.locator('.modal-card .combo-org__campo')
     await campo.click({ timeout: 2500 })
     await campo.fill(texto)
@@ -87,7 +97,9 @@ const escribirOrg = async (texto) => {
 const opcionesOrg = () =>
   p.evaluate(() => [...document.querySelectorAll('.selector-menu .selector-op')].map((x) => x.textContent.trim()))
 const elegirOpcionOrg = (texto) => pulsarSiEsta(p.locator('.selector-menu .selector-op', { hasText: texto }), 400)
-const hayCampoOrg = () => p.locator('.modal-card .combo-org__campo').count()
+// #354: el campo existe tanto si está vacío (texto) como si tiene una
+// organización elegida (etiqueta). Lo que se pregunta es si el campo ESTÁ.
+const hayCampoOrg = () => p.locator('.modal-card .combo-org').count()
 /** El desplegable del producto, por su etiqueta. */
 const abrirSelector = (etiqueta) => pulsarSiEsta(p.locator(`.selector-btn[aria-label="${etiqueta}"]`), 400)
 const opcionesSelector = () =>
@@ -355,8 +367,10 @@ await irAUsuarios()
 const nativosEnFicha = async () => {
   await abrirEditar('Carla Soto')
   const n = await p.evaluate(() => document.querySelectorAll('.modal-card select').length)
+  // #354: el campo de organización cuenta esté vacío (texto) o con una elegida
+  // (etiqueta); lo que se comprueba es que sea del producto y no del navegador.
   const propios = await p.evaluate(
-    () => document.querySelectorAll('.modal-card .selector-btn, .modal-card .combo-org__campo').length,
+    () => document.querySelectorAll('.modal-card .selector-btn, .modal-card .combo-org').length,
   )
   await pulsarSiEsta(p.locator('.modal-acciones .btn', { hasText: 'Cancelar' }), 400)
   return { n, propios }

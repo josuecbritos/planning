@@ -35,6 +35,8 @@ const chk = (ok, m, extra = '') => {
   console.log(`${ok ? 'OK   ' : 'FALLA'} ${m}${extra ? ' — ' + extra : ''}`)
   if (!ok) process.exitCode = 1
 }
+/** Ni verde ni rojo: la comprobación NO se pudo ejercer hoy, y se dice por qué. */
+const skip = (m, motivo) => console.log(`SKIP  ${m} — ${motivo}`)
 
 const b = await chromium.launch({ executablePath: EXE })
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } })
@@ -341,14 +343,35 @@ for (const tema of ['claro', 'oscuro']) {
 await p.evaluate(() => delete document.documentElement.dataset.tema)
 await esperar(300)
 await pulsarSiEsta(p.locator('.fecha-btn').first(), 450)
+// Hoy solo aparece como día VECINO en el mes anterior o en el siguiente, y solo
+// si cae cerca de un borde de mes: a mitad de mes no lo muestra ninguno. Se
+// busca el mes que lo muestre y, si con esta fecha no existe, se dice — antes
+// esta comprobación daba por sentado que hoy caía en la primera semana.
 await pulsarSiEsta(p.locator('.fecha-cal__ir-hoy'), 300)
-await pulsarSiEsta(p.locator('.fecha-cal__nav[aria-label="Mes anterior"]'), 350)
-const conHoy = await coloresCal()
-chk(
-  !!conHoy && conHoy.hoyDibujado && conHoy.hoyEsVecino,
-  '#344b · y la marca de hoy se sigue dibujando cuando hoy cae en un día vecino',
-  conHoy ? `dibujada=${conHoy.hoyDibujado} sobre un vecino=${conHoy.hoyEsVecino}` : '',
-)
+let conHoy = null
+for (const [etiqueta, pasos] of [['Mes anterior', 1], ['Mes siguiente', 2]]) {
+  for (let i = 0; i < pasos; i++) await pulsarSiEsta(p.locator(`.fecha-cal__nav[aria-label="${etiqueta}"]`), 280)
+  const e = await coloresCal()
+  if (e && e.hoyDibujado && e.hoyEsVecino) {
+    conHoy = e
+    break
+  }
+}
+if (conHoy) {
+  chk(true, '#344b · y la marca de hoy se sigue dibujando cuando hoy cae en un día vecino', 'dibujada sobre un día vecino')
+} else {
+  await pulsarSiEsta(p.locator('.fecha-cal__ir-hoy'), 300)
+  const enSuMes = await coloresCal()
+  skip(
+    '#344b · y la marca de hoy se sigue dibujando cuando hoy cae en un día vecino',
+    'hoy cae a mitad de mes: ninguna grilla lo muestra como día vecino con esta fecha',
+  )
+  chk(
+    !!enSuMes && enSuMes.hoyDibujado && !enSuMes.hoyEsVecino,
+    '#344b · control de vida: la marca de hoy sí se dibuja en su propio mes',
+    enSuMes ? `dibujada=${enSuMes.hoyDibujado}` : '',
+  )
+}
 // El elegido, si cae en el mes vecino, se sigue viendo como elegido.
 const elegido = await p.evaluate(() => {
   const d = document.querySelector('.fecha-cal__dia--fuera')

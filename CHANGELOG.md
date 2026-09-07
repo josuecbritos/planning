@@ -4049,7 +4049,23 @@ punto 1.
 `docs/prueba-353-agregar-colega-base.mjs` suma **3 comprobaciones** con la
 anatomía del defecto, y queda en **37**.
 
-**Regresión completa:** las 29 suites de `docs/`.
+**Regresión completa:** las 29 suites de `docs/`. Encontró cinco fallas, ninguna
+del producto, y las tres causas quedan anotadas porque las tres son defectos de
+las PRUEBAS:
+
+- **Dos comprobaciones del calendario dependían de la fecha.** Comprobaban que
+  la marca de "hoy" se dibuja cuando hoy cae en un día del mes vecino, y para
+  eso navegaban al mes anterior **dando por sentado que hoy caía en la primera
+  semana de su mes** — cierto el día que se escribieron, falso tres días
+  después. Ahora **buscan** el mes que muestre a hoy como día vecino y, si con
+  la fecha corriente no existe ninguno —hoy a mitad de mes: ninguna grilla de
+  seis semanas lo alcanza—, lo dicen con un `SKIP` y comprueban el control de
+  vida en su lugar. Ni verde ni rojo: aprobar por silencio sería peor que no
+  comprobar.
+- **Tres comprobaciones de #353 daban por hecho el contrato viejo del campo
+  Organización.** Con una elegida ya no hay campo de texto sino etiqueta, así
+  que el ayudante que escribía en él dejó de encontrarlo. Se actualizó: para
+  cambiarla, primero se quita con su × — que es el gesto del producto.
 
 #### De paso
 

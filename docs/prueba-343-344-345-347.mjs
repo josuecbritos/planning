@@ -38,6 +38,9 @@ const chk = (ok, m, extra = '') => {
   console.log(`${ok ? 'OK   ' : 'FALLA'} ${m}${extra ? ' — ' + extra : ''}`)
   if (!ok) process.exitCode = 1
 }
+/** Ni verde ni rojo: la comprobación NO se pudo ejercer hoy, y se dice por qué.
+ *  Aprobar por silencio sería peor que no comprobar. */
+const skip = (m, motivo) => console.log(`SKIP  ${m} — ${motivo}`)
 
 const b = await chromium.launch({ executablePath: EXE })
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } })
@@ -457,17 +460,42 @@ chk(!!trasHoy && trasHoy.hoy.length === 1, '#344 · "Hoy" lleva al mes actual si
 chk((await fechaDeLaFila()) === antesDeNavegar, '#344 · y tampoco asignó nada', await fechaDeLaFila())
 
 // La marca de hoy también cuando hoy cae en un día del mes vecino.
-// Con hoy en la PRIMERA semana de su mes, es el mes anterior el que lo muestra
-// como día vecino (en su última fila). El criterio del pedido lo plantea al
-// revés —hoy a fin de mes, visto desde el mes siguiente—, pero es la misma
-// regla y esta es la mitad que la fecha de hoy permite recorrer.
-await pulsarSiEsta(p.locator('.fecha-cal__nav[aria-label="Mes anterior"]'), 300)
-const mesAnterior = await estadoCal()
-chk(
-  !!mesAnterior && mesAnterior.hoy.length === 1 && mesAnterior.hoyEsVecino,
-  '#344 · hoy se ve marcado aunque caiga en un día del mes vecino',
-  mesAnterior ? `viendo ${mesAnterior.mes}, marcado ${mesAnterior.hoy.join()} (vecino: ${mesAnterior.hoyEsVecino})` : '',
-)
+// Hoy aparece como día VECINO solo en el mes anterior o en el siguiente, y solo
+// si cae cerca de un borde de mes: a mitad de mes no lo muestra ninguno. Antes
+// esta comprobación daba por sentado que hoy caía en la primera semana —cierto
+// el día que se escribió, falso una semana después—, así que ahora se BUSCA el
+// mes que lo muestre y, si no existe hoy, se dice en vez de aprobar o reprobar.
+const buscarHoyDeVecino = async () => {
+  for (const [etiqueta, pasos] of [['Mes anterior', 1], ['Mes siguiente', 2]]) {
+    for (let i = 0; i < pasos; i++) await pulsarSiEsta(p.locator(`.fecha-cal__nav[aria-label="${etiqueta}"]`), 280)
+    const e = await estadoCal()
+    if (e && e.hoy.length === 1 && e.hoyEsVecino) return e
+  }
+  return null
+}
+await pulsarSiEsta(p.locator('.fecha-cal__ir-hoy'), 300)
+const mesVecino = await buscarHoyDeVecino()
+if (mesVecino) {
+  chk(
+    true,
+    '#344 · hoy se ve marcado aunque caiga en un día del mes vecino',
+    `viendo ${mesVecino.mes}, marcado ${mesVecino.hoy.join()} como día vecino`,
+  )
+} else {
+  const enSuMes = await (async () => {
+    await pulsarSiEsta(p.locator('.fecha-cal__ir-hoy'), 300)
+    return estadoCal()
+  })()
+  skip(
+    '#344 · hoy se ve marcado aunque caiga en un día del mes vecino',
+    'hoy cae a mitad de mes: ninguna grilla de seis semanas lo muestra como día vecino, así que el caso no se puede ejercer con esta fecha',
+  )
+  chk(
+    !!enSuMes && enSuMes.hoy.length === 1 && !enSuMes.hoyEsVecino,
+    '#344 · control de vida: hoy sí se ve marcado en su propio mes',
+    enSuMes ? `viendo ${enSuMes.mes}, marcado ${enSuMes.hoy.join()}` : '',
+  )
+}
 
 // Elegir un día del mes vecino asigna y cierra.
 const elegido = await p.evaluate(() => {
