@@ -3088,3 +3088,18 @@ td.col-org { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   padding: 7px 10px; font: inherit; font-size: 13px; color: var(--texto);
 }
 .combo-org__campo:focus { outline: none; border-color: var(--primario); }
+
+/* #354 — Elegida, la organización se ve como ETIQUETA. Comparte las
+   declaraciones de `.asignacion`, la etiqueta del producto, en vez de copiar
+   sus valores: es lo único que impide que se separen (#292). El relleno
+   asimétrico de esa clase —10 a la izquierda, 6 a la derecha— existe
+   justamente para dejarle sitio a una × al final. */
+.combo-org--puesta { display: flex; align-items: center; min-height: 35px; }
+.combo-org__etiqueta { max-width: 100%; }
+.combo-org__quitar {
+  border: none; background: none; padding: 0; width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 5px; color: var(--gris-texto); font-size: 11px; line-height: 1;
+  cursor: pointer; flex: none;
+}
+.combo-org__quitar:hover { background: var(--velo); color: var(--texto); }

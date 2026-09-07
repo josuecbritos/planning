@@ -118,10 +118,15 @@ clientes", así que un consultor no notaba ninguna diferencia. Ahora:
   mismas personas. *Sin eso, un consultor podría sumar a un colega y quedarse
   sin poder ajustarle nada, teniendo que pedírselo al administrador — que es
   justo lo que esto viene a evitar.*
-- **La lista de a quién se puede agregar la entrega la base**
-  (`usuarios_agregables`), con la misma condición que la política que autoriza
-  la operación. *Si además el navegador la calculara por su cuenta, la regla
-  quedaría escrita en dos lugares y tarde o temprano se separan.*
+- **La pantalla no decide nada de los tres verbos.** Ni a quién se puede
+  agregar (`usuarios_agregables`), ni a quién quitar o configurar
+  (`puede_dar_acceso_a`, #354): las tres respuestas vienen de la misma fuente
+  que autoriza la operación. *Si el navegador las calculara por su cuenta, la
+  regla quedaría escrita en dos lugares y tarde o temprano se separan — y eso
+  fue exactamente lo que pasó: #353 sacó del navegador solo la lista de
+  agregables, y quitar y configurar se quedaron comparando organizaciones con
+  un dato que la pantalla NO TIENE (la organización de otro solo la ve el
+  administrador). Los dos iconos no se dibujaban nunca sobre un colega.*
 - **La organización solo se ofrece para consultores**, y la base tampoco la
   acepta en otro perfil. Una que hubiera quedado en un cliente **se borra**:
   guardada e invisible, cambiar después su perfil a consultor le activaría esa
@@ -129,7 +134,10 @@ clientes", así que un consultor no notaba ninguna diferencia. Ahora:
 - **La lista de organizaciones en uso se calcula solo sobre consultores.**
 - El campo **se escribe directo**: al escribir la lista se filtra, y si lo
   escrito no existe la última opción ofrece **crearlo**. Ya no hay que declarar
-  antes que se va a escribir algo nuevo.
+  antes que se va a escribir algo nuevo. **Elegida, se ve como etiqueta** con su
+  × (#354): antes seguía pareciendo un texto a medio escribir y no había ninguna
+  señal de que hubiera quedado tomada. Con la etiqueta puesta no se escribe
+  encima; para cambiarla, primero se quita.
 - En **Administración → Usuarios** hay una **columna Organización**, junto al
   Rol, del que depende.
 - Los tres desplegables que quedaban del navegador —Organización, Perfil y el de

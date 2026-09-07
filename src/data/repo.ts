@@ -177,6 +177,21 @@ export interface Repo {
    * quien pregunta es el JWT. Mismo patrón que `cambiarRolUsuario`.
    */
   usuariosAgregables(proyectoId: string, actorId?: string): Promise<Usuario[]>
+  /**
+   * #354 — De estos usuarios, ¿a cuáles ALCANZA la regla de acceso de quien
+   * pregunta? Devuelve el subconjunto.
+   *
+   * Es la misma pregunta que decide la lista de agregables, hecha sobre gente
+   * que YA es miembro: quien puede sumar a alguien puede quitarlo y
+   * configurarlo. La pantalla la calculaba por su cuenta comparando
+   * organizaciones, y esa comparación **no puede funcionar**: desde #339 la
+   * organización de otro solo la ve el administrador, así que a un consultor le
+   * llega vacía y la condición nunca se cumplía. Los iconos de quitar y de
+   * permisos no se dibujaban nunca sobre un colega.
+   *
+   * `actorId` solo lo usa el repo de memoria, que no tiene sesión.
+   */
+  alcanzadosPorLaRegla(usuarioIds: string[], actorId?: string): Promise<string[]>
   /** Asigna un proyecto a un usuario (cliente o consultor). El acceso nace
    *  con los permisos por DEFECTO del rol del usuario (4). */
   asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso>

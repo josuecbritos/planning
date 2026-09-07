@@ -3970,3 +3970,90 @@ pantalla con contratos distintos.
 1. **Respaldo del dueño** (`pg_dump`).
 2. Aplicar `20260707000033_agregar_colega_organizacion.sql`.
 3. Correr la compuerta contra producción con las dos cuentas de consultor.
+
+### #354 — Corrección de #353
+
+Dos cosas que aparecieron al usar #353 en producción. **Sin migración:** el
+punto 1 se resuelve con la función que #353 ya dejó publicada.
+
+#### 1 · BUG — No se podía quitar ni configurar a un colega recién agregado
+
+El dueño agregaba a un colega de su organización y después **no podía quitarlo
+ni abrirle sus permisos**: los dos iconos no aparecían.
+
+**La base estaba bien.** Las tres políticas de `acceso_proyecto` ya contemplaban
+al colega, tal como pedía #353. **Fallaba la pantalla**, y por algo que #353 dejó
+a medias: para decidir si mostraba esos iconos, **comparaba la organización de
+quien mira con la del otro**. Pero desde #339 la organización de otro **solo la
+ve el administrador**, así que a un consultor le llega vacía: la condición nunca
+se cumplía.
+
+**Era la regla escrita en dos lugares.** #353 la sacó del navegador **solo para
+la lista de a quién se puede agregar**; quitar y configurar se quedaron
+calculándola ahí, con un dato que la pantalla no tiene.
+
+Ahora los tres verbos preguntan a **la misma fuente que autoriza la operación**:
+`puede_dar_acceso_a`, la función que usan las tres políticas y que #353 ya dejó
+concedida al cliente. Lo único que la pantalla conserva es lo que sabe **de sí
+misma**: si es dueña del proyecto y si tiene el permiso. *No hizo falta
+migración, y por eso este pedido no lleva respaldo ni corrida de compuerta.*
+
+#### 2 · El campo Organización no mostraba que había quedado tomada
+
+Al elegir `Crear "Andotek"` el campo **seguía viéndose como un texto editable**:
+no había ninguna señal de que la organización hubiera quedado elegida, así que
+parecía que no había pasado nada — y recién al guardar se descubría que sí.
+
+Ahora, elegida, se ve como **etiqueta** con su ×, y con la etiqueta puesta **no
+se escribe encima**: para cambiarla, primero se quita. Vacío, el campo dice
+`Buscar o crear…`. Una organización existente y una recién creada se ven igual.
+*La etiqueta comparte las declaraciones de `.asignacion` —la etiqueta del
+producto— en vez de copiar sus valores.*
+
+#### Por qué la prueba de #353 no vio el bug, y qué se hizo al respecto
+
+**En el repo de memoria no hay enmascarado: todos ven todo.** Ahí la comparación
+de organizaciones **sí funcionaba**, así que las 51 comprobaciones de pantalla de
+#353 pasaban con el defecto puesto. El defecto solo existía contra Supabase.
+
+Y por la misma razón **tampoco se puede reproducir desde la pantalla**: en
+memoria el estado local **es** la fuente, así que quitarle la organización se la
+quita a los dos lados a la vez y el resultado no distingue una implementación de
+la otra. *Medido: corriendo la prueba nueva contra `main` —con el bug puesto—
+los criterios 1 a 4 pasan igual.* Una prueba de comportamiento no puede atrapar
+esto.
+
+Así que la garantía se puso donde sí se puede observar, en dos piezas:
+
+- **En la base** (`prueba-353-agregar-colega-base.mjs`): sobre el MISMO consultor
+  y en la MISMA sesión se miden las dos cosas a la vez — que la organización del
+  colega le llega **vacía**, y que `puede_dar_acceso_a` responde que **sí**. Es
+  la anatomía del bug, medida.
+- **Estructural** (`prueba-354-gestionables-y-etiqueta.mjs`): que el archivo del
+  modal de Miembros **no vuelva a mencionar la organización** para decidir, y que
+  en su lugar pregunte a la fuente. Mirar el código fuente no es lo habitual en
+  estas pruebas; se escribe a propósito, porque es el único guardián que puede
+  atrapar la reaparición.
+
+#### Verificación
+
+`docs/prueba-354-gestionables-y-etiqueta.mjs` — **30 comprobaciones en verde**.
+La etiqueta en sus seis criterios y en los dos temas; los dos iconos sobre el
+colega, sus permisos abriéndose y guardándose, quitarlo y que deje de ver el
+proyecto; los dos iconos sobre un cliente; y el guardián estructural.
+
+*Control negativo:* contra `main`, **12 comprobaciones fallan** — 10 de la
+etiqueta y **las 2 estructurales**, que son las únicas que atrapan el bug del
+punto 1.
+
+`docs/prueba-353-agregar-colega-base.mjs` suma **3 comprobaciones** con la
+anatomía del defecto, y queda en **37**.
+
+**Regresión completa:** las 29 suites de `docs/`.
+
+#### De paso
+
+`playwright-core` pasa a estar en `devDependencies`. No estaba declarado en
+ninguna parte, así que en un clon limpio **ninguna** de las pruebas del repo
+podía correr: el comando que documentan sus propias cabeceras fallaba con
+`Cannot find package 'playwright-core'`.
