@@ -302,6 +302,33 @@ for (const fn of ['usuarios_agregables(uuid)', 'puede_dar_acceso_a(uuid)', 'es_c
 const filasDeMas = como(AUTH.a, `select count(*) from (select id from usuario except select id from usuario_visible) x;`).split('\n').pop()
 chk(filasDeMas === '0', '#248 · la tabla `usuario` sigue sin devolver ninguna fila que la vista no tenga')
 
+// ── #354 · la fuente sabe lo que el cliente NO puede calcular ───────────────
+console.log('\n── #354 · quitar y configurar tampoco los decide la pantalla ──')
+// Éste es el par de medidas que explica el bug de #354 y lo cierra: sobre el
+// MISMO consultor y en la MISMA sesión, la organización del colega llega VACÍA
+// —así que comparar organizaciones en el navegador no puede funcionar— y sin
+// embargo la función que autoriza la operación responde que SÍ. Por eso la
+// pantalla tiene que preguntar en vez de calcular.
+const orgDelColega = como(AUTH.a, `select coalesce(organizacion,'(vacía)') from usuario_visible where nombre='B';`).split('\n').pop()
+const puedeSobreColega = como(AUTH.a, `select puede_dar_acceso_a('${id('B')}');`).split('\n').pop()
+chk(
+  orgDelColega === '(vacía)' && puedeSobreColega === 't',
+  '#354 · al consultor le llega VACÍA la organización del colega, y aun así la fuente dice que sí puede',
+  `organización del colega: ${orgDelColega} · puede_dar_acceso_a: ${puedeSobreColega}`,
+)
+const puedeSobreOtra = como(AUTH.a, `select puede_dar_acceso_a('${id('Otra')}');`).split('\n').pop()
+const puedeSobreSinOrg = como(AUTH.a, `select puede_dar_acceso_a('${id('SinOrg')}');`).split('\n').pop()
+const puedeSobreCliente = como(AUTH.a, `select puede_dar_acceso_a('${id('Cli')}');`).split('\n').pop()
+chk(
+  puedeSobreOtra === 'f' && puedeSobreSinOrg === 'f' && puedeSobreCliente === 't',
+  '#354 · y esa misma fuente dice que no sobre otra organización ni sobre uno sin organización, y que sí sobre un cliente',
+  `otra=${puedeSobreOtra} sinOrg=${puedeSobreSinOrg} cliente=${puedeSobreCliente}`,
+)
+chk(
+  q(`select has_function_privilege('authenticated', 'puede_dar_acceso_a(uuid)', 'execute');`).split('\n').pop() === 't',
+  '#354 · y el cliente puede preguntársela: la función ya estaba concedida desde #353',
+)
+
 try {
   comoPostgres(`${BIN}/pg_ctl -D ${DATA}/data stop -m immediate`)
 } catch {

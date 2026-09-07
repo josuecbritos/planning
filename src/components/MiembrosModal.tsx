@@ -74,12 +74,37 @@ export function MiembrosModal({ state, proyecto, sesion, actions, onClose }: Pro
     // entrar tiene que salir de la lista sin recargar la pantalla.
   }, [actions, proyecto.id, puedeInvitar, accesos.length, state.usuarios.length])
 
-  // Quitar y configurar siguen la MISMA regla que agregar (#353): quien puede
-  // sumar a alguien puede quitarlo y puede configurarlo. Se pregunta contra la
-  // misma lista, más los que ya están dentro y calzan con la regla.
-  const esColega = (u: Usuario) =>
-    u.rol === 'consultor' && sesion.rol === 'consultor' && !!sesion.organizacion && u.organizacion === sesion.organizacion
-  const alcanzable = (u: Usuario) => u.rol === 'cliente' || esColega(u)
+  // #354 — Quitar y configurar tampoco los decide esta pantalla.
+  //
+  // #353 sacó del navegador la lista de a quién se puede AGREGAR, pero dejó
+  // quitar y configurar calculándose acá, comparando la organización de quien
+  // mira con la del otro. Esa comparación **no puede funcionar**: desde #339 la
+  // organización de otro solo la ve el administrador, así que a un consultor le
+  // llega vacía, la condición nunca se cumple y los dos iconos no se dibujaban
+  // nunca sobre un colega. La base estaba bien; era la regla escrita en dos
+  // lugares, y el segundo no tenía el dato.
+  //
+  // Ahora se pregunta a la MISMA fuente que autoriza la operación
+  // (`puede_dar_acceso_a`, la función que usan las tres políticas), y lo único
+  // que esta pantalla conserva es lo que sabe de SÍ MISMA: si es dueña y si
+  // tiene el permiso.
+  const [alcanzados, setAlcanzados] = useState<Set<string>>(new Set())
+  const idsMiembros = miembros.map((u) => u.id).join(',')
+  useEffect(() => {
+    let vivo = true
+    if (esAdmin || (!puedeInvitar && !puedeConfigurar) || !idsMiembros) {
+      setAlcanzados(new Set())
+      return
+    }
+    void actions.alcanzadosPorLaRegla(idsMiembros.split(',')).then((ids) => {
+      if (vivo) setAlcanzados(new Set(ids))
+    })
+    return () => {
+      vivo = false
+    }
+  }, [actions, idsMiembros, esAdmin, puedeInvitar, puedeConfigurar])
+
+  const alcanzable = (u: Usuario) => alcanzados.has(u.id)
   const puedeConfigurarA = (u: Usuario) => esAdmin || (puedeConfigurar && alcanzable(u))
   const puedeQuitarA = (u: Usuario) => esAdmin || (puedeInvitar && alcanzable(u))
 

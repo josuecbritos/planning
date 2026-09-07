@@ -469,14 +469,31 @@ export class MemoryRepo implements Repo {
     if (!puede) return []
     return this.state.usuarios
       .filter((u) => u.activo && !u.eliminado && !dentro.has(u.id))
-      .filter(
-        (u) =>
-          esAdmin ||
-          u.rol === 'cliente' ||
-          // Colega: los DOS consultores, con organización y la misma.
-          (u.rol === 'consultor' && yo.rol === 'consultor' && !!yo.organizacion && u.organizacion === yo.organizacion),
-      )
+      .filter((u) => esAdmin || this.alcanzaLaRegla(yo, u))
       .map((u) => clone(u))
+  }
+
+  /**
+   * #354 — Espejo de `puede_dar_acceso_a`. Es la MISMA condición que usa
+   * `usuariosAgregables` de acá arriba, así que se comparte en vez de
+   * repetirse: escribirla dos veces es la forma segura de que se separen, y de
+   * eso venimos.
+   */
+  async alcanzadosPorLaRegla(usuarioIds: string[], actorId?: string): Promise<string[]> {
+    const yo = actorId ? this.state.usuarios.find((u) => u.id === actorId) : null
+    if (!yo) return []
+    return usuarioIds.filter((id) => {
+      const u = this.state.usuarios.find((x) => x.id === id)
+      return !!u && this.alcanzaLaRegla(yo, u)
+    })
+  }
+
+  /** Cliente, o colega: los DOS consultores, con organización y la misma. */
+  private alcanzaLaRegla(yo: Usuario, u: Usuario): boolean {
+    return (
+      u.rol === 'cliente' ||
+      (u.rol === 'consultor' && yo.rol === 'consultor' && !!yo.organizacion && u.organizacion === yo.organizacion)
+    )
   }
 
   async asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso> {

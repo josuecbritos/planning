@@ -98,6 +98,8 @@ export interface Actions {
   eliminarUsuario: (id: string) => Promise<boolean>
   /** #353: la lista de agregables la entrega la base, no la pantalla. */
   usuariosAgregables: (proyectoId: string) => Promise<Usuario[]>
+  /** #354: y a cuáles de los que YA son miembros alcanza la misma regla. */
+  alcanzadosPorLaRegla: (usuarioIds: string[]) => Promise<string[]>
   asignarAcceso: (usuarioId: string, proyectoId: string) => Promise<boolean>
   quitarAcceso: (usuarioId: string, proyectoId: string) => Promise<boolean>
   /** Configura el set de ocho DE UN ACCESO (usuario × proyecto). */
@@ -931,6 +933,7 @@ export default function App({ repo }: { repo: Repo }) {
           return (s) => apply.removeUsuario(s, id)
         }),
       usuariosAgregables: (proyectoId) => repo.usuariosAgregables(proyectoId, sesion?.id),
+      alcanzadosPorLaRegla: (ids) => repo.alcanzadosPorLaRegla(ids, sesion?.id),
       asignarAcceso: (usuarioId, proyectoId) =>
         run(async () => {
           const a = await repo.asignarAcceso(usuarioId, proyectoId)

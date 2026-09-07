@@ -396,6 +396,20 @@ export class SupabaseRepo implements Repo {
     return (rows ?? []).map(toUsuario)
   }
 
+  async alcanzadosPorLaRegla(usuarioIds: string[], _actorId?: string): Promise<string[]> {
+    void _actorId
+    if (!usuarioIds.length) return []
+    // `puede_dar_acceso_a` ES la función que usan las tres políticas de
+    // `acceso_proyecto` (#353): preguntarle a ella es preguntarle a la misma
+    // fuente que autoriza la operación. Toma un usuario por llamada, así que
+    // van en paralelo — la lista de miembros de un proyecto es corta y esto
+    // ocurre solo al abrir el modal.
+    const respuestas = await Promise.all(
+      usuarioIds.map(async (id) => [id, unwrap(await this.db.rpc('puede_dar_acceso_a', { p_usuario: id }))] as const),
+    )
+    return respuestas.filter(([, alcanza]) => alcanza === true).map(([id]) => id)
+  }
+
   async asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso> {
     const row = unwrap(
       await this.db
