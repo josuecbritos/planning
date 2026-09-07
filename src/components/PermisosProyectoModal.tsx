@@ -13,8 +13,13 @@ type Permiso = keyof PermisosProyecto
 const PERMISOS: { key: Permiso; label: string; hint?: string }[] = [
   { key: 'crearProyectos', label: 'Crear proyectos', hint: 'Sin esto, solo gestiona los que el admin le asigne' },
   { key: 'archivarEliminarProyectos', label: 'Archivar / eliminar sus proyectos', hint: 'Sobre los proyectos de los que es dueño' },
-  { key: 'invitarClientes', label: 'Invitar clientes a sus proyectos', hint: 'Sin esto, los clientes los asigna solo el admin' },
-  { key: 'configurarPermisosClientes', label: 'Configurar permisos de los clientes de sus proyectos', hint: 'Sin esto, esos permisos los define el admin' },
+  /* #353: el permiso pasa a alcanzar también a los colegas de la misma
+     organización, así que su nombre deja de hablar solo de clientes. El DATO
+     de la base no se renombra (`invitarClientes`): renombrarlo obligaría a
+     reescribir cada fila de permisos sin ganar nada. Lo que cambia es lo que
+     dice la pantalla y lo que habilita. */
+  { key: 'invitarClientes', label: 'Agregar usuarios a sus proyectos', hint: 'Clientes, y consultores de su misma organización. Sin esto, los agrega solo el admin' },
+  { key: 'configurarPermisosClientes', label: 'Configurar permisos de los usuarios de sus proyectos', hint: 'Las mismas personas que puede agregar. Sin esto, esos permisos los define el admin' },
 ]
 
 interface Props {

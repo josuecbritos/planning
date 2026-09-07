@@ -445,6 +445,40 @@ export class MemoryRepo implements Repo {
     return clone(u)
   }
 
+  /**
+   * #353 — Espejo de la función `usuarios_agregables` de la base.
+   *
+   * La condición es la misma que la de la política `acceso_insert`: el
+   * administrador puede con cualquiera; el dueño con el permiso, con un cliente
+   * o con un colega de su misma organización. Se escribe acá y no en la
+   * pantalla por la misma razón que en la base: la pantalla recibe la lista.
+   *
+   * Diferencia conocida con Supabase, y es del modo memoria, no de esta regla:
+   * allá la lista se calcula sobre `usuario_visible` —lo que uno VE—, y acá
+   * todos ven a todos. Por eso el modo memoria puede ofrecer un cliente con el
+   * que no se comparte ningún proyecto.
+   */
+  async usuariosAgregables(proyectoId: string, actorId?: string): Promise<Usuario[]> {
+    const yo = actorId ? this.state.usuarios.find((u) => u.id === actorId) : null
+    const p = this.state.proyectos.find((x) => x.id === proyectoId)
+    if (!yo || !p) return []
+    const dentro = new Set([p.duenoId, ...this.state.accesos.filter((a) => a.proyectoId === proyectoId).map((a) => a.usuarioId)])
+    const esAdmin = yo.rol === 'admin'
+    const dueno = p.duenoId === yo.id
+    const puede = esAdmin || (dueno && yo.permisosProyecto?.invitarClientes === true)
+    if (!puede) return []
+    return this.state.usuarios
+      .filter((u) => u.activo && !u.eliminado && !dentro.has(u.id))
+      .filter(
+        (u) =>
+          esAdmin ||
+          u.rol === 'cliente' ||
+          // Colega: los DOS consultores, con organización y la misma.
+          (u.rol === 'consultor' && yo.rol === 'consultor' && !!yo.organizacion && u.organizacion === yo.organizacion),
+      )
+      .map((u) => clone(u))
+  }
+
   async asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso> {
     const existente = this.state.accesos.find(
       (a) => a.usuarioId === usuarioId && a.proyectoId === proyectoId,

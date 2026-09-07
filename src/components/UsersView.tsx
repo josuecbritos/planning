@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Proyecto, Rol, Usuario } from '../types'
 import type { Actions } from '../App'
-import { puedeInvitarClientesEn, usuariosVisiblesPara } from '../lib/permisos'
+import { puedeAgregarUsuariosEn, usuariosVisiblesPara } from '../lib/permisos'
 import { UsuarioModal } from './UsuarioModal'
 import { PermisosProyectoModal } from './PermisosProyectoModal'
 import { supabaseConfigured, getClient } from '../data/client'
@@ -132,7 +132,7 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
   // El consultor solo puede crear usuarios si puede invitar clientes en algún
   // proyecto suyo (y solo como cliente).
   const puedeCrearUsuario =
-    esAdminActor || gestionables.some((p) => puedeInvitarClientesEn(state, usuarioActual, p.id))
+    esAdminActor || gestionables.some((p) => puedeAgregarUsuariosEn(state, usuarioActual, p.id))
 
   /**
    * #303 — Guardar el formulario de editar usuario. Los cambios NO viajan por
@@ -183,12 +183,18 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
    * Se mira `state.usuarios` y no la lista filtrada de la pantalla: esconder
    * los desactivados no debería hacer desaparecer su organización del
    * desplegable.
+   *
+   * #353: **solo sobre CONSULTORES.** Antes se calculaba sobre todos, así que
+   * una organización que solo tuviera clientes aparecía igual como opción para
+   * elegir en otros — y a un cliente la organización no le hace nada.
    */
   const organizaciones = useMemo(
     () =>
-      [...new Set(state.usuarios.map((u) => u.organizacion).filter(Boolean) as string[])].sort((a, b) =>
-        a.localeCompare(b),
-      ),
+      [
+        ...new Set(
+          state.usuarios.filter((u) => u.rol === 'consultor').map((u) => u.organizacion).filter(Boolean) as string[],
+        ),
+      ].sort((a, b) => a.localeCompare(b)),
     [state.usuarios],
   )
 
@@ -229,6 +235,11 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
               <th>Usuario</th>
               <th className="col-email">Email</th>
               <th className="col-rol">Rol</th>
+              {/* #353: la organización se veía solo abriendo la ficha de cada
+                  persona, una por una. Va pegada al Rol porque es de quien
+                  depende: solo existe para consultores y solo hace algo entre
+                  ellos. */}
+              <th className="col-org">Organización</th>
               <th className="col-estado-adm">Estado</th>
               <th className="col-proy">Proyectos</th>
               <th className="col-acc">Acciones</th>
@@ -349,7 +360,7 @@ function UsuarioFila({
   // puede invitar en alguno de sus proyectos (la Edge Function reconfirma).
   const puedeInvitarCorreo =
     esAdminActor ||
-    (targetEsCliente && gestionables.some((p) => puedeInvitarClientesEn(state, actor, p.id)))
+    (targetEsCliente && gestionables.some((p) => puedeAgregarUsuariosEn(state, actor, p.id)))
 
   return (
     <tr className={usuario.activo ? '' : 'usuario-inactivo'}>
@@ -369,6 +380,9 @@ function UsuarioFila({
             de siempre: un dato, no un control. */}
         <span className={`chip-rol chip-rol--${usuario.rol}`}>{ROL_LABEL[usuario.rol]}</span>
       </td>
+      {/* #353: sin organización va el mismo vacío que usa el producto en estas
+          tablas (el dueño de un proyecto sin dueño, en Proyectos). */}
+      <td className="col-org">{usuario.organizacion ?? <span className="usuarios-sin">—</span>}</td>
       <td>{usuario.activo ? 'Activo' : 'Inactivo'}</td>
       <td className="col-proy">
         <ProyectosCell items={proyectosUsuario} onIrAProyectos={onIrAProyectos} />

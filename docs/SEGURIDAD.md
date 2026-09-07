@@ -348,6 +348,42 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   forma de comprobar quién ve a quién: el repo de memoria devuelve todos los
   usuarios a todo el mundo.
 
+### #353 — Un consultor suma a un colega de su organización (migración 33)
+
+- **Las tres políticas de `acceso_proyecto`** (`insert`, `update`, `delete`)
+  cambian `es_cliente(usuario_id)` por `puede_dar_acceso_a(usuario_id)` dentro de
+  la rama del dueño-consultor. La rama del admin no se toca: sigue siendo el
+  primer disyuntor de las tres. `acceso_select` **no se toca**.
+- **`puede_dar_acceso_a` existe como UNA función** y no como una condición
+  repetida tres veces: la regla es una sola —quien puede sumar a alguien puede
+  quitarlo y configurarlo— y escribirla tres veces es la forma segura de que se
+  separen. Se apoya en `misma_organizacion` de #339 en vez de duplicarla.
+- **`usuarios_agregables(uuid)`** publica la lista ya filtrada, con la MISMA
+  condición que `acceso_insert`, para que la pantalla no vuelva a escribir la
+  regla por su cuenta. Devuelve filas de `usuario_visible`, así que llega con el
+  enmascarado de siempre: la organización de otro sigue siendo un dato del
+  administrador. *Consecuencia asumida: la lista es la intersección de "lo que
+  puedo agregar" con "lo que veo" — un cliente con el que no se comparte ningún
+  proyecto no aparece, igual que antes de este cambio.*
+- **La organización queda acotada a los consultores**, en la base y no solo en
+  la pantalla. La que hubiera en otro perfil **se borra** al migrar: guardada e
+  invisible, un cambio de perfil a consultor le activaría sola una visibilidad
+  que nadie decidió. El trigger `normalizar_organizacion` pasa a dispararse
+  también con `rol`, así que pasar a alguien a cliente se la quita.
+- **La trampa de #290, otra vez.** Tres funciones nuevas, tres `revoke ... from
+  public`. La migración se auto-comprueba en la misma transacción, además de las
+  otras dos: que la regla de visibilidad siga diciendo lo mismo en los dos
+  lugares, y que ningún no-consultor quede con organización.
+- **La compuerta gana `probarAgregarColega`**, con sus dos lados —que el dueño
+  SÍ puede con un colega de su organización y NO con uno de otra ni sin
+  organización—, y restituye siempre lo que toca.
+- **Hallazgo anotado, para que no se repita:** una función que declara
+  `returns setof <vista>` queda registrada como DEPENDIENTE de esa vista, y desde
+  ahí la migración que la recrea con `drop view` deja de poder aplicarse de
+  nuevo. Volver a correr una migración para REPONER una vista es lo que hicieron
+  la 22 y la 24; ese camino no se puede perder por un tipo de retorno. Las
+  columnas se declaran una por una y el cuerpo sigue leyendo de la vista.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.

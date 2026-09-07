@@ -94,13 +94,16 @@ export function puedeEliminarProyecto(state: AppState, usuario: Usuario | null, 
 }
 
 /** ¿Puede invitar/quitar CLIENTES en este proyecto? */
-export function puedeInvitarClientesEn(state: AppState, usuario: Usuario | null, proyectoId: string): boolean {
+export function puedeAgregarUsuariosEn(state: AppState, usuario: Usuario | null, proyectoId: string): boolean {
   if (usuario?.rol === 'admin') return true
   return esDuenoDe(state, usuario, proyectoId) && permisoProyecto(usuario, 'invitarClientes')
 }
 
-/** ¿Puede configurar los permisos de los CLIENTES de este proyecto? (5) */
-export function puedeConfigurarClientesEn(state: AppState, usuario: Usuario | null, proyectoId: string): boolean {
+/** #353: ¿puede configurar los permisos de los usuarios de este proyecto? El
+ *  permiso guardado sigue llamándose `configurarPermisosClientes` —renombrar el
+ *  dato obligaría a reescribir cada fila sin ganar nada—, pero lo que habilita
+ *  alcanza también a los colegas de la misma organización. */
+export function puedeConfigurarUsuariosEn(state: AppState, usuario: Usuario | null, proyectoId: string): boolean {
   if (usuario?.rol === 'admin') return true
   return esDuenoDe(state, usuario, proyectoId) && permisoProyecto(usuario, 'configurarPermisosClientes')
 }

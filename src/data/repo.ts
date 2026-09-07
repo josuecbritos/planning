@@ -165,6 +165,18 @@ export interface Repo {
    * en modo Local hay que decírselo.
    */
   cambiarRolUsuario(id: string, rol: Rol, actorId?: string): Promise<Usuario>
+  /**
+   * #353 — A quién puede sumar a ESTE proyecto quien está mirando, ya filtrado.
+   *
+   * La pantalla no decide a quién puede agregar el dueño: recibe la lista. La
+   * regla de quién puede ser agregado ya vive en la base, en la política que
+   * autoriza la operación; si además el navegador la calculara por su cuenta,
+   * quedaría escrita en dos lugares y tarde o temprano se separan.
+   *
+   * `actorId` solo lo usa el repo de memoria, que no tiene sesión: en Supabase
+   * quien pregunta es el JWT. Mismo patrón que `cambiarRolUsuario`.
+   */
+  usuariosAgregables(proyectoId: string, actorId?: string): Promise<Usuario[]>
   /** Asigna un proyecto a un usuario (cliente o consultor). El acceso nace
    *  con los permisos por DEFECTO del rol del usuario (4). */
   asignarAcceso(usuarioId: string, proyectoId: string): Promise<Acceso>
