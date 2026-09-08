@@ -390,6 +390,17 @@ Requiere desplegar las Edge Functions y conectar un proveedor de correo:
    > funciones, pero **Supabase los inyecta automáticamente** en el entorno de
    > las Edge Functions: no hace falta configurarlos a mano.
 
+   > ⚠️ **`SUPABASE_SERVICE_ROLE_KEY` está marcada como obsoleta en este
+   > proyecto** (la vigente es `SUPABASE_SECRET_KEYS`). Estas cuatro funciones
+   > la USAN para construir su cliente admin —no comparan contra ella, que era
+   > el defecto de #272—, así que **siguen funcionando mientras la plataforma la
+   > inyecte**. El día que deje de inyectarse, las cuatro se caen a la vez: el
+   > `createClient` se construiría con `undefined`. Es un cambio de una línea
+   > por función (tomar la primera de `SUPABASE_SECRET_KEYS` cuando la anterior
+   > falte, como hace `resumen-diario/credenciales.ts`), y obliga a
+   > **redesplegar las cuatro**. Anotado acá para que la decisión sea deliberada
+   > y no una sorpresa.
+
    **Para probar en un preview de Vercel** hace falta un secret más. Las
    funciones responden con CORS acotado a `SITE_URL`, así que desde el dominio
    del preview el navegador bloquea la respuesta y la app lo reporta como si
@@ -459,14 +470,22 @@ Dashboard → **Edge Functions** → *Deploy a new function*, con el nombre
 |---|---|
 | `index.ts` | toma el turno, pide los datos y envía por Resend |
 | `plantilla.ts` | el correo: asunto, cuerpo con formato y cuerpo en texto plano |
+| `credenciales.ts` | qué credenciales acepta como "el programador" |
 
-Están separados para que la prueba `docs/prueba-272-correo.mjs` pueda comprobar
-el correo **de verdad** —el mismo que se envía— en vez de una copia del texto.
+Los tres están separados para que las pruebas puedan comprobar **lo que la
+función usa de verdad** —el correo y la puerta— en vez de una copia.
 
-Se deja con la verificación de JWT **activada** (el valor por defecto): quien la
-llama es el programador con la clave de servicio, y la función además comprueba
-que la credencial sea exactamente esa. No lleva CORS: no la llama ningún
-navegador.
+Se deja con la verificación de JWT **activada** (el valor por defecto), y además
+la función comprueba que la credencial sea **una clave del proyecto**. No lleva
+CORS: no la llama ningún navegador.
+
+> **Las dos generaciones de claves.** La variable vigente es
+> **`SUPABASE_SECRET_KEYS`** —en plural, porque un proyecto puede tener varias a
+> la vez, que es lo que permite rotar una sin cortar el servicio— y
+> `SUPABASE_SERVICE_ROLE_KEY` es la anterior. La función **acepta todas las
+> vigentes y también la anterior mientras el proyecto la tenga**, así que
+> funciona antes y después del cambio, sin una ventana en la que el resumen deje
+> de salir. Si el entorno no tiene ninguna, responde **503** y no se abre.
 
 ### 3. Dejar el programador
 
@@ -482,7 +501,7 @@ select cron.schedule(
     url     := 'https://<REF-DEL-PROYECTO>.supabase.co/functions/v1/resumen-diario',
     headers := jsonb_build_object(
       'Content-Type',  'application/json',
-      'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
+      'Authorization', 'Bearer <CLAVE-SECRETA-DEL-PROYECTO>'
     ),
     body    := '{}'::jsonb,
     timeout_milliseconds := 60000
@@ -501,7 +520,7 @@ es el momento es `resumen_diario_tomar_turno()`, **en la base, mirando la zona
 Sábado y domingo tampoco corre: el atraso se cuenta en días hábiles y el sábado
 repetiría lo del viernes.
 
-> La clave de servicio queda guardada en la definición del trabajo
+> La clave queda guardada en la definición del trabajo
 > (`cron.job`), que solo pueden leer `postgres` y `service_role`. Si se prefiere
 > no tenerla escrita ahí, se puede guardar en Vault
 > (`vault.create_secret(...)`) y leerla dentro del `$$ ... $$`.
@@ -513,7 +532,7 @@ salvo el día y la hora: los mismos destinatarios y las mismas tareas.
 
 ```bash
 curl -X POST 'https://<REF>.supabase.co/functions/v1/resumen-diario' \
-  -H 'Authorization: Bearer <SERVICE_ROLE_KEY>' \
+  -H 'Authorization: Bearer <CLAVE-SECRETA-DEL-PROYECTO>' \
   -H 'Content-Type: application/json' \
   -d '{"forzar": true}'
 ```

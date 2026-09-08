@@ -4294,3 +4294,91 @@ que fuerza una corrida sin esperar a mañana.
 único que allá se puede comprobar: que uno cambia el suyo y no el de otro, que
 el de un tercero llega enmascarado, y que ni los datos del correo, ni el turno,
 ni el registro de corridas están al alcance de la aplicación.
+
+---
+
+### #272 (corrección) — El programador recibía 401 con una credencial válida
+
+**Solo la función de servidor.** No toca la base ni los permisos: **sin
+migración**.
+
+#### El problema
+
+La comprobación de credencial de `resumen-diario` comparaba contra
+`SUPABASE_SERVICE_ROLE_KEY` **y nada más**. En este proyecto esa variable está
+marcada como **obsoleta**: la vigente es `SUPABASE_SECRET_KEYS`. La llamada del
+programador llegaba con una credencial de rol `service_role` válida, la
+comparación se hacía contra `undefined` —es decir, contra la cadena literal
+`"Bearer undefined"`— y la función respondía **401**. El resumen no salía y en
+los registros no quedaba ni una línea que lo explicara, porque ese 401 se
+devolvía sin anotar nada.
+
+**Medido en los registros antes de tocar nada**, para no arreglar a ciegas: la
+función **arrancó** a las `18:15:32.660` y el borde registró el **401** a las
+`18:15:32.683`. Veintitrés milisegundos: el código **corrió**. No fue la
+verificación de JWT de la plataforma —esa no habría dejado arrancar la función—,
+fue esta comparación. La verificación de JWT sigue activada y no hace falta
+tocarla.
+
+#### Lo que se hizo
+
+**La puerta acepta ahora todas las claves vigentes del proyecto, y también la
+anterior mientras exista.** Así funciona antes y después del cambio de sistema de
+claves, sin una ventana en la que el resumen deje de salir. `SUPABASE_SECRET_KEYS`
+viene en **plural** y se admiten sus dos formas —arreglo JSON y lista separada
+por comas—: cuál entrega la plataforma no es algo que esta función deba adivinar,
+y equivocarse ahí es exactamente el error que se estaba corrigiendo.
+
+**Más allá del nombre de la variable, el defecto de fondo era comparar contra una
+cadena fija.** Un proyecto puede tener varias claves vigentes a la vez —es lo que
+permite rotar una sin cortar el servicio—, así que una comparación contra UNA
+convierte cualquier rotación en una caída silenciosa. Por eso el arreglo no es
+"cambiar el nombre de la variable" sino aceptar una lista.
+
+- **Con la lista vacía se rechaza a todos**, nunca se abre: sin ninguna clave
+  configurada no hay forma de saber quién es legítimo. Es el mismo criterio con
+  el que #249 trató a `SITE_URL`.
+- **La comparación es de tiempo constante.** Desde que esta comprobación es la
+  única puerta, una que corta en el primer byte distinto le cuenta al que prueba
+  cuánto lleva acertado. La longitud se sigue filtrando y no es lo que se
+  protege acá.
+- **El 401 ahora queda anotado** en los registros de la función. Sin esa línea,
+  no había forma de distinguirlo del que pone la plataforma — que es justo la
+  confusión que hubo que deshacer con los registros para diagnosticar esto.
+- **El cliente admin toma la primera clave disponible**, así que la función
+  tampoco depende de la variable obsoleta para hablar con la base.
+
+La lógica vive en **`credenciales.ts`**, un archivo aparte, por la misma razón
+que `plantilla.ts`: para que la prueba pueda comprobar **la puerta de verdad** en
+vez de leer el código y creerle. La función pasa a llevar tres archivos.
+
+#### La revisión de las otras funciones
+
+**Ninguna otra función de servidor COMPARA contra la variable obsoleta.** Las
+otras cuatro —`invitar-usuario`, `aceptar-invitacion`, `recuperar-contrasena`,
+`eliminar-usuario`— la **usan** para construir su cliente admin, que es otra
+cosa: funcionan mientras la plataforma la inyecte.
+
+**No se tocaron, y es deliberado:** el día que esa variable deje de inyectarse
+las cuatro se caen a la vez, pero el arreglo obliga a redesplegar las cuatro y
+esa es una decisión de despliegue, no una consecuencia de este defecto. Queda
+anotado en DEPLOY.md, con el cambio exacto de una línea.
+
+#### Cómo se comprobó
+
+`docs/prueba-272-credenciales.mjs` —**30 comprobaciones**— importa
+`credenciales.ts`, que es lo que la función usa de verdad: el escenario exacto de
+producción (la obsoleta ausente, la llamada con la vigente), la rotación con dos
+claves en las tres formas en que puede llegar la variable, y lo que **no** debe
+pasar —sin cabecera, con la cabecera vacía, con otra credencial, con la clave y
+un carácter de más o de menos, y con el entorno vacío—.
+
+*Control negativo:* `credenciales.ts` es un archivo **nuevo**, así que no hay
+versión anterior contra la que correr la prueba. La regla vieja se escribe dentro
+de la prueba, tal como estaba, y se comprueba que **en el mismo escenario
+falla**. Sin eso, "la clave vigente pasa" no distinguiría el arreglo de una
+prueba que habría aprobado igual antes.
+
+*La revisión de las otras cuatro funciones también es una comprobación*, y lee el
+código en vez de fiarse de la memoria: distingue **usar** la variable de
+**comparar** contra ella, y se pone roja si alguien agrega una comparación nueva.

@@ -20,18 +20,33 @@
 //   RESEND_API_KEY  — API key de Resend
 //   EMAIL_FROM      — remitente verificado, ej. "Andotek Planning <planning@andotek.cl>"
 //   SITE_URL        — URL publica de la app
-// (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY los inyecta la plataforma.)
+// (SUPABASE_URL y las claves del proyecto los inyecta la plataforma: la vigente
+// es `SUPABASE_SECRET_KEYS` —en plural, porque puede haber varias a la vez— y
+// `SUPABASE_SERVICE_ROLE_KEY` es la anterior. Ver `credenciales.ts`.)
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { asunto, html, texto, type Resumen, type TareaCorreo } from './plantilla.ts'
+import { autorizada, clavesAceptadas } from './credenciales.ts'
 
 // SIN CORS, y es deliberado: a esta función no la llama ningún navegador. La
-// llama el programador de la base con la clave de servicio. Publicar cabeceras
+// llama el programador de la base con una clave del proyecto. Publicar cabeceras
 // de CORS sería ofrecerle una puerta a un origen que no existe.
 
 const CONFIGURADA = Boolean(
   Deno.env.get('RESEND_API_KEY') && Deno.env.get('EMAIL_FROM') && Deno.env.get('SITE_URL'),
 )
+
+// Las credenciales que se aceptan como "el programador", y la que esta función
+// usa para hablar con la base. Se leen UNA vez al arrancar.
+const CLAVES = clavesAceptadas(
+  Deno.env.get('SUPABASE_SECRET_KEYS'),
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+)
+// Para el cliente admin sirve cualquiera de las vigentes: `clavesAceptadas` las
+// devuelve en orden, con la anterior al final, así que se toma la primera.
+// El `?? ''` es para el tipo, no para el caso: con la lista vacía la función ya
+// respondió 503 antes de llegar a construir el cliente.
+const CLAVE_ADMIN = CLAVES[0] ?? ''
 
 function registrar(etiqueta: string, detalle: unknown) {
   console.error(`[resumen-diario] ${etiqueta}:`, detalle instanceof Error ? detalle.message : detalle)
@@ -61,16 +76,27 @@ Deno.serve(async (req) => {
     return responder(503, { error: 'El servicio no está configurado.' })
   }
 
-  // Solo la clave de servicio. No hay ninguna persona detrás de esta llamada:
+  // Sin ninguna clave configurada no hay forma de saber quién es legítimo, y
+  // abrirse "por si acaso" sería peor que no responder (#249).
+  if (CLAVES.length === 0) {
+    registrar('configuración', 'no hay ninguna clave del proyecto en el entorno (SUPABASE_SECRET_KEYS)')
+    return responder(503, { error: 'El servicio no está configurado.' })
+  }
+
+  // Solo una clave del proyecto. No hay ninguna persona detrás de esta llamada:
   // cualquier otra credencial —incluida la de un administrador con sesión— se
-  // rechaza, porque esta función lee correos de terceros.
-  const clave = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  if (req.headers.get('Authorization') !== `Bearer ${clave}`) {
+  // rechaza, porque esta función lee correos de terceros. Se aceptan TODAS las
+  // vigentes, no una sola: comparar contra una cadena fija convierte cualquier
+  // rotación de clave en una caída silenciosa, que es exactamente lo que pasó.
+  if (!autorizada(req.headers.get('Authorization'), CLAVES)) {
+    // Se deja constancia: sin esta línea, el 401 solo se ve en el registro del
+    // borde y no hay forma de distinguirlo del que pone la plataforma.
+    registrar('autorización', 'la credencial recibida no es ninguna de las claves del proyecto')
     return responder(401, { error: 'Sin autorización' })
   }
 
   try {
-    const admin = createClient(Deno.env.get('SUPABASE_URL')!, clave)
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, CLAVE_ADMIN)
     const sitio = Deno.env.get('SITE_URL')!
 
     // `forzar` existe para VERIFICAR desde el dashboard: saltea el día y la

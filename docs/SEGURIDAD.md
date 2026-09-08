@@ -408,9 +408,25 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   `security definer` y está concedida SOLO a `service_role`: lee correos de
   terceros, que es justo lo que la aplicación tiene prohibido. Es la misma razón
   por la que la invitación se envía desde una función de servidor.
-- **La función de servidor exige la clave de servicio exacta**, no una sesión
-  válida: un administrador con sesión tampoco puede dispararla. Y no publica
-  CORS, porque no la llama ningún navegador.
+- **La función de servidor exige una CLAVE DEL PROYECTO**, no una sesión válida:
+  un administrador con sesión tampoco puede dispararla. Y no publica CORS,
+  porque no la llama ningún navegador.
+- **Acepta todas las claves vigentes, no una sola.** La primera versión comparaba
+  contra `SUPABASE_SERVICE_ROLE_KEY` y nada más; en este proyecto esa variable
+  está obsoleta —la vigente es `SUPABASE_SECRET_KEYS`, en plural—, así que la
+  comparación se hacía contra `undefined` y el programador recibía **401 con una
+  credencial válida**. Más allá del nombre de la variable, la lección es que
+  **comparar contra una cadena fija convierte cualquier rotación de clave en una
+  caída silenciosa**. La lista se arma en `credenciales.ts`, admite las dos
+  generaciones, y **con la lista vacía rechaza a todos** en vez de abrirse —el
+  mismo criterio que #249 con `SITE_URL`—. La comparación es de tiempo constante:
+  desde que esta puerta es la única, una que corta en el primer byte distinto le
+  contaría al que prueba cuánto lleva acertado.
+- **Ninguna otra función de servidor compara contra la variable obsoleta**
+  (comprobado sobre el código, no de memoria, en
+  `docs/prueba-272-credenciales.mjs`). Las otras cuatro la USAN para construir su
+  cliente admin, que es otra cosa: funcionan mientras la plataforma la inyecte, y
+  el día que deje de hacerlo se caen las cuatro. Queda anotado en DEPLOY.md.
 - **`resumen_diario_corrida`** queda con RLS activada y sin ninguna política, y
   revocada a `anon` y a `authenticated` — los default privileges de Supabase
   conceden las tablas nuevas a `anon`, así que hay que revocarlo explícitamente
