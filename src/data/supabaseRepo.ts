@@ -49,6 +49,10 @@ const toUsuario = (r: Row): Usuario => ({
   activo: r.activo, authId: r.auth_id ?? undefined,
   permisosProyecto: r.permisos_proyecto ?? undefined,
   organizacion: r.organizacion ?? undefined, // #339
+  // #272: la vista lo enmascara igual que la organización, así que sobre un
+  // tercero llega `null` y acá queda `undefined` — no es "apagado", es "no me
+  // corresponde saberlo".
+  resumenDiario: r.resumen_diario ?? undefined,
 })
 const toAcceso = (r: Row): Acceso => ({
   usuarioId: r.usuario_id, proyectoId: r.proyecto_id, fechaAsignacion: r.fecha_asignacion,
@@ -378,6 +382,8 @@ export class SupabaseRepo implements Repo {
     // (trigger `normalizar_organizacion`), así que "Andotek " y "Andotek" no
     // pueden convertirse en dos organizaciones distintas por ningún camino.
     if ('organizacion' in patch) upd.organizacion = normalizarOrganizacion(patch.organizacion) ?? null
+    // #272: la columna es `not null`, así que se manda el booleano tal cual.
+    if ('resumenDiario' in patch) upd.resumen_diario = patch.resumenDiario === true
     // Aplica el cambio y relee por la vista (solo admin llega aquí) para traer
     // email/permisos ya desenmascarados; la tabla base no expone esas columnas.
     unwrap(await this.db.from('usuario').update(upd).eq('id', id).select('id').single())

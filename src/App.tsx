@@ -233,6 +233,23 @@ export default function App({ repo }: { repo: Repo }) {
   // sea cual sea el rol. No se recuerda el último proyecto visitado: decisión
   // tomada, no simplificación. (Llegar desde una notificación navega después.)
   const [pantalla, setPantalla] = useState<Pantalla>('resumen')
+  // #272 — Los dos enlaces del resumen diario por correo, y NADA más: no es
+  // una capa de direcciones para toda la aplicación. #274 sigue en pie —entrar
+  // normalmente parte en Resumen—; esto es lo mismo que ya pasa al llegar
+  // desde una notificación, que también navega DESPUÉS de entrar.
+  const [destinoCorreo, setDestinoCorreo] = useState<Pantalla | null>(() => {
+    if (window.location.hash === '#mis-tareas') return 'mipanel'
+    if (window.location.hash === '#mi-cuenta') return 'configuracion'
+    return null
+  })
+  // Se aplica cuando hay sesión, no al montar: llegando sin sesión, primero
+  // está la pantalla de entrar y el destino espera al otro lado.
+  useEffect(() => {
+    if (!sesion || !destinoCorreo) return
+    setPantalla(destinoCorreo)
+    setDestinoCorreo(null)
+    window.location.hash = ''
+  }, [sesion, destinoCorreo])
   // P1: vista congelada ("foto"). El nonce fuerza el re-snapshot al tocar
   // "Actualizar vista"; `vistaStale` lo reporta la vista activa (tabla/Gantt).
   const [snapshotNonce, setSnapshotNonce] = useState(0)

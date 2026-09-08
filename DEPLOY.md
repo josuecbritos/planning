@@ -426,6 +426,124 @@ Requiere desplegar las Edge Functions y conectar un proveedor de correo:
    sí le sirven a quien mira la pantalla —"Esta invitación ya fue usada", "El
    enlace expiró", "El usuario ya tiene cuenta activa"— siguen llegando tal cual.
 
+## Resumen diario por correo (#272)
+
+Cada mañana a las **8:00 de Chile**, cada persona con el interruptor encendido
+recibe un correo con sus tareas atrasadas y las que vencen ese día. Es el único
+correo del producto que **no lo dispara nadie**: lo dispara el programador de
+la base.
+
+**No hay secretos nuevos.** Sale por el mismo Resend y el mismo `EMAIL_FROM`
+que la invitación, que ya está validado de punta a punta. Lo único nuevo es la
+parte que corre sola.
+
+### 1. Aplicar la migración 34
+
+`supabase/migrations/20260707000034_resumen_diario.sql`, con **`pg_dump` antes**
+(el plan gratuito no tiene respaldos automáticos, ver *Mantenimiento*). Agrega
+la columna `usuario.resumen_diario`, amplía `usuario_visible`, y crea el turno,
+los datos del correo y el registro de corridas.
+
+> **Los usuarios que ya existen quedan APAGADOS y los nuevos nacen encendidos.**
+> No es un descuido: nadie de los que ya están pidió este correo. La migración
+> hace los dos pasos en ese orden a propósito.
+
+Después, correr la compuerta `scripts/validar-rls.mjs`: trae casos nuevos.
+
+### 2. Desplegar la función `resumen-diario`
+
+Dashboard → **Edge Functions** → *Deploy a new function*, con el nombre
+`resumen-diario`. **Lleva DOS archivos** y hay que subir los dos:
+
+| Archivo | Qué es |
+|---|---|
+| `index.ts` | toma el turno, pide los datos y envía por Resend |
+| `plantilla.ts` | el correo: asunto, cuerpo con formato y cuerpo en texto plano |
+
+Están separados para que la prueba `docs/prueba-272-correo.mjs` pueda comprobar
+el correo **de verdad** —el mismo que se envía— en vez de una copia del texto.
+
+Se deja con la verificación de JWT **activada** (el valor por defecto): quien la
+llama es el programador con la clave de servicio, y la función además comprueba
+que la credencial sea exactamente esa. No lleva CORS: no la llama ningún
+navegador.
+
+### 3. Dejar el programador
+
+Dashboard → **Database → Extensions**, y activar **`pg_cron`** y **`pg_net`**.
+Después, en el **SQL Editor**:
+
+```sql
+select cron.schedule(
+  'resumen-diario',
+  '0 * * * *',                        -- CADA HORA, en punto (UTC)
+  $$
+  select net.http_post(
+    url     := 'https://<REF-DEL-PROYECTO>.supabase.co/functions/v1/resumen-diario',
+    headers := jsonb_build_object(
+      'Content-Type',  'application/json',
+      'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
+    ),
+    body    := '{}'::jsonb,
+    timeout_milliseconds := 60000
+  );
+  $$
+);
+```
+
+**Cada hora y no una vez al día, y es el punto entero.** El programador trabaja
+en UTC y **Chile cambia de hora dos veces al año**: un horario fijo en UTC daría
+las 8:00 la mitad del año y las 7:00 o las 9:00 la otra mitad. Quien decide si
+es el momento es `resumen_diario_tomar_turno()`, **en la base, mirando la zona
+`America/Santiago` por su nombre** — la misma regla que ya rige `hoy_chile()`
+(#291). Las otras 23 llamadas del día no hacen nada y no cuestan un correo.
+
+Sábado y domingo tampoco corre: el atraso se cuenta en días hábiles y el sábado
+repetiría lo del viernes.
+
+> La clave de servicio queda guardada en la definición del trabajo
+> (`cron.job`), que solo pueden leer `postgres` y `service_role`. Si se prefiere
+> no tenerla escrita ahí, se puede guardar en Vault
+> (`vault.create_secret(...)`) y leerla dentro del `$$ ... $$`.
+
+### 4. Verificar
+
+Antes de esperar a las 8:00, se puede forzar una corrida. Es lo mismo en todo
+salvo el día y la hora: los mismos destinatarios y las mismas tareas.
+
+```bash
+curl -X POST 'https://<REF>.supabase.co/functions/v1/resumen-diario' \
+  -H 'Authorization: Bearer <SERVICE_ROLE_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{"forzar": true}'
+```
+
+Para verificar contra la casilla del dueño sin molestar a nadie: encender el
+interruptor **solo para él** (Administración → Usuarios → ficha) y forzar.
+
+**Qué pasó en cada corrida:**
+
+```sql
+select * from resumen_diario_corrida order by fecha desc limit 5;
+```
+
+Una fila por día en que el resumen intentó correr, con cuántos se enviaron,
+cuántos fallaron y el detalle del fallo. **La fila se escribe ANTES de enviar**:
+una corrida que falla queda anotada y **no se reintenta** — si se reintentara,
+el día que Resend responda lento todos recibirían el correo dos veces. El
+detalle técnico va además a **Edge Functions → resumen-diario → Logs**, con el
+prefijo `[resumen-diario]`.
+
+### 5. Lo que este correo NO lleva
+
+**No lleva la cabecera de baja** que pone el botón de "darse de baja" de Gmail.
+Evaluado y descartado por ahora: exige una función de servidor nueva, abierta
+sin sesión, que reciba el aviso del proveedor y apague el interruptor. **No
+afecta la entrega** —lo que decide si el correo entra es la autenticación del
+dominio, que ya está montada, y el volumen está lejos del umbral de remitente
+masivo (5.000 mensajes diarios a cuentas personales)—. Se agrega si aparece la
+primera queja de spam.
+
 ## Mantenimiento
 
 - **Nuevos usuarios**: Módulo de Usuarios (app) + Authentication → Add user (panel),

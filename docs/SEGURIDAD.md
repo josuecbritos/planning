@@ -384,6 +384,46 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   la 22 y la 24; ese camino no se puede perder por un tipo de retorno. Las
   columnas se declaran una por una y el cuerpo sigue leyendo de la vista.
 
+### #272 — Resumen diario por correo (migración 34)
+
+- **`usuario.resumen_diario`** entra a `usuario_visible` con la MISMA regla de
+  enmascarado que `organizacion` y `permisos_proyecto`: al administrador y a
+  cada quien el suyo. Sobre un tercero llega `null` — nadie necesita saber si a
+  otro le llega un correo. El grant por columnas de la tabla **no se toca**
+  (invariante 3: el cliente lee por la vista, nunca la tabla).
+- **La vista se amplía con `create or replace` y la columna al final**, que es lo
+  único que PostgreSQL admite sin soltarla. Así `regla_visibilidad_usuario` —que
+  depende de ella— no hay que tocarla, y el `WHERE` queda idéntico al de #339.
+  La migración vuelve a comprobar en la misma transacción que las dos escrituras
+  de la regla siguen diciendo lo mismo.
+- **La columna NO entra al candado de auto-edición, y es deliberado.** El
+  candado enumera las columnas PROHIBIDAS una por una, así que una columna nueva
+  queda permitida sola — que es justo lo que hace falta: cada quien tiene que
+  poder apagar el suyo. Es lo contrario del caso de `organizacion` en #339, que
+  sí entró a la lista porque cambiarla amplía lo que uno VE. Esta solo decide si
+  a esa persona le llega un correo. Que nadie pueda tocar el interruptor de OTRO
+  lo sigue resolviendo la política `usuario_update`, que solo deja la propia fila
+  (o al administrador).
+- **El destinatario se resuelve EN EL SERVIDOR.** `resumen_diario_datos()` es
+  `security definer` y está concedida SOLO a `service_role`: lee correos de
+  terceros, que es justo lo que la aplicación tiene prohibido. Es la misma razón
+  por la que la invitación se envía desde una función de servidor.
+- **La función de servidor exige la clave de servicio exacta**, no una sesión
+  válida: un administrador con sesión tampoco puede dispararla. Y no publica
+  CORS, porque no la llama ningún navegador.
+- **`resumen_diario_corrida`** queda con RLS activada y sin ninguna política, y
+  revocada a `anon` y a `authenticated` — los default privileges de Supabase
+  conceden las tablas nuevas a `anon`, así que hay que revocarlo explícitamente
+  (misma nota que la migración 30).
+- **La trampa de #290, otra vez.** Tres funciones nuevas, tres `revoke ... from
+  public` ANTES de los demás revokes. La migración se auto-comprueba en la misma
+  transacción.
+- **La compuerta gana `probarResumenDiario`**: que uno SÍ puede cambiar el suyo,
+  que NO puede el de otro —medido por el VALOR de la otra persona, porque la
+  política no da error sino que no alcanza ninguna fila—, que el de un tercero
+  llega enmascarado, y que ni los datos, ni el turno, ni el registro de corridas
+  están al alcance de la aplicación. Restituye siempre lo que toca.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.

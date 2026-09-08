@@ -372,6 +372,10 @@ export class MemoryRepo implements Repo {
       // Defaults por rol (4): el consultor nace con sus permisos de proyecto.
       permisosProyecto: input.rol === 'consultor' ? { ...DEFAULT_PERMISOS_PROYECTO } : undefined,
       organizacion: normalizarOrganizacion(input.organizacion), // #339
+      // #272: espejo del default de la columna `resumen_diario`. Quien se da
+      // de alta a partir de ahora NACE encendido; los que ya estaban —los del
+      // seed— quedan apagados, igual que en la base al aplicar la migración.
+      resumenDiario: true,
     }
     this.state.usuarios.push(u)
     this.persist()

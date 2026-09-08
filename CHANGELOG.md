@@ -4132,3 +4132,165 @@ nombre del frente va seguido de su contador dentro del mismo título, así que s
 lee el primer nodo de texto y no todo el `textContent`; y el proyecto propio de
 la consultora **no está** en el Resumen del administrador, así que el criterio 6
 crea su propio segundo proyecto en vez de dar por hecho que hay dos a mano.
+
+---
+
+### #272 — Un resumen diario por correo, y su interruptor
+
+**Toca la base, la función de servidor y la pantalla.** Lleva **migración 34**,
+y por lo tanto respaldo previo del dueño y la compuerta de permisos en verde
+antes de cerrar.
+
+#### La situación
+
+El producto **enviaba dos correos y no más** —la invitación y el
+restablecimiento de contraseña—, los dos disparados por una persona desde
+funciones de servidor con Resend. **No existía nada que corriera solo a una hora
+fija**, ni ninguna preferencia de correo en la ficha del usuario ni en Mi
+cuenta. Para saber qué tenía atrasado, cada quien entraba a Mis Tareas.
+
+#### Lo que se hizo
+
+**El correo.** Un correo por persona, **de lunes a viernes a las 8:00 de Chile**,
+con sus tareas —donde es responsable— en los proyectos a los que **hoy** tiene
+acceso. Dos bloques: *Atrasadas*, de mayor a menor atraso, y *Vencen hoy*, por
+proyecto y, dentro de cada uno, **en el orden que el dueño le dio a frentes y
+sub frentes arrastrándolos**. Un bloque sin tareas no aparece. Después, una sola
+línea con cuántas más vencen esta semana: con 50 tareas el correo se vuelve
+ilegible, y para eso está la herramienta.
+
+**No se inventó un diseño para el correo.** La tabla es la de Mis Tareas —Tarea ·
+Ubicación · Estado · Fecha Objetivo · Atraso—, con la fila pintada del color de
+su estado, la misma pastilla y la ruta completa dentro de Ubicación, como hace
+Mis Tareas en el teléfono. Los cinco colores salen de la paleta del producto y
+la prueba los compara **contra `src/styles.css`**, así que no pueden separarse
+sin que se note.
+
+**Ninguna tipografía se carga de la web** —Outlook y varios clientes las
+bloquean—, y las fechas y el atraso van en monoespaciada común para que queden
+alineados. El mensaje viaja con **las dos versiones adentro**: la de formato y
+una de texto plano. Sin la segunda, quien lo lea con un lector de pantalla o con
+el formato bloqueado vería un correo vacío.
+
+**Cuándo NO se envía:** sin atrasadas ni vencimientos de hoy —aunque queden
+tareas más adelante en la semana—, sábado y domingo, y a quien lo tenga apagado.
+Tampoco a quien no puede entrar a la herramienta: un desactivado, un eliminado o
+un invitado que todavía no activó su cuenta, **aunque su interruptor esté
+encendido**. Le llega a cualquier usuario, consultor o cliente, con la misma
+regla: un cliente tiene tareas asignadas igual que un consultor.
+
+**El interruptor, en dos pantallas y uno solo.** En **Mi cuenta**, un bloque
+*Notificaciones por correo* entre Perfil y Contraseña, que **guarda al tocarlo**
+—es una sola decisión de dos estados; un botón Guardar al lado sería un paso de
+más—. En la **ficha del usuario**, al final, después de Perfil, con su misma
+nota, porque ahí el administrador está decidiendo por otra persona. **Nace
+encendido para todo usuario nuevo y los que ya existían quedaron apagados:** un
+interruptor que nace apagado no lo enciende nadie, y a los que ya estaban no se
+les enciende un correo sin avisar.
+
+**No es una pieza nueva:** es el control Sí/No que la pantalla de permisos ya usa
+para cada decisión de sí-o-no sobre una persona, con su misma lista y su misma
+fila. No se agregó una sola declaración de estilo. El orden de las dos
+posiciones también es el de allá (No, Sí): el mismo control en dos pantallas no
+puede leerse al revés en cada una.
+
+**Este campo NO entra en el candado de auto-edición**, y cuesta nada porque el
+candado enumera las columnas PROHIBIDAS una por una: una columna nueva queda
+permitida sola. Es lo contrario del caso de la organización en #339, que sí entró
+a la lista porque cambiarla amplía lo que uno VE. Que nadie pueda tocar el
+interruptor de OTRO lo sigue resolviendo la política `usuario_update`.
+
+**El envío no monta nada nuevo:** mismo Resend y mismo remitente que la
+invitación, ya validados de punta a punta. De ahí sale también **cómo se obtiene
+la dirección: en el servidor.** La aplicación tiene prohibido leer el correo de
+terceros —solo se ve el propio—, así que el destinatario no puede resolverse
+desde el navegador; `resumen_diario_datos()` está concedida solo a
+`service_role`.
+
+**La hora, por nombre de zona.** El programador de Supabase trabaja en UTC y
+Chile cambia de hora dos veces al año, así que el trabajo despierta a la función
+**cada hora** y quien decide si es el momento mira `America/Santiago` — la misma
+regla que ya rige `hoy_chile()` (#291). Un horario fijo en UTC daría las 8:00 la
+mitad del año y las 7:00 o las 9:00 la otra mitad. **Una corrida que falla no se
+reintenta:** la fila del día se escribe ANTES de enviar, y el motivo del fallo
+queda anotado en `resumen_diario_corrida`.
+
+**Los dos enlaces del correo abren la pantalla que nombran.** Se agregaron las
+únicas dos direcciones profundas de la aplicación, `#mis-tareas` y `#mi-cuenta`.
+**#274 sigue en pie** —entrar normalmente parte en Resumen—: esto es lo mismo que
+ya pasa al llegar desde una notificación, que también navega después de entrar.
+Sin esto, "Gestionar correos" no llevaba a Mi cuenta y el criterio 13c quedaba
+sin cumplir.
+
+**Sin botón de baja, por ahora.** Evaluado y descartado: exige una función de
+servidor nueva, abierta sin sesión, que reciba el aviso del proveedor y apague el
+interruptor. No afecta la entrega —lo que decide si el correo entra es la
+autenticación del dominio, ya montada— y el volumen está lejos del umbral de
+remitente masivo. Se agrega si aparece la primera queja de spam.
+
+#### Decisiones que el pedido no resolvía, preguntadas antes de escribir nada
+
+1. **El control:** el Sí/No que el producto ya usa, no un interruptor deslizante
+   nuevo.
+2. **Qué es "atraso":** la columna Atraso **del producto** —días hábiles que la
+   tarea se corrió respecto de su compromiso original—, no los días vencidos.
+   *Consecuencia asumida y dicha al preguntar:* con esa lectura, la frase del
+   pedido "en el bloque de hoy la columna Atraso muestra el vacío de siempre"
+   **no se cumple siempre** — una tarea que vence hoy y fue replanificada lleva
+   su número. Lo que sí se cumple es "el mismo formato que la tabla de Mis
+   Tareas", que era la otra mitad de la misma sección.
+3. **Los enlaces:** sí, con dos direcciones propias.
+4. **Guardar en Mi cuenta:** al tocarlo, sin botón.
+5. **Al crear un usuario:** el interruptor no aparece — nace encendido y no hay
+   nada que decidir todavía.
+
+#### Cómo se comprobó
+
+**Tres pruebas, cada una donde la cosa vive.** `docs/prueba-272-correo.mjs`
+importa `plantilla.ts` —lo que la función envía de verdad, no una copia del
+texto— y mide asunto, bloques, columnas, colores contra la hoja de estilos,
+tipografías, enlaces y la versión en texto plano.
+`docs/prueba-272-resumen-diario-base.mjs` levanta un PostgreSQL local, aplica
+las migraciones **parando antes de la 34** para poder medir el criterio 1b, y
+después interroga quién recibe qué y en qué orden.
+`docs/prueba-272-resumen-diario.mjs` recorre las dos pantallas y los dos enlaces
+con el navegador.
+
+*Control negativo:* la pantalla contra `main` da **21 fallas y 7 pases**, y la
+base sin la migración 34 da **21 fallas y 4 pases**. Los pases de los dos lados
+son los guardias que tienen que valer igual con y sin el cambio —que las
+migraciones previas aplican, que la regla de visibilidad de #339 y su candado
+siguen intactos, que ninguna función quedó abierta a PUBLIC, que entrar sin
+dirección sigue partiendo en Resumen— más **una comprobación de AUSENCIA que
+pasa por trivialidad** cuando la función no existe: que el formulario de alta
+no ofrezca el interruptor. Esa queda porque sirve de guardia hacia adelante, no
+porque distinga nada hoy.
+
+*El control negativo encontró dos defectos míos, los dos en el arnés:*
+
+- **Un verde falso.** "El administrador los ve todos" preguntaba si el conteo
+  era **distinto de cero**, y sin la columna la consulta devuelve un ERROR, que
+  tampoco es cero. Ahora compara `n/n`.
+- **Una prueba que se moría a mitad de camino.** Sin la función, la pantalla de
+  Mis Tareas no existe y leer su título reventaba: el proceso se caía y dejaba
+  **tres comprobaciones sin correr**, así que el control negativo informaba
+  menos de lo que en realidad se rompía (decía 19 fallas donde había 21). Las
+  lecturas de título ahora devuelven vacío en vez de reventar, como el resto de
+  los ayudantes de estas pruebas.
+
+*El atraso de la base se mide contra el de la pantalla:* `dias_habiles_entre` y
+`difDiasHabiles` tienen que dar el mismo número, y la prueba compara **los 900
+pares de fechas de un mes**, no tres elegidos a mano. El correo muestra esa
+columna y ordena por ella; si las dos implementaciones se separaran, el correo
+diría un número y la pantalla otro.
+
+**Lo que estas pruebas NO pueden cubrir, y se dice en cada archivo:** que Resend
+entregue, que el programador despierte a las 8:00 y cómo se ve el correo en
+Outlook. Son los criterios 5 a 14 y **se verifican contra la casilla del dueño**
+después de desplegar — DEPLOY.md § "Resumen diario por correo" trae el `curl`
+que fuerza una corrida sin esperar a mañana.
+
+**La compuerta gana `probarResumenDiario`**, que comprueba contra producción lo
+único que allá se puede comprobar: que uno cambia el suyo y no el de otro, que
+el de un tercero llega enmascarado, y que ni los datos del correo, ni el turno,
+ni el registro de corridas están al alcance de la aplicación.

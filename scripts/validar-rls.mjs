@@ -1491,6 +1491,130 @@ async function probarAgregarColega(admin) {
   }
 }
 
+/**
+ * #272 — El interruptor del resumen diario y las piezas del programador.
+ *
+ * Lo que se comprueba acá es lo que solo se puede comprobar contra una base de
+ * verdad: que cada quien pueda apagar EL SUYO y no el de otro (criterios 4 y
+ * 4b), que la vista enmascare el de un tercero, y que nada de lo que el
+ * programador usa —las funciones y el registro de corridas— quede al alcance
+ * de la aplicación.
+ *
+ * Lo que NO se comprueba acá: que el correo llegue a las 8:00. Eso exige la
+ * plataforma y son los criterios 5 a 14, que se verifican contra la casilla
+ * del dueño (DEPLOY.md § "Resumen diario").
+ */
+async function probarResumenDiario(admin) {
+  const rotulo = 'resumen'
+  const emailA = process.env.RLS_CONSULTOR_A_EMAIL
+  const passA = process.env.RLS_CONSULTOR_A_PASS
+  const emailB = process.env.RLS_CONSULTOR_B_EMAIL
+  const passB = process.env.RLS_CONSULTOR_B_PASS
+  if (!emailA || !passA) {
+    console.log('  SKIP  [resumen] hace falta la cuenta de consultor A para el caso de #272')
+    return
+  }
+
+  let idA = null
+  let idB = null
+  let previoA = null
+  let previoB = null
+  const restituir = async () => {
+    if (idA && previoA !== null) await admin.from('usuario').update({ resumen_diario: previoA }).eq('id', idA)
+    if (idB && previoB !== null) await admin.from('usuario').update({ resumen_diario: previoB }).eq('id', idB)
+  }
+
+  try {
+    // ¿La migración 34 está aplicada? Sin ella no hay nada que medir y NO se
+    // aprueba por silencio (#295).
+    const { error: errCol } = await admin.from('usuario_visible').select('id, resumen_diario').limit(1)
+    if (errCol) {
+      marcaNoConcluyente(rotulo, '#272 el interruptor del resumen diario', `${errCol.message} — ¿migración 34 aplicada?`)
+      return
+    }
+
+    const a = await sesion(emailA, passA)
+    const yoA = await perfilDe(a)
+    if (!yoA) {
+      marcaNoConcluyente(rotulo, '#272 el interruptor del resumen diario', 'la cuenta A no tiene perfil activo')
+      return
+    }
+    idA = yoA.id
+    previoA = yoA.resumen_diario ?? false
+
+    // (1) Criterio 4b — uno SÍ puede cambiar el suyo. Es el único campo fuera
+    // de nombre e iniciales que el candado de auto-edición deja pasar.
+    const mio = await a.from('usuario').update({ resumen_diario: !previoA }).eq('id', idA).select('id')
+    marca(!bloqueado(mio), rotulo, '#272-4b uno SÍ puede cambiar su propio resumen diario', mio.error?.message ?? '')
+    const { data: releo } = await a.from('usuario_visible').select('resumen_diario').eq('id', idA).single()
+    marca(
+      releo?.resumen_diario === !previoA,
+      rotulo,
+      '#272-4b y el cambio quedó guardado',
+      `quedó en ${releo?.resumen_diario}`,
+    )
+    await admin.from('usuario').update({ resumen_diario: previoA }).eq('id', idA)
+
+    // (2) Criterio 4 — el de OTRO, no. Se mide el VALOR de B y no el mensaje:
+    // la política no da error, simplemente no alcanza ninguna fila.
+    if (emailB && passB) {
+      const b = await sesion(emailB, passB)
+      const yoB = await perfilDe(b)
+      await b.auth.signOut()
+      if (yoB) {
+        idB = yoB.id
+        previoB = yoB.resumen_diario ?? false
+        await admin.from('usuario').update({ resumen_diario: true }).eq('id', idB)
+        const ajeno = await a.from('usuario').update({ resumen_diario: false }).eq('id', idB).select('id')
+        const { data: sigue } = await admin.from('usuario_visible').select('resumen_diario').eq('id', idB).single()
+        marca(
+          bloqueado(ajeno) && sigue?.resumen_diario === true,
+          rotulo,
+          '#272-4 un usuario NO puede cambiar el resumen diario de otro',
+          sigue?.resumen_diario === true ? '' : 'se lo cambió',
+        )
+        // (3) Y ni siquiera lo VE: la vista lo entrega con la misma regla que
+        // la organización — al administrador, y a cada quien el suyo.
+        const { data: verB } = await a.from('usuario_visible').select('resumen_diario').eq('id', idB).maybeSingle()
+        marca(
+          !verB || verB.resumen_diario === null,
+          rotulo,
+          '#272 y el de un tercero llega enmascarado',
+          `llegó ${JSON.stringify(verB?.resumen_diario)}`,
+        )
+      } else {
+        marcaNoConcluyente(rotulo, '#272-4 un usuario NO puede cambiar el de otro', 'la cuenta B no tiene perfil activo')
+      }
+    } else {
+      console.log('  SKIP  [resumen] sin la cuenta B no se puede comprobar el interruptor de un tercero')
+    }
+
+    // (4) Las piezas del programador no están al alcance de la aplicación.
+    const datos = await a.rpc('resumen_diario_datos')
+    marca(
+      Boolean(datos.error),
+      rotulo,
+      '#272 la aplicación no puede pedir los datos del correo (lleva correos de terceros)',
+      datos.error ? '' : `devolvió ${(datos.data ?? []).length} fila(s)`,
+    )
+    const turno = await a.rpc('resumen_diario_tomar_turno', { p_forzar: true })
+    marca(Boolean(turno.error), rotulo, '#272 ni tomar el turno del programador', turno.error ? '' : 'lo tomó')
+    const corridas = await a.from('resumen_diario_corrida').select('fecha')
+    marca(
+      bloqueado(corridas),
+      rotulo,
+      '#272 ni leer el registro de corridas',
+      corridas.error ? '' : `devolvió ${(corridas.data ?? []).length} fila(s)`,
+    )
+
+    await a.auth.signOut()
+  } catch (e) {
+    marcaNoConcluyente(rotulo, '#272 el interruptor del resumen diario', e.message)
+  } finally {
+    await restituir()
+  }
+}
+
 async function probarExecutePublico(admin) {
   const rotulo = 'execute'
   const { data, error } = await admin.from('permiso_ejecucion_abierto').select('funcion, es_security_definer')
@@ -1842,6 +1966,9 @@ async function main() {
 
   // ---------- #353: el dueño suma a un colega de su organización ----------
   await probarAgregarColega(admin)
+
+  // ---------- #272: el resumen diario por correo ----------
+  await probarResumenDiario(admin)
 
   // ---------- #290: el permiso de ejecución universal quedó cerrado ----------
   await probarExecutePublico(admin)

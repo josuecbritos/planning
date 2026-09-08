@@ -64,7 +64,21 @@ export interface NuevoUsuario {
   organizacion?: string
 }
 export type PatchUsuario = Partial<
-  Pick<Usuario, 'nombre' | 'iniciales' | 'activo' | 'rol' | 'permisosProyecto' | 'inicialesManual' | 'organizacion'>
+  Pick<
+    Usuario,
+    | 'nombre'
+    | 'iniciales'
+    | 'activo'
+    | 'rol'
+    | 'permisosProyecto'
+    | 'inicialesManual'
+    | 'organizacion'
+    // #272: el único de esta lista que uno puede cambiar EN SU PROPIA fila sin
+    // ser administrador. La barrera está en la base (`validar_autoedicion_
+    // usuario` lo deja pasar a propósito; `usuario_update` sigue impidiendo
+    // tocar la fila de otro).
+    | 'resumenDiario'
+  >
 >
 
 /**
