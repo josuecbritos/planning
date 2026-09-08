@@ -4238,7 +4238,10 @@ remitente masivo. Se agrega si aparece la primera queja de spam.
    pedido "en el bloque de hoy la columna Atraso muestra el vacío de siempre"
    **no se cumple siempre** — una tarea que vence hoy y fue replanificada lleva
    su número. Lo que sí se cumple es "el mismo formato que la tabla de Mis
-   Tareas", que era la otra mitad de la misma sección.
+   Tareas", que era la otra mitad de la misma sección. **El pedido eliminó
+   después esa frase**, dando por buena la otra mitad: el formato de Mis Tareas
+   manda, y la columna Atraso significa en el correo lo mismo que en la
+   herramienta.
 3. **Los enlaces:** sí, con dos direcciones propias.
 4. **Guardar en Mi cuenta:** al tocarlo, sin botón.
 5. **Al crear un usuario:** el interruptor no aparece — nace encendido y no hay
@@ -4382,3 +4385,92 @@ prueba que habría aprobado igual antes.
 *La revisión de las otras cuatro funciones también es una comprobación*, y lee el
 código en vez de fiarse de la memoria: distingue **usar** la variable de
 **comparar** contra ella, y se pone roja si alguien agrega una comparación nueva.
+
+---
+
+### #272 (corrección 2) — `resumen-diario` no podía hablar con la base
+
+**Solo la función.** Sin migración.
+
+#### El problema
+
+La corrección anterior arregló la puerta y **rompió lo que viene después**.
+Construía el cliente de la base con `CLAVES[0]` —la primera de la lista que
+sirve para **reconocer a quien llama**— y esa credencial no sirve para hablar
+con la base: PostgREST responde `Invalid API key`. La corrida moría antes de
+anotarse, así que la tabla de corridas quedaba vacía y no llegaba ningún correo.
+
+**Son dos usos distintos y no comparten credencial**, y esa es toda la lección:
+
+1. **Reconocer al programador** — la lista de `credenciales.ts`, que acepta las
+   claves vigentes y también la anterior.
+2. **Hablar con la base con permisos de servicio** — `SUPABASE_SERVICE_ROLE_KEY`,
+   igual que las otras cuatro funciones del proyecto.
+
+Medido en producción antes de tocar nada: `[resumen-diario] tomar turno: {
+message: "Invalid API key", hint: "Double check your Supabase anon or
+service_role API key." }`.
+
+#### Lo que se hizo
+
+- **El cliente vuelve a construirse con `SUPABASE_SERVICE_ROLE_KEY`.** Si esa
+  variable falta o viene vacía, la función responde **503** con el motivo
+  anotado y **no se cae a ninguna otra credencial**. Entró a la misma lista de
+  configuración obligatoria que `RESEND_API_KEY`, `EMAIL_FROM` y `SITE_URL`, que
+  ahora dice en el registro **cuál** falta en vez de nombrarlas todas.
+- **`CLAVE_ADMIN` desaparece.** La lista de `credenciales.ts` queda intacta y
+  **solo para la puerta**.
+- **Y queda dicho en el encabezado de los dos archivos**, con la advertencia
+  arriba del todo en `credenciales.ts`: *esta lista sirve para reconocer a quien
+  llama, no para hablar con la base*. Un comentario al final no habría evitado
+  el error; este está donde se lee primero.
+
+#### Cómo se comprobó
+
+`docs/prueba-272-credenciales.mjs` pasa de 30 a **39 comprobaciones**. Las nueve
+nuevas son de dos clases y conviene distinguirlas:
+
+- **Guardias que leen el código** —cuál clave construye el cliente, que
+  `CLAVE_ADMIN` no exista, que la falta de la variable entre en el 503—, porque
+  esa decisión vive en `index.ts`, que importa APIs de Deno y no se puede
+  ejecutar desde Node. Valen por lo que son: impiden volver a mezclarlos.
+- **Un control negativo de verdad**: la regla anterior y la nueva, las dos
+  escritas en la prueba, sobre el mismo entorno de producción. La anterior elige
+  la clave de la puerta; la nueva elige la de servicio.
+
+Regresión completa: **34 suites, 1307 comprobaciones, 0 fallas**.
+
+#### Desplegado, y lo que quedó SIN verificar
+
+`resumen-diario` quedó en **versión 3** en producción, con sus tres archivos,
+`verify_jwt` activada como estaba. Verificado releyendo lo desplegado.
+
+**Los criterios 1, 2, 3 y 6 no se pudieron comprobar**, y no por el cambio: la
+única credencial alcanzable desde la base es la que tiene guardada el trabajo
+agendado, y **esa credencial la puerta la rechaza**. Ver la nota de abajo.
+
+#### Hallazgo: el trabajo agendado nunca ha pasado la puerta
+
+El pedido daba por sentado que el programador seguiría pasando con la credencial
+que se le puso al crearlo. **Medido, no es así.** Las siete llamadas que
+`pg_net` registró:
+
+| UTC | Resultado | Quién |
+|---|---|---|
+| 18:15:30 | 401 | versión 1 |
+| **19:00:00** | **401** | **el programador** |
+| 19:20:35 | 401 | a mano, versión 2 |
+| 19:26:39 | 500 `Invalid API key` | a mano, versión 2 — **la única que pasó la puerta** |
+| 19:55:35 | 401 | a mano con la credencial del programador, versión 3 |
+| **20:00:00** | **401** | **el programador** |
+| 20:05:06 | 401 | el comando del programador, tal cual |
+
+**Cero respuestas 200 y `resumen_diario_corrida` vacía.** Los dos disparos del
+programador —19:00 y 20:00— dieron 401, y ejecutar su comando literal también.
+La llamada de las 19:26 pasó la puerta, así que **hay dos credenciales en juego
+y solo una está en el entorno de la función**: la que el programador tiene
+guardada no.
+
+**No se tocó**, porque el pedido lo dice explícitamente y porque rehacer el
+trabajo agendado es una decisión de despliegue, no una consecuencia de este
+defecto. Queda levantado.

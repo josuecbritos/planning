@@ -411,6 +411,14 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
 - **La función de servidor exige una CLAVE DEL PROYECTO**, no una sesión válida:
   un administrador con sesión tampoco puede dispararla. Y no publica CORS,
   porque no la llama ningún navegador.
+- **Dos usos de credencial que NO comparten clave.** Reconocer a quien llama se
+  hace con la lista de `credenciales.ts`; hablar con la base con permisos de
+  servicio, con `SUPABASE_SERVICE_ROLE_KEY` y con ninguna otra. Confundirlos
+  costó una corrida entera —el cliente construido con una clave de la puerta hace
+  que PostgREST responda `Invalid API key`—, así que la advertencia va en el
+  encabezado de los dos archivos y hay guardias en la prueba. Si la variable de
+  servicio falta, la función responde **503** y **no se cae a ninguna otra
+  credencial**.
 - **Acepta todas las claves vigentes, no una sola.** La primera versión comparaba
   contra `SUPABASE_SERVICE_ROLE_KEY` y nada más; en este proyecto esa variable
   está obsoleta —la vigente es `SUPABASE_SECRET_KEYS`, en plural—, así que la

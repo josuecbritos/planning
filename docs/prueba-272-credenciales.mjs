@@ -123,6 +123,62 @@ chk(
   'la comparación recorre los bytes enteros en vez de cortar en el primero distinto',
 )
 
+console.log('\n── Los dos usos de credencial no comparten clave ──')
+// La primera corrección de #272 arregló la puerta y rompió lo que viene
+// después: construía el cliente de la base con `CLAVES[0]` —la lista que sirve
+// para RECONOCER a quien llama— y la base respondía `Invalid API key`. La
+// corrida moría antes de anotarse, así que la tabla de corridas quedaba vacía y
+// no llegaba ningún correo.
+//
+// Cuál clave usa el cliente es una decisión de `index.ts`, que importa APIs de
+// Deno y no se puede ejecutar acá. Estas comprobaciones LEEN EL CÓDIGO, y se
+// dice para que valgan por lo que son: guardias contra volver a mezclarlos.
+const idx = readFileSync('supabase/functions/resumen-diario/index.ts', 'utf8')
+const idxVivo = idx.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
+chk(
+  /const CLAVE_SERVICIO = \(Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)/.test(idxVivo),
+  '#272 · la clave de servicio sale de SUPABASE_SERVICE_ROLE_KEY',
+)
+chk(
+  /createClient\(\s*Deno\.env\.get\('SUPABASE_URL'\)!,\s*CLAVE_SERVICIO\s*\)/.test(idxVivo),
+  '#272-1 · y es con ESA con la que se construye el cliente de la base',
+)
+chk(!/CLAVE_ADMIN/.test(idx), '#272-2 · `CLAVE_ADMIN` desapareció, también de los comentarios')
+chk(
+  !/createClient\([^)]*\bCLAVES\b/.test(idxVivo),
+  '#272 · el cliente NO se construye con la lista de la puerta',
+)
+chk(
+  /\['SUPABASE_SERVICE_ROLE_KEY', Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)\]/.test(idxVivo),
+  '#272-1 · si esa variable falta, entra en la lista que responde 503',
+)
+chk(
+  /FALTAN\.length > 0[\s\S]{0,200}?responder\(503/.test(idxVivo),
+  '#272-1 · y el 503 llega con el motivo anotado, sin caerse a otra credencial',
+)
+chk(
+  /ESTA LISTA SIRVE PARA RECONOCER A QUIEN LLAMA, NO PARA HABLAR CON LA BASE/.test(
+    readFileSync('supabase/functions/resumen-diario/credenciales.ts', 'utf8'),
+  ),
+  '#272-2 · y queda dicho en el propio `credenciales.ts`',
+)
+
+// Control negativo de ESTA corrección: la regla anterior y la nueva, las dos
+// escritas acá, sobre el mismo entorno de producción —una clave vigente y la
+// anterior—. Sin esto, las comprobaciones de arriba solo dirían que el código
+// dice lo que dice.
+const claveDelClienteANTES = (secretKeys, serviceRoleKey) => clavesAceptadas(secretKeys, serviceRoleKey)[0]
+const claveDelClienteAHORA = (_secretKeys, serviceRoleKey) => (serviceRoleKey ?? '').trim()
+chk(
+  claveDelClienteANTES(VIGENTE, ANTERIOR) === VIGENTE,
+  '#272 · control negativo: la regla ANTERIOR tomaba la clave de la puerta para hablar con la base',
+  'de ahí el `Invalid API key`',
+)
+chk(
+  claveDelClienteAHORA(VIGENTE, ANTERIOR) === ANTERIOR,
+  '#272 · y la de ahora toma la de SERVICIO, aunque haya claves vigentes en el entorno',
+)
+
 console.log('\n── Ninguna otra función de servidor compara contra la obsoleta ──')
 // La revisión que pidió el pedido, hecha sobre el código y no de memoria: se
 // distingue USAR la clave (para construir el cliente admin) de COMPARAR contra

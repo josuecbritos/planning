@@ -1,5 +1,14 @@
 // #272 — Qué credenciales acepta `resumen-diario` como "el programador".
 //
+// ⚠️ ESTA LISTA SIRVE PARA RECONOCER A QUIEN LLAMA, NO PARA HABLAR CON LA BASE.
+//
+// Son dos usos distintos y NO comparten credencial. Para hablar con la base con
+// permisos de servicio está `SUPABASE_SERVICE_ROLE_KEY`, y es la única que
+// sirve: construir el cliente con una clave de esta lista hace que la base
+// responda `Invalid API key` y la corrida muera antes de anotar nada. Pasó —la
+// primera corrección de #272 tomaba `CLAVES[0]` para el cliente— y por eso esta
+// advertencia está acá arriba y no al final.
+//
 // Vive en su propio archivo, y no dentro de `index.ts`, por la misma razón que
 // `plantilla.ts`: para que la prueba `docs/prueba-272-credenciales.mjs` pueda
 // comprobar la puerta DE VERDAD en vez de leer el código y creerle. No usa

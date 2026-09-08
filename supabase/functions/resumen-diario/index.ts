@@ -20,9 +20,19 @@
 //   RESEND_API_KEY  — API key de Resend
 //   EMAIL_FROM      — remitente verificado, ej. "Andotek Planning <planning@andotek.cl>"
 //   SITE_URL        — URL publica de la app
-// (SUPABASE_URL y las claves del proyecto los inyecta la plataforma: la vigente
-// es `SUPABASE_SECRET_KEYS` —en plural, porque puede haber varias a la vez— y
-// `SUPABASE_SERVICE_ROLE_KEY` es la anterior. Ver `credenciales.ts`.)
+// (SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY los inyecta la plataforma.)
+//
+// DOS USOS DE CREDENCIAL QUE NO COMPARTEN CLAVE. Confundirlos costó una corrida
+// entera, así que queda escrito:
+//
+//   1. RECONOCER A QUIEN LLAMA — la cabecera `Authorization` del programador. Se
+//      compara contra la lista de `credenciales.ts`, que acepta las claves
+//      vigentes y también la anterior.
+//   2. HABLAR CON LA BASE con permisos de servicio — `SUPABASE_SERVICE_ROLE_KEY`,
+//      igual que las otras cuatro funciones del proyecto.
+//
+// Una credencial de la lista (1) NO sirve para (2): la base responde
+// `Invalid API key` y la corrida muere antes de anotar nada.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { asunto, html, texto, type Resumen, type TareaCorreo } from './plantilla.ts'
@@ -32,21 +42,33 @@ import { autorizada, clavesAceptadas } from './credenciales.ts'
 // llama el programador de la base con una clave del proyecto. Publicar cabeceras
 // de CORS sería ofrecerle una puerta a un origen que no existe.
 
-const CONFIGURADA = Boolean(
-  Deno.env.get('RESEND_API_KEY') && Deno.env.get('EMAIL_FROM') && Deno.env.get('SITE_URL'),
-)
+// Todo se lee UNA vez al arrancar.
 
-// Las credenciales que se aceptan como "el programador", y la que esta función
-// usa para hablar con la base. Se leen UNA vez al arrancar.
+/** Lo que falta para que la función pueda trabajar. Si sobra algo en esta lista,
+ *  la función responde 503 y anota QUÉ falta — no se abre a medias ni se cae a
+ *  otra credencial. */
+const FALTAN = (
+  [
+    ['RESEND_API_KEY', Deno.env.get('RESEND_API_KEY')],
+    ['EMAIL_FROM', Deno.env.get('EMAIL_FROM')],
+    ['SITE_URL', Deno.env.get('SITE_URL')],
+    ['SUPABASE_URL', Deno.env.get('SUPABASE_URL')],
+    ['SUPABASE_SERVICE_ROLE_KEY', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')],
+  ] as const
+)
+  .filter(([, valor]) => !(valor ?? '').trim())
+  .map(([nombre]) => nombre)
+
+/** Uso 2: la credencial con la que se HABLA CON LA BASE. Es la misma que usan
+ *  las otras cuatro funciones del proyecto, y no admite reemplazo: si falta, la
+ *  función responde 503. */
+const CLAVE_SERVICIO = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim()
+
+/** Uso 1: las credenciales que se ACEPTAN de quien llama. Solo para la puerta. */
 const CLAVES = clavesAceptadas(
   Deno.env.get('SUPABASE_SECRET_KEYS'),
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
 )
-// Para el cliente admin sirve cualquiera de las vigentes: `clavesAceptadas` las
-// devuelve en orden, con la anterior al final, así que se toma la primera.
-// El `?? ''` es para el tipo, no para el caso: con la lista vacía la función ya
-// respondió 503 antes de llegar a construir el cliente.
-const CLAVE_ADMIN = CLAVES[0] ?? ''
 
 function registrar(etiqueta: string, detalle: unknown) {
   console.error(`[resumen-diario] ${etiqueta}:`, detalle instanceof Error ? detalle.message : detalle)
@@ -71,8 +93,8 @@ Deno.serve(async (req) => {
 
   if (req.method !== 'POST') return responder(405, { error: 'Método no permitido' })
 
-  if (!CONFIGURADA) {
-    registrar('configuración', 'faltan RESEND_API_KEY, EMAIL_FROM o SITE_URL')
+  if (FALTAN.length > 0) {
+    registrar('configuración', `falta configurar: ${FALTAN.join(', ')}`)
     return responder(503, { error: 'El servicio no está configurado.' })
   }
 
@@ -96,7 +118,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const admin = createClient(Deno.env.get('SUPABASE_URL')!, CLAVE_ADMIN)
+    // Con la clave de SERVICIO, no con la de la puerta: son dos usos distintos
+    // y no comparten credencial. Construirlo con una de la lista de arriba
+    // dejaba la función respondiendo 500 con `Invalid API key`.
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, CLAVE_SERVICIO)
     const sitio = Deno.env.get('SITE_URL')!
 
     // `forzar` existe para VERIFICAR desde el dashboard: saltea el día y la

@@ -3,10 +3,11 @@
 // ordenados por `resumen_diario_datos()` y devuelve texto.
 //
 // Vive en su propio archivo y no dentro de `index.ts` por una razón práctica:
-// así la prueba `docs/prueba-272-resumen-diario.mjs` puede importarlo y
-// comprobar el correo DE VERDAD —el mismo que se envía— en vez de una copia
-// del texto. `index.ts` lo importa con `./plantilla.ts`; al desplegar, la
-// función lleva los DOS archivos (DEPLOY.md § "Resumen diario").
+// así la prueba `docs/prueba-272-correo.mjs` puede importarlo y comprobar el
+// correo DE VERDAD —el mismo que se envía— en vez de una copia del texto.
+// `index.ts` lo importa con `./plantilla.ts`; al desplegar, la función lleva
+// TRES archivos: este, `index.ts` y `credenciales.ts` (DEPLOY.md § "Resumen
+// diario por correo").
 //
 // No usa ninguna API de Deno a propósito: se ejecuta igual en Deno y en Node.
 
