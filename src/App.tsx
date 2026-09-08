@@ -1257,16 +1257,42 @@ export default function App({ repo }: { repo: Repo }) {
     }
   }, [pantalla, vista, proyectoActivoId])
 
+  /**
+   * #352 — La selección de frente, ACOTADA a lo que existe.
+   *
+   * Al eliminar el frente que se estaba viendo, la selección se quedaba
+   * apuntando a un frente que ya no existe: la vista filtraba por él, no
+   * encontraba nada y caía en "Este proyecto aún no tiene frentes", aunque
+   * quedaran otros. La barra lateral, que no filtra por frente, sí los
+   * mostraba — de ahí lo desconcertante.
+   *
+   * Se protege la VISTA y no el momento de eliminar. Limpiar la selección
+   * dentro de `eliminarFrente` taparía este caso y dejaría la vía abierta para
+   * el próximo: cualquier camino que deje la selección apuntando a un frente
+   * que no está en el proyecto abierto queda cubierto por esto. Es la
+   * observación que #297 dejó anotada al cerrar los dos caminos que conocía —
+   * ahí se limpió la selección AL ENTRAR a un proyecto, que es el mismo
+   * problema resuelto en el otro extremo.
+   *
+   * "No existe" incluye las dos formas de no existir: que el frente se haya ido
+   * del estado, y que pertenezca a otro proyecto.
+   */
+  const frenteSelEfectivo = useMemo<FrenteSel>(() => {
+    if (frenteSel === 'todos' || !state || !proyectoActivoId) return 'todos'
+    const existe = state.frentes.some((f) => f.id === frenteSel && f.proyectoId === proyectoActivoId)
+    return existe ? frenteSel : 'todos'
+  }, [state, proyectoActivoId, frenteSel])
+
   const tareasVisibles = useMemo<Tarea[]>(() => {
     if (!state || !proyectoActivoId) return []
     const frenteIds = new Set(state.frentes.filter((f) => f.proyectoId === proyectoActivoId).map((f) => f.id))
     const subIds = new Set(
       state.subFrentes
-        .filter((sf) => frenteIds.has(sf.frenteId) && (frenteSel === 'todos' || sf.frenteId === frenteSel))
+        .filter((sf) => frenteIds.has(sf.frenteId) && (frenteSelEfectivo === 'todos' || sf.frenteId === frenteSelEfectivo))
         .map((sf) => sf.id),
     )
     return state.tareas.filter((t) => subIds.has(t.subFrenteId))
-  }, [state, proyectoActivoId, frenteSel])
+  }, [state, proyectoActivoId, frenteSelEfectivo])
 
   const contadores = useMemo(
     () => (state ? contar(state, tareasVisibles, HOY) : null),
@@ -1467,7 +1493,7 @@ export default function App({ repo }: { repo: Repo }) {
           state={state}
           proyectos={proyectosVisibles}
           proyectoActivoId={proyectoActivoId}
-          frenteSel={frenteSel}
+          frenteSel={frenteSelEfectivo}
           pantalla={pantalla}
           puedeVerUsuarios={puedeVerUsuarios}
           noLeidas={noLeidas}
@@ -1604,7 +1630,7 @@ export default function App({ repo }: { repo: Repo }) {
                 <TableView
                   state={state}
                   proyectoId={proyecto.id}
-                  frenteSel={frenteSel}
+                  frenteSel={frenteSelEfectivo}
                   hoy={HOY}
                   can={can}
                   filtro={vistaActiva.filtro}
@@ -1622,7 +1648,7 @@ export default function App({ repo }: { repo: Repo }) {
                 <GanttView
                   state={state}
                   proyectoId={proyecto.id}
-                  frenteSel={frenteSel}
+                  frenteSel={frenteSelEfectivo}
                   hoy={HOY}
                   can={can}
                   filtro={vistaActiva.filtro}

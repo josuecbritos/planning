@@ -880,6 +880,18 @@ NO entra en el filtro — cada opción muestra su rango literal.
   frentes" aunque los tuviera. Crear un proyecto además lo **incorpora al
   estado antes de navegar hacia él**: al revés, el efecto que corrige el
   proyecto activo no lo encontraba entre los visibles y devolvía a Resumen.
+- **Y la vista se protege sola de una selección imposible** (#352). Lo anterior
+  cerraba los caminos de ENTRADA uno por uno, y #297 dejó anotado que la vista
+  no se protegía sola. La vía real era **eliminar el frente que se estaba
+  viendo**: la selección quedaba apuntando a un frente que ya no existe, la
+  vista filtraba por él, no encontraba nada y caía en "aún no tiene frentes"
+  aunque quedaran otros — la barra lateral, que no filtra por frente, sí los
+  mostraba, de ahí lo desconcertante. Ahora la vista principal **acota la
+  selección a lo que existe**: si apunta a un frente que no está en el proyecto
+  abierto, se comporta como "todos". *Se descartó limpiar la selección solo al
+  eliminar: tapa ese caso y deja la vía abierta para el próximo.* La pantalla
+  "Este proyecto aún no tiene frentes" sigue apareciendo cuando el proyecto de
+  verdad no tiene ninguno.
 
 En la Tabla, frentes y sub frentes se **colapsan** con un chevron (▸/▾) para
 enfocar; el colapso es momentáneo (no se guarda).

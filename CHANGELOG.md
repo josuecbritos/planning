@@ -4073,3 +4073,62 @@ las PRUEBAS:
 ninguna parte, así que en un clon limpio **ninguna** de las pruebas del repo
 podía correr: el comando que documentan sus propias cabeceras fallaba con
 `Cannot find package 'playwright-core'`.
+
+### #352 — BUG: la vista principal se quedaba filtrando por un frente eliminado
+
+**Solo interfaz.** No toca la base ni los permisos: sin migración.
+
+#### El problema
+
+En la barra lateral se elige un frente con un clic y la vista principal muestra
+solo ese. **Si ese frente se eliminaba, la selección se quedaba apuntando a un
+frente que ya no existe:** la vista filtraba por él, no encontraba nada y caía en
+**"Este proyecto aún no tiene frentes"**, aunque quedaran otros. La barra
+lateral, que no filtra por frente, sí los seguía mostrando — de ahí lo
+desconcertante.
+
+Es la observación que **#297 dejó anotada sin solicitud**, cuando cerró los dos
+caminos de entrada que conocía y quedó dicho que la vista no se protege sola de
+una selección imposible. Eliminar un frente era la vía real.
+
+#### Lo que se hizo
+
+La vista principal **acota la selección a lo que existe**: si apunta a un frente
+que no está en el proyecto abierto, se comporta como **"todos"**.
+
+Se protege **la vista** y no el momento de eliminar. *Limpiar la selección dentro
+de `deleteFrente` taparía este caso y dejaría la vía abierta para el próximo:
+así queda cubierto cualquier camino que deje la selección apuntando a un frente
+inexistente, y "no existe" incluye sus dos formas — que el frente se haya ido del
+estado, y que pertenezca a otro proyecto.* Es el mismo problema que #297 resolvió
+en el otro extremo, ahora resuelto donde se consume.
+
+El valor acotado va a los tres consumidores —tabla, Gantt y barra lateral— para
+que no haya dos verdades sobre qué se está viendo. En la barra **no cambia nada
+visible**: solo marca la fila de un frente concreto, y un frente eliminado ya no
+tiene fila.
+
+**No cambia** la pantalla "Este proyecto aún no tiene frentes", que sigue
+apareciendo cuando el proyecto de verdad no tiene ninguno.
+
+#### Verificación
+
+`docs/prueba-352-frente-eliminado.mjs` — **27 comprobaciones en verde**. Los seis
+criterios: eliminar el frente que se está viendo y que la vista pase a los que
+quedan sin caer en la pantalla vacía; que sí caiga cuando el proyecto se queda
+sin ninguno; que eliminar un frente distinto del elegido no cambie nada; lo mismo
+en la Gantt; y que cambiar de proyecto con un frente elegido siga funcionando
+como lo dejó #297.
+
+*Control negativo:* contra `main`, **fallan exactamente las 5 comprobaciones que
+describen el bug** —las de los criterios 1, 2 y 5— y **pasan** las de los
+criterios 3, 4 y 6, que son las de "no cambia". Es la forma de la prueba que se
+buscaba: distingue el defecto de lo que ya funcionaba.
+
+*Tres correcciones del arnés, anotadas porque las tres eran suposiciones mías
+sobre la pantalla:* el ⋯ de un frente está `visibility: hidden` hasta que el
+mouse pasa por su fila (#222), así que hay que pasarlo antes de pulsarlo; el
+nombre del frente va seguido de su contador dentro del mismo título, así que se
+lee el primer nodo de texto y no todo el `textContent`; y el proyecto propio de
+la consultora **no está** en el Resumen del administrador, así que el criterio 6
+crea su propio segundo proyecto en vez de dar por hecho que hay dos a mano.
