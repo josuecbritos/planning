@@ -10,6 +10,12 @@
 // diario por correo").
 //
 // No usa ninguna API de Deno a propósito: se ejecuta igual en Deno y en Node.
+//
+// LOS ESTILOS VAN ESCRITOS EN CADA ELEMENTO, no en una hoja aparte. La primera
+// versión los emitía en un bloque <style> y **Gmail lo descartó entero**: el
+// correo llegó sin colores de fila, sin bordes, sin anchos de columna y sin
+// tipografías. Medido en producción el 09-sep-2026 con una corrida forzada.
+// Los valores son exactamente los mismos que se aprobaron.
 
 /** Una tarea, tal como la entrega `resumen_diario_datos()`. */
 export interface TareaCorreo {
@@ -51,8 +57,7 @@ export interface Resumen {
 //
 // Se guardan RESUELTOS y no como `var(--x)`: Outlook de escritorio usa el motor
 // de Word, que no entiende variables CSS, y ahí las filas quedarían blancas y
-// la fecha vencida en negro. Las reglas son las mismas; lo único que cambia es
-// que el valor va escrito donde se usa.
+// la fecha vencida en negro.
 const COLOR = {
   rojo: '#d32f2f',
   rojoSuave: '#fdecea',
@@ -68,14 +73,17 @@ const COLOR = {
   enlace: '#1565c0',
 }
 
-/** Espejo de `colorTarea` (src/lib/derive.ts): la clase de la fila. Una tarea
- *  hecha nunca llega hasta acá, y una pendiente sin replanificar no lleva
- *  clase — es la fila sin color del producto. */
-const CLASE_FILA: Record<TareaCorreo['categoria'], string> = {
-  atrasada: 'fila--rojo',
-  atrasada_replan: 'fila--morado',
-  pendiente: '',
-  pendiente_replan: 'fila--ambar',
+/** Espejo de `colorTarea` (src/lib/derive.ts): el FONDO de la fila. Una tarea
+ *  hecha nunca llega hasta acá, y una pendiente sin replanificar va en blanco
+ *  — es la fila sin color del producto.
+ *
+ *  Antes esto era un mapa de CLASES. Con los estilos escritos en cada elemento
+ *  la clase no sirve: lo que viaja es el color. */
+const FONDO_FILA: Record<TareaCorreo['categoria'], string> = {
+  atrasada: COLOR.rojoSuave,
+  atrasada_replan: COLOR.moradoSuave,
+  pendiente: '#ffffff',
+  pendiente_replan: COLOR.ambarSuave,
 }
 
 /** Espejo de `CATEGORIA_LABEL` (src/lib/derive.ts). Ya no hay columna Estado
@@ -131,9 +139,8 @@ function esc(s: string): string {
 // Asunto
 // ---------------------------------------------------------------------------
 
-/** `3 atrasadas · 2 vencen hoy — Andotek Planning`, con los números de esa
- *  persona. Un bloque vacío no aparece en el asunto, igual que no aparece en
- *  el cuerpo. */
+/** `3 tareas atrasadas · 2 vencen hoy`, con los números de esa persona. Un
+ *  bloque vacío no aparece en el asunto, igual que no aparece en el cuerpo. */
 export function asunto(r: Resumen): string {
   const partes: string[] = []
   const a = r.atrasadas.length
@@ -164,78 +171,64 @@ export function lineaSemana(n: number): string {
 // Cuerpo con formato
 // ---------------------------------------------------------------------------
 
-/** La hoja de estilos del correo. Va tal como quedó resuelta y aprobada, con
- *  UN cambio mecánico: los `var(--x)` quedan escritos con su valor. Outlook de
- *  escritorio usa el motor de Word, que no entiende variables CSS — con ellas,
- *  las filas quedarían blancas y la fecha vencida en negro, que es justo lo
- *  contrario de la regla de oro del producto.
- *
- *  El ancho es 640, que es lo que un cliente de correo muestra sin recortar, y
- *  deja 608 útiles: las cuatro columnas suman exactamente eso. */
-const ESTILOS = `<style>
-*{box-sizing:border-box}
-body{margin:0;background:#e9e9ec;font-family:${TIPO};color:${COLOR.texto}}
-.tarjeta{width:640px;max-width:100%;margin:0 auto;background:#fff;border:1px solid ${COLOR.grisLinea};border-radius:8px;overflow:hidden}
-.marca{padding:13px 16px;border-bottom:1px solid ${COLOR.grisLinea};display:flex;align-items:baseline;justify-content:space-between}
-.wordmark{font-size:15px;font-weight:700;letter-spacing:-.01em}
-.wordmark .tek{color:${COLOR.naranja}}
-.wordmark .plan{font-family:${MONO};font-weight:500;color:${COLOR.grisTexto};margin-left:6px;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
-.fechahoy{font-family:${MONO};font-size:11px;font-weight:500;color:${COLOR.grisTexto}}
-.saludo{padding:15px 16px 0;font-size:14px;line-height:1.5;margin:0}
-.bajada{padding:5px 16px 0;font-size:14px;line-height:1.5;margin:0}
-.secc{padding:16px 16px 0}
-.secc h3{font-size:15px;font-weight:700;margin:0 0 8px}
-table.tareas{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border-left:1px solid ${COLOR.grisBorde};border-top:1px solid ${COLOR.grisBorde};table-layout:fixed}
-table.tareas th,table.tareas td{border-right:1px solid ${COLOR.grisBorde};border-bottom:1px solid ${COLOR.grisBorde};padding:4px 8px;text-align:left;font-size:13px;vertical-align:middle}
-table.tareas th{background:${COLOR.superficie2};font-family:${MONO};font-size:10px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:${COLOR.grisTexto}}
-.col-tarea{width:230px}
-.col-ruta{width:190px}
-.col-fecha{width:108px;white-space:nowrap}
-.col-desv{width:80px;white-space:nowrap}
-table.tareas .col-fecha,table.tareas .col-desv{text-align:center}
-table.tareas td.col-fecha,table.tareas td.col-desv{font-family:${MONO};font-size:12px;font-weight:500}
-tr.fila--rojo>td{background:${COLOR.rojoSuave}}
-tr.fila--morado>td{background:${COLOR.moradoSuave}}
-tr.fila--ambar>td{background:${COLOR.ambarSuave}}
-.tarea-cell{font-weight:500}
-.replan{font-family:${MONO};font-size:11px;font-weight:700;color:${COLOR.ambarTexto};background:rgba(0,0,0,.05);border-radius:4px;padding:1px 5px;white-space:nowrap;margin-left:8px}
-.ruta{display:flex;align-items:center;gap:7px;font-size:12px;color:${COLOR.grisTexto}}
-.dot{width:10px;height:10px;border-radius:3px;flex:none}
-.fecha-vencida{color:${COLOR.rojo};font-weight:700}
-.linea-sem{padding:16px 16px 0;font-size:14px;line-height:1.55;margin:0}
-.linea-sem a{color:${COLOR.enlace}}
-.pie{border-top:1px solid ${COLOR.grisLinea};margin-top:16px;padding:12px 16px 15px;font-size:11.5px;color:${COLOR.grisTexto};line-height:1.5}
-.pie a{color:${COLOR.grisTexto}}
-</style>`
+// El ancho es 640, que es lo que un cliente de correo muestra sin recortar, y
+// deja 608 útiles: las cuatro columnas suman exactamente eso.
+//
+// Tres cosas que la hoja de estilos hacía y en correo NO funcionan, así que
+// acá están resueltas de otra forma:
+//   · `display:flex` en la ruta → el punto va `inline-block` con su margen.
+//   · `border-collapse:separate` → `collapse`, que es lo que respetan todos.
+//   · los anchos solo en estilos → van TAMBIÉN en el atributo `width` de la
+//     celda, porque varios clientes ignoran los de estilo.
+
+const TIPO_CSS = `font-family:${TIPO};`
+const MONO_CSS = `font-family:${MONO};`
+
+/** Lo común a toda celda de la tabla: bordes, relleno, tamaño y alineación. */
+const CELDA = `border-right:1px solid ${COLOR.grisBorde};border-bottom:1px solid ${COLOR.grisBorde};padding:4px 8px;font-size:13px;vertical-align:middle;`
+
+/** Lo común a todo encabezado. */
+const ENCABEZADO = `border-right:1px solid ${COLOR.grisBorde};border-bottom:1px solid ${COLOR.grisBorde};padding:4px 8px;background:${COLOR.superficie2};${MONO_CSS}font-size:10px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:${COLOR.grisTexto};`
+
+/** Lo común a los párrafos del cuerpo. */
+const PARRAFO = `${TIPO_CSS}font-size:14px;line-height:1.5;margin:0;color:${COLOR.texto};`
 
 function filaHtml(t: TareaCorreo): string {
-  const clase = CLASE_FILA[t.categoria]
-  // La fecha va en rojo SOLO si la tarea está atrasada.
+  const fondo = FONDO_FILA[t.categoria]
+  // La fecha va en rojo y 700 SOLO si la tarea está atrasada; si no, en 500
+  // como el resto de lo monoespaciado.
   const vencida = t.categoria === 'atrasada' || t.categoria === 'atrasada_replan'
+  const estiloFecha =
+    `${CELDA}${MONO_CSS}font-size:12px;text-align:center;white-space:nowrap;background:${fondo};` +
+    (vencida ? `color:${COLOR.rojo};font-weight:700;` : 'font-weight:500;')
+
   // El ↻ ×N va pegado al nombre, dentro de la misma celda, y solo si la tarea
-  // se movió alguna vez. La separación la pone el `margin-left` de `.replan`.
+  // se movió alguna vez.
   const replan =
     t.replanificaciones > 0
-      ? `<span class="replan">&#8635; &times;${t.replanificaciones}</span>`
+      ? `<span style="${MONO_CSS}font-size:11px;font-weight:700;color:${COLOR.ambarTexto};background:rgba(0,0,0,.05);border-radius:4px;padding:1px 5px;white-space:nowrap;margin-left:8px;">&#8635; &times;${t.replanificaciones}</span>`
       : ''
+
   return `
-      <tr${clase ? ` class="${clase}"` : ''}>
-        <td class="tarea-cell">${esc(t.titulo)}${replan}</td>
-        <td><span class="ruta"><span class="dot" style="background:${esc(t.colorProyecto)}"></span><span>${esc(ubicacion(t))}</span></span></td>
-        <td class="col-fecha${vencida ? ' fecha-vencida' : ''}">${fecha(t.fecha)}</td>
-        <td class="col-desv">${atraso(t.atraso)}</td>
+      <tr>
+        <td width="230" align="left" style="${CELDA}${TIPO_CSS}font-weight:500;color:${COLOR.texto};background:${fondo};">${esc(t.titulo)}${replan}</td>
+        <td width="190" align="left" style="${CELDA}${TIPO_CSS}font-size:12px;color:${COLOR.grisTexto};background:${fondo};"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${esc(t.colorProyecto)};vertical-align:middle;margin-right:7px;"></span><span style="vertical-align:middle;">${esc(ubicacion(t))}</span></td>
+        <td width="108" align="center" style="${estiloFecha}">${fecha(t.fecha)}</td>
+        <td width="80" align="center" style="${CELDA}${MONO_CSS}font-size:12px;font-weight:500;text-align:center;white-space:nowrap;color:${COLOR.texto};background:${fondo};">${atraso(t.atraso)}</td>
       </tr>`
 }
 
 function seccionHtml(titulo: string, tareas: TareaCorreo[]): string {
   if (tareas.length === 0) return ''
   return `
-  <div class="secc">
-    <h3>${titulo}</h3>
-    <table class="tareas">
+  <div style="padding:16px 16px 0;">
+    <h3 style="${TIPO_CSS}font-size:15px;font-weight:700;margin:0 0 8px;color:${COLOR.texto};">${titulo}</h3>
+    <table width="608" cellpadding="0" cellspacing="0" border="0" style="width:608px;border-collapse:collapse;table-layout:fixed;background:#ffffff;border-left:1px solid ${COLOR.grisBorde};border-top:1px solid ${COLOR.grisBorde};">
       <thead><tr>
-        <th class="col-tarea">Tarea</th><th class="col-ruta">Ubicación</th>
-        <th class="col-fecha">Fecha Objetivo</th><th class="col-desv">Atraso</th>
+        <th width="230" align="left" style="${ENCABEZADO}">Tarea</th>
+        <th width="190" align="left" style="${ENCABEZADO}">Ubicación</th>
+        <th width="108" align="center" style="${ENCABEZADO}text-align:center;white-space:nowrap;">Fecha Objetivo</th>
+        <th width="80" align="center" style="${ENCABEZADO}text-align:center;white-space:nowrap;">Atraso</th>
       </tr></thead>
       <tbody>${tareas.map(filaHtml).join('')}
       </tbody>
@@ -249,17 +242,26 @@ export function html(r: Resumen): string {
   // ninguna tarea para la semana desaparece la FRASE, no el párrafo: si no, el
   // correo se quedaría sin lo único que lleva de vuelta a la herramienta.
   const semana = r.semana > 0 ? `${lineaSemana(r.semana)} ` : ''
-  return `${ESTILOS}
-<div class="tarjeta">
-  <div class="marca">
-    <span class="wordmark">Ando<span class="tek">tek</span><span class="plan">Planning</span></span>
-    <span class="fechahoy">${fecha(r.hoy)}</span>
-  </div>
-  <p class="saludo">Hola ${esc(r.nombre)},</p>
-  <p class="bajada">A continuación un resumen de tus tareas pendientes hasta el día de hoy:</p>${seccionHtml('Atrasadas', r.atrasadas)}${seccionHtml('Vencen hoy', r.vencenHoy)}
-  <p class="linea-sem">${semana}<a href="${r.sitio}/#mis-tareas">Ver mis tareas</a></p>
-  <div class="pie">Recibes este correo porque tienes activado el resumen diario.
-    <a href="${r.sitio}/#mi-cuenta">Gestionar correos</a></div>
+  return `
+<div style="background:#e9e9ec;padding:16px 0;${TIPO_CSS}color:${COLOR.texto};">
+<table width="640" cellpadding="0" cellspacing="0" border="0" align="center" style="width:640px;max-width:100%;margin:0 auto;background:#ffffff;border:1px solid ${COLOR.grisLinea};border-radius:8px;border-collapse:separate;">
+<tr><td>
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border-bottom:1px solid ${COLOR.grisLinea};">
+    <tr>
+      <td align="left" style="padding:13px 16px;${TIPO_CSS}font-size:15px;font-weight:700;letter-spacing:-.01em;color:${COLOR.texto};">Ando<span style="color:${COLOR.naranja};">tek</span><span style="${MONO_CSS}font-weight:500;color:${COLOR.grisTexto};margin-left:6px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;">Planning</span></td>
+      <td align="right" style="padding:13px 16px;${MONO_CSS}font-size:11px;font-weight:500;color:${COLOR.grisTexto};">${fecha(r.hoy)}</td>
+    </tr>
+  </table>
+
+  <p style="${PARRAFO}padding:15px 16px 0;">Hola ${esc(r.nombre)},</p>
+  <p style="${PARRAFO}padding:5px 16px 0;">A continuación un resumen de tus tareas pendientes hasta el día de hoy:</p>${seccionHtml('Atrasadas', r.atrasadas)}${seccionHtml('Vencen hoy', r.vencenHoy)}
+  <p style="${PARRAFO}padding:16px 16px 0;line-height:1.55;">${semana}<a href="${r.sitio}/#mis-tareas" style="color:${COLOR.enlace};">Ver mis tareas</a></p>
+  <div style="border-top:1px solid ${COLOR.grisLinea};margin-top:16px;padding:12px 16px 15px;${TIPO_CSS}font-size:11.5px;color:${COLOR.grisTexto};line-height:1.5;">Recibes este correo porque tienes activado el resumen diario.
+    <a href="${r.sitio}/#mi-cuenta" style="color:${COLOR.grisTexto};">Gestionar correos</a></div>
+
+</td></tr>
+</table>
 </div>`
 }
 

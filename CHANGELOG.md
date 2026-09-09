@@ -4600,3 +4600,64 @@ no podía **nombrar** Inter ni JetBrains Mono. Ahora las nombra —con el respal
 del sistema detrás, que es lo que el pedido pide— así que pasa a comprobar lo que
 de verdad importaba: que no **cargue** ninguna (`@font-face`, `@import`,
 `googleapis`, `<link>`).
+
+---
+
+### #272 (ajustes 3) — Reponer en el repo la plantilla que quedó en producción
+
+**Solo la plantilla del correo.** Sin migración, sin cambios de comportamiento.
+
+#### Qué pasó
+
+**El correo llegó sin ningún formato:** sin colores de fila, sin bordes, sin
+anchos de columna y sin tipografías. **La plantilla emitía sus estilos en un
+bloque `<style>` y Gmail lo descarta entero.** En correo los estilos van
+escritos en cada elemento.
+
+El dueño lo corrigió y lo desplegó a mano desde el dashboard, y **el correo llegó
+correcto en producción el 09-sep-2026**, verificado con una corrida forzada. Esta
+entrada **repone en el repo lo que ya está corriendo**: si no, el próximo
+despliegue desde el repo pisaría la versión buena.
+
+El archivo se copió **del propio pedido, extrayéndolo del bloque de código**, y se
+comprobó que quedara idéntico byte a byte — transcribir 300 líneas a mano es
+justo la clase de tarea donde se cuela un carácter.
+
+**Los tres cambios técnicos**, que son los que hacen que el correo sobreviva:
+
+- Los estilos van **escritos en cada elemento**, no en una hoja aparte.
+- **`display:flex` y `border-collapse:separate` salen:** el punto del proyecto va
+  en línea y los bordes van colapsados, que es lo que respetan todos los
+  clientes.
+- **Los anchos van también en el atributo `width` de cada celda**, porque varios
+  clientes ignoran los de estilo.
+
+`CLASE_FILA` pasa a ser `FONDO_FILA`: sin hoja de estilos la clase no sirve de
+nada, lo que viaja es el color. `index.ts` y `credenciales.ts` **no se tocaron**.
+
+#### Cómo se comprobó
+
+`docs/prueba-272-correo.mjs` pasa de **87 a 91 comprobaciones** — el pedido pedía
+explícitamente que el número no bajara, y por qué: *ya pasó una vez que al
+reemplazar un bloque se perdieron 17 y la corrida siguió verde.* Las cuatro
+nuevas son del defecto que se cierra: que **no haya ningún bloque `<style>`**, que
+los estilos vayan en cada elemento, que los anchos se repitan en el atributo
+`width`, y que el punto **no** use `display:flex`.
+
+Todo lo demás sigue midiéndose contra `src/styles.css` —los colores de fila, el
+rojo de la fecha vencida, el ámbar de la flecha, los pesos— y los anchos se leen
+de lo que el correo emite y se comprueba que sumen 608.
+
+*Dos defectos del arnés, encontrados al reescribirlo:*
+
+- **Un `replace` que no encontró su texto y no avisó.** Se perdieron cinco
+  comprobaciones sin que nada se pusiera rojo, y solo se notó porque una variable
+  quedó sin definir y el proceso murió. Los reemplazos siguientes se hicieron con
+  una aserción que falla si el texto buscado no está.
+- **Una comprobación que medía la celda equivocada.** La fecha de hoy aparece dos
+  veces en el correo —en el encabezado y en la fila de una tarea que vence hoy—,
+  y el selector agarraba la primera. "La fecha de hoy no va en rojo" pasaba
+  mirando el encabezado, que nunca lo estuvo. Ahora el selector exige el ancho de
+  la columna.
+
+Regresión completa: **34 suites, 1347 comprobaciones, 0 fallas**.

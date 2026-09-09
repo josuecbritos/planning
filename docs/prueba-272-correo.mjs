@@ -117,9 +117,12 @@ const conTodo = html(
     semana: 43,
   }),
 )
-const anchoDe = (clase) => Number((conTodo.match(new RegExp(`\\.${clase}\\{width:(\\d+)px`)) ?? [])[1])
-const COLUMNAS = ['col-tarea', 'col-ruta', 'col-fecha', 'col-desv']
-const anchos = COLUMNAS.map(anchoDe)
+// Los anchos se leen del atributo `width` de cada encabezado, que es donde
+// viven ahora: varios clientes ignoran los de estilo, así que van en los dos.
+const COLUMNAS = ['Tarea', 'Ubicación', 'Fecha Objetivo', 'Atraso']
+const anchos = COLUMNAS.map((col) =>
+  Number((conTodo.match(new RegExp(`<th width="(\\d+)"[^>]*>${col}</th>`)) ?? [])[1]),
+)
 console.log(`  columnas: ${COLUMNAS.map((c, i) => `${c}=${anchos[i]}`).join(' · ')}`)
 chk(
   anchos.join(',') === '230,190,108,80',
@@ -131,7 +134,19 @@ chk(
   '#272-1 · y suman exactamente los 608 útiles',
   String(anchos.reduce((a, b) => a + b, 0)),
 )
-chk(/\.tarjeta\{width:640px/.test(conTodo), '#272-1 · dentro de una tarjeta de 640, que es lo que un correo muestra sin recortar')
+chk(
+  /<table width="640"[^>]*style="width:640px/.test(conTodo),
+  '#272-1 · dentro de una tarjeta de 640, que es lo que un correo muestra sin recortar',
+)
+chk(
+  /<table width="608"[^>]*style="width:608px/.test(conTodo),
+  '#272-1 · y la tabla declara sus 608 en el atributo y en el estilo',
+)
+// Los anchos van en los DOS sitios: hay clientes que ignoran los de estilo.
+chk(
+  ['230', '190', '108', '80'].every((w) => conTodo.includes(`<td width="${w}"`)),
+  '#272-1 · cada celda repite su ancho en el atributo `width`',
+)
 chk(/table-layout:fixed/.test(conTodo), '#272-1 · con el ancho fijo, para que las columnas no se descuadren')
 
 for (const col of ['Tarea', 'Ubicación', 'Fecha Objetivo', 'Atraso']) {
@@ -145,13 +160,15 @@ chk(!/>Proyecto</.test(conTodo), 'NO hay columna Proyecto aparte')
 
 // Criterios 2 y 3: los encabezados y las dos columnas de números, en una línea
 // y centrados.
+// Dos secciones, así que cada uno de los dos encabezados aparece dos veces.
 chk(
-  /\.col-fecha\{width:108px;white-space:nowrap\}/.test(conTodo) &&
-    /\.col-desv\{width:80px;white-space:nowrap\}/.test(conTodo),
-  '#272-2 · "Fecha Objetivo" y "Atraso" no se parten en dos líneas',
+  (conTodo.match(/white-space:nowrap;">(?:Fecha Objetivo|Atraso)</g) ?? []).length === 4,
+  '#272-2 · "Fecha Objetivo" y "Atraso" no se parten en dos líneas, en las dos secciones',
+  String((conTodo.match(/white-space:nowrap;">(?:Fecha Objetivo|Atraso)</g) ?? []).length),
 )
 chk(
-  /table\.tareas \.col-fecha,table\.tareas \.col-desv\{text-align:center\}/.test(conTodo),
+  (conTodo.match(/<th width="(?:108|80)" align="center"/g) ?? []).length === 4 &&
+    (conTodo.match(/<td width="(?:108|80)" align="center"/g) ?? []).length === 4,
   '#272-3 · las dos van centradas, encabezado incluido',
 )
 
@@ -173,16 +190,17 @@ const prop = (selector, nombre) => {
 
 // 4 · El ↻ ×N, pegado al nombre y dentro de su misma celda.
 chk(/&#8635; &times;3/.test(conTodo), '#272-4 · una tarea replanificada muestra ↻ ×N con su número')
+const marcaReplan = (conTodo.match(/Conseguir referencia CA<span style="([^"]*)">&#8635;/) ?? [])[1] ?? ''
+chk(marcaReplan !== '', '#272-4 · pegado a la última palabra del nombre, sin nada en medio')
 chk(
-  /Conseguir referencia CA<span class="replan">/.test(conTodo),
-  '#272-4 · pegado a la última palabra del nombre, sin nada en medio',
-)
-chk(
-  /\.replan\{[^}]*margin-left:8px/.test(conTodo) && /\.replan\{[^}]*white-space:nowrap/.test(conTodo),
+  /margin-left:8px/.test(marcaReplan) && /white-space:nowrap/.test(marcaReplan),
   '#272-4 · con su separación y sin partirse',
 )
 chk(
-  conTodo.includes(`.replan{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:700;color:${token('ambar-texto')}`),
+  marcaReplan.includes("font-family:'JetBrains Mono',ui-monospace,monospace") &&
+    /font-size:11px/.test(marcaReplan) &&
+    /font-weight:700/.test(marcaReplan) &&
+    marcaReplan.includes(`color:${token('ambar-texto')}`),
   '#272-4 · monoespaciada en 700 y con el ámbar del producto',
   token('ambar-texto'),
 )
@@ -190,37 +208,50 @@ chk(!/&times;0\b/.test(conTodo), '#272-4 · y no aparece cuando la tarea nunca s
 
 // 5 · El punto de color del proyecto.
 chk(prop('.nav-proyecto__dot', 'width') === '10px', 'terreno: `.nav-proyecto__dot` mide 10px')
-chk(/\.dot\{width:10px;height:10px;border-radius:3px;flex:none\}/.test(conTodo), '#272-5 · el punto tiene la forma del producto')
+// `display:flex` no existe en Outlook: el punto va en línea, con su margen.
+const marcaPunto = (conTodo.match(/<span style="(display:inline-block[^"]*)"><\/span>/) ?? [])[1] ?? ''
 chk(
-  /<span class="dot" style="background:#6a1b9a"><\/span><span>Proyecto › /.test(conTodo),
+  /width:10px;height:10px;border-radius:3px/.test(marcaPunto),
+  '#272-5 · el punto tiene la forma del producto',
+  marcaPunto,
+)
+chk(!/display:flex/.test(conTodo), '#272-5 · y va en línea, sin `display:flex`, que Outlook no entiende')
+chk(
+  /background:#6a1b9a;[^"]*"><\/span><span[^>]*>Proyecto › /.test(conTodo),
   '#272-5 · lleva el color de SU proyecto y abre la ubicación',
 )
 
 // 6 · La fecha de una atrasada, en rojo y negrita.
 chk(prop('.fecha-vencida', 'color') === 'var(--rojo)', 'terreno: `.fecha-vencida` usa --rojo')
+// La atrasada del ejemplo vence el 01-sep; la otra, hoy. El estilo se lee de
+// la celda misma: ya no hay clase a la que mirar.
+// Se exige el `width` de la columna: la fecha de hoy aparece TAMBIÉN en el
+// encabezado del correo, y sin esto se mediría esa celda en vez de la de la
+// tarea — que fue exactamente lo que pasó la primera vez.
+const estiloDe = (ancho, texto) =>
+  (conTodo.match(new RegExp(`<td width="${ancho}"[^>]*style="([^"]*)">${texto}<`)) ?? [])[1] ?? ''
+const estiloVencida = estiloDe(108, '01-sep-2026')
+const estiloHoy = estiloDe(108, fecha(HOY))
 chk(
-  conTodo.includes(`.fecha-vencida{color:${token('rojo')};font-weight:700}`),
-  '#272-6 · el rojo de la fecha vencida es el del producto',
+  estiloVencida.includes(`color:${token('rojo')};font-weight:700;`),
+  '#272-6 · el rojo de la fecha vencida es el del producto, y va en 700',
   token('rojo'),
 )
-// La atrasada del ejemplo vence el 01-sep; la otra, hoy.
 chk(
-  /<td class="col-fecha fecha-vencida">01-sep-2026/.test(conTodo),
+  estiloVencida !== '' && /white-space:nowrap/.test(estiloVencida),
   '#272-6 · la fecha de una atrasada la lleva',
 )
 chk(
-  !/<td class="col-fecha">01-sep-2026/.test(conTodo),
-  '#272-6 · y ninguna atrasada se queda sin ella',
-)
-chk(
-  new RegExp(`<td class="col-fecha">${fecha(HOY)}`).test(conTodo),
-  '#272-6 · la de una que vence hoy, no',
+  estiloHoy !== '' && !estiloHoy.includes(token('rojo')) && /font-weight:500/.test(estiloHoy),
+  '#272-6 · la de una que vence hoy, no: va en 500 como el resto',
 )
 
 // 7 · El grosor de fecha y atraso: la aplicación carga JetBrains Mono solo en
 //     500 y 700, así que nada monoespaciado va en 400.
 chk(
-  /table\.tareas td\.col-fecha,table\.tareas td\.col-desv\{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:500\}/.test(conTodo),
+  estiloHoy.includes("font-family:'JetBrains Mono',ui-monospace,monospace") &&
+    /font-size:12px/.test(estiloHoy) &&
+    estiloDe(80, '24 días').includes('font-size:12px;font-weight:500'),
   '#272-7 · fecha y atraso van en monoespaciada de 12px y peso 500, como en la pantalla',
 )
 chk(
@@ -228,25 +259,56 @@ chk(
   '#272-7 · nada monoespaciado queda en 400, que es un peso que la marca no tiene',
 )
 chk(prop('.tarea-cell', 'font-weight') === '500', 'terreno: `.tarea-cell` pesa 500')
-chk(/\.tarea-cell\{font-weight:500\}/.test(conTodo), '#272-7 · y el nombre de la tarea pesa lo mismo que en la tabla')
+chk(
+  /<td width="230"[^>]*font-weight:500;/.test(conTodo),
+  '#272-7 · y el nombre de la tarea pesa lo mismo que en la tabla',
+)
 
 // 8 · La fila, pintada con el color de su estado.
-for (const [clase, tokenNombre] of [
-  ['fila--rojo', 'rojo-suave'],
-  ['fila--morado', 'morado-suave'],
-  ['fila--ambar', 'ambar-suave'],
+// Sin hoja de estilos no hay clase que valga: lo que viaja es el color, en
+// CADA celda de la fila.
+const fuentePlantilla = readFileSync('supabase/functions/resumen-diario/plantilla.ts', 'utf8')
+for (const [categoria, tokenNombre] of [
+  ['atrasada', 'rojo-suave'],
+  ['atrasada_replan', 'morado-suave'],
+  ['pendiente_replan', 'ambar-suave'],
 ]) {
+  const c = token(tokenNombre)
+  const emitido = html(base({ atrasadas: [t({ titulo: 'X', categoria })] }))
   chk(
-    conTodo.includes(`tr.${clase}>td{background:${token(tokenNombre)}}`),
-    `#272-8 · ${clase} usa el color del producto (--${tokenNombre})`,
-    token(tokenNombre),
+    (emitido.match(new RegExp(`background:${c};`, 'g')) ?? []).length === 4,
+    `#272-8 · ${categoria} pinta sus CUATRO celdas con el color del producto (--${tokenNombre})`,
+    c,
   )
 }
-chk(/<tr class="fila--morado">/.test(conTodo), '#272-8 · y la fila atrasada replanificada la lleva puesta')
-chk(/<tr>\s*<td class="tarea-cell">Enviar informe/.test(conTodo), '#272-8 · una pendiente sin replanificar va sin clase, que es la fila sin color')
+chk(
+  (conTodo.match(new RegExp(`background:${token('morado-suave')};`, 'g')) ?? []).length === 4,
+  '#272-8 · y la fila atrasada replanificada la lleva puesta',
+)
+// Solo las CELDAS: el blanco lo llevan también la tarjeta y la tabla.
+const celdasBlancas = (
+  html(base({ vencenHoy: [t({ titulo: 'X', categoria: 'pendiente', fecha: HOY })] })).match(
+    /<td width="\d+"[^>]*background:#ffffff;/g,
+  ) ?? []
+).length
+chk(
+  celdasBlancas === 4,
+  '#272-8 · una pendiente sin replanificar va en blanco, que es la fila sin color',
+  String(celdasBlancas),
+)
+chk(!/class="/.test(conTodo), '#272-8 · y no queda ninguna clase, que sin hoja de estilos no sirve de nada')
 // Los colores van RESUELTOS: Outlook de escritorio no entiende variables CSS y
 // ahí las filas quedarían blancas.
-chk(!/var\(--/.test(conTodo), '#272-8 · ninguna regla depende de una variable CSS')
+chk(!/var\(--/.test(conTodo), '#272-8 · ningún estilo depende de una variable CSS')
+// EL DEFECTO QUE ESTA RONDA CIERRA: los estilos iban en un bloque <style> y
+// Gmail lo descartó entero — el correo llegó sin colores, sin bordes, sin
+// anchos y sin tipografías. Medido en producción el 09-sep-2026.
+chk(!/<style/i.test(conTodo), '#272-2 · no hay ningún bloque <style>: Gmail lo descarta entero')
+chk(
+  (conTodo.match(/ style="/g) ?? []).length > 20,
+  '#272-2 · los estilos van escritos en cada elemento',
+  `${(conTodo.match(/ style="/g) ?? []).length} elementos con estilo`,
+)
 
 // ── Tipografías (criterio 9) ──────────────────────────────────────────────
 console.log('\n── Tipografías ──')
@@ -273,11 +335,14 @@ chk(
 // ── Encabezado, enlaces y pie ─────────────────────────────────────────────
 console.log('\n── Encabezado, enlaces y pie ──')
 chk(
-  /<span class="wordmark">Ando<span class="tek">tek<\/span><span class="plan">Planning<\/span><\/span>/.test(conTodo),
-  'el encabezado lleva el wordmark',
+  new RegExp(`Ando<span style="color:${token('naranja')};">tek</span><span [^>]*>Planning</span>`).test(conTodo),
+  'el encabezado lleva el wordmark, con el naranja de la marca',
+  token('naranja'),
 )
-chk(conTodo.includes(`.wordmark .tek{color:${token('naranja')}}`), 'con el naranja de la marca', token('naranja'))
-chk(/<span class="fechahoy">08-sep-2026<\/span>/.test(conTodo), 'y la fecha de hoy a la derecha')
+chk(
+  new RegExp(`<td align="right"[^>]*>${fecha(HOY)}</td>`).test(conTodo),
+  'y la fecha de hoy a la derecha',
+)
 
 chk(/>Ver mis tareas</.test(conTodo), 'el enlace se llama "Ver mis tareas"')
 chk(conTodo.includes(`href="${SITIO}/#mis-tareas"`), 'y apunta a Mis Tareas')
@@ -289,7 +354,7 @@ chk(
 // puede quedarse sin lo único que lleva de vuelta a la herramienta.
 const sinSemana = html(base({ atrasadas: [t({})] }))
 chk(!/vencen esta semana/.test(sinSemana), 'sin tareas para la semana, la frase no está')
-chk(/<p class="linea-sem"><a href/.test(sinSemana), 'pero el enlace sí, solo en su párrafo')
+chk(/<p style="[^"]*"><a href/.test(sinSemana), 'pero el enlace sí, solo en su párrafo')
 
 chk(
   /Recibes este correo porque tienes activado el resumen diario\./.test(conTodo),

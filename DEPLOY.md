@@ -484,6 +484,17 @@ Dashboard → **Edge Functions** → *Deploy a new function*, con el nombre
 | `plantilla.ts` | el correo: asunto, cuerpo con formato y cuerpo en texto plano |
 | `credenciales.ts` | qué credenciales acepta como "el programador" |
 
+> ⚠️ **La plantilla lleva los estilos escritos EN CADA ELEMENTO, y no es
+> descuido.** La primera versión los emitía en un bloque `<style>` y **Gmail lo
+> descartó entero**: el correo llegó sin colores de fila, sin bordes, sin anchos
+> de columna y sin tipografías. Medido en producción el **09-sep-2026** con una
+> corrida forzada. Por lo mismo no hay `display:flex` —el punto del proyecto va
+> en línea—, los bordes van `collapse`, los anchos se repiten en el atributo
+> `width` de cada celda porque varios clientes ignoran los de estilo, y ningún
+> color usa `var(--x)` porque Outlook de escritorio no entiende variables CSS.
+> **Es exactamente el tipo de cosa que alguien "limpiaría" en seis meses sin
+> saber por qué estaba así.** La prueba `docs/prueba-272-correo.mjs` lo vigila.
+
 Los tres están separados para que las pruebas puedan comprobar **lo que la
 función usa de verdad** —el correo y la puerta— en vez de una copia.
 
