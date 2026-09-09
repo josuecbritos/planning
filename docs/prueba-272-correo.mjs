@@ -98,50 +98,70 @@ chk(
   lineaSemana(1),
 )
 
-// ── La tabla, con el formato de Mis Tareas (criterio 5) ────────────────────
+// ── La tabla: cuatro columnas que caben en el ancho de un correo ──────────
+// Los anchos NO se copian acá: se leen de la propia hoja de estilos que el
+// correo emite y se comprueba que sumen lo que tienen que sumar.
 console.log('\n── La tabla ──')
-for (const col of ['Tarea', 'Ubicación', 'Estado', 'Fecha Objetivo', 'Atraso']) {
-  chk(new RegExp(`>${col}</th>`).test(completo), `la columna ${col} está`)
-}
-const orden = ['Tarea', 'Ubicación', 'Estado', 'Fecha Objetivo', 'Atraso'].map((c) =>
-  completo.indexOf(`>${c}</th>`),
+const conTodo = html(
+  base({
+    atrasadas: [
+      t({
+        titulo: 'Conseguir referencia CA',
+        categoria: 'atrasada_replan',
+        atraso: 24,
+        replanificaciones: 3,
+        colorProyecto: '#6a1b9a',
+      }),
+    ],
+    vencenHoy: [t({ titulo: 'Enviar informe', fecha: HOY, categoria: 'pendiente' })],
+    semana: 43,
+  }),
 )
-chk(orden.every((v, i) => i === 0 || v > orden[i - 1]), 'y en ese orden')
-chk(!/>Proyecto</.test(completo), 'NO hay columna Proyecto aparte')
+const anchoDe = (clase) => Number((conTodo.match(new RegExp(`\\.${clase}\\{width:(\\d+)px`)) ?? [])[1])
+const COLUMNAS = ['col-tarea', 'col-ruta', 'col-fecha', 'col-desv']
+const anchos = COLUMNAS.map(anchoDe)
+console.log(`  columnas: ${COLUMNAS.map((c, i) => `${c}=${anchos[i]}`).join(' · ')}`)
 chk(
-  /Proyecto › Frente › Sub/.test(completo),
-  'Ubicación es la ruta completa Proyecto › Frente › Sub Frente',
+  anchos.join(',') === '230,190,108,80',
+  '#272-1 · las cuatro columnas miden 230 · 190 · 108 · 80',
+  anchos.join(','),
 )
-chk(/>Atrasada replanificada</.test(completo), 'Estado es la pastilla con el nombre completo de la categoría')
-chk(/08-sep-2026/.test(completo), 'la fecha va en el formato del producto', fecha(HOY))
-chk(fecha('2026-01-05') === '05-ene-2026', 'y con el mes en el nombre corto de siempre', fecha('2026-01-05'))
-chk(atraso(4) === '4 días' && atraso(1) === '1 día' && atraso(0) === '—', 'el atraso concuerda y el vacío es "—"')
+chk(
+  anchos.reduce((a, b) => a + b, 0) === 608,
+  '#272-1 · y suman exactamente los 608 útiles',
+  String(anchos.reduce((a, b) => a + b, 0)),
+)
+chk(/\.tarjeta\{width:640px/.test(conTodo), '#272-1 · dentro de una tarjeta de 640, que es lo que un correo muestra sin recortar')
+chk(/table-layout:fixed/.test(conTodo), '#272-1 · con el ancho fijo, para que las columnas no se descuadren')
 
-// Los cinco colores del producto, medidos CONTRA la hoja de estilos: si
-// alguien cambia la paleta en `styles.css`, esta prueba lo ve.
+for (const col of ['Tarea', 'Ubicación', 'Fecha Objetivo', 'Atraso']) {
+  chk(new RegExp(`>${col}</th>`).test(conTodo), `la columna ${col} está`)
+}
+const orden = ['Tarea', 'Ubicación', 'Fecha Objetivo', 'Atraso'].map((c) => conTodo.indexOf(`>${c}</th>`))
+chk(orden.every((v, i) => i === 0 || v > orden[i - 1]), 'y en ese orden')
+chk(!/>Estado</.test(conTodo), '#272-1 · la columna Estado ya NO está')
+chk(!/estado-chip|108px;height:30px/.test(conTodo), '#272-1 · ni queda rastro de la pastilla')
+chk(!/>Proyecto</.test(conTodo), 'NO hay columna Proyecto aparte')
+
+// Criterios 2 y 3: los encabezados y las dos columnas de números, en una línea
+// y centrados.
+chk(
+  /\.col-fecha\{width:108px;white-space:nowrap\}/.test(conTodo) &&
+    /\.col-desv\{width:80px;white-space:nowrap\}/.test(conTodo),
+  '#272-2 · "Fecha Objetivo" y "Atraso" no se parten en dos líneas',
+)
+chk(
+  /table\.tareas \.col-fecha,table\.tareas \.col-desv\{text-align:center\}/.test(conTodo),
+  '#272-3 · las dos van centradas, encabezado incluido',
+)
+
+// ── Igual que Mis Tareas ──────────────────────────────────────────────────
+// Cada valor se mide CONTRA `src/styles.css`: no se copia acá. Si la pantalla
+// cambia de paleta o de medidas, el correo deja de coincidir y esto lo dice.
+console.log('\n── Igual que Mis Tareas ──')
 const css = readFileSync('src/styles.css', 'utf8')
 const token = (n) => (css.match(new RegExp(`\\s--${n}:\\s*(#[0-9a-fA-F]{6});`)) ?? [])[1]
 const fuente = readFileSync('supabase/functions/resumen-diario/plantilla.ts', 'utf8')
-for (const [nombre, cual] of [
-  ['verde-suave', 'fila hecha'],
-  ['rojo-suave', 'fila atrasada'],
-  ['ambar-suave', 'fila pendiente replanificada'],
-  ['morado-suave', 'fila atrasada replanificada'],
-]) {
-  const v = token(nombre)
-  chk(Boolean(v) && fuente.includes(v), `el color de la ${cual} es el del producto (--${nombre})`, v ?? 'sin token')
-}
-chk(
-  completo.includes(`background:${token('morado-suave')}`),
-  'y la fila COMPLETA va pintada con el color de su estado',
-)
-
-// ── Las cinco diferencias con Mis Tareas (criterios 1 a 5) ────────────────
-// Cada una se mide CONTRA `src/styles.css`: los valores no se copian acá, se
-// leen de la hoja de estilos del producto. Si la pantalla cambia, esto lo ve.
-console.log('\n── Igual que Mis Tareas ──')
-
-/** El valor de una propiedad dentro de una regla de `styles.css`. */
 const regla = (selector) => {
   const m = css.match(new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`))
   return m ? m[1].replace(/\s+/g, ' ') : ''
@@ -151,116 +171,142 @@ const prop = (selector, nombre) => {
   return m ? m[1].trim() : ''
 }
 
-const conTodo = html(
-  base({
-    atrasadas: [t({ titulo: 'Cerrar acta', atraso: 4, categoria: 'atrasada_replan', replanificaciones: 3, colorProyecto: '#8e44ad' })],
-    vencenHoy: [t({ titulo: 'Enviar informe', fecha: HOY, categoria: 'pendiente' })],
-  }),
-)
-
-// 1 · La pastilla: ancho, alto, tamaño de letra, mayúsculas y monoespaciada,
-//     todo tomado de `.estado-chip` (la regla base y la que la pasa a mono).
-const anchoPastilla = prop('.estado-chip', 'width')
-const altoPastilla = prop('.estado-chip', 'height')
-chk(anchoPastilla === '108px' && altoPastilla === '30px', 'terreno: `.estado-chip` mide 108×30', `${anchoPastilla}×${altoPastilla}`)
+// 4 · El ↻ ×N, pegado al nombre y dentro de su misma celda.
+chk(/&#8635; &times;3/.test(conTodo), '#272-4 · una tarea replanificada muestra ↻ ×N con su número')
 chk(
-  conTodo.includes(`width:${anchoPastilla};height:${altoPastilla}`),
-  '#272-1 · la pastilla del correo tiene el MISMO ancho y alto que la de Mis Tareas',
-)
-chk(/text-transform:uppercase/.test(conTodo), '#272-1 · va en mayúsculas')
-chk(/font-size:8\.5px;font-weight:700;letter-spacing:\.04em/.test(conTodo), '#272-1 · con su tamaño, peso y tracking')
-chk(
-  new RegExp(`border:1px solid ${token('morado-suave') ? '#d5bfe0' : 'X'};border-radius:4px`).test(conTodo),
-  '#272-1 · y el borde del color de su estado, con las esquinas de 4px',
-)
-// `border-radius:10px` a secas también lo tiene la tarjeta del correo entera,
-// así que se busca la FIRMA de la píldora vieja y no el valor suelto.
-chk(
-  !/border-radius:10px;font-size:11px;font-weight:600/.test(conTodo),
-  '#272-1 · ya no es la píldora redondeada y en negrita de antes',
-)
-
-// 2 · ↻ ×N junto al nombre, con la anatomía de `.replan-count`.
-chk(/↻ ×3/.test(conTodo), '#272-2 · una tarea replanificada muestra ↻ ×N con su número')
-chk(
-  conTodo.indexOf('↻ ×3') - conTodo.indexOf('Cerrar acta') < 200 &&
-    conTodo.indexOf('↻ ×3') > conTodo.indexOf('Cerrar acta'),
-  '#272-2 · y va JUNTO al nombre de la tarea',
+  /Conseguir referencia CA<span class="replan">/.test(conTodo),
+  '#272-4 · pegado a la última palabra del nombre, sin nada en medio',
 )
 chk(
-  conTodo.includes(`color:${token('ambar-texto')}`),
-  '#272-2 · con el ámbar de `.replan-count`',
+  /\.replan\{[^}]*margin-left:8px/.test(conTodo) && /\.replan\{[^}]*white-space:nowrap/.test(conTodo),
+  '#272-4 · con su separación y sin partirse',
+)
+chk(
+  conTodo.includes(`.replan{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:700;color:${token('ambar-texto')}`),
+  '#272-4 · monoespaciada en 700 y con el ámbar del producto',
   token('ambar-texto'),
 )
-chk(!/↻ ×0|↻ ×undefined/.test(conTodo), '#272-2 · y no aparece cuando la tarea nunca se movió')
+chk(!/&times;0\b/.test(conTodo), '#272-4 · y no aparece cuando la tarea nunca se movió')
 
-// 3 · El punto de color del proyecto, al principio de Ubicación.
-const puntoW = prop('.nav-proyecto__dot', 'width')
-const puntoR = prop('.nav-proyecto__dot', 'border-radius')
-chk(puntoW === '10px' && puntoR === '3px', 'terreno: `.nav-proyecto__dot` mide 10px con esquinas de 3px', `${puntoW}/${puntoR}`)
+// 5 · El punto de color del proyecto.
+chk(prop('.nav-proyecto__dot', 'width') === '10px', 'terreno: `.nav-proyecto__dot` mide 10px')
+chk(/\.dot\{width:10px;height:10px;border-radius:3px;flex:none\}/.test(conTodo), '#272-5 · el punto tiene la forma del producto')
 chk(
-  conTodo.includes(`width:${puntoW};height:${puntoW};border-radius:${puntoR};background:#8e44ad`),
-  '#272-3 · cada fila lleva el punto con el color de SU proyecto, con la forma del producto',
-)
-chk(
-  conTodo.indexOf('#8e44ad') < conTodo.indexOf('Proyecto › Frente › Sub'),
-  '#272-3 · y va al PRINCIPIO de la ubicación',
+  /<span class="dot" style="background:#6a1b9a"><\/span><span>Proyecto › /.test(conTodo),
+  '#272-5 · lleva el color de SU proyecto y abre la ubicación',
 )
 
-// 4 · La fecha de una atrasada, en rojo y negrita como `.fecha-vencida`.
-const rojo = token('rojo')
+// 6 · La fecha de una atrasada, en rojo y negrita.
 chk(prop('.fecha-vencida', 'color') === 'var(--rojo)', 'terreno: `.fecha-vencida` usa --rojo')
 chk(
-  new RegExp(`color:${rojo};font-weight:700;">01-sep-2026`).test(conTodo),
-  '#272-4 · en el bloque de atrasadas la fecha objetivo va en rojo',
-  rojo,
+  conTodo.includes(`.fecha-vencida{color:${token('rojo')};font-weight:700}`),
+  '#272-6 · el rojo de la fecha vencida es el del producto',
+  token('rojo'),
+)
+// La atrasada del ejemplo vence el 01-sep; la otra, hoy.
+chk(
+  /<td class="col-fecha fecha-vencida">01-sep-2026/.test(conTodo),
+  '#272-6 · la fecha de una atrasada la lleva',
 )
 chk(
-  !new RegExp(`color:${rojo};font-weight:700;">08-sep-2026`).test(conTodo),
-  '#272-4 · y la de una que vence hoy, no',
+  !/<td class="col-fecha">01-sep-2026/.test(conTodo),
+  '#272-6 · y ninguna atrasada se queda sin ella',
+)
+chk(
+  new RegExp(`<td class="col-fecha">${fecha(HOY)}`).test(conTodo),
+  '#272-6 · la de una que vence hoy, no',
 )
 
-// 5 · El nombre de la tarea, con el peso de `.tarea-cell`.
-const pesoNombre = prop('.tarea-cell', 'font-weight')
-chk(pesoNombre === '500', 'terreno: `.tarea-cell` pesa 500', pesoNombre)
-chk(conTodo.includes(`font-weight:${pesoNombre};">Cerrar acta`), '#272-5 · el nombre de la tarea NO va en negrita')
-chk(!/font-weight:600;">Cerrar acta/.test(conTodo), '#272-5 · ya no pesa 600')
+// 7 · El grosor de fecha y atraso: la aplicación carga JetBrains Mono solo en
+//     500 y 700, así que nada monoespaciado va en 400.
+chk(
+  /table\.tareas td\.col-fecha,table\.tareas td\.col-desv\{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:500\}/.test(conTodo),
+  '#272-7 · fecha y atraso van en monoespaciada de 12px y peso 500, como en la pantalla',
+)
+chk(
+  !/font-weight:400/.test(conTodo),
+  '#272-7 · nada monoespaciado queda en 400, que es un peso que la marca no tiene',
+)
+chk(prop('.tarea-cell', 'font-weight') === '500', 'terreno: `.tarea-cell` pesa 500')
+chk(/\.tarea-cell\{font-weight:500\}/.test(conTodo), '#272-7 · y el nombre de la tarea pesa lo mismo que en la tabla')
 
-// ── Tipografías (criterio 13) ──────────────────────────────────────────────
+// 8 · La fila, pintada con el color de su estado.
+for (const [clase, tokenNombre] of [
+  ['fila--rojo', 'rojo-suave'],
+  ['fila--morado', 'morado-suave'],
+  ['fila--ambar', 'ambar-suave'],
+]) {
+  chk(
+    conTodo.includes(`tr.${clase}>td{background:${token(tokenNombre)}}`),
+    `#272-8 · ${clase} usa el color del producto (--${tokenNombre})`,
+    token(tokenNombre),
+  )
+}
+chk(/<tr class="fila--morado">/.test(conTodo), '#272-8 · y la fila atrasada replanificada la lleva puesta')
+chk(/<tr>\s*<td class="tarea-cell">Enviar informe/.test(conTodo), '#272-8 · una pendiente sin replanificar va sin clase, que es la fila sin color')
+// Los colores van RESUELTOS: Outlook de escritorio no entiende variables CSS y
+// ahí las filas quedarían blancas.
+chk(!/var\(--/.test(conTodo), '#272-8 · ninguna regla depende de una variable CSS')
+
+// ── Tipografías (criterio 9) ──────────────────────────────────────────────
 console.log('\n── Tipografías ──')
-chk(!/fonts\.googleapis|fonts\.gstatic|@font-face|@import/.test(completo), 'el correo no carga ninguna tipografía de la web')
-chk(!/Inter|JetBrains/.test(completo), 'no menciona las de marca, que un cliente bloquearía')
-chk(/font-family:Arial/.test(completo), 'el texto usa una tipografía común')
-const monoEnFecha = /font-family:'Courier New', Courier, monospace;white-space:nowrap;">08-sep/.test(completo)
-chk(monoEnFecha, 'la fecha va en monoespaciada común, para que quede alineada')
 chk(
-  (completo.match(/'Courier New'/g) ?? []).length >= 3,
-  'y también el atraso y la fecha del encabezado',
-  `${(completo.match(/'Courier New'/g) ?? []).length} usos`,
+  !/@font-face|@import|fonts\.googleapis|fonts\.gstatic|<link/.test(conTodo),
+  '#272-9 · el correo no CARGA ninguna tipografía de la web',
+)
+// Nombrarlas no es cargarlas: van primero por si el lector ya las tiene, y
+// detrás va el respaldo del sistema. Lo que se replica es el peso y el tamaño.
+chk(
+  /font-family:Inter,system-ui,sans-serif/.test(conTodo),
+  '#272-9 · las nombra con respaldo del sistema detrás',
+)
+chk(
+  /'JetBrains Mono',ui-monospace,monospace/.test(conTodo),
+  '#272-9 · y la monoespaciada, igual',
+)
+chk(
+  (conTodo.match(/'JetBrains Mono'/g) ?? []).length >= 4,
+  '#272-9 · en el encabezado de tabla, la fecha, el atraso y el ↻ ×N',
+  `${(conTodo.match(/'JetBrains Mono'/g) ?? []).length} usos`,
 )
 
-// ── Encabezado, enlaces y pie (criterio 13c) ───────────────────────────────
+// ── Encabezado, enlaces y pie ─────────────────────────────────────────────
 console.log('\n── Encabezado, enlaces y pie ──')
-chk(/Ando<span style="color:#f97316;">tek<\/span>/.test(completo), 'el encabezado lleva el wordmark, con el naranja de la marca')
-chk(/Planning/.test(completo), 'y la palabra Planning')
-chk(completo.indexOf('08-sep-2026') > completo.indexOf('Andotek') || /text-align:right[^>]*>08-sep-2026/.test(completo), 'con la fecha de hoy a la derecha')
-chk(/>Ver mis tareas</.test(completo), 'el enlace se llama "Ver mis tareas"')
-chk(completo.includes(`href="${SITIO}/#mis-tareas"`), 'y apunta a Mis Tareas')
 chk(
-  /Recibes este correo porque tienes activado el resumen diario\./.test(completo),
+  /<span class="wordmark">Ando<span class="tek">tek<\/span><span class="plan">Planning<\/span><\/span>/.test(conTodo),
+  'el encabezado lleva el wordmark',
+)
+chk(conTodo.includes(`.wordmark .tek{color:${token('naranja')}}`), 'con el naranja de la marca', token('naranja'))
+chk(/<span class="fechahoy">08-sep-2026<\/span>/.test(conTodo), 'y la fecha de hoy a la derecha')
+
+chk(/>Ver mis tareas</.test(conTodo), 'el enlace se llama "Ver mis tareas"')
+chk(conTodo.includes(`href="${SITIO}/#mis-tareas"`), 'y apunta a Mis Tareas')
+chk(
+  conTodo.indexOf(SEMANA) < conTodo.indexOf('Ver mis tareas'),
+  'va en el mismo párrafo que la línea de la semana, detrás de ella',
+)
+// Sin tareas para la semana desaparece la FRASE, no el párrafo: el correo no
+// puede quedarse sin lo único que lleva de vuelta a la herramienta.
+const sinSemana = html(base({ atrasadas: [t({})] }))
+chk(!/vencen esta semana/.test(sinSemana), 'sin tareas para la semana, la frase no está')
+chk(/<p class="linea-sem"><a href/.test(sinSemana), 'pero el enlace sí, solo en su párrafo')
+
+chk(
+  /Recibes este correo porque tienes activado el resumen diario\./.test(conTodo),
   'el pie dice por qué llega el correo',
 )
-chk(/>Gestionar correos</.test(completo), 'y termina con el enlace "Gestionar correos"')
-chk(completo.includes(`href="${SITIO}/#mi-cuenta"`), 'que lleva a Mi cuenta')
-// "Ningún enlace del correo muestra la dirección escrita": el texto visible
-// —lo que queda al quitar las etiquetas— no puede contener ninguna dirección.
-const visible = completo.replace(/<[^>]+>/g, ' ')
-chk(!/https?:\/\//.test(visible), 'ningún enlace muestra la dirección escrita')
-
-// La dirección NO está fija: se pasa una distinta a propósito y el correo la
-// sigue. Si estuviera escrita, el resultado no cambiaría.
-const otro = html(base({ atrasadas: [t({})], sitio: 'https://otra-direccion.invalid' }))
-chk(otro.includes('https://otra-direccion.invalid/#mi-cuenta'), 'la dirección sale de la configuración, no está escrita fija')
+chk(/>Gestionar correos</.test(conTodo), 'y termina con el enlace "Gestionar correos"')
+chk(conTodo.includes(`href="${SITIO}/#mi-cuenta"`), 'que lleva a Mi cuenta')
+// Ningún enlace muestra la dirección escrita: el texto visible —lo que queda
+// al quitar las etiquetas— no puede contener ninguna.
+chk(!/https?:\/\//.test(conTodo.replace(/<[^>]+>/g, ' ')), 'ningún enlace muestra la dirección escrita')
+// Y la dirección NO está fija: se pasa una distinta y el correo la sigue.
+chk(
+  html(base({ atrasadas: [t({})], sitio: 'https://otra-direccion.invalid' })).includes(
+    'https://otra-direccion.invalid/#mi-cuenta',
+  ),
+  'la dirección sale de la configuración, no está escrita fija',
+)
 
 // ── Texto plano (criterio 13b) ─────────────────────────────────────────────
 console.log('\n── Texto plano ──')

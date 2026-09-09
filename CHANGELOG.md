@@ -4542,3 +4542,61 @@ las migraciones **parando antes de la 34** para poder medir el criterio 1b, y la
 35 quedaba en el primer barrido — pero lee `usuario.resumen_diario`, que crea la
 34. Las dos quedan ahora diferidas y se aplican en orden después de dar de alta a
 la gente.
+
+---
+
+### #272 (ajustes 2) — La tabla del correo, con la plantilla resuelta
+
+**Solo la plantilla del correo.** Sin migración, sin tocar la base ni el
+programador.
+
+#### Lo que se hizo
+
+**Las dos rondas anteriores describieron medidas en palabras y no alcanzó.** Esta
+vez el pedido trajo **el HTML y el CSS ya resueltos y aprobados**, y se usaron tal
+cual, reemplazando los datos de ejemplo por los reales.
+
+- **Cuatro columnas que suman 608** dentro de una tarjeta de 640, que es lo que un
+  cliente de correo muestra sin recortar: Tarea 230 · Ubicación 190 · Fecha
+  Objetivo 108 · Atraso 80, con `table-layout:fixed`.
+- **Sale la columna Estado.** La fila ya va pintada con el color de su estado y
+  cada sección se llama por él, así que la pastilla lo repetía por tercera vez — y
+  era la única columna que obligaba a achicar la letra hasta volverla ilegible.
+- **El proyecto va dentro de Ubicación**, con su punto de color al principio, que
+  es lo que hace Mis Tareas cuando el espacio es angosto. **El atraso se queda**,
+  aunque el producto lo esconda en el teléfono: es el dato por el que existe este
+  correo.
+- **Todo lo monoespaciado en peso 500**, y la fecha vencida y el ↻ ×N en 700. La
+  aplicación carga JetBrains Mono **solo en 500 y 700**, así que un 400 sería un
+  peso que la marca no tiene.
+
+#### Dos decisiones que el material no cubría, preguntadas antes de escribir nada
+
+1. **El enlace quedó dentro del párrafo de la línea de la semana**, y esa línea
+   desaparece cuando no queda ninguna tarea para la semana. Se resolvió que
+   **desaparece la frase, no el párrafo**: si no, el correo se quedaría sin lo
+   único que lleva de vuelta a la herramienta.
+2. **El CSS aprobado usa variables** (`var(--rojo)`), y **Outlook de escritorio no
+   las entiende** — usa el motor de Word. Ahí las filas habrían quedado blancas y
+   la fecha vencida en negro, que es lo contrario de la regla de oro del producto.
+   Se emiten **las mismas reglas con los colores resueltos**: mismo aspecto donde
+   las variables funcionan, y también donde no.
+
+#### Cómo se comprobó
+
+`docs/prueba-272-correo.mjs`, **87 comprobaciones**. Los anchos no se copian en la
+prueba: **se leen de la hoja de estilos que el propio correo emite** y se
+comprueba que sumen 608. Los colores, el punto y los pesos se siguen midiendo
+contra `src/styles.css`.
+
+*Al reemplazar el bloque de la tabla se llevó por delante dos secciones enteras de
+la prueba* —tipografías, y encabezado/enlaces/pie—, y la corrida quedó igual de
+verde con **17 comprobaciones menos**. Se repusieron actualizadas. Un verde no
+dice cuántas cosas dejó de mirar: el número de comprobaciones hay que leerlo
+también.
+
+*Y una que cambió de sentido:* la comprobación de tipografías decía que el correo
+no podía **nombrar** Inter ni JetBrains Mono. Ahora las nombra —con el respaldo
+del sistema detrás, que es lo que el pedido pide— así que pasa a comprobar lo que
+de verdad importaba: que no **cargue** ninguna (`@font-face`, `@import`,
+`googleapis`, `<link>`).

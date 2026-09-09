@@ -159,16 +159,23 @@ lo dispara nadie.
   frentes y sub frentes arrastrándolos**, no el alfabético. Un bloque sin tareas
   no aparece. Después, una sola línea con **cuántas más vencen esta semana**: con
   50 tareas el correo se vuelve ilegible, y para eso está la herramienta.
-- **La tabla del correo es la de Mis Tareas** —Tarea · Ubicación · Estado · Fecha
-  Objetivo · Atraso—, con la fila pintada del color de su estado, **la misma
-  pastilla** (la caja de 108×30 en monoespaciada y mayúsculas, con el borde de su
-  estado), el **↻ ×N** junto al nombre, el **punto de color del proyecto** al
-  principio de la ubicación y la **fecha en rojo** cuando la tarea está atrasada.
-  El nombre va con el mismo peso que en la tabla, sin negrita. La ruta completa
-  va dentro de Ubicación, como hace Mis Tareas en el teléfono. **La columna
-  Atraso es la del producto** (días hábiles que la tarea se corrió respecto de su
-  compromiso original), así que una atrasada que nunca se movió va con la raya de
-  siempre y una que vence hoy y sí se movió lleva su número.
+- **La tabla del correo es la de Mis Tareas, acotada al ancho que un correo
+  puede mostrar:** cuatro columnas —**Tarea 230 · Ubicación 190 · Fecha Objetivo
+  108 · Atraso 80**— que suman los 608 útiles de una tarjeta de 640. Lleva la
+  fila pintada del color de su estado, el **↻ ×N** pegado al nombre, el **punto
+  de color del proyecto** abriendo la ubicación y la **fecha en rojo** cuando la
+  tarea está atrasada. Todo lo monoespaciado va en peso 500 —la aplicación carga
+  JetBrains Mono solo en 500 y 700—, y la fecha vencida y la flecha, en 700.
+- **La columna Estado no está**, y es deliberado: la fila ya va pintada con el
+  color de su estado y cada sección se llama por él, así que la pastilla lo
+  repetía por tercera vez — y era la única columna que obligaba a achicar la
+  letra hasta volverla ilegible. **El proyecto va dentro de Ubicación**, con su
+  punto, como hace Mis Tareas cuando el espacio es angosto. **El atraso se
+  queda**, aunque el producto lo esconda en el teléfono: es el dato por el que
+  existe este correo.
+- **La columna Atraso es la del producto** (días hábiles que la tarea se corrió
+  respecto de su compromiso original), así que una atrasada que nunca se movió va
+  con la raya de siempre y una que vence hoy y sí se movió lleva su número.
 - **El asunto dice de qué se trata sin abrirlo:** `9 tareas atrasadas · 2 vencen
   hoy`, con los números de esa persona. Sin la marca al final —el remitente ya la
   dice, y repetirla gasta 17 de los pocos caracteres que el programa de correo
