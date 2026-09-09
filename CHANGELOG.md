@@ -4474,3 +4474,190 @@ guardada no.
 **No se tocó**, porque el pedido lo dice explícitamente y porque rehacer el
 trabajo agendado es una decisión de despliegue, no una consecuencia de este
 defecto. Queda levantado.
+
+---
+
+### #272 (ajustes) — El correo se ve como Mis Tareas, y el asunto dice de qué se trata
+
+**La plantilla del correo, el asunto y una migración.** El correo ya llegaba y
+funcionaba: esto es cómo se ve y qué dice.
+
+#### Las cinco diferencias con la pantalla
+
+Medidas contra el correo real recibido en producción, comparándolo con Mis
+Tareas:
+
+| | Estaba | Queda |
+|---|---|---|
+| La pastilla de estado | grande, en negrita, con esquinas de píldora | la del producto: **108×30, monoespaciada en mayúsculas de 8.5px**, con el borde de su estado |
+| El ↻ ×N | no aparecía | **junto al nombre**, con el ámbar de `.replan-count` |
+| El color del proyecto | no aparecía | **el punto de 10px**, al principio de Ubicación |
+| La fecha de una atrasada | en negro | **en rojo y negrita**, como `.fecha-vencida` |
+| El nombre de la tarea | en negrita | **peso 500**, el de `.tarea-cell` |
+
+**Ninguno de esos valores está escrito en la plantilla como número suelto:** la
+prueba los lee de `src/styles.css` y los compara. Si la pantalla cambia de
+paleta o de medidas, el correo deja de coincidir y la prueba lo dice.
+
+#### El asunto
+
+`9 tareas atrasadas · 2 vencen hoy`. **Sale la marca del final** —el remitente ya
+dice Andotek Planning, y repetirlo gastaba 17 de los ~40 caracteres que el
+programa de correo muestra— y **entra la palabra "tareas"**, que era lo que les
+faltaba a los números para decir de qué. Con las dos mitades juntas la palabra va
+solo en la primera: repetirla no agrega nada y cuesta caracteres.
+
+#### Los textos del cuerpo
+
+Saludo con el nombre completo, la bajada debajo —*A continuación un resumen de
+tus tareas pendientes hasta el día de hoy:*— y la línea de la semana, que **deja
+de ser una sección con título** y pasa a ser una línea después de la última
+tabla: *Además, 43 tareas tuyas vencen esta semana.*
+
+#### La migración 35, que el pedido no contemplaba
+
+**Preguntado antes de escribir nada.** Dos de las cinco diferencias necesitan
+datos que la base no entregaba: el `↻ ×N` necesita **cuántas** replanificaciones
+—la categoría solo dice si hubo— y el punto necesita **el color** del proyecto.
+El pedido decía "sin migración, sin tocar la base", así que las dos cosas
+chocaban.
+
+Se eligió agregarlos a `resumen_diario_datos()` en vez de que la función de
+servidor los busque por su cuenta, y la razón es concreta: **lo que la base
+entrega no lleva ids**, así que cualquier cruce posterior tendría que ser por
+nombre de tarea y de proyecto, y dos tareas con el mismo título se llevarían el
+`↻ ×N` o el color de la otra. La migración es un `create or replace` de una sola
+función: no toca tablas, ni datos, ni permisos, y la firma queda idéntica.
+
+#### Cómo se comprobó
+
+`docs/prueba-272-correo.mjs` pasa a **84 comprobaciones** y
+`docs/prueba-272-resumen-diario-base.mjs` a **61**. Las nuevas de la base miden
+que el número de replanificaciones sea **el mismo que cuenta la tabla**, y que el
+color llegue —tanto el del proyecto como el respaldo que usa la pantalla cuando
+no tiene ninguno.
+
+*Un defecto del propio arnés, encontrado al correrlo:* la prueba de base aplica
+las migraciones **parando antes de la 34** para poder medir el criterio 1b, y la
+35 quedaba en el primer barrido — pero lee `usuario.resumen_diario`, que crea la
+34. Las dos quedan ahora diferidas y se aplican en orden después de dar de alta a
+la gente.
+
+---
+
+### #272 (ajustes 2) — La tabla del correo, con la plantilla resuelta
+
+**Solo la plantilla del correo.** Sin migración, sin tocar la base ni el
+programador.
+
+#### Lo que se hizo
+
+**Las dos rondas anteriores describieron medidas en palabras y no alcanzó.** Esta
+vez el pedido trajo **el HTML y el CSS ya resueltos y aprobados**, y se usaron tal
+cual, reemplazando los datos de ejemplo por los reales.
+
+- **Cuatro columnas que suman 608** dentro de una tarjeta de 640, que es lo que un
+  cliente de correo muestra sin recortar: Tarea 230 · Ubicación 190 · Fecha
+  Objetivo 108 · Atraso 80, con `table-layout:fixed`.
+- **Sale la columna Estado.** La fila ya va pintada con el color de su estado y
+  cada sección se llama por él, así que la pastilla lo repetía por tercera vez — y
+  era la única columna que obligaba a achicar la letra hasta volverla ilegible.
+- **El proyecto va dentro de Ubicación**, con su punto de color al principio, que
+  es lo que hace Mis Tareas cuando el espacio es angosto. **El atraso se queda**,
+  aunque el producto lo esconda en el teléfono: es el dato por el que existe este
+  correo.
+- **Todo lo monoespaciado en peso 500**, y la fecha vencida y el ↻ ×N en 700. La
+  aplicación carga JetBrains Mono **solo en 500 y 700**, así que un 400 sería un
+  peso que la marca no tiene.
+
+#### Dos decisiones que el material no cubría, preguntadas antes de escribir nada
+
+1. **El enlace quedó dentro del párrafo de la línea de la semana**, y esa línea
+   desaparece cuando no queda ninguna tarea para la semana. Se resolvió que
+   **desaparece la frase, no el párrafo**: si no, el correo se quedaría sin lo
+   único que lleva de vuelta a la herramienta.
+2. **El CSS aprobado usa variables** (`var(--rojo)`), y **Outlook de escritorio no
+   las entiende** — usa el motor de Word. Ahí las filas habrían quedado blancas y
+   la fecha vencida en negro, que es lo contrario de la regla de oro del producto.
+   Se emiten **las mismas reglas con los colores resueltos**: mismo aspecto donde
+   las variables funcionan, y también donde no.
+
+#### Cómo se comprobó
+
+`docs/prueba-272-correo.mjs`, **87 comprobaciones**. Los anchos no se copian en la
+prueba: **se leen de la hoja de estilos que el propio correo emite** y se
+comprueba que sumen 608. Los colores, el punto y los pesos se siguen midiendo
+contra `src/styles.css`.
+
+*Al reemplazar el bloque de la tabla se llevó por delante dos secciones enteras de
+la prueba* —tipografías, y encabezado/enlaces/pie—, y la corrida quedó igual de
+verde con **17 comprobaciones menos**. Se repusieron actualizadas. Un verde no
+dice cuántas cosas dejó de mirar: el número de comprobaciones hay que leerlo
+también.
+
+*Y una que cambió de sentido:* la comprobación de tipografías decía que el correo
+no podía **nombrar** Inter ni JetBrains Mono. Ahora las nombra —con el respaldo
+del sistema detrás, que es lo que el pedido pide— así que pasa a comprobar lo que
+de verdad importaba: que no **cargue** ninguna (`@font-face`, `@import`,
+`googleapis`, `<link>`).
+
+---
+
+### #272 (ajustes 3) — Reponer en el repo la plantilla que quedó en producción
+
+**Solo la plantilla del correo.** Sin migración, sin cambios de comportamiento.
+
+#### Qué pasó
+
+**El correo llegó sin ningún formato:** sin colores de fila, sin bordes, sin
+anchos de columna y sin tipografías. **La plantilla emitía sus estilos en un
+bloque `<style>` y Gmail lo descarta entero.** En correo los estilos van
+escritos en cada elemento.
+
+El dueño lo corrigió y lo desplegó a mano desde el dashboard, y **el correo llegó
+correcto en producción el 09-sep-2026**, verificado con una corrida forzada. Esta
+entrada **repone en el repo lo que ya está corriendo**: si no, el próximo
+despliegue desde el repo pisaría la versión buena.
+
+El archivo se copió **del propio pedido, extrayéndolo del bloque de código**, y se
+comprobó que quedara idéntico byte a byte — transcribir 300 líneas a mano es
+justo la clase de tarea donde se cuela un carácter.
+
+**Los tres cambios técnicos**, que son los que hacen que el correo sobreviva:
+
+- Los estilos van **escritos en cada elemento**, no en una hoja aparte.
+- **`display:flex` y `border-collapse:separate` salen:** el punto del proyecto va
+  en línea y los bordes van colapsados, que es lo que respetan todos los
+  clientes.
+- **Los anchos van también en el atributo `width` de cada celda**, porque varios
+  clientes ignoran los de estilo.
+
+`CLASE_FILA` pasa a ser `FONDO_FILA`: sin hoja de estilos la clase no sirve de
+nada, lo que viaja es el color. `index.ts` y `credenciales.ts` **no se tocaron**.
+
+#### Cómo se comprobó
+
+`docs/prueba-272-correo.mjs` pasa de **87 a 91 comprobaciones** — el pedido pedía
+explícitamente que el número no bajara, y por qué: *ya pasó una vez que al
+reemplazar un bloque se perdieron 17 y la corrida siguió verde.* Las cuatro
+nuevas son del defecto que se cierra: que **no haya ningún bloque `<style>`**, que
+los estilos vayan en cada elemento, que los anchos se repitan en el atributo
+`width`, y que el punto **no** use `display:flex`.
+
+Todo lo demás sigue midiéndose contra `src/styles.css` —los colores de fila, el
+rojo de la fecha vencida, el ámbar de la flecha, los pesos— y los anchos se leen
+de lo que el correo emite y se comprueba que sumen 608.
+
+*Dos defectos del arnés, encontrados al reescribirlo:*
+
+- **Un `replace` que no encontró su texto y no avisó.** Se perdieron cinco
+  comprobaciones sin que nada se pusiera rojo, y solo se notó porque una variable
+  quedó sin definir y el proceso murió. Los reemplazos siguientes se hicieron con
+  una aserción que falla si el texto buscado no está.
+- **Una comprobación que medía la celda equivocada.** La fecha de hoy aparece dos
+  veces en el correo —en el encabezado y en la fila de una tarea que vence hoy—,
+  y el selector agarraba la primera. "La fecha de hoy no va en rojo" pasaba
+  mirando el encabezado, que nunca lo estuvo. Ahora el selector exige el ancho de
+  la columna.
+
+Regresión completa: **34 suites, 1347 comprobaciones, 0 fallas**.

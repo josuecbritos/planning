@@ -448,6 +448,21 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   llega enmascarado, y que ni los datos, ni el turno, ni el registro de corridas
   están al alcance de la aplicación. Restituye siempre lo que toca.
 
+### #272 (ajustes) — El correo se ve como Mis Tareas (migración 35)
+
+- **Un `create or replace` de UNA función**, `resumen_diario_datos()`, que suma a
+  cada tarea el número de replanificaciones y el color de su proyecto. No toca
+  ninguna tabla, ninguna columna, ninguna política ni ningún permiso, y la firma
+  y las columnas de retorno quedan idénticas.
+- **Los datos se piden a la base y no se cruzan después.** Lo que la función
+  entrega no lleva ids, así que un cruce hecho en la función de servidor tendría
+  que ser por nombre de tarea y de proyecto: dos tareas con el mismo título se
+  llevarían el `↻ ×N` o el color de la otra. Misma razón por la que #272 dejó el
+  orden en la base.
+- **Sigue concedida solo a `service_role`** y el revoke a PUBLIC se repite, con
+  su autocomprobación: `create or replace` conserva los permisos de la función
+  que ya existía, pero "en teoría no hace falta" no se mide y la comprobación sí.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.

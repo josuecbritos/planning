@@ -238,6 +238,12 @@ orden** el contenido de:
     esta migración; después mergear el front. **Correr la compuerta después**
     (casos nuevos `probarCambioDePerfil` y `probarEliminarCorta`).
 
+> **Esta lista llega hasta la 31.** Las migraciones **32** (organización del
+> usuario), **33** (un consultor suma a un colega), **34** y **35** (resumen
+> diario por correo) se aplican igual, en orden, desde el SQL Editor; cada una
+> lleva su propia cabecera con qué hace y qué comprobar. Las dos del resumen
+> diario están documentadas más abajo, en *Resumen diario por correo*.
+
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
 o `brew install supabase/tap/supabase`— y luego
 `supabase link --project-ref TU_REF && supabase db push`. Todo el esquema puede
@@ -448,12 +454,18 @@ la base.
 que la invitación, que ya está validado de punta a punta. Lo único nuevo es la
 parte que corre sola.
 
-### 1. Aplicar la migración 34
+### 1. Aplicar las migraciones 34 y 35
 
-`supabase/migrations/20260707000034_resumen_diario.sql`, con **`pg_dump` antes**
-(el plan gratuito no tiene respaldos automáticos, ver *Mantenimiento*). Agrega
-la columna `usuario.resumen_diario`, amplía `usuario_visible`, y crea el turno,
-los datos del correo y el registro de corridas.
+`supabase/migrations/20260707000034_resumen_diario.sql` y, encima,
+`20260707000035_resumen_diario_formato.sql`, con **`pg_dump` antes** (el plan
+gratuito no tiene respaldos automáticos, ver *Mantenimiento*).
+
+La **34** agrega la columna `usuario.resumen_diario`, amplía `usuario_visible`, y
+crea el turno, los datos del correo y el registro de corridas. La **35** es un
+`create or replace` de una sola función —`resumen_diario_datos()`— que suma a
+cada tarea el número de replanificaciones y el color de su proyecto, para que la
+tabla del correo pueda verse igual que la de Mis Tareas. No toca ninguna tabla ni
+ningún dato, y hay que **redesplegar la función** después.
 
 > **Los usuarios que ya existen quedan APAGADOS y los nuevos nacen encendidos.**
 > No es un descuido: nadie de los que ya están pidió este correo. La migración
@@ -471,6 +483,17 @@ Dashboard → **Edge Functions** → *Deploy a new function*, con el nombre
 | `index.ts` | toma el turno, pide los datos y envía por Resend |
 | `plantilla.ts` | el correo: asunto, cuerpo con formato y cuerpo en texto plano |
 | `credenciales.ts` | qué credenciales acepta como "el programador" |
+
+> ⚠️ **La plantilla lleva los estilos escritos EN CADA ELEMENTO, y no es
+> descuido.** La primera versión los emitía en un bloque `<style>` y **Gmail lo
+> descartó entero**: el correo llegó sin colores de fila, sin bordes, sin anchos
+> de columna y sin tipografías. Medido en producción el **09-sep-2026** con una
+> corrida forzada. Por lo mismo no hay `display:flex` —el punto del proyecto va
+> en línea—, los bordes van `collapse`, los anchos se repiten en el atributo
+> `width` de cada celda porque varios clientes ignoran los de estilo, y ningún
+> color usa `var(--x)` porque Outlook de escritorio no entiende variables CSS.
+> **Es exactamente el tipo de cosa que alguien "limpiaría" en seis meses sin
+> saber por qué estaba así.** La prueba `docs/prueba-272-correo.mjs` lo vigila.
 
 Los tres están separados para que las pruebas puedan comprobar **lo que la
 función usa de verdad** —el correo y la puerta— en vez de una copia.
