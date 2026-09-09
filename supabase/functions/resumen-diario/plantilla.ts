@@ -22,6 +22,10 @@ export interface TareaCorreo {
   categoria: 'atrasada' | 'atrasada_replan' | 'pendiente' | 'pendiente_replan'
   /** Días hábiles que la tarea se corrió hacia adelante. 0 = sin atraso. */
   atraso: number
+  /** Cuántas veces se replanificó — el N del `↻ ×N`. 0 = no se muestra. */
+  replanificaciones: number
+  /** El color del proyecto, para el punto de Ubicación (migración 35). */
+  colorProyecto: string
 }
 
 export interface Resumen {
@@ -116,31 +120,62 @@ export function asunto(r: Resumen): string {
   const partes: string[] = []
   const a = r.atrasadas.length
   const h = r.vencenHoy.length
-  if (a > 0) partes.push(`${a} atrasada${a === 1 ? '' : 's'}`)
-  if (h > 0) partes.push(`${h} vence${h === 1 ? '' : 'n'} hoy`)
-  return `${partes.join(' · ')} — Andotek Planning`
+  if (a > 0) partes.push(`${a} ${a === 1 ? 'tarea atrasada' : 'tareas atrasadas'}`)
+  if (h > 0) {
+    // "tareas" solo cuando esta mitad va SOLA: con las dos, la palabra ya
+    // apareció al principio y repetirla gasta caracteres de los pocos que el
+    // programa de correo muestra.
+    partes.push(
+      a > 0
+        ? `${h} vence${h === 1 ? '' : 'n'} hoy`
+        : `${h} ${h === 1 ? 'tarea vence' : 'tareas vencen'} hoy`,
+    )
+  }
+  return partes.join(' · ')
 }
 
-/** `43 tareas más vencen esta semana.` — la línea de contexto. */
+/** `Además, 43 tareas tuyas vencen esta semana.` — la línea de contexto, que
+ *  va después de la última tabla. */
 export function lineaSemana(n: number): string {
-  return n === 1 ? '1 tarea más vence esta semana.' : `${n} tareas más vencen esta semana.`
+  return n === 1
+    ? 'Además, 1 tarea tuya vence esta semana.'
+    : `Además, ${n} tareas tuyas vencen esta semana.`
 }
 
 // ---------------------------------------------------------------------------
 // Cuerpo con formato
 // ---------------------------------------------------------------------------
 
+/** La pastilla de estado, con la MISMA anatomía que `.estado-chip`: caja de
+ *  108×30, monoespaciada en mayúsculas de 8.5px, y el borde y el texto del
+ *  color de su estado. Va como tabla de una celda y no como `span`, porque es
+ *  lo único que centra vertical de forma fiable en un correo — `inline-flex`
+ *  no existe en la mitad de los clientes. */
+function pastillaHtml(t: TareaCorreo): string {
+  const c = COLOR[COLOR_DE[t.categoria]]
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="border-collapse:separate;"><tr><td style="width:108px;height:30px;box-sizing:border-box;padding:2px 6px;background:#ffffff;border:1px solid ${c.borde};border-radius:4px;color:${c.texto};font-family:${MONO};text-transform:uppercase;font-size:8.5px;font-weight:700;letter-spacing:.04em;line-height:1.3;text-align:center;vertical-align:middle;">${ETIQUETA[t.categoria]}</td></tr></table>`
+}
+
 function filaHtml(t: TareaCorreo): string {
   const c = COLOR[COLOR_DE[t.categoria]]
   const celda = `padding:8px 10px;border-bottom:1px solid ${c.borde};font-size:13px;color:#1a1c1d;`
+  // La fecha de una atrasada va en rojo y en negrita, como `.fecha-vencida`.
+  const vencida = t.categoria === 'atrasada' || t.categoria === 'atrasada_replan'
+  const estiloFecha = vencida ? `color:${COLOR.rojo.texto};font-weight:700;` : ''
+  // `↻ ×N` junto al nombre, con la anatomía de `.replan-count`.
+  const replan =
+    t.replanificaciones > 0
+      ? ` <span style="font-size:11px;font-weight:700;color:#8a6100;background:rgba(0,0,0,.05);border-radius:4px;padding:1px 5px;white-space:nowrap;">↻ ×${t.replanificaciones}</span>`
+      : ''
+  // El punto de color del proyecto, al principio de Ubicación, con la misma
+  // forma que `.nav-proyecto__dot` (10×10, esquinas de 3px).
+  const punto = `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${t.colorProyecto};vertical-align:middle;"></span>&nbsp;`
   return `
           <tr style="background:${c.fila};">
-            <td style="${celda}font-weight:600;">${esc(t.titulo)}</td>
-            <td style="${celda}color:#71717a;">${esc(ubicacion(t))}</td>
-            <td style="${celda}white-space:nowrap;">
-              <span style="display:inline-block;padding:2px 8px;border:1px solid ${c.borde};border-radius:10px;font-size:11px;font-weight:600;color:${c.texto};background:#ffffff;">${ETIQUETA[t.categoria]}</span>
-            </td>
-            <td style="${celda}font-family:${MONO};white-space:nowrap;">${fecha(t.fecha)}</td>
+            <td style="${celda}font-weight:500;">${esc(t.titulo)}${replan}</td>
+            <td style="${celda}color:#71717a;">${punto}${esc(ubicacion(t))}</td>
+            <td style="${celda}white-space:nowrap;text-align:center;">${pastillaHtml(t)}</td>
+            <td style="${celda}font-family:${MONO};white-space:nowrap;${estiloFecha}">${fecha(t.fecha)}</td>
             <td style="${celda}font-family:${MONO};white-space:nowrap;text-align:right;">${atraso(t.atraso)}</td>
           </tr>`
 }
@@ -182,11 +217,13 @@ export function html(r: Resumen): string {
       </tr>
     </table>
     <p style="margin:22px 0 0;font-size:14px;color:#1a1c1d;">Hola ${esc(r.nombre)},</p>
+    <p style="margin:8px 0 0;font-size:14px;color:#1a1c1d;">A continuación un resumen de tus tareas pendientes hasta el día de hoy:</p>
 ${tablaHtml('Atrasadas', r.atrasadas)}${tablaHtml('Vencen hoy', r.vencenHoy)}${
+    // La línea de la semana ya no lleva título de sección: es UNA línea de
+    // contexto después de la última tabla, no un bloque más.
     r.semana > 0
       ? `
-      <h2 style="margin:26px 0 10px;font-size:15px;font-weight:700;color:#1a1c1d;">Esta semana</h2>
-      <p style="margin:0;font-size:13px;color:#71717a;">${lineaSemana(r.semana)}</p>`
+      <p style="margin:18px 0 0;font-size:13px;color:#71717a;">${lineaSemana(r.semana)}</p>`
       : ''
   }
     <p style="margin:26px 0 0;"><a href="${enlace}" style="display:inline-block;padding:9px 16px;background:#1a1a1b;color:#ffffff;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;">Ver mis tareas</a></p>
@@ -218,7 +255,9 @@ export function texto(r: Resumen): string {
           titulo.toUpperCase(),
           ...tareas.map(
             (t) =>
-              `- ${t.titulo}\n  ${ubicacion(t)}\n  ${ETIQUETA[t.categoria]} · ${fecha(t.fecha)} · atraso ${atraso(t.atraso)}`,
+              `- ${t.titulo}${t.replanificaciones > 0 ? ` (replanificada ×${t.replanificaciones})` : ''}` +
+              `\n  ${ubicacion(t)}` +
+              `\n  ${ETIQUETA[t.categoria]} · ${fecha(t.fecha)} · atraso ${atraso(t.atraso)}`,
           ),
         ]
 
@@ -226,9 +265,10 @@ export function texto(r: Resumen): string {
     `Andotek Planning · ${fecha(r.hoy)}`,
     '',
     `Hola ${r.nombre},`,
+    'A continuación un resumen de tus tareas pendientes hasta el día de hoy:',
     ...bloque('Atrasadas', r.atrasadas),
     ...bloque('Vencen hoy', r.vencenHoy),
-    ...(r.semana > 0 ? ['', 'ESTA SEMANA', lineaSemana(r.semana)] : []),
+    ...(r.semana > 0 ? ['', lineaSemana(r.semana)] : []),
     '',
     `Ver mis tareas: ${r.sitio}/#mis-tareas`,
     '',

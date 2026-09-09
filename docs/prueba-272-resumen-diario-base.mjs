@@ -35,6 +35,11 @@ const DATA = process.env.PG_DATA ?? '/var/lib/pgtest272'
 const PUERTO = process.env.PG_PORT ?? '5442'
 const SOCK = '/tmp'
 const MIG34 = '20260707000034_resumen_diario.sql'
+// La 35 redefine `resumen_diario_datos()`, que lee `usuario.resumen_diario`:
+// la crea la 34, así que las dos quedan fuera del primer barrido y se aplican
+// en orden después de dar de alta a la gente.
+const MIG35 = '20260707000035_resumen_diario_formato.sql'
+const DIFERIDAS = [MIG34, MIG35]
 
 if (!existsSync(join(BIN, 'initdb'))) {
   console.log(`SKIP  no hay PostgreSQL en ${BIN}: la prueba de base no puede correr`)
@@ -114,14 +119,18 @@ sh('psql', ['-h', SOCK, '-p', PUERTO, '-U', 'postgres', '-d', 'postgres', '-v', 
 const migraciones = readdirSync('supabase/migrations').filter((f) => f.endsWith('.sql')).sort()
 chk(migraciones.includes(MIG34), '#272 · la migración 34 está en el repo y entra en la cadena')
 
-// Se aplican TODAS menos la 34: hace falta que haya usuarios ANTES de que la
-// columna exista para poder medir el criterio 1b.
+// Se aplican TODAS menos la 34 y la 35: hace falta que haya usuarios ANTES de
+// que la columna exista para poder medir el criterio 1b.
 const fallaron = []
-for (const m of migraciones.filter((m) => m !== MIG34)) {
+for (const m of migraciones.filter((m) => !DIFERIDAS.includes(m))) {
   const err = aplicar(join('supabase/migrations', m))
   if (err) fallaron.push(`${m}: ${err}`)
 }
-chk(fallaron.length === 0, `las ${migraciones.length - 1} migraciones previas aplican limpias`, fallaron.join(' | '))
+chk(
+  fallaron.length === 0,
+  `las ${migraciones.length - DIFERIDAS.length} migraciones previas aplican limpias`,
+  fallaron.join(' | '),
+)
 
 // ── El escenario ───────────────────────────────────────────────────────────
 const A = {
@@ -165,12 +174,17 @@ chk(
     'true',
   '#272-1b · y el default pasa a encendido',
 )
+const err35 = aplicar(join('supabase/migrations', MIG35))
+chk(err35 === '', '#272 · y la 35 encima de ella, también', err35)
 q(`insert into usuario (nombre, iniciales, email, rol, activo) values ('Nuevo','NU','nuevo@x.cl','consultor',true);`)
 chk(
   q(`select resumen_diario from usuario where email='nuevo@x.cl';`) === 't',
   '#272-1b · un usuario creado DESPUÉS nace encendido',
 )
-chk(aplicar(join('supabase/migrations', MIG34)) === '', '#272 · y se puede volver a aplicar sin romperse')
+chk(
+  aplicar(join('supabase/migrations', MIG34)) === '' && aplicar(join('supabase/migrations', MIG35)) === '',
+  '#272 · y las dos se pueden volver a aplicar sin romperse',
+)
 chk(
   q(`select count(*) from usuario where not resumen_diario;`) === anchos,
   '#272 · volver a aplicarla NO apaga a los que ya se habían encendido',
@@ -448,6 +462,45 @@ chk(
   ana.vencen_hoy.every((t) => t.fecha === HOY),
   '#272 · y todas vencen hoy',
 )
+// #272 (ajustes) — Los dos campos que la migración 35 sumó, y que la pantalla
+// necesita para verse igual: el NÚMERO de replanificaciones y el color del
+// proyecto. La categoría sola no alcanza: dice si hubo, no cuántas.
+chk(
+  ana.atrasadas[0]?.replanificaciones === 1,
+  '#272 · cada tarea trae CUÁNTAS veces se replanificó, no solo si hubo',
+  JSON.stringify(ana.atrasadas.map((t) => t.replanificaciones)),
+)
+chk(
+  ana.atrasadas[1]?.replanificaciones === 0,
+  '#272 · y una que nunca se movió trae 0',
+)
+chk(
+  ana.atrasadas[0]?.replanificaciones ===
+    Number(q(`select count(*) from replanificacion where tarea_id='50000000-0000-0000-0000-000000000001';`)),
+  '#272 · el número es el MISMO que cuenta la tabla de replanificaciones',
+)
+chk(
+  [...ana.atrasadas, ...ana.vencen_hoy].every((t) => /^#[0-9a-fA-F]{6}$/.test(t.colorProyecto ?? '')),
+  '#272 · cada tarea trae el color de su proyecto',
+  JSON.stringify([...ana.atrasadas, ...ana.vencen_hoy].map((t) => t.colorProyecto)),
+)
+// El proyecto del terreno se creó SIN color: tiene que llegar el respaldo que
+// usa la pantalla, no un vacío que el correo pintaría de negro.
+chk(
+  ana.atrasadas[0]?.colorProyecto === '#607d8b',
+  '#272 · y un proyecto sin color asignado trae el mismo respaldo que la pantalla',
+  String(ana.atrasadas[0]?.colorProyecto),
+)
+q(`update proyecto set color = '#8e44ad' where id = '20000000-0000-0000-0000-000000000002';`)
+const conColor = JSON.parse(
+  q(`select coalesce(jsonb_agg(to_jsonb(d)), '[]'::jsonb) from resumen_diario_datos() d where d.nombre = 'Ana';`),
+)[0]
+chk(
+  conColor?.atrasadas?.[0]?.colorProyecto === '#8e44ad',
+  '#272 · y si el proyecto SÍ tiene color, llega el suyo',
+  String(conColor?.atrasadas?.[0]?.colorProyecto),
+)
+
 chk(ana.semana === 1, '#272-12 · la línea de la semana dice el número correcto', String(ana.semana))
 const beto = datos.find((d) => d.nombre === 'Beto')
 chk(beto?.semana === 0, '#272-12 · y vale 0 cuando no queda ninguna, para que la sección desaparezca')

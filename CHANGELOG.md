@@ -4474,3 +4474,71 @@ guardada no.
 **No se tocó**, porque el pedido lo dice explícitamente y porque rehacer el
 trabajo agendado es una decisión de despliegue, no una consecuencia de este
 defecto. Queda levantado.
+
+---
+
+### #272 (ajustes) — El correo se ve como Mis Tareas, y el asunto dice de qué se trata
+
+**La plantilla del correo, el asunto y una migración.** El correo ya llegaba y
+funcionaba: esto es cómo se ve y qué dice.
+
+#### Las cinco diferencias con la pantalla
+
+Medidas contra el correo real recibido en producción, comparándolo con Mis
+Tareas:
+
+| | Estaba | Queda |
+|---|---|---|
+| La pastilla de estado | grande, en negrita, con esquinas de píldora | la del producto: **108×30, monoespaciada en mayúsculas de 8.5px**, con el borde de su estado |
+| El ↻ ×N | no aparecía | **junto al nombre**, con el ámbar de `.replan-count` |
+| El color del proyecto | no aparecía | **el punto de 10px**, al principio de Ubicación |
+| La fecha de una atrasada | en negro | **en rojo y negrita**, como `.fecha-vencida` |
+| El nombre de la tarea | en negrita | **peso 500**, el de `.tarea-cell` |
+
+**Ninguno de esos valores está escrito en la plantilla como número suelto:** la
+prueba los lee de `src/styles.css` y los compara. Si la pantalla cambia de
+paleta o de medidas, el correo deja de coincidir y la prueba lo dice.
+
+#### El asunto
+
+`9 tareas atrasadas · 2 vencen hoy`. **Sale la marca del final** —el remitente ya
+dice Andotek Planning, y repetirlo gastaba 17 de los ~40 caracteres que el
+programa de correo muestra— y **entra la palabra "tareas"**, que era lo que les
+faltaba a los números para decir de qué. Con las dos mitades juntas la palabra va
+solo en la primera: repetirla no agrega nada y cuesta caracteres.
+
+#### Los textos del cuerpo
+
+Saludo con el nombre completo, la bajada debajo —*A continuación un resumen de
+tus tareas pendientes hasta el día de hoy:*— y la línea de la semana, que **deja
+de ser una sección con título** y pasa a ser una línea después de la última
+tabla: *Además, 43 tareas tuyas vencen esta semana.*
+
+#### La migración 35, que el pedido no contemplaba
+
+**Preguntado antes de escribir nada.** Dos de las cinco diferencias necesitan
+datos que la base no entregaba: el `↻ ×N` necesita **cuántas** replanificaciones
+—la categoría solo dice si hubo— y el punto necesita **el color** del proyecto.
+El pedido decía "sin migración, sin tocar la base", así que las dos cosas
+chocaban.
+
+Se eligió agregarlos a `resumen_diario_datos()` en vez de que la función de
+servidor los busque por su cuenta, y la razón es concreta: **lo que la base
+entrega no lleva ids**, así que cualquier cruce posterior tendría que ser por
+nombre de tarea y de proyecto, y dos tareas con el mismo título se llevarían el
+`↻ ×N` o el color de la otra. La migración es un `create or replace` de una sola
+función: no toca tablas, ni datos, ni permisos, y la firma queda idéntica.
+
+#### Cómo se comprobó
+
+`docs/prueba-272-correo.mjs` pasa a **84 comprobaciones** y
+`docs/prueba-272-resumen-diario-base.mjs` a **61**. Las nuevas de la base miden
+que el número de replanificaciones sea **el mismo que cuenta la tabla**, y que el
+color llegue —tanto el del proyecto como el respaldo que usa la pantalla cuando
+no tiene ninguno.
+
+*Un defecto del propio arnés, encontrado al correrlo:* la prueba de base aplica
+las migraciones **parando antes de la 34** para poder medir el criterio 1b, y la
+35 quedaba en el primer barrido — pero lee `usuario.resumen_diario`, que crea la
+34. Las dos quedan ahora diferidas y se aplican en orden después de dar de alta a
+la gente.

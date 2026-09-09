@@ -160,12 +160,20 @@ lo dispara nadie.
   no aparece. Después, una sola línea con **cuántas más vencen esta semana**: con
   50 tareas el correo se vuelve ilegible, y para eso está la herramienta.
 - **La tabla del correo es la de Mis Tareas** —Tarea · Ubicación · Estado · Fecha
-  Objetivo · Atraso—, con la fila pintada del color de su estado y la misma
-  pastilla. La ruta completa va dentro de Ubicación, como hace Mis Tareas en el
-  teléfono. **La columna Atraso es la del producto** (días hábiles que la tarea
-  se corrió respecto de su compromiso original), así que una atrasada que nunca
-  se movió va con la raya de siempre y una que vence hoy y sí se movió lleva su
-  número.
+  Objetivo · Atraso—, con la fila pintada del color de su estado, **la misma
+  pastilla** (la caja de 108×30 en monoespaciada y mayúsculas, con el borde de su
+  estado), el **↻ ×N** junto al nombre, el **punto de color del proyecto** al
+  principio de la ubicación y la **fecha en rojo** cuando la tarea está atrasada.
+  El nombre va con el mismo peso que en la tabla, sin negrita. La ruta completa
+  va dentro de Ubicación, como hace Mis Tareas en el teléfono. **La columna
+  Atraso es la del producto** (días hábiles que la tarea se corrió respecto de su
+  compromiso original), así que una atrasada que nunca se movió va con la raya de
+  siempre y una que vence hoy y sí se movió lleva su número.
+- **El asunto dice de qué se trata sin abrirlo:** `9 tareas atrasadas · 2 vencen
+  hoy`, con los números de esa persona. Sin la marca al final —el remitente ya la
+  dice, y repetirla gasta 17 de los pocos caracteres que el programa de correo
+  muestra— y con la palabra "tareas", que era lo que les faltaba a los números
+  para decir de qué.
 - **No se envía** si no hay atrasadas ni vencimientos de hoy —aunque queden
   tareas más adelante en la semana—, ni sábado y domingo, ni a quien lo tenga
   apagado. Tampoco a quien no puede entrar: un desactivado, un eliminado o un
