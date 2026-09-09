@@ -69,6 +69,16 @@ export interface Usuario {
    */
   organizacion?: string
   /**
+   * #272: ¿recibe el resumen diario por correo? Los usuarios anteriores a la
+   * migración 34 quedaron apagados; los nuevos nacen encendidos. La vista lo
+   * entrega con la misma regla que `organizacion`: al administrador y a cada
+   * quien el suyo, así que sobre un tercero llega `undefined`.
+   *
+   * A diferencia de `organizacion`, este campo NO entra en el candado de
+   * auto-edición: cada quien tiene que poder apagar el suyo.
+   */
+  resumenDiario?: boolean
+  /**
    * #136: tercer nivel de baja = desactivado + invisible. Un eliminado no
    * entra ni aparece en la UI (la vista usuario_visible lo filtra); su fila e
    * historial quedan intactos. Reactivable dando de alta el mismo correo.

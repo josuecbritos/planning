@@ -150,7 +150,7 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
    */
   async function guardarUsuario(
     usuario: Usuario,
-    d: { nombre: string; iniciales?: string; rol: Rol; organizacion?: string },
+    d: { nombre: string; iniciales?: string; rol: Rol; organizacion?: string; resumenDiario?: boolean },
   ): Promise<boolean> {
     const cambiaPerfil =
       esAdminActor && usuario.id !== usuarioActual.id && usuario.rol !== 'admin' && d.rol !== usuario.rol
@@ -172,6 +172,9 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
       nombre: d.nombre,
       iniciales: d.iniciales,
       ...('organizacion' in d ? { organizacion: d.organizacion } : {}),
+      // #272: mismo criterio que la organización — solo llega cuando el
+      // formulario pudo ofrecerlo, así que apagarlo es deliberado.
+      ...('resumenDiario' in d ? { resumenDiario: d.resumenDiario } : {}),
     })
   }
 
@@ -301,6 +304,9 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
              `puedeCambiarPerfil` sí se apaga. */
           organizaciones={organizaciones}
           puedeOrganizacion={esAdminActor}
+          /* #272: el mismo criterio que la organización — el administrador,
+             también sobre sí mismo o sobre otro administrador. */
+          puedeResumen={esAdminActor}
           onSubmit={(d) => guardarUsuario(modal.usuario, d)}
           onClose={() => setModal(null)}
         />

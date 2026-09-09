@@ -148,6 +148,54 @@ clientes", así que un consultor no notaba ninguna diferencia. Ahora:
 obligaría a reescribir cada fila de permisos sin ganar nada. Lo que cambia es lo
 que dice la pantalla y lo que habilita.*
 
+**Un resumen diario por correo, y su interruptor (#272).** Cada mañana a las
+**8:00 de Chile, de lunes a viernes**, quien lo tenga encendido recibe un correo
+con **sus** tareas atrasadas y las que vencen ese día — las suyas en los
+proyectos a los que **hoy** tiene acceso. Es el único correo del producto que no
+lo dispara nadie.
+
+- **Dos bloques y una línea.** *Atrasadas*, de mayor a menor atraso; *Vencen
+  hoy*, por proyecto y, dentro de cada uno, **en el orden que el dueño les dio a
+  frentes y sub frentes arrastrándolos**, no el alfabético. Un bloque sin tareas
+  no aparece. Después, una sola línea con **cuántas más vencen esta semana**: con
+  50 tareas el correo se vuelve ilegible, y para eso está la herramienta.
+- **La tabla del correo es la de Mis Tareas** —Tarea · Ubicación · Estado · Fecha
+  Objetivo · Atraso—, con la fila pintada del color de su estado y la misma
+  pastilla. La ruta completa va dentro de Ubicación, como hace Mis Tareas en el
+  teléfono. **La columna Atraso es la del producto** (días hábiles que la tarea
+  se corrió respecto de su compromiso original), así que una atrasada que nunca
+  se movió va con la raya de siempre y una que vence hoy y sí se movió lleva su
+  número.
+- **No se envía** si no hay atrasadas ni vencimientos de hoy —aunque queden
+  tareas más adelante en la semana—, ni sábado y domingo, ni a quien lo tenga
+  apagado. Tampoco a quien no puede entrar: un desactivado, un eliminado o un
+  invitado que todavía no activó su cuenta, aunque su interruptor esté encendido.
+  **Le llega a cualquier usuario, consultor o cliente, con la misma regla.**
+- **El interruptor está en dos pantallas y es el mismo.** En **Mi cuenta**, un
+  bloque *Notificaciones por correo* entre Perfil y Contraseña, que guarda al
+  tocarlo. En la **ficha del usuario**, al final, para que el administrador
+  pueda encenderlo y apagarlo — con su misma nota, porque ahí está decidiendo
+  por otra persona. Es el control Sí/No que la pantalla de permisos ya usa, no
+  una pieza nueva.
+- **Nace encendido para todo usuario nuevo; los que ya existían quedaron
+  apagados.** Un interruptor que nace apagado no lo enciende nadie, y a los que
+  ya estaban no se les enciende un correo sin avisar.
+- **Este campo NO entra en el candado de auto-edición**: cada quien tiene que
+  poder apagar el suyo. Es lo contrario del caso de la organización, que sí
+  entra porque afecta a terceros.
+- **El correo no carga ninguna tipografía de la web** —Outlook y otros las
+  bloquean— y viaja con **las dos versiones adentro**, la de formato y una de
+  texto plano: sin la segunda, quien lo lea con un lector de pantalla o con el
+  formato bloqueado vería un correo vacío.
+- **Sus dos enlaces abren la pantalla que nombran** —*Ver mis tareas* y
+  *Gestionar correos*—, que son las únicas dos direcciones profundas de la
+  aplicación. Entrar normalmente sigue partiendo en Resumen (#274).
+- **La hora se resuelve por nombre de zona.** El programador de la base despierta
+  a la función **cada hora** y quien decide si es el momento mira
+  `America/Santiago`: Chile cambia de hora dos veces al año y un horario fijo en
+  UTC daría las 8:00 media parte del año. **Una corrida que falla no se
+  reintenta** y queda anotada, con su motivo, en `resumen_diario_corrida`.
+
 **"Hoy" es el día de Chile, para la aplicación y para la base (#291).** El
 navegador siempre usó la hora local; la base usaba `current_date`, que en
 Supabase es UTC, así que desde las 20:00 de Chile creía que era el día

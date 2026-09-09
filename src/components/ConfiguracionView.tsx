@@ -5,6 +5,7 @@ import type { AuthService } from '../auth/auth'
 import { mensajeError } from '../lib/errores'
 import { REGLA_PASSWORD, passwordFuerte } from '../lib/password'
 import { CampoPassword } from './CampoPassword'
+import { Seg } from './PermisosModal'
 
 // #207 — Configuración de la propia cuenta. Se entra desde el pie de la barra
 // lateral, donde ya viven el nombre y el botón de salir.
@@ -16,10 +17,15 @@ import { CampoPassword } from './CampoPassword'
 //   Email             → NO: es la llave de la cuenta y su cambio arrastra al
 //                       inicio de sesión.
 //   Rol / permisos / estado → NO: los gestiona el admin.
+//   Resumen diario     → sí (#272). Es el único campo fuera de nombre e
+//                       iniciales que uno puede cambiar en su propia fila: el
+//                       candado de la base lo deja pasar a propósito, porque
+//                       solo decide si a esa persona le llega un correo.
 //
 // La barrera dura no es esta pantalla: la RLS solo deja actualizar la propia
-// fila y un trigger rechaza cualquier columna que no sea nombre o iniciales
-// (migración 18). Aquí solo se decide qué se OFRECE.
+// fila y un trigger rechaza cualquier columna que no sea nombre, iniciales o
+// —desde #272— el resumen diario (migración 18, ampliada por la 32 y la 34).
+// Aquí solo se decide qué se OFRECE.
 
 const ROL_LABEL: Record<Usuario['rol'], string> = {
   admin: 'Admin',
@@ -38,6 +44,24 @@ export function ConfiguracionView({ usuario, actions, auth }: Props) {
   const [iniciales, setIniciales] = useState(usuario.iniciales)
   const [guardando, setGuardando] = useState(false)
   const [avisoPerfil, setAvisoPerfil] = useState<{ ok: boolean; texto: string } | null>(null)
+
+  // #272 — El interruptor del resumen diario. A diferencia de los otros dos
+  // bloques, NO tiene botón: es una sola decisión de dos estados y elegirla ya
+  // es tomarla. Se guarda con `actualizarPerfil` —la misma puerta que el
+  // nombre— porque además de guardar refresca la sesión, que es la copia de la
+  // que sale el valor pintado acá.
+  const [avisoResumen, setAvisoResumen] = useState<{ ok: boolean; texto: string } | null>(null)
+
+  async function cambiarResumen(valor: boolean) {
+    if (valor === (usuario.resumenDiario === true)) return
+    setAvisoResumen(null)
+    try {
+      await actions.actualizarPerfil({ resumenDiario: valor })
+      setAvisoResumen({ ok: true, texto: 'Listo, se guardó.' })
+    } catch (err) {
+      setAvisoResumen({ ok: false, texto: mensajeError(err) })
+    }
+  }
 
   const [actual, setActual] = useState('')
   const [nueva, setNueva] = useState('')
@@ -145,6 +169,37 @@ export function ConfiguracionView({ usuario, actions, auth }: Props) {
             )}
           </div>
         </form>
+
+        {/* #272: la MISMA pieza que la pantalla de permisos usa para cada
+            decisión de sí-o-no sobre una persona —lista, fila y control—, no
+            una copia. El orden de las dos posiciones también es el de allá
+            (No, Sí): el mismo control en dos pantallas no puede leerse al
+            revés en cada una. */}
+        <div className="config__bloque">
+          <h3>Notificaciones por correo</h3>
+          <div className="permisos-lista">
+            <div className="permiso-item">
+              <span className="permiso-item__label">
+                Resumen diario
+                <small>Cada mañana, tus tareas atrasadas y las que vencen ese día.</small>
+              </span>
+              <Seg
+                ariaLabel="Resumen diario"
+                opciones={[
+                  { v: false, label: 'No' },
+                  { v: true, label: 'Sí' },
+                ]}
+                valor={usuario.resumenDiario === true}
+                onChange={cambiarResumen}
+              />
+            </div>
+          </div>
+          {avisoResumen && (
+            <div className="config__acciones">
+              <span className={avisoResumen.ok ? 'config__ok' : 'config__error'}>{avisoResumen.texto}</span>
+            </div>
+          )}
+        </div>
 
         <form className="config__bloque" onSubmit={guardarPassword}>
           <h3>Contraseña</h3>

@@ -3,6 +3,7 @@ import type { Rol, Usuario } from '../types'
 import { Modal } from './Modal'
 import { Selector } from './Selector'
 import { ComboOrganizacion } from './ComboOrganizacion'
+import { Seg } from './PermisosModal'
 
 // Crear / editar usuario (Modulo 7.1, reestructurado). Tres roles, sin
 // limite de admins (1). El usuario nace con los permisos por DEFECTO de su
@@ -41,12 +42,21 @@ interface Props {
    * verdad es el trigger `validar_autoedicion_usuario` en la base.
    */
   puedeOrganizacion?: boolean
+  /**
+   * #272: ¿este formulario puede cambiar el resumen diario? Solo el
+   * administrador, y solo AL EDITAR: el usuario nuevo nace encendido —lo
+   * decide el default de la base— y ofrecer la decisión en el alta sería
+   * ofrecer una que ya está tomada. La barrera de verdad es la política
+   * `usuario_update`, que no deja tocar la fila de otro.
+   */
+  puedeResumen?: boolean
   onSubmit: (datos: {
     nombre: string
     iniciales?: string
     email: string
     rol: Rol
     organizacion?: string
+    resumenDiario?: boolean
   }) => void | Promise<boolean>
   onClose: () => void
 }
@@ -67,6 +77,7 @@ export function UsuarioModal({
   puedeCambiarPerfil = false,
   organizaciones = [],
   puedeOrganizacion = false,
+  puedeResumen = false,
   onSubmit,
   onClose,
 }: Props) {
@@ -87,6 +98,10 @@ export function UsuarioModal({
   // une consultores. Y sigue al PERFIL ELEGIDO, no al guardado — al cambiar el
   // perfil a consultor en este mismo formulario, el campo aparece.
   const ofreceOrganizacion = puedeOrganizacion && rol === 'consultor'
+  // #272: se ofrece solo al EDITAR. El alta no lo muestra porque el usuario
+  // nuevo nace encendido y no hay nada que decidir todavía.
+  const ofreceResumen = puedeResumen && edicion
+  const [resumenDiario, setResumenDiario] = useState(usuario?.resumenDiario === true)
   const valido = nombre.trim().length > 0 && /\S+@\S+\.\S+/.test(email)
   const [guardando, setGuardando] = useState(false)
 
@@ -108,6 +123,9 @@ export function UsuarioModal({
         // corresponde: guardada e invisible, volver a ponerlo como consultor le
         // activaría sola una organización que nadie decidió.
         ...(puedeOrganizacion ? { organizacion: rol === 'consultor' ? organizacion : undefined } : {}),
+        // #272: viaja en el mismo guardado que el nombre, y solo si este
+        // formulario pudo ofrecerlo — igual que la organización.
+        ...(ofreceResumen ? { resumenDiario } : {}),
       })
       // `false` = la base rechazó algo y no se aplicó nada: el formulario
       // queda abierto con lo escrito, para poder corregir.
@@ -185,6 +203,31 @@ export function UsuarioModal({
             />
             <small className="ayuda">{AYUDA_ROL[rol]}</small>
           </label>
+        )}
+        {/* #272: AL FINAL, después de Perfil. Es el MISMO interruptor de Mi
+            cuenta, con la misma nota y el mismo marcado: la nota va también
+            acá porque el administrador está decidiendo por otra persona y
+            necesita saber qué le va a llegar. */}
+        {ofreceResumen && (
+          <div className="campo">
+            <div className="permisos-lista">
+              <div className="permiso-item">
+                <span className="permiso-item__label">
+                  Resumen diario
+                  <small>Cada mañana, tus tareas atrasadas y las que vencen ese día.</small>
+                </span>
+                <Seg
+                  ariaLabel="Resumen diario"
+                  opciones={[
+                    { v: false, label: 'No' },
+                    { v: true, label: 'Sí' },
+                  ]}
+                  valor={resumenDiario}
+                  onChange={setResumenDiario}
+                />
+              </div>
+            </div>
+          </div>
         )}
         <div className="modal-acciones">
           <button type="button" className="btn" onClick={onClose}>Cancelar</button>

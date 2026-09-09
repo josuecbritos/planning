@@ -4132,3 +4132,345 @@ nombre del frente va seguido de su contador dentro del mismo título, así que s
 lee el primer nodo de texto y no todo el `textContent`; y el proyecto propio de
 la consultora **no está** en el Resumen del administrador, así que el criterio 6
 crea su propio segundo proyecto en vez de dar por hecho que hay dos a mano.
+
+---
+
+### #272 — Un resumen diario por correo, y su interruptor
+
+**Toca la base, la función de servidor y la pantalla.** Lleva **migración 34**,
+y por lo tanto respaldo previo del dueño y la compuerta de permisos en verde
+antes de cerrar.
+
+#### La situación
+
+El producto **enviaba dos correos y no más** —la invitación y el
+restablecimiento de contraseña—, los dos disparados por una persona desde
+funciones de servidor con Resend. **No existía nada que corriera solo a una hora
+fija**, ni ninguna preferencia de correo en la ficha del usuario ni en Mi
+cuenta. Para saber qué tenía atrasado, cada quien entraba a Mis Tareas.
+
+#### Lo que se hizo
+
+**El correo.** Un correo por persona, **de lunes a viernes a las 8:00 de Chile**,
+con sus tareas —donde es responsable— en los proyectos a los que **hoy** tiene
+acceso. Dos bloques: *Atrasadas*, de mayor a menor atraso, y *Vencen hoy*, por
+proyecto y, dentro de cada uno, **en el orden que el dueño le dio a frentes y
+sub frentes arrastrándolos**. Un bloque sin tareas no aparece. Después, una sola
+línea con cuántas más vencen esta semana: con 50 tareas el correo se vuelve
+ilegible, y para eso está la herramienta.
+
+**No se inventó un diseño para el correo.** La tabla es la de Mis Tareas —Tarea ·
+Ubicación · Estado · Fecha Objetivo · Atraso—, con la fila pintada del color de
+su estado, la misma pastilla y la ruta completa dentro de Ubicación, como hace
+Mis Tareas en el teléfono. Los cinco colores salen de la paleta del producto y
+la prueba los compara **contra `src/styles.css`**, así que no pueden separarse
+sin que se note.
+
+**Ninguna tipografía se carga de la web** —Outlook y varios clientes las
+bloquean—, y las fechas y el atraso van en monoespaciada común para que queden
+alineados. El mensaje viaja con **las dos versiones adentro**: la de formato y
+una de texto plano. Sin la segunda, quien lo lea con un lector de pantalla o con
+el formato bloqueado vería un correo vacío.
+
+**Cuándo NO se envía:** sin atrasadas ni vencimientos de hoy —aunque queden
+tareas más adelante en la semana—, sábado y domingo, y a quien lo tenga apagado.
+Tampoco a quien no puede entrar a la herramienta: un desactivado, un eliminado o
+un invitado que todavía no activó su cuenta, **aunque su interruptor esté
+encendido**. Le llega a cualquier usuario, consultor o cliente, con la misma
+regla: un cliente tiene tareas asignadas igual que un consultor.
+
+**El interruptor, en dos pantallas y uno solo.** En **Mi cuenta**, un bloque
+*Notificaciones por correo* entre Perfil y Contraseña, que **guarda al tocarlo**
+—es una sola decisión de dos estados; un botón Guardar al lado sería un paso de
+más—. En la **ficha del usuario**, al final, después de Perfil, con su misma
+nota, porque ahí el administrador está decidiendo por otra persona. **Nace
+encendido para todo usuario nuevo y los que ya existían quedaron apagados:** un
+interruptor que nace apagado no lo enciende nadie, y a los que ya estaban no se
+les enciende un correo sin avisar.
+
+**No es una pieza nueva:** es el control Sí/No que la pantalla de permisos ya usa
+para cada decisión de sí-o-no sobre una persona, con su misma lista y su misma
+fila. No se agregó una sola declaración de estilo. El orden de las dos
+posiciones también es el de allá (No, Sí): el mismo control en dos pantallas no
+puede leerse al revés en cada una.
+
+**Este campo NO entra en el candado de auto-edición**, y cuesta nada porque el
+candado enumera las columnas PROHIBIDAS una por una: una columna nueva queda
+permitida sola. Es lo contrario del caso de la organización en #339, que sí entró
+a la lista porque cambiarla amplía lo que uno VE. Que nadie pueda tocar el
+interruptor de OTRO lo sigue resolviendo la política `usuario_update`.
+
+**El envío no monta nada nuevo:** mismo Resend y mismo remitente que la
+invitación, ya validados de punta a punta. De ahí sale también **cómo se obtiene
+la dirección: en el servidor.** La aplicación tiene prohibido leer el correo de
+terceros —solo se ve el propio—, así que el destinatario no puede resolverse
+desde el navegador; `resumen_diario_datos()` está concedida solo a
+`service_role`.
+
+**La hora, por nombre de zona.** El programador de Supabase trabaja en UTC y
+Chile cambia de hora dos veces al año, así que el trabajo despierta a la función
+**cada hora** y quien decide si es el momento mira `America/Santiago` — la misma
+regla que ya rige `hoy_chile()` (#291). Un horario fijo en UTC daría las 8:00 la
+mitad del año y las 7:00 o las 9:00 la otra mitad. **Una corrida que falla no se
+reintenta:** la fila del día se escribe ANTES de enviar, y el motivo del fallo
+queda anotado en `resumen_diario_corrida`.
+
+**Los dos enlaces del correo abren la pantalla que nombran.** Se agregaron las
+únicas dos direcciones profundas de la aplicación, `#mis-tareas` y `#mi-cuenta`.
+**#274 sigue en pie** —entrar normalmente parte en Resumen—: esto es lo mismo que
+ya pasa al llegar desde una notificación, que también navega después de entrar.
+Sin esto, "Gestionar correos" no llevaba a Mi cuenta y el criterio 13c quedaba
+sin cumplir.
+
+**Sin botón de baja, por ahora.** Evaluado y descartado: exige una función de
+servidor nueva, abierta sin sesión, que reciba el aviso del proveedor y apague el
+interruptor. No afecta la entrega —lo que decide si el correo entra es la
+autenticación del dominio, ya montada— y el volumen está lejos del umbral de
+remitente masivo. Se agrega si aparece la primera queja de spam.
+
+#### Decisiones que el pedido no resolvía, preguntadas antes de escribir nada
+
+1. **El control:** el Sí/No que el producto ya usa, no un interruptor deslizante
+   nuevo.
+2. **Qué es "atraso":** la columna Atraso **del producto** —días hábiles que la
+   tarea se corrió respecto de su compromiso original—, no los días vencidos.
+   *Consecuencia asumida y dicha al preguntar:* con esa lectura, la frase del
+   pedido "en el bloque de hoy la columna Atraso muestra el vacío de siempre"
+   **no se cumple siempre** — una tarea que vence hoy y fue replanificada lleva
+   su número. Lo que sí se cumple es "el mismo formato que la tabla de Mis
+   Tareas", que era la otra mitad de la misma sección. **El pedido eliminó
+   después esa frase**, dando por buena la otra mitad: el formato de Mis Tareas
+   manda, y la columna Atraso significa en el correo lo mismo que en la
+   herramienta.
+3. **Los enlaces:** sí, con dos direcciones propias.
+4. **Guardar en Mi cuenta:** al tocarlo, sin botón.
+5. **Al crear un usuario:** el interruptor no aparece — nace encendido y no hay
+   nada que decidir todavía.
+
+#### Cómo se comprobó
+
+**Tres pruebas, cada una donde la cosa vive.** `docs/prueba-272-correo.mjs`
+importa `plantilla.ts` —lo que la función envía de verdad, no una copia del
+texto— y mide asunto, bloques, columnas, colores contra la hoja de estilos,
+tipografías, enlaces y la versión en texto plano.
+`docs/prueba-272-resumen-diario-base.mjs` levanta un PostgreSQL local, aplica
+las migraciones **parando antes de la 34** para poder medir el criterio 1b, y
+después interroga quién recibe qué y en qué orden.
+`docs/prueba-272-resumen-diario.mjs` recorre las dos pantallas y los dos enlaces
+con el navegador.
+
+*Control negativo:* la pantalla contra `main` da **21 fallas y 7 pases**, y la
+base sin la migración 34 da **21 fallas y 4 pases**. Los pases de los dos lados
+son los guardias que tienen que valer igual con y sin el cambio —que las
+migraciones previas aplican, que la regla de visibilidad de #339 y su candado
+siguen intactos, que ninguna función quedó abierta a PUBLIC, que entrar sin
+dirección sigue partiendo en Resumen— más **una comprobación de AUSENCIA que
+pasa por trivialidad** cuando la función no existe: que el formulario de alta
+no ofrezca el interruptor. Esa queda porque sirve de guardia hacia adelante, no
+porque distinga nada hoy.
+
+*El control negativo encontró dos defectos míos, los dos en el arnés:*
+
+- **Un verde falso.** "El administrador los ve todos" preguntaba si el conteo
+  era **distinto de cero**, y sin la columna la consulta devuelve un ERROR, que
+  tampoco es cero. Ahora compara `n/n`.
+- **Una prueba que se moría a mitad de camino.** Sin la función, la pantalla de
+  Mis Tareas no existe y leer su título reventaba: el proceso se caía y dejaba
+  **tres comprobaciones sin correr**, así que el control negativo informaba
+  menos de lo que en realidad se rompía (decía 19 fallas donde había 21). Las
+  lecturas de título ahora devuelven vacío en vez de reventar, como el resto de
+  los ayudantes de estas pruebas.
+
+*El atraso de la base se mide contra el de la pantalla:* `dias_habiles_entre` y
+`difDiasHabiles` tienen que dar el mismo número, y la prueba compara **los 900
+pares de fechas de un mes**, no tres elegidos a mano. El correo muestra esa
+columna y ordena por ella; si las dos implementaciones se separaran, el correo
+diría un número y la pantalla otro.
+
+**Lo que estas pruebas NO pueden cubrir, y se dice en cada archivo:** que Resend
+entregue, que el programador despierte a las 8:00 y cómo se ve el correo en
+Outlook. Son los criterios 5 a 14 y **se verifican contra la casilla del dueño**
+después de desplegar — DEPLOY.md § "Resumen diario por correo" trae el `curl`
+que fuerza una corrida sin esperar a mañana.
+
+**La compuerta gana `probarResumenDiario`**, que comprueba contra producción lo
+único que allá se puede comprobar: que uno cambia el suyo y no el de otro, que
+el de un tercero llega enmascarado, y que ni los datos del correo, ni el turno,
+ni el registro de corridas están al alcance de la aplicación.
+
+---
+
+### #272 (corrección) — El programador recibía 401 con una credencial válida
+
+**Solo la función de servidor.** No toca la base ni los permisos: **sin
+migración**.
+
+#### El problema
+
+La comprobación de credencial de `resumen-diario` comparaba contra
+`SUPABASE_SERVICE_ROLE_KEY` **y nada más**. En este proyecto esa variable está
+marcada como **obsoleta**: la vigente es `SUPABASE_SECRET_KEYS`. La llamada del
+programador llegaba con una credencial de rol `service_role` válida, la
+comparación se hacía contra `undefined` —es decir, contra la cadena literal
+`"Bearer undefined"`— y la función respondía **401**. El resumen no salía y en
+los registros no quedaba ni una línea que lo explicara, porque ese 401 se
+devolvía sin anotar nada.
+
+**Medido en los registros antes de tocar nada**, para no arreglar a ciegas: la
+función **arrancó** a las `18:15:32.660` y el borde registró el **401** a las
+`18:15:32.683`. Veintitrés milisegundos: el código **corrió**. No fue la
+verificación de JWT de la plataforma —esa no habría dejado arrancar la función—,
+fue esta comparación. La verificación de JWT sigue activada y no hace falta
+tocarla.
+
+#### Lo que se hizo
+
+**La puerta acepta ahora todas las claves vigentes del proyecto, y también la
+anterior mientras exista.** Así funciona antes y después del cambio de sistema de
+claves, sin una ventana en la que el resumen deje de salir. `SUPABASE_SECRET_KEYS`
+viene en **plural** y se admiten sus dos formas —arreglo JSON y lista separada
+por comas—: cuál entrega la plataforma no es algo que esta función deba adivinar,
+y equivocarse ahí es exactamente el error que se estaba corrigiendo.
+
+**Más allá del nombre de la variable, el defecto de fondo era comparar contra una
+cadena fija.** Un proyecto puede tener varias claves vigentes a la vez —es lo que
+permite rotar una sin cortar el servicio—, así que una comparación contra UNA
+convierte cualquier rotación en una caída silenciosa. Por eso el arreglo no es
+"cambiar el nombre de la variable" sino aceptar una lista.
+
+- **Con la lista vacía se rechaza a todos**, nunca se abre: sin ninguna clave
+  configurada no hay forma de saber quién es legítimo. Es el mismo criterio con
+  el que #249 trató a `SITE_URL`.
+- **La comparación es de tiempo constante.** Desde que esta comprobación es la
+  única puerta, una que corta en el primer byte distinto le cuenta al que prueba
+  cuánto lleva acertado. La longitud se sigue filtrando y no es lo que se
+  protege acá.
+- **El 401 ahora queda anotado** en los registros de la función. Sin esa línea,
+  no había forma de distinguirlo del que pone la plataforma — que es justo la
+  confusión que hubo que deshacer con los registros para diagnosticar esto.
+- **El cliente admin toma la primera clave disponible**, así que la función
+  tampoco depende de la variable obsoleta para hablar con la base.
+
+La lógica vive en **`credenciales.ts`**, un archivo aparte, por la misma razón
+que `plantilla.ts`: para que la prueba pueda comprobar **la puerta de verdad** en
+vez de leer el código y creerle. La función pasa a llevar tres archivos.
+
+#### La revisión de las otras funciones
+
+**Ninguna otra función de servidor COMPARA contra la variable obsoleta.** Las
+otras cuatro —`invitar-usuario`, `aceptar-invitacion`, `recuperar-contrasena`,
+`eliminar-usuario`— la **usan** para construir su cliente admin, que es otra
+cosa: funcionan mientras la plataforma la inyecte.
+
+**No se tocaron, y es deliberado:** el día que esa variable deje de inyectarse
+las cuatro se caen a la vez, pero el arreglo obliga a redesplegar las cuatro y
+esa es una decisión de despliegue, no una consecuencia de este defecto. Queda
+anotado en DEPLOY.md, con el cambio exacto de una línea.
+
+#### Cómo se comprobó
+
+`docs/prueba-272-credenciales.mjs` —**30 comprobaciones**— importa
+`credenciales.ts`, que es lo que la función usa de verdad: el escenario exacto de
+producción (la obsoleta ausente, la llamada con la vigente), la rotación con dos
+claves en las tres formas en que puede llegar la variable, y lo que **no** debe
+pasar —sin cabecera, con la cabecera vacía, con otra credencial, con la clave y
+un carácter de más o de menos, y con el entorno vacío—.
+
+*Control negativo:* `credenciales.ts` es un archivo **nuevo**, así que no hay
+versión anterior contra la que correr la prueba. La regla vieja se escribe dentro
+de la prueba, tal como estaba, y se comprueba que **en el mismo escenario
+falla**. Sin eso, "la clave vigente pasa" no distinguiría el arreglo de una
+prueba que habría aprobado igual antes.
+
+*La revisión de las otras cuatro funciones también es una comprobación*, y lee el
+código en vez de fiarse de la memoria: distingue **usar** la variable de
+**comparar** contra ella, y se pone roja si alguien agrega una comparación nueva.
+
+---
+
+### #272 (corrección 2) — `resumen-diario` no podía hablar con la base
+
+**Solo la función.** Sin migración.
+
+#### El problema
+
+La corrección anterior arregló la puerta y **rompió lo que viene después**.
+Construía el cliente de la base con `CLAVES[0]` —la primera de la lista que
+sirve para **reconocer a quien llama**— y esa credencial no sirve para hablar
+con la base: PostgREST responde `Invalid API key`. La corrida moría antes de
+anotarse, así que la tabla de corridas quedaba vacía y no llegaba ningún correo.
+
+**Son dos usos distintos y no comparten credencial**, y esa es toda la lección:
+
+1. **Reconocer al programador** — la lista de `credenciales.ts`, que acepta las
+   claves vigentes y también la anterior.
+2. **Hablar con la base con permisos de servicio** — `SUPABASE_SERVICE_ROLE_KEY`,
+   igual que las otras cuatro funciones del proyecto.
+
+Medido en producción antes de tocar nada: `[resumen-diario] tomar turno: {
+message: "Invalid API key", hint: "Double check your Supabase anon or
+service_role API key." }`.
+
+#### Lo que se hizo
+
+- **El cliente vuelve a construirse con `SUPABASE_SERVICE_ROLE_KEY`.** Si esa
+  variable falta o viene vacía, la función responde **503** con el motivo
+  anotado y **no se cae a ninguna otra credencial**. Entró a la misma lista de
+  configuración obligatoria que `RESEND_API_KEY`, `EMAIL_FROM` y `SITE_URL`, que
+  ahora dice en el registro **cuál** falta en vez de nombrarlas todas.
+- **`CLAVE_ADMIN` desaparece.** La lista de `credenciales.ts` queda intacta y
+  **solo para la puerta**.
+- **Y queda dicho en el encabezado de los dos archivos**, con la advertencia
+  arriba del todo en `credenciales.ts`: *esta lista sirve para reconocer a quien
+  llama, no para hablar con la base*. Un comentario al final no habría evitado
+  el error; este está donde se lee primero.
+
+#### Cómo se comprobó
+
+`docs/prueba-272-credenciales.mjs` pasa de 30 a **39 comprobaciones**. Las nueve
+nuevas son de dos clases y conviene distinguirlas:
+
+- **Guardias que leen el código** —cuál clave construye el cliente, que
+  `CLAVE_ADMIN` no exista, que la falta de la variable entre en el 503—, porque
+  esa decisión vive en `index.ts`, que importa APIs de Deno y no se puede
+  ejecutar desde Node. Valen por lo que son: impiden volver a mezclarlos.
+- **Un control negativo de verdad**: la regla anterior y la nueva, las dos
+  escritas en la prueba, sobre el mismo entorno de producción. La anterior elige
+  la clave de la puerta; la nueva elige la de servicio.
+
+Regresión completa: **34 suites, 1307 comprobaciones, 0 fallas**.
+
+#### Desplegado, y lo que quedó SIN verificar
+
+`resumen-diario` quedó en **versión 3** en producción, con sus tres archivos,
+`verify_jwt` activada como estaba. Verificado releyendo lo desplegado.
+
+**Los criterios 1, 2, 3 y 6 no se pudieron comprobar**, y no por el cambio: la
+única credencial alcanzable desde la base es la que tiene guardada el trabajo
+agendado, y **esa credencial la puerta la rechaza**. Ver la nota de abajo.
+
+#### Hallazgo: el trabajo agendado nunca ha pasado la puerta
+
+El pedido daba por sentado que el programador seguiría pasando con la credencial
+que se le puso al crearlo. **Medido, no es así.** Las siete llamadas que
+`pg_net` registró:
+
+| UTC | Resultado | Quién |
+|---|---|---|
+| 18:15:30 | 401 | versión 1 |
+| **19:00:00** | **401** | **el programador** |
+| 19:20:35 | 401 | a mano, versión 2 |
+| 19:26:39 | 500 `Invalid API key` | a mano, versión 2 — **la única que pasó la puerta** |
+| 19:55:35 | 401 | a mano con la credencial del programador, versión 3 |
+| **20:00:00** | **401** | **el programador** |
+| 20:05:06 | 401 | el comando del programador, tal cual |
+
+**Cero respuestas 200 y `resumen_diario_corrida` vacía.** Los dos disparos del
+programador —19:00 y 20:00— dieron 401, y ejecutar su comando literal también.
+La llamada de las 19:26 pasó la puerta, así que **hay dos credenciales en juego
+y solo una está en el entorno de la función**: la que el programador tiene
+guardada no.
+
+**No se tocó**, porque el pedido lo dice explícitamente y porque rehacer el
+trabajo agendado es una decisión de despliegue, no una consecuencia de este
+defecto. Queda levantado.
