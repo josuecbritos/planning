@@ -1599,6 +1599,16 @@ async function probarResumenDiario(admin) {
     )
     const turno = await a.rpc('resumen_diario_tomar_turno', { p_forzar: true })
     marca(Boolean(turno.error), rotulo, '#272 ni tomar el turno del programador', turno.error ? '' : 'lo tomó')
+    // #358: la función que cierra el intento es nueva, así que nace con EXECUTE
+    // para PUBLIC — la trampa de #290. Si estuviera abierta, cualquiera con
+    // sesión podría CERRAR el día y dejar a todos sin correo.
+    const cerrarDia = await a.rpc('resumen_diario_cerrar', { p_enviados: 0, p_fallidos: 0, p_detalle: null })
+    marca(
+      Boolean(cerrarDia.error),
+      rotulo,
+      '#358 ni cerrar la corrida del día (dejaría a todos sin correo)',
+      cerrarDia.error ? '' : 'la cerró',
+    )
     const corridas = await a.from('resumen_diario_corrida').select('fecha')
     marca(
       bloqueado(corridas),

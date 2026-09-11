@@ -4727,3 +4727,98 @@ comprobación, así que ahora dice qué encontró: *"no existe el traductor
 compartido"*.
 
 Regresión completa: **35 suites, 1376 comprobaciones, 0 fallas**.
+
+---
+
+### #358 — Que el resumen diario llegue aunque un intento falle
+
+**Toca la base y la función de servidor.** Lleva **migración 36**.
+
+#### Qué pasó, medido
+
+**El viernes 11-sep-2026 el resumen no salió**, con 12 tareas atrasadas y 3
+venciendo ese día. A las 11:00 UTC —las 8:00 de Chile— la función arrancó en
+116 ms y **falló a los 5,4 segundos con `Gateway Timeout`** al llamar a
+`resumen_diario_tomar_turno`. **La base estaba sana en ese mismo segundo:** el
+trabajo del programador terminó en 180 ms, como todas las horas del día. Falló
+la capa entre la función y la base, y la operación era insertar una fila.
+
+**Por qué eso costó el día entero, que es lo que se corrige:**
+
+- **De las 24 llamadas del día solo una hacía trabajo.** Las otras 23 salían en
+  el acto porque "no es la hora". Una sola oportunidad, y el tropiezo cayó justo
+  ahí.
+- **Tomar el turno hacía dos cosas a la vez:** marcar que el día ya se hizo y
+  servir de candado. Como lo que falló fue esa misma inserción, **no quedó
+  ninguna fila** y nadie se enteró hasta que el dueño preguntó.
+
+*Esto no intenta evitar el fallo. No se puede: es infraestructura ajena y va a
+volver a ocurrir.*
+
+#### Lo que se hizo
+
+- **La pregunta cambia de "¿son las 8:00?" a "¿ya salió el de hoy?".** Día
+  hábil, pasada la hora de envío y el día abierto: envía. El programador ya
+  corre cada hora, así que **si a las 8:00 falla, a las 9:00 sale** — y no hay
+  que tocarlo. No es un rodeo: el disparo del programador es de *lanzar y
+  olvidar*, no reintenta ni avisa, así que **quien tiene que aguantar el
+  tropiezo es la función**.
+- **El intento se anota al EMPEZAR**, con su estado. `resumen_diario_corrida`
+  gana `estado` (`en_curso` / `cerrado` / `fallido`) e `intentos`.
+- **Solo un envío logrado cierra el día.** Un intento que falla lo deja abierto
+  y anota qué falló; `detalle` acumula los de todos los intentos, no solo el
+  último.
+- **Cada correo va con su clave de idempotencia** —`resumen-diario/<día>/<usuario>`,
+  el formato que recomienda Resend—, que el proveedor guarda 24 horas. Un
+  reintento no puede duplicar, ni en el caso peor: que el envío llegue y la
+  respuesta se pierda.
+
+**El candado sigue siendo uno solo** y ahora está en el `where` del `on
+conflict`: dos llamadas simultáneas no pueden enviar dos veces, porque el
+`insert` toma el bloqueo de la fila y la segunda ve el estado que dejó la
+primera.
+
+**Una salida que no estaba en el pedido y sin la cual esto se traba:** un
+intento que muere sin cerrar ni anotar —una función que revienta a medias— deja
+la fila en `en_curso` para siempre y el día no se puede retomar nunca. Pasados
+**diez minutos** el intento siguiente lo retoma; la función de servidor no puede
+durar tanto ni de lejos.
+
+**Y una decisión que el pedido no nombra:** *cero destinatarios también cierra el
+día*. "No había nada que mandar" es una corrida completa, no un fallo — si no
+cerrara, la pregunta se repetiría cada hora y el criterio de #272 (se mira una
+vez al día) dejaría de valer.
+
+#### Cómo se comprobó
+
+`docs/prueba-358-reintento.mjs` levanta un PostgreSQL local y recorre la máquina
+de estados entera: **42 comprobaciones**. Un fallo no cierra el día y queda
+anotado con su motivo; el intento siguiente lo retoma; un envío logrado cierra y
+`forzar` con el día cerrado ya no manda un segundo; dos llamadas a la vez y solo
+una gana; el intento muerto se retoma a los diez minutos y no antes; y lo de ayer
+no se arrastra a hoy.
+
+**Un cambio de contrato, no una regresión:** `docs/prueba-272-resumen-diario-base.mjs`
+comprobaba *"fuera de las 8:00 el turno NO se toma"*. Con #358 eso deja de ser
+cierto a propósito. Se reescribió esa sección para medir la regla nueva, y queda
+dicho en el archivo por qué cambió.
+
+**Lo que estas pruebas NO cubren:** que Resend respete la clave de idempotencia.
+Eso es del proveedor y se comprueba con correos reales; acá se comprueba que la
+clave **viaje**, con su formato y su valor.
+
+Regresión completa: **36 suites, 1419 en verde, 0 fallas** (2 saltadas por la
+fecha: el caso de #344 solo se puede ejercer si hoy cae cerca del borde del mes).
+
+**Tres suites no llegaron al final, y ninguna por este cambio** — se comprobó
+corriéndolas contra `origin/main`, donde fallan igual:
+
+| Suite | Por qué |
+|---|---|
+| `prueba-296-alcance-rpc.mjs` | pide `SUPABASE_URL` / `SUPABASE_ANON_KEY`, que no existen en este entorno. Va con la compuerta, contra producción. |
+| `prueba-300-301-perfiles-y-ciclo-vida.mjs` | busca `form .campo select`, y el Perfil **ya no es un `<select>` nativo**: es el `selector-btn` con listbox. La prueba quedó atrás del producto. |
+| `prueba-305-franjas-y-controles.mjs` | `.filtro-op--todos` ahora resuelve a **dos** botones (se sumó "Seleccionar todos menos Hecha"), y el selector no distingue. |
+
+Las dos últimas son deuda del arnés, anterior a #357 y #358, y **no se tocaron
+acá**: arreglarlas es decidir qué debe medir cada una, y eso no es parte de este
+pedido.

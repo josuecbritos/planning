@@ -2,10 +2,16 @@
 //
 // Cada mañana a las 8:00 de Chile, un correo por persona con SUS tareas
 // atrasadas y las que vencen ese día. Quien la despierta es el programador de
-// la base (pg_cron + pg_net), que la llama CADA HORA; quien decide si es el
-// momento es `resumen_diario_tomar_turno()`, en la base, mirando la zona
+// la base (pg_cron + pg_net), que la llama CADA HORA; quien decide si hay que
+// enviar es `resumen_diario_tomar_turno()`, en la base, mirando la zona
 // `America/Santiago` por su nombre — el programador trabaja en UTC y Chile
 // cambia de hora dos veces al año. Ver DEPLOY.md § "Resumen diario".
+//
+// #358: la pregunta NO es "¿son las 8:00?" sino "¿ya salió el de hoy?". El
+// disparo del programador es de lanzar y olvidar —no reintenta ante un error
+// ni avisa ante una respuesta incorrecta—, así que quien tiene que aguantar un
+// tropiezo es esta función: se la puede llamar muchas veces sin daño, y el
+// programador pasa cada hora. Si a las 8:00 falla, a las 9:00 sale.
 //
 // El envío NO monta nada nuevo: mismo proveedor (Resend) y mismo remitente
 // (`EMAIL_FROM`) que la invitación, que ya está validada de punta a punta. Lo
@@ -87,6 +93,23 @@ function hoyChile(): string {
 
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+/** #358 — Anota cómo terminó el intento. Con `fallidos > 0` el día queda
+ *  ABIERTO y el programador vuelve a probar dentro de la misma jornada; solo
+ *  un envío logrado lo cierra.
+ *
+ *  Si esta llamada misma falla, no se insiste: el intento queda `en_curso` y
+ *  el siguiente lo retoma pasados diez minutos. Es el mismo principio de todo
+ *  #358 — ningún tropiezo puntual puede cerrar el día. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function cerrar(admin: any, enviados: number, fallidos: number, detalle: string) {
+  const { error } = await admin.rpc('resumen_diario_cerrar', {
+    p_enviados: enviados,
+    p_fallidos: fallidos,
+    p_detalle: detalle ? detalle.slice(0, 2000) : null,
+  })
+  if (error) registrar('cerrar corrida', error)
+}
+
 Deno.serve(async (req) => {
   const responder = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -149,10 +172,9 @@ Deno.serve(async (req) => {
     const { data: filas, error: errDatos } = await admin.rpc('resumen_diario_datos')
     if (errDatos) {
       registrar('datos', errDatos)
-      await admin
-        .from('resumen_diario_corrida')
-        .update({ terminada: new Date().toISOString(), detalle: `datos: ${errDatos.message}` })
-        .eq('fecha', hoy)
+      // Deja el día ABIERTO: esto es justo la clase de tropiezo que antes
+      // costaba la jornada entera.
+      await cerrar(admin, 0, 1, `datos: ${errDatos.message}`)
       return responder(500, { error: 'No se pudieron reunir los datos' })
     }
 
@@ -185,6 +207,14 @@ Deno.serve(async (req) => {
           headers: {
             Authorization: `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
             'Content-Type': 'application/json',
+            // #358: una clave por PERSONA y DÍA, con el formato que recomienda
+            // Resend —evento/identificador—. Resend la guarda 24 horas: si
+            // llega un envío repetido con la misma clave, devuelve la
+            // respuesta del primero SIN volver a enviar.
+            //
+            // Es lo que hace que reintentar no pueda duplicar, y de paso cubre
+            // el caso peor: que el correo salga y la respuesta se pierda.
+            'Idempotency-Key': `resumen-diario/${hoy}/${d.usuario_id}`,
           },
           body: JSON.stringify({
             from: Deno.env.get('EMAIL_FROM'),
@@ -206,15 +236,10 @@ Deno.serve(async (req) => {
     }
 
     if (fallos.length > 0) registrar('envíos fallidos', fallos.join(' | '))
-    await admin
-      .from('resumen_diario_corrida')
-      .update({
-        terminada: new Date().toISOString(),
-        enviados,
-        fallidos: fallos.length,
-        detalle: fallos.length > 0 ? fallos.join(' | ').slice(0, 4000) : null,
-      })
-      .eq('fecha', hoy)
+    // #358: SOLO un envío logrado cierra el día. Con fallos, el día queda
+    // ABIERTO y el intento de la hora siguiente vuelve a probar — a quien ya le
+    // llegó no le llega de nuevo, por la clave de idempotencia.
+    await cerrar(admin, enviados, fallos.length, fallos.join(' | '))
 
     return responder(200, { ok: true, enviados, fallidos: fallos.length })
   } catch (e) {
