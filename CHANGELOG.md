@@ -4822,3 +4822,148 @@ corriéndolas contra `origin/main`, donde fallan igual:
 Las dos últimas son deuda del arnés, anterior a #357 y #358, y **no se tocaron
 acá**: arreglarlas es decidir qué debe medir cada una, y eso no es parte de este
 pedido.
+
+### #317 — Filtrar la Gantt tocando las fechas
+
+**Solo interfaz.** Sin migración: no toca la base ni los permisos.
+
+#### El problema
+
+Para ver un período había que abrir **Filtrar → Fecha Objetivo → rango fijo** y
+escribir las dos fechas — aunque el período que se quería ver estuviera a la
+vista, arriba, en el encabezado de la grilla. **Las dos bandas no respondían a
+nada:** el rótulo de la semana y el de cada día eran solo texto.
+
+#### Lo que se hizo
+
+Cuatro gestos, todos sobre el encabezado:
+
+| Gesto | Dónde | Resultado |
+|---|---|---|
+| Clic | Sobre un **día** | Filtra a ese día |
+| Clic | Sobre el **rótulo de una semana** | Filtra a esa semana |
+| Arrastrar | Entre **días** | Filtra a ese rango |
+| Arrastrar | Entre **rótulos de semana** | Filtra a esas semanas completas |
+
+**El gesto no crea un control nuevo: pone el filtro de fecha que ya existía.**
+Exactamente el mismo rango fijo que se escribe a mano — aparece su ficha, su ×
+lo limpia, cierra el horizonte (#250), filtra también la tabla y apaga el
+selector "Alrededor de hoy / Todo el proyecto" como cualquier filtro de fecha.
+Con un filtro puesto **el gesto sigue activo**, así que se va cerrando de una
+semana a un día sin limpiar antes.
+
+**Solo el encabezado.** En la grilla el clic sigue significando planificar, y
+las columnas congeladas —que comparten fila con los rótulos— quedan fuera.
+
+**Las dos bandas no se mezclan.** La banda queda fijada al apretar y el paso
+del puntero por la otra se ignora: un arrastre que empieza en un día no puede
+terminar en un rótulo de semana.
+
+**Sobre los rótulos toma las semanas ENTERAS**, de lunes a domingo, aunque de
+esa semana se esté viendo solo parte. Que el sábado y el domingo se dibujen lo
+sigue decidiendo **Rango** — un control no cambia otro—: un rango de viernes a
+lunes muestra viernes y lunes con los fines de semana apagados, y los cuatro
+días al encenderlos, **sin que el filtro se toque**.
+
+**Una salida que el pedido no pide y sin la cual el gesto se traba:** si se
+suelta el botón fuera del encabezado, el gesto igual se cierra con lo último que
+alcanzó a tocar. Quedarse a medias esperando un "soltar" que nunca llega sobre
+una celda sería una trampa.
+
+#### Cómo se comprobó
+
+`docs/prueba-317-encabezado-filtra.mjs` recorre los doce criterios en el
+navegador: **44 comprobaciones**. El calendario de modo Local es fijo —hoy es el
+miércoles 30-oct-2024— así que las fechas son literales y no cambian entre
+corridas.
+
+**Control negativo contra `origin/main`: 11 en verde y 33 en rojo.** Las 11 que
+aguantan son justo las que miden lo que el pedido dice que NO cambia: el clic de
+la grilla sigue planificando, las columnas congeladas siguen fuera del gesto, la
+× sigue limpiando y la tabla sigue reflejando a la Gantt.
+
+**Tres comprobaciones pasaban en `main` por accidente**, comparando dos vacíos
+—"ida y vuelta dan lo mismo" cuando ninguna de las dos filtró nada—. Se
+apretaron: ahora exigen además que el filtro haya acotado algo. Un control
+negativo sirve para eso.
+
+**El criterio 9 quedó como estaba, y es una decisión.** Dice "la grilla queda
+con ese día y sin filas", pero cuando un filtro deja la Gantt vacía esta no
+dibuja la grilla: muestra "Ninguna tarea coincide con el filtro activo.". Eso es
+anterior a este pedido y vale para cualquier filtro. Cambiarlo tocaría el vacío
+de las dos Gantt para todos los filtros, que no es lo que #317 nombra; y el
+requisito que sí importa —que los dos caminos den lo mismo— ya se cumple:
+medido, el vacío es idéntico por gesto y por menú. **Consultado y confirmado con
+el dueño antes de dejarlo así.**
+
+Regresión completa: **37 suites, 1463 en verde, 0 fallas** (2 saltadas por la
+fecha, las de #344). Son exactamente las 1419 de #358 más las 44 nuevas:
+**ninguna suite perdió comprobaciones** — se comparó suite por suite contra la
+corrida anterior, no solo el total.
+
+Siguen sin llegar al final las mismas tres de #358, por las mismas razones
+—`prueba-296` pide credenciales de Supabase; `prueba-300-301` y `prueba-305`
+son deuda del arnés, anterior a este pedido— y **no se tocaron acá**.
+
+### #317 (corrección) — Que se vea que el encabezado se puede tocar
+
+**Solo estilos.** No cambia ningún comportamiento.
+
+#### El problema
+
+**El filtro funcionaba, pero nada lo anunciaba.** Un día o un rótulo de semana
+se veían igual estuvieran o no bajo el mouse, así que **nadie descubría que el
+encabezado filtra**. Lo único que había era el cursor de mano.
+
+#### Lo que se hizo
+
+**El día o el rótulo bajo el mouse llevan el velo del producto** —la capa
+translúcida que oscurece lo que hay debajo **sin reemplazar su color**— más **la
+línea naranja de acento**. Es el mismo mecanismo, y los mismos valores, que la
+fila bajo el mouse: `--velo-fila` y `--naranja`. **Ningún color nuevo.**
+
+**Por qué un velo y no un relleno:** tiene que funcionar sobre cualquier fondo.
+El gris del fin de semana y el azul de hoy se conservan; un relleno los
+borraría. Y el gris claro ni siquiera estaba libre — *es el de los fines de
+semana*, así que un día resaltado con él se vería igual que un sábado.
+
+- **El rótulo de semana se vela solo a sí mismo.** Sus días no se marcan: el
+  rótulo ya dice qué abarca.
+- **Durante el arrastre no hay velo.** Manda la marca del arrastre y nada más,
+  incluso sobre el día que está bajo el cursor. Se apaga desde la tabla
+  (`gantt--gesto`) y no celda por celda, porque vale para las dos bandas a la
+  vez.
+- **El relleno oscuro del arrastre no se tocó**, ni el cursor, ni los colores
+  del encabezado, ni nada del comportamiento del filtro. La grilla no se tiñe.
+
+#### Cómo se comprobó
+
+La sección **H** de `docs/prueba-317-encabezado-filtra.mjs`: la suite pasa de
+**44 a 66 comprobaciones**. No mira si "hay algo distinto": mide el degradado y
+la sombra que de verdad calcula el navegador, y sobre todo que **el color de
+fondo no cambie** — que es lo que separa un velo de un relleno.
+
+**Dos controles negativos**, no uno:
+
+| Contra | Resultado |
+|---|---|
+| `origin/main`, sin nada de #317 | **11 en verde · 33 en rojo** |
+| El commit del gesto, **sin el velo** | **53 en verde · 13 en rojo** |
+
+El segundo es el que importa acá, y es el que dejó ver que **cuatro
+comprobaciones pasaban por accidente**: "conserva su gris", "conserva su azul",
+"el fondo sigue siendo el suyo" y "arrastrando no hay velo" salían verdes en un
+árbol donde no hay velo en ninguna parte. Ahora las tres primeras exigen además
+que el velo esté, y la cuarta comprueba que **sobre ese mismo día, ya sin
+arrastre, el velo sí aparece**.
+
+**Un detalle del navegador que quedó dicho en la prueba:** al soltar se aplica
+el filtro y la grilla se redibuja, y Chromium **no recalcula `:hover` mientras
+el puntero no se mueva**. No es de este estilo; la comprobación vuelve a pasar
+el mouse antes de medir.
+
+Regresión completa: **37 suites, 1485 en verde, 0 fallas** (2 saltadas por la
+fecha, las de #344). Son exactamente las 1463 anteriores más las 22 nuevas, y
+la comparación suite por suite confirma que **la única que cambió es la de
+#317**. Siguen sin llegar al final las mismas tres de siempre, por las mismas
+razones, y no se tocaron.

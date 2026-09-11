@@ -848,6 +848,36 @@ que no tienen fecha. Las opciones que no son una ventana temporal —"Sin fecha"
 "Con fecha"— filtran sin tocar el horizonte, y "En horizonte visible" va al
 revés: deriva su rango del horizonte en vez de definirlo.
 
+**El encabezado de la Gantt filtra (#317).** Las dos bandas eran solo texto:
+para ver un período había que abrir Filtrar → Fecha Objetivo y escribir las dos
+fechas, aunque el período estuviera a la vista arriba. Ahora **tocar un día lo
+deja solo a él; tocar el rótulo de una semana deja esa semana; y arrastrando
+—dentro de una banda o de la otra— se toma el rango**, en cualquier dirección.
+Lo que el gesto deja puesto **es el filtro de fecha que ya existía**, el mismo
+rango fijo que se escribe a mano: aparece su ficha, su × lo limpia, cierra el
+horizonte (#250) y filtra también la tabla. Con un filtro puesto el gesto sigue
+activo, así que se va cerrando de una semana a un día sin limpiar primero.
+
+- **Se ve que se puede tocar.** El día o el rótulo bajo el mouse llevan **el
+  velo del producto** —la capa translúcida que oscurece lo que hay debajo sin
+  reemplazar su color— más **la línea naranja de acento**: el mismo mecanismo,
+  y los mismos valores, que la fila bajo el mouse. Un velo y no un relleno
+  porque tiene que funcionar sobre cualquier fondo: el gris del fin de semana y
+  el azul de hoy se conservan, y un relleno los borraría — *ese gris claro ni
+  siquiera está libre: es el de los fines de semana*. El rótulo se vela **solo
+  a sí mismo**; sus días no se marcan, porque el rótulo ya dice qué abarca. **El
+  velo es el estado de reposo y solo eso:** apenas empieza el arrastre deja de
+  mostrarse y manda la marca del arrastre, incluso sobre el día bajo el cursor.
+- **Solo el encabezado.** En la grilla el clic sigue significando planificar.
+- **Las dos bandas no se mezclan:** un arrastre que empieza en un día termina
+  en un día, y uno que empieza en un rótulo termina en un rótulo.
+- **Sobre los rótulos toma las semanas ENTERAS**, de lunes a domingo. Que el
+  sábado y el domingo se dibujen lo sigue decidiendo **Rango**: un control no
+  cambia otro, y por eso un rango de viernes a lunes muestra viernes y lunes
+  mientras los fines de semana estén apagados, y los cuatro días al
+  encenderlos, sin tocar el filtro.
+- **En el teléfono no hay Gantt**, así que tampoco hay gesto.
+
 **La franja de la semana no puede ensanchar la columna (#345).** La banda
 superior del encabezado agrupa los días por semana y mostraba **el rango
 completo** —"31 ago – 4 sep"— aunque de esa semana se viera un solo día; ese
