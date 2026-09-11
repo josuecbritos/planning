@@ -982,7 +982,12 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
           {/* #190: `gantt--conproy` activa la columna de proyecto y desplaza
               los anclajes de las columnas congeladas (variable CSS). */}
           <table
-            className={`gantt${misTareas ? ' gantt--conproy' : ''}${dnd ? ' gantt--dnd' : ''}`}
+            /* #317: mientras hay un gesto en curso manda la marca del
+               arrastre, y el velo del mouse deja de mostrarse — es el estado
+               de REPOSO y solo eso. Se apaga desde acá y no celda por celda
+               porque vale para las dos bandas a la vez, incluida la que el
+               cursor está tocando. */
+            className={`gantt${misTareas ? ' gantt--conproy' : ''}${dnd ? ' gantt--dnd' : ''}${gesto ? ' gantt--gesto' : ''}`}
             onContextMenu={(e) => e.preventDefault()}
           >
             <thead>

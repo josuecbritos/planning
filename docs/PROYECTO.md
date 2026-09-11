@@ -858,6 +858,16 @@ rango fijo que se escribe a mano: aparece su ficha, su × lo limpia, cierra el
 horizonte (#250) y filtra también la tabla. Con un filtro puesto el gesto sigue
 activo, así que se va cerrando de una semana a un día sin limpiar primero.
 
+- **Se ve que se puede tocar.** El día o el rótulo bajo el mouse llevan **el
+  velo del producto** —la capa translúcida que oscurece lo que hay debajo sin
+  reemplazar su color— más **la línea naranja de acento**: el mismo mecanismo,
+  y los mismos valores, que la fila bajo el mouse. Un velo y no un relleno
+  porque tiene que funcionar sobre cualquier fondo: el gris del fin de semana y
+  el azul de hoy se conservan, y un relleno los borraría — *ese gris claro ni
+  siquiera está libre: es el de los fines de semana*. El rótulo se vela **solo
+  a sí mismo**; sus días no se marcan, porque el rótulo ya dice qué abarca. **El
+  velo es el estado de reposo y solo eso:** apenas empieza el arrastre deja de
+  mostrarse y manda la marca del arrastre, incluso sobre el día bajo el cursor.
 - **Solo el encabezado.** En la grilla el clic sigue significando planificar.
 - **Las dos bandas no se mezclan:** un arrastre que empieza en un día termina
   en un día, y uno que empieza en un rótulo termina en un rótulo.

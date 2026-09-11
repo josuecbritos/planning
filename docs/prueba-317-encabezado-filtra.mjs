@@ -12,19 +12,28 @@
 // entre corridas. El horizonte por defecto ("Alrededor de hoy", días hábiles)
 // va del lunes 14-oct al viernes 15-nov: 25 días en 5 semanas.
 //
-// Control negativo comprobado contra `origin/main`: **11 en verde y 33 en
-// rojo**. Fallan todas las que tocan el encabezado, porque ahí los `th` no
-// llevan ni `data-dia` ni manejador y el clic no hace nada. Las 11 que
-// aguantan son justo las que miden lo que el pedido dice que NO cambia: el
-// clic de la grilla sigue planificando, las columnas congeladas siguen fuera
-// del gesto, la × sigue limpiando, la tabla sigue reflejando a la Gantt y
-// Mis Tareas sigue en su sitio.
+// La sección H mide la corrección posterior: que al pasar el mouse por el
+// encabezado se VEA que ahí se puede tocar. El filtro funcionaba pero nada lo
+// anunciaba.
 //
-// Varias comprobaciones comparan DOS listas, y sin cuidado una corrida donde
-// el gesto no filtró nada saldría verde comparando el proyecto entero contra
-// sí mismo. Por eso las de ese tipo exigen además que el filtro haya acotado
-// algo (`TODAS`, el largo del rango, la ficha no nula): salieron de apretar
-// este control negativo, donde tres de ellas pasaban comparando dos vacíos.
+// Dos controles negativos, los dos corridos:
+//   · contra `origin/main` (sin nada de #317): **11 en verde y 33 en rojo**.
+//     Fallan todas las que tocan el encabezado, porque ahí los `th` no llevan
+//     ni `data-dia` ni manejador y el clic no hace nada.
+//   · contra el commit del gesto, SIN el velo: **53 en verde y 13 en rojo** —
+//     exactamente las de la sección H que miden el velo, y ninguna otra.
+//
+// Lo que aguanta los dos controles es lo que el pedido dice que NO cambia: el
+// clic de la grilla sigue planificando, las columnas congeladas siguen fuera
+// del gesto, la × sigue limpiando, la tabla sigue reflejando a la Gantt y Mis
+// Tareas sigue en su sitio.
+//
+// Varias comprobaciones comparan DOS cosas, y sin cuidado una corrida donde no
+// pasó nada saldría verde comparando dos vacíos: el proyecto entero contra sí
+// mismo, o "el fondo no cambió" cuando no hay velo que lo cambie. Por eso las
+// de ese tipo exigen además que algo haya ocurrido de verdad (`TODAS`, el
+// largo del rango, la ficha no nula, `conVelo`). Todas salieron de apretar
+// estos controles negativos, donde pasaban por accidente.
 //
 // Lo que esta prueba NO cubre: el teléfono, donde no hay Gantt y por lo tanto
 // no hay gesto (el pedido lo excluye).
@@ -445,6 +454,214 @@ d = await dias(p)
 chk(d.length >= 1 && d[0] === semanaMT, '12 y el rótulo de semana también', `${d.length} días desde ${d[0]}`)
 await limpiarFecha(p)
 chk((await dias(p)).join(',') === mtHorizonte.join(','), '12 la × devuelve Mis Tareas a su horizonte', String((await dias(p)).length))
+
+// ═══════════════════════════════════════════════════════════════════════════
+// H · El mouse sobre el encabezado (corrección de #317)
+//
+// El filtro funcionaba pero nada lo anunciaba: un día se veía igual estuviera
+// o no bajo el mouse, así que nadie descubría que el encabezado filtra. Lo que
+// se mide acá es que el VELO —el mismo de la fila bajo el mouse— aparezca, y
+// sobre todo que OSCUREZCA sin reemplazar: el gris del fin de semana y el azul
+// de hoy tienen que sobrevivir.
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── H · El mouse sobre el encabezado ──')
+
+/** Lo que de verdad pinta una celda del encabezado. `velo` es el degradado que
+ *  oscurece; `acento`, la línea naranja; `fondo`, el color de abajo, que es lo
+ *  que NO se puede perder. */
+const pintura = (p, sel) =>
+  p.evaluate((s) => {
+    const e = document.querySelector(s)
+    if (!e) return null
+    const c = getComputedStyle(e)
+    return { velo: c.backgroundImage, acento: c.boxShadow, fondo: c.backgroundColor }
+  }, sel)
+const conVelo = (x) => !!x && x.velo !== 'none'
+const conAcento = (x) => !!x && /249,\s*115,\s*22/.test(x.acento) // --naranja #f97316
+
+// Volver al proyecto: Mis Tareas quedó arriba.
+await p.getByText('Resumen', { exact: true }).first().click()
+await p.waitForTimeout(400)
+await p.locator('.resumen-card', { hasText: 'Plan PGP Arauco' }).first().click()
+await p.waitForTimeout(900)
+await verVista(p, 'Gantt')
+
+const DIA_NORMAL = '2024-10-23' // miércoles
+const DIA_FINDE = '2024-11-02' // sábado — hay que encender la semana completa
+const SEMANA = '2024-10-21'
+
+// ── H1 · Un día cualquiera ─────────────────────────────────────────────────
+const reposo = await pintura(p, D(DIA_NORMAL))
+chk(!conVelo(reposo) && !conAcento(reposo), 'H1 en reposo un día no lleva velo ni línea', `${reposo?.velo} · ${reposo?.acento}`)
+await p.hover(D(DIA_NORMAL))
+await p.waitForTimeout(250)
+const encima = await pintura(p, D(DIA_NORMAL))
+chk(conVelo(encima), 'H1 con el mouse encima el día se oscurece', String(encima?.velo))
+chk(conAcento(encima), 'H1 y aparece la línea naranja abajo', String(encima?.acento))
+// Al salir vuelve a como estaba: se lleva el mouse a un rincón sin encabezado.
+await p.mouse.move(5, 5)
+await p.waitForTimeout(250)
+const vuelto = await pintura(p, D(DIA_NORMAL))
+chk(!conVelo(vuelto) && !conAcento(vuelto), 'H1 al salir vuelve a como estaba', `${vuelto?.velo} · ${vuelto?.acento}`)
+
+// ── H2 y H3 · El fin de semana y hoy conservan su color ────────────────────
+// El sábado solo se dibuja con la semana completa encendida.
+await elegirRango(p, 'Semana completa')
+const findeReposo = await pintura(p, D(DIA_FINDE))
+await p.hover(D(DIA_FINDE))
+await p.waitForTimeout(250)
+const findeEncima = await pintura(p, D(DIA_FINDE))
+chk(conVelo(findeEncima), 'H2 el sábado bajo el mouse se oscurece', String(findeEncima?.velo))
+chk(
+  // Con velo Y con el mismo fondo. Sin exigir el velo, esto pasaría solo en un
+  // árbol donde no hay velo en ninguna parte, que es justo lo que no queremos.
+  conVelo(findeEncima) && findeEncima?.fondo === findeReposo?.fondo,
+  'H2 y CONSERVA su gris: el velo oscurece, no reemplaza',
+  `${findeReposo?.fondo} → ${findeEncima?.fondo}`,
+)
+const normalEncima = await (async () => {
+  await p.hover(D(DIA_NORMAL))
+  await p.waitForTimeout(250)
+  return pintura(p, D(DIA_NORMAL))
+})()
+chk(
+  normalEncima?.fondo !== findeEncima?.fondo,
+  'H2 y un sábado bajo el mouse se sigue distinguiendo de un día normal bajo el mouse',
+  `${normalEncima?.fondo} vs ${findeEncima?.fondo}`,
+)
+await elegirRango(p, 'Días hábiles')
+
+const hoyReposo = await pintura(p, D(HOY))
+await p.hover(D(HOY))
+await p.waitForTimeout(250)
+const hoyEncima = await pintura(p, D(HOY))
+chk(conVelo(hoyEncima), 'H3 hoy bajo el mouse se oscurece', String(hoyEncima?.velo))
+chk(
+  conVelo(hoyEncima) && hoyEncima?.fondo === hoyReposo?.fondo,
+  'H3 y CONSERVA su azul',
+  `${hoyReposo?.fondo} → ${hoyEncima?.fondo}`,
+)
+
+// ── H4 · El rótulo de semana se vela solo a sí mismo ───────────────────────
+await p.hover(S(SEMANA))
+await p.waitForTimeout(250)
+const rotulo = await pintura(p, S(SEMANA))
+chk(conVelo(rotulo) && conAcento(rotulo), 'H4 el rótulo bajo el mouse se vela', `${rotulo?.velo} · ${rotulo?.acento}`)
+const susDias = await p.evaluate(
+  () =>
+    [...document.querySelectorAll('.gantt th.dia')]
+      .map((e) => getComputedStyle(e).backgroundImage)
+      .filter((v) => v !== 'none').length,
+)
+chk(susDias === 0, 'H4 y sus días NO se marcan: el rótulo ya dice qué abarca', `${susDias} días velados`)
+
+// ── H5 · Arrastrando no hay velo ───────────────────────────────────────────
+const a = await caja(p, D('2024-10-29'))
+const c = await caja(p, D('2024-10-31'))
+let duranteEncima = null
+let duranteTomado = null
+let trasSoltar = null
+if (a && c) {
+  await p.mouse.move(a.x + a.width / 2, a.y + a.height / 2)
+  await p.mouse.down()
+  await p.mouse.move(c.x + c.width / 2, c.y + c.height / 2, { steps: 6 })
+  await p.waitForTimeout(250)
+  // El cursor está sobre el 31: ni ahí se muestra el velo.
+  duranteEncima = await pintura(p, D('2024-10-31'))
+  duranteTomado = await p.evaluate(
+    () => document.querySelectorAll('.gantt th.dia.head-sel').length,
+  )
+  await p.mouse.up()
+  await p.waitForTimeout(600)
+  // El MISMO día, ya sin arrastre, vuelve a mostrar el velo. Sin esto, que
+  // arriba no hubiera velo podría ser simplemente que el velo no existe.
+  //
+  // Hay que volver a pasar el mouse por encima: al soltar se aplica el filtro y
+  // la grilla se redibuja, y Chromium no recalcula `:hover` mientras el puntero
+  // no se mueva. Es del navegador, no de este estilo.
+  await p.mouse.move(5, 5)
+  await p.waitForTimeout(150)
+  await p.hover(D('2024-10-31'))
+  await p.waitForTimeout(250)
+  trasSoltar = await pintura(p, D('2024-10-31'))
+}
+chk(duranteTomado === 3, 'H5 preparación: durante el arrastre hay tres días tomados', String(duranteTomado))
+chk(!conVelo(duranteEncima), 'H5 arrastrando, ni el día bajo el cursor muestra el velo', String(duranteEncima?.velo))
+chk(!conAcento(duranteEncima), 'H5 ni la línea naranja', String(duranteEncima?.acento))
+chk(
+  conVelo(trasSoltar),
+  'H5 y sobre ESE MISMO día, ya sin arrastre, el velo sí está: era el arrastre apagándolo',
+  String(trasSoltar?.velo),
+)
+
+// ── H6 · Soltar deja el filtro igual que antes ─────────────────────────────
+d = await dias(p)
+chk(d.join(',') === '2024-10-29,2024-10-30,2024-10-31', 'H6 soltar deja el filtro puesto, sin cambios', d.join(','))
+
+// ── H7 · La grilla no se tiñe ──────────────────────────────────────────────
+await limpiarFecha(p)
+const celdaVelada = async () => {
+  await p.hover(D(DIA_NORMAL))
+  await p.waitForTimeout(250)
+  return p.evaluate(
+    () =>
+      [...document.querySelectorAll('.gantt tbody td.celda')]
+        .map((e) => getComputedStyle(e).backgroundImage)
+        .filter((v) => v !== 'none').length,
+  )
+}
+chk((await celdaVelada()) === 0, 'H7 con el mouse en el encabezado la grilla no se tiñe')
+
+// ── H8 · Modo oscuro ───────────────────────────────────────────────────────
+await p.evaluate(() => document.documentElement.setAttribute('data-tema', 'oscuro'))
+await p.waitForTimeout(350)
+await p.mouse.move(5, 5)
+await p.waitForTimeout(200)
+const oscReposo = await pintura(p, D(DIA_NORMAL))
+await p.hover(D(DIA_NORMAL))
+await p.waitForTimeout(250)
+const oscEncima = await pintura(p, D(DIA_NORMAL))
+chk(conVelo(oscEncima) && conAcento(oscEncima), 'H8 en modo oscuro también hay velo y línea', `${oscEncima?.velo} · ${oscEncima?.acento}`)
+chk(
+  oscEncima?.velo !== encima?.velo,
+  'H8 y el velo es el del tema oscuro, no el del claro — se aclara en vez de oscurecer',
+  `claro=${encima?.velo} · oscuro=${oscEncima?.velo}`,
+)
+chk(
+  conVelo(oscEncima) && oscEncima?.fondo === oscReposo?.fondo,
+  'H8 el fondo del día sigue siendo el suyo',
+  `${oscReposo?.fondo} → ${oscEncima?.fondo}`,
+)
+await p.evaluate(() => document.documentElement.setAttribute('data-tema', 'claro'))
+await p.waitForTimeout(350)
+
+// ── H9 · Mis Tareas ────────────────────────────────────────────────────────
+await p.getByText('Mis Tareas', { exact: true }).first().click()
+await p.waitForTimeout(900)
+await verVista(p, 'Gantt')
+const unDiaMT2 = (await dias(p))[3]
+await p.hover(D(unDiaMT2))
+await p.waitForTimeout(250)
+const mtEncima = await pintura(p, D(unDiaMT2))
+chk(conVelo(mtEncima) && conAcento(mtEncima), 'H9 en la Gantt de Mis Tareas pasa lo mismo', `${mtEncima?.velo} · ${mtEncima?.acento}`)
+
+// ── El velo es el MISMO que el de la fila bajo el mouse ────────────────────
+// No es parecido: es el mismo mecanismo y el mismo valor. Si alguien cambia
+// uno de los dos, esto lo dice.
+const veloFila = await p.evaluate(() => {
+  const fila = document.querySelector('.gantt tbody tr.gfila-tarea')
+  if (!fila) return null
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--velo-fila').trim()
+  return v || null
+})
+// La variable se declara `.06` y el navegador la computa `0.06`: se comparan
+// normalizadas, que si no esto falla por la forma de escribir un número.
+const igual = (s) => s.replace(/\s/g, '').replace(/([(,])\./g, '$10.')
+chk(
+  !!veloFila && igual(encima?.velo ?? '').includes(igual(veloFila)),
+  'el velo del encabezado es el MISMO `--velo-fila` de la fila bajo el mouse: ningún color nuevo',
+  `${veloFila} en ${encima?.velo}`,
+)
 
 console.log(`\n${falla === 0 ? '✅' : '❌'} #317 — ${ok} en verde, ${falla} en rojo`)
 await b.close()

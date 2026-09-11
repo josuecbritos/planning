@@ -1574,6 +1574,27 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 }
 .gantt th.dia.head-sel small { color: var(--sobre-primario); opacity: .75; }
 
+/* #317 — Que se vea que ahí se puede tocar. El filtro funcionaba pero nada lo
+   anunciaba: un día se veía igual estuviera o no bajo el mouse, así que nadie
+   descubría que el encabezado filtra.
+   El velo y la línea naranja son EXACTAMENTE los de la fila bajo el mouse (más
+   arriba, § "la fila sobre la que se abrió el menú"): mismo mecanismo y ningún
+   color nuevo. Y el velo es lo que hace falta acá, no un relleno: OSCURECE lo
+   que hay debajo sin reemplazarlo, así que el gris del fin de semana y el azul
+   de hoy se conservan. Un relleno los borraría — y el gris claro ni siquiera
+   está libre: es el de los fines de semana.
+   Solo con mouse, como el resto de lo que vive solo en escritorio: en el
+   teléfono no hay Gantt. */
+@media (min-width: 769px) {
+  /* `gantt--gesto` lo apaga mientras se arrastra: ahí manda la marca del
+     arrastre y nada más, incluso sobre el día que está bajo el cursor. */
+  .gantt:not(.gantt--gesto) th.dia:hover,
+  .gantt:not(.gantt--gesto) th.semana-lbl:hover {
+    background-image: linear-gradient(var(--velo-fila), var(--velo-fila));
+    box-shadow: inset 0 -3px 0 0 var(--naranja);
+  }
+}
+
 .gantt td.celda { height: 30px; text-align: center; padding: 0; }
 .gantt td.lunes, .gantt th.lunes { border-left: 2px solid var(--semana-borde); }
 

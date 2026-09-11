@@ -4904,3 +4904,66 @@ corrida anterior, no solo el total.
 Siguen sin llegar al final las mismas tres de #358, por las mismas razones
 —`prueba-296` pide credenciales de Supabase; `prueba-300-301` y `prueba-305`
 son deuda del arnés, anterior a este pedido— y **no se tocaron acá**.
+
+### #317 (corrección) — Que se vea que el encabezado se puede tocar
+
+**Solo estilos.** No cambia ningún comportamiento.
+
+#### El problema
+
+**El filtro funcionaba, pero nada lo anunciaba.** Un día o un rótulo de semana
+se veían igual estuvieran o no bajo el mouse, así que **nadie descubría que el
+encabezado filtra**. Lo único que había era el cursor de mano.
+
+#### Lo que se hizo
+
+**El día o el rótulo bajo el mouse llevan el velo del producto** —la capa
+translúcida que oscurece lo que hay debajo **sin reemplazar su color**— más **la
+línea naranja de acento**. Es el mismo mecanismo, y los mismos valores, que la
+fila bajo el mouse: `--velo-fila` y `--naranja`. **Ningún color nuevo.**
+
+**Por qué un velo y no un relleno:** tiene que funcionar sobre cualquier fondo.
+El gris del fin de semana y el azul de hoy se conservan; un relleno los
+borraría. Y el gris claro ni siquiera estaba libre — *es el de los fines de
+semana*, así que un día resaltado con él se vería igual que un sábado.
+
+- **El rótulo de semana se vela solo a sí mismo.** Sus días no se marcan: el
+  rótulo ya dice qué abarca.
+- **Durante el arrastre no hay velo.** Manda la marca del arrastre y nada más,
+  incluso sobre el día que está bajo el cursor. Se apaga desde la tabla
+  (`gantt--gesto`) y no celda por celda, porque vale para las dos bandas a la
+  vez.
+- **El relleno oscuro del arrastre no se tocó**, ni el cursor, ni los colores
+  del encabezado, ni nada del comportamiento del filtro. La grilla no se tiñe.
+
+#### Cómo se comprobó
+
+La sección **H** de `docs/prueba-317-encabezado-filtra.mjs`: la suite pasa de
+**44 a 66 comprobaciones**. No mira si "hay algo distinto": mide el degradado y
+la sombra que de verdad calcula el navegador, y sobre todo que **el color de
+fondo no cambie** — que es lo que separa un velo de un relleno.
+
+**Dos controles negativos**, no uno:
+
+| Contra | Resultado |
+|---|---|
+| `origin/main`, sin nada de #317 | **11 en verde · 33 en rojo** |
+| El commit del gesto, **sin el velo** | **53 en verde · 13 en rojo** |
+
+El segundo es el que importa acá, y es el que dejó ver que **cuatro
+comprobaciones pasaban por accidente**: "conserva su gris", "conserva su azul",
+"el fondo sigue siendo el suyo" y "arrastrando no hay velo" salían verdes en un
+árbol donde no hay velo en ninguna parte. Ahora las tres primeras exigen además
+que el velo esté, y la cuarta comprueba que **sobre ese mismo día, ya sin
+arrastre, el velo sí aparece**.
+
+**Un detalle del navegador que quedó dicho en la prueba:** al soltar se aplica
+el filtro y la grilla se redibuja, y Chromium **no recalcula `:hover` mientras
+el puntero no se mueva**. No es de este estilo; la comprobación vuelve a pasar
+el mouse antes de medir.
+
+Regresión completa: **37 suites, 1485 en verde, 0 fallas** (2 saltadas por la
+fecha, las de #344). Son exactamente las 1463 anteriores más las 22 nuevas, y
+la comparación suite por suite confirma que **la única que cambió es la de
+#317**. Siguen sin llegar al final las mismas tres de siempre, por las mismas
+razones, y no se tocaron.
