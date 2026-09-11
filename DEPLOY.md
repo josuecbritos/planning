@@ -239,9 +239,9 @@ orden** el contenido de:
     (casos nuevos `probarCambioDePerfil` y `probarEliminarCorta`).
 
 > **Esta lista llega hasta la 31.** Las migraciones **32** (organización del
-> usuario), **33** (un consultor suma a un colega), **34** y **35** (resumen
+> usuario), **33** (un consultor suma a un colega) y **34** a **36** (resumen
 > diario por correo) se aplican igual, en orden, desde el SQL Editor; cada una
-> lleva su propia cabecera con qué hace y qué comprobar. Las dos del resumen
+> lleva su propia cabecera con qué hace y qué comprobar. Las tres del resumen
 > diario están documentadas más abajo, en *Resumen diario por correo*.
 
 *(Alternativa con CLI: instala primero la CLI de Supabase —`npm i -g supabase`
@@ -454,7 +454,7 @@ la base.
 que la invitación, que ya está validado de punta a punta. Lo único nuevo es la
 parte que corre sola.
 
-### 1. Aplicar las migraciones 34 y 35
+### 1. Aplicar las migraciones 34, 35 y 36
 
 `supabase/migrations/20260707000034_resumen_diario.sql` y, encima,
 `20260707000035_resumen_diario_formato.sql`, con **`pg_dump` antes** (el plan
@@ -464,8 +464,9 @@ La **34** agrega la columna `usuario.resumen_diario`, amplía `usuario_visible`,
 crea el turno, los datos del correo y el registro de corridas. La **35** es un
 `create or replace` de una sola función —`resumen_diario_datos()`— que suma a
 cada tarea el número de replanificaciones y el color de su proyecto, para que la
-tabla del correo pueda verse igual que la de Mis Tareas. No toca ninguna tabla ni
-ningún dato, y hay que **redesplegar la función** después.
+tabla del correo pueda verse igual que la de Mis Tareas. La **36** hace que un
+intento fallido deje de costar el día entero (ver más abajo). Ninguna toca datos,
+y después de la 35 y de la 36 hay que **redesplegar la función**.
 
 > **Los usuarios que ya existen quedan APAGADOS y los nuevos nacen encendidos.**
 > No es un descuido: nadie de los que ya están pidió este correo. La migración
@@ -533,12 +534,22 @@ select cron.schedule(
 );
 ```
 
-**Cada hora y no una vez al día, y es el punto entero.** El programador trabaja
-en UTC y **Chile cambia de hora dos veces al año**: un horario fijo en UTC daría
-las 8:00 la mitad del año y las 7:00 o las 9:00 la otra mitad. Quien decide si
-es el momento es `resumen_diario_tomar_turno()`, **en la base, mirando la zona
-`America/Santiago` por su nombre** — la misma regla que ya rige `hoy_chile()`
-(#291). Las otras 23 llamadas del día no hacen nada y no cuestan un correo.
+**Cada hora y no una vez al día, y es el punto entero.** Por dos razones:
+
+1. **La hora.** El programador trabaja en UTC y **Chile cambia de hora dos veces
+   al año**: un horario fijo en UTC daría las 8:00 la mitad del año y las 7:00 o
+   las 9:00 la otra mitad. Quien decide es `resumen_diario_tomar_turno()`, **en
+   la base, mirando `America/Santiago` por su nombre** (#291).
+2. **El reintento (#358).** El disparo del programador es de *lanzar y olvidar*:
+   no reintenta ante un error ni avisa ante una respuesta incorrecta. Así que
+   quien tiene que aguantar un tropiezo es la función — **se la puede llamar
+   muchas veces sin daño** — y el programador tiene que pasar seguido. **Si a
+   las 8:00 falla, a las 9:00 sale.** Pasó el 11-sep-2026: un `Gateway Timeout`
+   de cinco segundos costó el día entero, porque la pregunta era "¿son las
+   8:00?" y solo había una oportunidad.
+
+Cada correo va además con una **clave de idempotencia** por persona y día, que
+Resend guarda 24 horas: reintentar no puede duplicar.
 
 Sábado y domingo tampoco corre: el atraso se cuenta en días hábiles y el sábado
 repetiría lo del viernes.
@@ -563,18 +574,32 @@ curl -X POST 'https://<REF>.supabase.co/functions/v1/resumen-diario' \
 Para verificar contra la casilla del dueño sin molestar a nadie: encender el
 interruptor **solo para él** (Administración → Usuarios → ficha) y forzar.
 
+> **`forzar` saltea el día y la hora, pero NO el estado.** Con el correo del día
+> ya enviado no manda un segundo — que es justo lo que #358 vino a garantizar.
+> Para repetir un envío a propósito hay que borrar la fila del día:
+> `delete from resumen_diario_corrida where fecha = hoy_chile();`
+
 **Qué pasó en cada corrida:**
 
 ```sql
 select * from resumen_diario_corrida order by fecha desc limit 5;
 ```
 
-Una fila por día en que el resumen intentó correr, con cuántos se enviaron,
-cuántos fallaron y el detalle del fallo. **La fila se escribe ANTES de enviar**:
-una corrida que falla queda anotada y **no se reintenta** — si se reintentara,
-el día que Resend responda lento todos recibirían el correo dos veces. El
-detalle técnico va además a **Edge Functions → resumen-diario → Logs**, con el
-prefijo `[resumen-diario]`.
+Una fila por día en que el resumen intentó correr. **La fila se escribe al
+EMPEZAR el intento**, con su estado:
+
+| `estado` | Qué significa |
+|---|---|
+| `en_curso` | alguien lo está intentando ahora |
+| `cerrado` | el correo del día **salió**; nadie más envía hoy |
+| `fallido` | el intento no llegó a buen puerto y el día queda **abierto** |
+
+**Solo un envío logrado cierra el día** (#358). Un intento que falla lo deja
+abierto, anota el motivo en `detalle` —que acumula los de todos los intentos— y
+suma uno a `intentos`; el disparo de la hora siguiente vuelve a probar. A quien
+ya le llegó no le llega de nuevo: cada envío va con su clave de idempotencia.
+El detalle técnico va además a **Edge Functions → resumen-diario → Logs**, con
+el prefijo `[resumen-diario]`.
 
 ### 5. Lo que este correo NO lleva
 

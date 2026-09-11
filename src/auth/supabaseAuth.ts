@@ -4,21 +4,18 @@ import type { AuthService, MotivoSalida } from './auth'
 import { MENSAJE_LOGIN } from './auth'
 import { esErrorDeRed } from '../lib/errores'
 import { getClient } from '../data/client'
+import { usuarioDesdeFila } from '../data/repo'
 
 // Login real con Supabase Auth (email + password). El registro en `usuario`
 // lo crea el Admin desde el Modulo de Usuarios; al iniciar sesion por primera
 // vez, el trigger `vincular_usuario_auth` enlaza ambos registros por email.
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Row = Record<string, any>
-
-const toUsuario = (r: Row): Usuario => ({
-  id: r.id, nombre: r.nombre, iniciales: r.iniciales ?? '', email: r.email, rol: r.rol,
-  activo: r.activo, authId: r.auth_id ?? undefined,
-  // Necesario para gobernar la UI del usuario en sesion (p.ej. el "+" de
-  // crear proyecto, que depende de permisos_proyecto.crearProyectos).
-  permisosProyecto: r.permisos_proyecto ?? undefined,
-})
+//
+// #357: la sesión traduce al usuario con `usuarioDesdeFila`, EL MISMO que usa
+// el repositorio. Acá vivía una segunda copia que se había quedado atrás en
+// tres campos —`inicialesManual`, `organizacion` y `resumenDiario`—, y como la
+// sesión es la que arma el usuario al recargar, el interruptor del resumen
+// diario aparecía apagado aunque en la base estuviera encendido. La consulta
+// siempre trajo el dato; la traducción lo tiraba.
 
 /**
  * #252: traduce el fallo de `signInWithPassword` a uno de los mensajes del
@@ -51,7 +48,7 @@ export class SupabaseAuth implements AuthService {
     // completos; la tabla base ya no permite SELECT directo desde el cliente.
     const { data, error } = await this.db.from('usuario_visible').select('*').eq('auth_id', authId).maybeSingle()
     if (error) throw new Error(error.message)
-    return data ? toUsuario(data) : null
+    return data ? usuarioDesdeFila(data) : null
   }
 
   async getUsuarioActual(): Promise<Usuario | null> {

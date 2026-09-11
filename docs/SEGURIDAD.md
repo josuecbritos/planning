@@ -463,6 +463,17 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   su autocomprobación: `create or replace` conserva los permisos de la función
   que ya existía, pero "en teoría no hace falta" no se mide y la comprobación sí.
 
+### #358 — Un intento fallido no cierra el día (migración 36)
+
+- **`resumen_diario_cerrar` es una función NUEVA**, así que nace con EXECUTE
+  para PUBLIC: el `revoke ... from public` va primero y la migración se
+  auto-comprueba (#290). No es una formalidad — si quedara abierta, cualquiera
+  con sesión podría **cerrar la corrida del día y dejar a todos sin correo**.
+- **La compuerta lo comprueba** desde una sesión real, junto a los casos de #272.
+- El resto del régimen no cambia: las dos funciones siguen concedidas solo a
+  `service_role`, y la tabla de corridas sigue sin lectura para `anon` ni para la
+  aplicación.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.

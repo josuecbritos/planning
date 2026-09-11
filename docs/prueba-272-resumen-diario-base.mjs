@@ -39,7 +39,9 @@ const MIG34 = '20260707000034_resumen_diario.sql'
 // la crea la 34, así que las dos quedan fuera del primer barrido y se aplican
 // en orden después de dar de alta a la gente.
 const MIG35 = '20260707000035_resumen_diario_formato.sql'
-const DIFERIDAS = [MIG34, MIG35]
+// La 36 altera `resumen_diario_corrida`, que crea la 34: se difiere igual.
+const MIG36 = '20260707000036_resumen_diario_reintento.sql'
+const DIFERIDAS = [MIG34, MIG35, MIG36]
 
 if (!existsSync(join(BIN, 'initdb'))) {
   console.log(`SKIP  no hay PostgreSQL en ${BIN}: la prueba de base no puede correr`)
@@ -176,14 +178,16 @@ chk(
 )
 const err35 = aplicar(join('supabase/migrations', MIG35))
 chk(err35 === '', '#272 · y la 35 encima de ella, también', err35)
+const err36 = aplicar(join('supabase/migrations', MIG36))
+chk(err36 === '', '#272 · y la 36, también', err36)
 q(`insert into usuario (nombre, iniciales, email, rol, activo) values ('Nuevo','NU','nuevo@x.cl','consultor',true);`)
 chk(
   q(`select resumen_diario from usuario where email='nuevo@x.cl';`) === 't',
   '#272-1b · un usuario creado DESPUÉS nace encendido',
 )
 chk(
-  aplicar(join('supabase/migrations', MIG34)) === '' && aplicar(join('supabase/migrations', MIG35)) === '',
-  '#272 · y las dos se pueden volver a aplicar sin romperse',
+  DIFERIDAS.every((m) => aplicar(join('supabase/migrations', m)) === ''),
+  '#272 · y las tres se pueden volver a aplicar sin romperse',
 )
 chk(
   q(`select count(*) from usuario where not resumen_diario;`) === anchos,
@@ -303,27 +307,33 @@ chk(
   '#272-14 · la hora se resuelve por NOMBRE de zona, nunca con un desfase fijo',
 )
 const ahoraCl = q(`select to_char(now() at time zone 'America/Santiago', 'YYYY-MM-DD HH24:MI Dy');`)
-const [, horaCl, diaCl] = ahoraCl.match(/ (\d\d):\d\d (\w+)$/) ?? []
-const esMomento = horaCl === '08' && !['Sat', 'Sun'].includes(diaCl)
-if (esMomento) {
-  skip('#272-9 · fuera de las 8:00 el turno no se toma', `ahora SON las 8:00 de Chile (${ahoraCl})`)
-} else {
-  chk(
-    q(`select resumen_diario_tomar_turno(false);`) === 'f',
-    '#272-9/14 · fuera de las 8:00 de Chile (o en fin de semana) el turno NO se toma',
-    ahoraCl,
-  )
-}
+
+// #358 CAMBIÓ ESTE CONTRATO, y no es una regresión: la pregunta pasó de "¿son
+// las 8:00?" a "¿ya salió el de hoy?". Antes había UNA sola oportunidad al día
+// y un tropiezo de segundos la gastaba entera —pasó el 11-sep-2026—. La máquina
+// de estados completa se mide en `docs/prueba-358-reintento.mjs`; acá queda lo
+// que #272 necesita seguir garantizando.
+const habilYPasoLaHora =
+  q(`select extract(isodow from now() at time zone 'America/Santiago') < 6
+        and extract(hour from now() at time zone 'America/Santiago') >= 8;`) === 't'
+q(`delete from resumen_diario_corrida;`)
+chk(
+  (q(`select resumen_diario_tomar_turno(false);`) === 't') === habilYPasoLaHora,
+  habilYPasoLaHora
+    ? '#272/#358 · día hábil y pasada la hora: se toma el turno'
+    : '#272-9 · fin de semana o antes de las 8:00: NO se toma el turno',
+  ahoraCl,
+)
+q(`delete from resumen_diario_corrida;`)
 chk(q(`select resumen_diario_tomar_turno(true);`) === 't', '#272 · forzado desde el dashboard, sí')
 chk(
   q(`select count(*) from resumen_diario_corrida where fecha = (now() at time zone 'America/Santiago')::date;`) === '1',
   '#272-§7 · y la corrida queda ANOTADA antes de enviar nada',
 )
-q(`delete from resumen_diario_corrida;`)
-q(`insert into resumen_diario_corrida (fecha) values ((now() at time zone 'America/Santiago')::date);`)
+q(`select resumen_diario_cerrar(1, 0, null);`)
 chk(
   q(`select resumen_diario_tomar_turno(false);`) === 'f',
-  '#272-§7 · con la corrida del día ya anotada, no se reintenta',
+  '#272-§7 · con el correo del día ya enviado, no se manda otro',
 )
 q(`delete from resumen_diario_corrida;`)
 

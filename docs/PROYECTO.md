@@ -148,7 +148,7 @@ clientes", así que un consultor no notaba ninguna diferencia. Ahora:
 obligaría a reescribir cada fila de permisos sin ganar nada. Lo que cambia es lo
 que dice la pantalla y lo que habilita.*
 
-**Un resumen diario por correo, y su interruptor (#272).** Cada mañana a las
+**Un resumen diario por correo, y su interruptor (#272, #358).** Cada mañana a las
 **8:00 de Chile, de lunes a viernes**, quien lo tenga encendido recibe un correo
 con **sus** tareas atrasadas y las que vencen ese día — las suyas en los
 proyectos a los que **hoy** tiene acceso. Es el único correo del producto que no
@@ -206,10 +206,20 @@ lo dispara nadie.
   *Gestionar correos*—, que son las únicas dos direcciones profundas de la
   aplicación. Entrar normalmente sigue partiendo en Resumen (#274).
 - **La hora se resuelve por nombre de zona.** El programador de la base despierta
-  a la función **cada hora** y quien decide si es el momento mira
+  a la función **cada hora** y quien decide si hay que enviar mira
   `America/Santiago`: Chile cambia de hora dos veces al año y un horario fijo en
-  UTC daría las 8:00 media parte del año. **Una corrida que falla no se
-  reintenta** y queda anotada, con su motivo, en `resumen_diario_corrida`.
+  UTC daría las 8:00 media parte del año.
+- **Un intento que falla no cuesta el día (#358).** La pregunta no es "¿son las
+  8:00?" sino **"¿ya salió el de hoy?"**: día hábil, pasada la hora y el día
+  abierto, envía. Como el programador pasa cada hora, **si a las 8:00 falla, a
+  las 9:00 sale**. El intento se anota **al empezar** en
+  `resumen_diario_corrida` —con su `estado` y su número de `intentos`— y **solo
+  un envío logrado cierra el día**; uno que falla lo deja abierto y anota el
+  motivo, acumulando el de todos los intentos. Cada correo viaja con una
+  **clave de idempotencia** que Resend guarda 24 horas, así que reintentar no
+  puede duplicar: a quien ya le llegó no le llega de nuevo. *Cero
+  destinatarios también cierra el día:* "no había nada que mandar" es una
+  corrida completa, no un fallo.
 
 **"Hoy" es el día de Chile, para la aplicación y para la base (#291).** El
 navegador siempre usó la hora local; la base usaba `current_date`, que en
