@@ -179,6 +179,19 @@ interface Aviso {
 const SIN_ASIGNAR = '__sin_asignar__'
 
 /**
+ * #317 — Cuál de las dos bandas del encabezado se está tocando. La clave de
+ * una celda es su día; la de un rótulo, el lunes de su semana.
+ */
+type BandaGesto = 'dia' | 'semana'
+interface Gesto {
+  banda: BandaGesto
+  /** Donde se apretó. */
+  ancla: ISODate
+  /** Última celda de la MISMA banda por la que pasó el puntero. */
+  hasta: ISODate
+}
+
+/**
  * Ventana fija del modo "Alrededor de hoy": 2 semanas hacia atras + la
  * semana actual + 2 semanas hacia adelante.
  */
@@ -592,6 +605,67 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
     return grupos
   }, [dias])
 
+  // ── #317 · El encabezado filtra ─────────────────────────────────────────
+  // Las dos bandas eran solo texto: para ver un período había que abrir
+  // Filtrar → Fecha Objetivo y escribir las dos fechas, aunque el período
+  // estuviera a la vista arriba. Ahora tocarlo PONE ESE MISMO FILTRO — el
+  // rango fijo que ya existe, no un control nuevo: aparece su ficha, su × lo
+  // limpia, cierra el horizonte (#250) y filtra también la tabla.
+  //
+  // Solo el encabezado. En la grilla el clic significa planificar, y eso no se
+  // toca.
+  //
+  // LAS DOS BANDAS NO SE MEZCLAN: `banda` queda fijada al apretar y el
+  // `pointerenter` de la otra se ignora, así que un arrastre que empieza en un
+  // día no puede terminar en un rótulo de semana.
+  const [gesto, setGesto] = useState<Gesto | null>(null)
+  const apretar = (banda: BandaGesto, clave: ISODate) => setGesto({ banda, ancla: clave, hasta: clave })
+  const entrar = (banda: BandaGesto, clave: ISODate) =>
+    setGesto((g) => (g && g.banda === banda ? { ...g, hasta: clave } : g))
+
+  /** El rango que dejaría el gesto en curso. Del primer al último tocado, en
+   *  cualquier dirección. Sobre los rótulos toma las SEMANAS ENTERAS —del
+   *  lunes de la primera al domingo de la última—, que es lo que "esa semana"
+   *  quiere decir; que el sábado y el domingo se dibujen lo sigue decidiendo
+   *  Rango, porque un control no cambia otro. */
+  const rangoGesto = useMemo(() => {
+    if (!gesto) return null
+    const [a, b] = cmp(gesto.ancla, gesto.hasta) <= 0 ? [gesto.ancla, gesto.hasta] : [gesto.hasta, gesto.ancla]
+    return { desde: a, hasta: gesto.banda === 'semana' ? addDays(b, 6) : b }
+  }, [gesto])
+
+  // Se cierra al soltar, esté el puntero donde esté: soltar fuera del
+  // encabezado no puede dejar el gesto a medias. `pointercancel` lo abandona
+  // sin filtrar — ahí el navegador se quedó con el puntero y no hubo gesto.
+  useEffect(() => {
+    if (!rangoGesto) return
+    const soltar = () => {
+      setGesto(null)
+      // #322: poner un rango apaga "Con fecha" y "Sin fecha". Es exactamente
+      // lo que hace escribirlo a mano en el menú, y tiene que serlo: los dos
+      // caminos dejan la pantalla idéntica.
+      onCambiarFiltro({
+        ...filtro,
+        conFecha: undefined,
+        sinFecha: undefined,
+        fecha: { tipo: 'rango', ...rangoGesto },
+      })
+    }
+    const abandonar = () => setGesto(null)
+    window.addEventListener('pointerup', soltar)
+    window.addEventListener('pointercancel', abandonar)
+    return () => {
+      window.removeEventListener('pointerup', soltar)
+      window.removeEventListener('pointercancel', abandonar)
+    }
+  }, [rangoGesto, filtro, onCambiarFiltro])
+
+  /** Mientras se arrastra, qué días quedarían dentro. Se marcan en las dos
+   *  bandas: tocando un rótulo se encienden también sus días, que es lo que
+   *  dice qué va a quedar. */
+  const enGesto = (d: ISODate) =>
+    !!rangoGesto && cmp(d, rangoGesto.desde) >= 0 && cmp(d, rangoGesto.hasta) <= 0
+
   // #345 — Qué semanas muestran solo el mes. La franja mostraba el rango
   // completo de la semana —"31 ago – 4 sep"— aunque de esa semana se viera un
   // solo día, y ese texto no se corta: era ÉL el que imponía el ancho de la
@@ -921,14 +995,25 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                 {semanas.map((s) => {
                   const rango = etiquetaSemana(s.lunes, finOffsetSemana)
                   const corta = semanasCortas.has(s.lunes)
+                  const sel = gesto?.banda === 'semana' && enGesto(s.lunes)
                   return (
                     <th
                       key={s.lunes}
                       /* #345b: cuando la franja muestra solo el mes, el texto
                          puede usar el ancho COMPLETO de sus días visibles. */
-                      className={`semana-lbl lunes${corta ? ' semana-lbl--mes' : ''}`}
+                      className={`semana-lbl lunes${corta ? ' semana-lbl--mes' : ''}${sel ? ' head-sel' : ''}`}
                       colSpan={s.dias.length}
                       data-lunes={s.lunes}
+                      /* #317: filtra a esa semana. `preventDefault` para que
+                         arrastrar marque el rango en vez de seleccionar el
+                         texto del rótulo. */
+                      title={`Filtrar a la semana del ${s.lunes}`}
+                      onPointerDown={(e) => {
+                        if (e.button !== 0) return
+                        e.preventDefault()
+                        apretar('semana', s.lunes)
+                      }}
+                      onPointerEnter={() => entrar('semana', s.lunes)}
                     >
                       {/* #345: la regla. Lleva SIEMPRE el rango completo y está
                           fuera del flujo, así que no ocupa ancho y su medida no
@@ -949,7 +1034,19 @@ export function GanttView({ state, proyectoId, frenteSel, hoy, can, filtro, orde
                   return (
                     <th
                       key={d}
-                      className={`dia${esLunes(d) ? ' lunes' : ''}${esHoy ? ' hoy-head' : ''}${esFinDeSemana(d) ? ' finde' : ''}`}
+                      className={`dia${esLunes(d) ? ' lunes' : ''}${esHoy ? ' hoy-head' : ''}${esFinDeSemana(d) ? ' finde' : ''}${enGesto(d) ? ' head-sel' : ''}`}
+                      /* #317: filtra a ese día; arrastrando, al rango. El
+                         encabezado muestra la inicial y el número, así que la
+                         fecha entera vive acá — como `data-lunes` en la banda
+                         de arriba. */
+                      data-dia={d}
+                      title={`Filtrar al ${d}`}
+                      onPointerDown={(e) => {
+                        if (e.button !== 0) return
+                        e.preventDefault()
+                        apretar('dia', d)
+                      }}
+                      onPointerEnter={() => entrar('dia', d)}
                     >
                       {inicial}
                       <small>{numero}</small>

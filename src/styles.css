@@ -1562,6 +1562,18 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .gantt th.dia.hoy-head { background: var(--hoy); color: #fff; }
 .gantt th.dia.hoy-head small { color: #cfe3f7; }
 
+/* #317 — El encabezado filtra. `cursor: pointer` es lo que dice que ahí se
+   puede tocar; `user-select: none` evita que arrastrar seleccione el texto de
+   los rótulos en vez de marcar el rango. Solo el encabezado: las celdas de la
+   grilla conservan su cursor, porque ahí el clic sigue siendo planificar. */
+.gantt th.dia, .gantt th.semana-lbl { cursor: pointer; user-select: none; }
+/* La marca del arrastre. Va DESPUÉS de `hoy-head` —misma especificidad— para
+   que el día de hoy también se vea tomado mientras se arrastra sobre él. */
+.gantt th.dia.head-sel, .gantt th.semana-lbl.head-sel {
+  background: var(--primario); color: var(--sobre-primario);
+}
+.gantt th.dia.head-sel small { color: var(--sobre-primario); opacity: .75; }
+
 .gantt td.celda { height: 30px; text-align: center; padding: 0; }
 .gantt td.lunes, .gantt th.lunes { border-left: 2px solid var(--semana-borde); }
 
