@@ -14,7 +14,9 @@ import type {
 } from '../types'
 import type { VistaGuardada } from '../lib/filtros'
 import { getClient } from './client'
-import { derivarIniciales, normalizarOrganizacion } from './repo'
+// #357: `usuarioDesdeFila` es el ÚNICO traductor de usuario, compartido con
+// la sesión (`src/auth/supabaseAuth.ts`). Ver su comentario en `repo.ts`.
+import { derivarIniciales, normalizarOrganizacion, usuarioDesdeFila } from './repo'
 import type {
   NuevaTarea,
   NuevoFrente,
@@ -43,17 +45,6 @@ function unwrap(res: { data: unknown; error: { message: string } | null }): any 
   return res.data
 }
 
-const toUsuario = (r: Row): Usuario => ({
-  id: r.id, nombre: r.nombre, iniciales: r.iniciales ?? '', email: r.email, rol: r.rol,
-  inicialesManual: r.iniciales_manual ?? undefined, // #207
-  activo: r.activo, authId: r.auth_id ?? undefined,
-  permisosProyecto: r.permisos_proyecto ?? undefined,
-  organizacion: r.organizacion ?? undefined, // #339
-  // #272: la vista lo enmascara igual que la organización, así que sobre un
-  // tercero llega `null` y acá queda `undefined` — no es "apagado", es "no me
-  // corresponde saberlo".
-  resumenDiario: r.resumen_diario ?? undefined,
-})
 const toAcceso = (r: Row): Acceso => ({
   usuarioId: r.usuario_id, proyectoId: r.proyecto_id, fechaAsignacion: r.fecha_asignacion,
   permisos: r.permisos ?? undefined,
@@ -138,7 +129,7 @@ export class SupabaseRepo implements Repo {
       this.db.from('vista_guardada').select('*').order('creada', { ascending: true }),
     ])
     return {
-      usuarios: unwrap(u).map(toUsuario),
+      usuarios: unwrap(u).map(usuarioDesdeFila),
       proyectos: unwrap(p).map(toProyecto),
       frentes: unwrap(f).map(toFrente),
       subFrentes: unwrap(sf).map(toSubFrente),
@@ -317,9 +308,9 @@ export class SupabaseRepo implements Repo {
     // donde la regla ya existe.
     const organizacion = normalizarOrganizacion(input.organizacion)
     if (organizacion) {
-      return this.updateUsuario(toUsuario(row).id, { organizacion })
+      return this.updateUsuario(usuarioDesdeFila(row).id, { organizacion })
     }
-    return toUsuario(row)
+    return usuarioDesdeFila(row)
   }
 
   async eliminarUsuario(id: string): Promise<void> {
@@ -366,7 +357,7 @@ export class SupabaseRepo implements Repo {
     // Se relee por la vista para traer email/permisos desenmascarados; la
     // fila que devuelve la RPC viene de la tabla base.
     const visible = unwrap(await this.db.from('usuario_visible').select('*').eq('id', row.id).single())
-    return toUsuario(visible)
+    return usuarioDesdeFila(visible)
   }
 
   async updateUsuario(id: string, patch: PatchUsuario): Promise<Usuario> {
@@ -388,7 +379,7 @@ export class SupabaseRepo implements Repo {
     // email/permisos ya desenmascarados; la tabla base no expone esas columnas.
     unwrap(await this.db.from('usuario').update(upd).eq('id', id).select('id').single())
     const row = unwrap(await this.db.from('usuario_visible').select('*').eq('id', id).single())
-    return toUsuario(row)
+    return usuarioDesdeFila(row)
   }
 
   async usuariosAgregables(proyectoId: string, _actorId?: string): Promise<Usuario[]> {
@@ -399,7 +390,7 @@ export class SupabaseRepo implements Repo {
     // `_actorId` no se usa: acá quien pregunta es el JWT de la sesión.
     void _actorId
     const rows = unwrap(await this.db.rpc('usuarios_agregables', { p_proyecto: proyectoId }))
-    return (rows ?? []).map(toUsuario)
+    return (rows ?? []).map(usuarioDesdeFila)
   }
 
   async alcanzadosPorLaRegla(usuarioIds: string[], _actorId?: string): Promise<string[]> {

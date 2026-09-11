@@ -4661,3 +4661,69 @@ de lo que el correo emite y se comprueba que sumen 608.
   la columna.
 
 Regresión completa: **34 suites, 1347 comprobaciones, 0 fallas**.
+
+---
+
+### #357 — BUG: el interruptor del resumen diario se veía apagado aunque estuviera encendido
+
+**Solo el cliente.** Sin migración.
+
+#### El problema
+
+Encender el resumen diario en Mi cuenta, recargar, y verlo apagado. **En la base
+estaba encendido** — así que no fallaba el guardado, fallaba la lectura.
+
+**Había DOS traductores de usuario.** `src/auth/supabaseAuth.ts` armaba la
+sesión —la que corre **al entrar y al recargar**— y traducía ocho campos;
+`src/data/supabaseRepo.ts` traducía once. Los dos leen `usuario_visible` con
+`select('*')`, así que **el dato siempre llegó: el de la sesión lo descartaba al
+traducir**.
+
+De ahí el síntoma exacto: al encenderlo, la pantalla se refrescaba con el
+traductor completo y se veía encendido; al recargar entraba el de la sesión, el
+campo llegaba vacío y el control se veía apagado.
+
+**Y no era solo el resumen diario:** la organización (#339) y las iniciales
+manuales (#207) se perdían por el mismo lado. El traductor de la sesión se
+escribió antes de que existieran esos tres campos y nadie lo actualizó al
+agregarlos.
+
+#### Lo que se hizo
+
+**Un solo traductor, `usuarioDesdeFila`, en `src/data/repo.ts`** — el mismo
+lugar donde ya viven `derivarIniciales` y `normalizarOrganizacion`, y por la
+misma razón que los puso ahí #239: *junto a los tipos que comparten los dos,
+para que no puedan separarse*. La sesión y el repositorio lo importan.
+
+No cambia nada de lo que la vista entrega ni del enmascarado: los campos de un
+tercero siguen llegando vacíos. `eliminado` sigue sin traducirse, y ahora está
+dicho por qué — la vista filtra a los eliminados, así que esa columna nunca
+viene en una fila que el cliente pueda leer.
+
+#### Cómo se comprobó
+
+`docs/prueba-357-traductor-unico.mjs`, **29 comprobaciones**. La que cumple el
+criterio 7 —que el próximo campo no se pierda por el mismo lado— **no lleva la
+lista de campos escrita**: la lee del tipo `Usuario` en `src/types.ts` y
+comprueba que el traductor los entregue todos. Agregar un campo al tipo y
+olvidarse del traductor la pone en rojo.
+
+*Control negativo:* el traductor anterior de la sesión está escrito dentro de la
+prueba y se comprueba que, con la misma fila, **pierde los tres campos**. Sin
+eso, "el traductor entrega todo" no distinguiría el arreglo de una prueba que
+habría aprobado igual antes.
+
+**Por qué no hay prueba de pantalla:** el defecto es exclusivo de Supabase. En
+modo Local la sesión toma el `Usuario` directo del estado del repo, sin
+traducir, así que el navegador **no puede reproducirlo**. Los criterios 1 a 5 se
+comprueban contra Supabase, a mano.
+
+*Y un defecto del arnés, encontrado al correr el control negativo:* con el
+`import` arriba del archivo, contra un árbol donde el traductor compartido no
+existe, **el módulo no resuelve y el proceso muere antes de la primera línea**.
+El control informaba **cero comprobaciones y cero fallas** — indistinguible de no
+haberlo corrido. La importación pasa a ser dinámica y con su propia
+comprobación, así que ahora dice qué encontró: *"no existe el traductor
+compartido"*.
+
+Regresión completa: **35 suites, 1376 comprobaciones, 0 fallas**.

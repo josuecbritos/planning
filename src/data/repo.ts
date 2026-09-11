@@ -106,6 +106,47 @@ export function normalizarOrganizacion(valor?: string | null): string | undefine
   return limpio || undefined
 }
 
+/**
+ * #357 — Una fila de `usuario_visible` (o de `usuario`) traducida a `Usuario`.
+ *
+ * VIVE ACÁ Y NO EN CADA LADO, y esa es toda la corrección. Había DOS
+ * traductores: uno en `src/auth/supabaseAuth.ts`, que arma la sesión al entrar
+ * y al recargar, y otro en `src/data/supabaseRepo.ts`, para el resto de la
+ * aplicación. El de la sesión se escribió antes de que existieran
+ * `inicialesManual` (#207), `organizacion` (#339) y `resumenDiario` (#272), y
+ * al agregarlos nadie lo actualizó: los dos leen la vista con `select('*')`,
+ * así que el dato LLEGABA — el de la sesión lo descartaba al traducir.
+ *
+ * El síntoma: encender el resumen diario en Mi cuenta y verlo encendido —la
+ * pantalla se refresca con el traductor completo—, recargar, y verlo apagado.
+ * Con un solo traductor, el próximo campo no se puede perder por este lado.
+ *
+ * `eliminado` NO se traduce, y es deliberado: la vista filtra a los eliminados
+ * (`where not u.eliminado`), así que esa columna nunca viene en una fila que
+ * el cliente pueda leer.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function usuarioDesdeFila(r: Record<string, any>): Usuario {
+  return {
+    id: r.id,
+    nombre: r.nombre,
+    iniciales: r.iniciales ?? '',
+    email: r.email,
+    rol: r.rol,
+    activo: r.activo,
+    authId: r.auth_id ?? undefined,
+    // #207: sin esta bandera, unas iniciales escritas a mano y unas derivadas
+    // iguales son indistinguibles.
+    inicialesManual: r.iniciales_manual ?? undefined,
+    permisosProyecto: r.permisos_proyecto ?? undefined,
+    // #339 y #272: la vista los enmascara igual, así que sobre un tercero
+    // llegan `null` y acá quedan `undefined` — no es "vacío" ni "apagado", es
+    // "no me corresponde saberlo".
+    organizacion: r.organizacion ?? undefined,
+    resumenDiario: r.resumen_diario ?? undefined,
+  }
+}
+
 export interface NuevaVista {
   /** id del proyecto, o 'mis-tareas'. */
   contexto: string
