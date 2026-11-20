@@ -4967,3 +4967,101 @@ fecha, las de #344). Son exactamente las 1463 anteriores más las 22 nuevas, y
 la comparación suite por suite confirma que **la única que cambió es la de
 #317**. Siguen sin llegar al final las mismas tres de siempre, por las mismas
 razones, y no se tocaron.
+
+### #350 — El MCP de planificación
+
+Un administrador agrega **Andotek Planning como conector en Claude**, inicia
+sesión con su cuenta y desde el chat lee el plan y planifica —crear, poner
+fechas, asignar, marcar listas— con las mismas reglas de la aplicación. Se
+publica con la app en Vercel: `https://planning.andotek.cl/mcp`.
+
+**Sin migración.** La base no cambia. Lo que hay que hacer una vez es encender
+el servidor OAuth de Supabase Auth: `DEPLOY.md` → *Conector de Claude* dice
+exactamente qué y dónde (Authentication → OAuth Server, Authorization Path
+`/oauth/consent`, registro dinámico encendido).
+
+#### Lo que se hizo
+
+- **El MCP** (`mcp/`, `api/`): servidor MCP remoto, Streamable HTTP sin estado,
+  en dos funciones de Vercel. Sin token responde **401** con la dirección de sus
+  metadatos (RFC 9728), que nombran a Supabase Auth como servidor de
+  autorización. Con token, arma un cliente con la **llave anon** y ese token:
+  la RLS decide todo como en la app. Nunca la llave de servicio; ninguna
+  contraseña guardada. Exige que el token venga del servidor OAuth (`client_id`)
+  y que la persona sea **administradora activa**.
+- **Doce herramientas.** Seis lecturas —proyectos con miembros y contadores, el
+  plan completo de un proyecto, las tareas de una persona como Mis Tareas, la
+  carga diaria por proyecto y por persona, el historial de una tarea— y seis
+  escrituras —crear frente, sub frente y tarea, cambiar fecha, asignar
+  responsable, marcar lista—. Las escrituras dicen en su descripción que
+  modifican datos reales. No hay herramienta que borre, archive, cree
+  proyectos ni administre.
+- **Por el repo de siempre.** Las escrituras son `SupabaseRepo`, el mismo de la
+  app; las reglas de replanificación, cierre e historial siguen en la base. El
+  MCP agrega las que la base no exige: responsable **miembro** del proyecto,
+  **archivadas intocables**, fechas solo `AAAA-MM-DD` y que existan. Después de
+  escribir **relee** y responde con lo guardado.
+- **Nombres por ruta** (proyecto › frente › sub frente › tarea). Si un nombre
+  coincide con más de uno, **no toca nada** y devuelve los candidatos con su
+  ruta; con las personas, pregunta cuál.
+- **Carga con la regla de la Gantt**, calculada por el MCP: fecha vigente,
+  hechas y no hechas, cada tarea una vez, más sin responsable y total.
+- **Pantalla de autorización** (`/oauth/consent`, la única nueva): quién pide
+  acceso, la cuenta, a qué dominio vuelve, **Autorizar / Rechazar**. Sin sesión,
+  primero el login de siempre. A quien no es administrador le dice que el
+  conector es solo para administradores y solo le deja rechazar.
+- **La capa de datos corre fuera del navegador.** `SupabaseRepo` recibe el
+  cliente por constructor (la app le pasa el mismo de siempre), y las
+  importaciones relativas del recorrido del MCP llevan `.js`: Vercel compila
+  archivo por archivo y Node no adivina extensiones — sin eso el build pasa y
+  la función revienta en producción.
+- **Solo POST.** Sin sesiones no hay stream que abrir: un GET (o DELETE)
+  autenticado recibe 405 en vez de dejar la función esperando hasta su tiempo
+  máximo.
+- **`vercel.json`:** solo **reescrituras** (`/mcp`, los dos caminos de los
+  metadatos y `/oauth/consent`). **Los headers de seguridad no cambiaron**: la
+  pantalla habla con `*.supabase.co`, ya permitido, y la vuelta a Claude es una
+  navegación, no un formulario.
+
+#### Decisiones tomadas al implementar
+
+- **Alcance de proyectos:** los de la barra lateral —de los que la persona es
+  **miembro**, no archivados—, no todos los que un administrador ve en
+  Administración → Proyectos. Vive en una sola función (`proyectosDelAlcance`).
+- **Carga, rango por defecto:** desde hoy, 4 semanas; como máximo 120 días por
+  consulta. Solo vienen los días con algo.
+- **Audiencia del token:** Supabase no deja atarla al MCP sin una función de
+  base nueva; queda documentado como desvío aceptado en `docs/SEGURIDAD.md` §7,
+  con su mitigación.
+
+#### Cómo se comprobó
+
+- `docs/prueba-350-mcp-carga-en-node.mjs` — transpila archivo por archivo como
+  Vercel, importa las funciones en Node y las llama: 401 con
+  `WWW-Authenticate`, token inválido, metadatos. Y el camino autenticado
+  completo con Supabase **simulado** (se intercepta `fetch`): un administrador
+  inicia la sesión MCP, lista las doce herramientas y usa una; **todas las
+  consultas a la base viajan con su token y la llave anon**, ninguna con la de
+  servicio; un token sin `client_id` da 401; un consultor, una cuenta
+  desactivada o sin ficha, 403; un GET, 405. **Controles negativos:** sin un
+  `.js` en `derive.ts` cae con el mismo `ERR_MODULE_NOT_FOUND` de producción;
+  sin el chequeo de administrador o de `client_id`, caen esas comprobaciones.
+  Además se corrió el `vercel build` real y se ejecutaron las funciones que
+  produjo.
+- `docs/prueba-350-mcp-herramientas.mjs` — un cliente MCP real contra el repo de
+  memoria: las doce herramientas, las reglas de fecha, la ambigüedad sin
+  efectos, la membresía, las archivadas. Y la **carga contra la Gantt, celda por
+  celda**, con el plan de ejemplo y con el plan como lo dejaron las escrituras
+  (con fila de sin responsable y una hecha sin fecha). **Controles negativos:**
+  excluir las hechas de la carga hace caer la comparación con la Gantt; aceptar
+  responsables que no son miembros hace caer las de membresía; contra la app de
+  `main`, cae la de la pantalla de autorización.
+
+**Lo que no se pudo probar acá:** el ida y vuelta real con Claude y Supabase
+(este entorno no llega a Supabase ni a Vercel). Queda para la verificación de
+`DEPLOY.md` después del merge.
+
+**Fuera de alcance, anotado:** abrir el conector a no administradores; la
+regla de carga está ahora en dos lugares (Gantt y MCP), unificarla es una
+mejora pendiente; la regla de membresía del responsable sigue sin estar
+protegida en la base.

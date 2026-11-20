@@ -1,0 +1,20 @@
+{
+  // #350: el MCP (mcp/) y sus funciones de Vercel (api/). Solo revisa tipos:
+  // lo compila Vercel, archivo por archivo. Mismas exigencias que la app.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["mcp", "api"]
+}

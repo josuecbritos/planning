@@ -172,6 +172,7 @@ src/
     vistas.ts            Vista guardada activa y su persistencia (#215)
     errores.ts           Traducción de fallos de red a lenguaje humano (#210)
     menciones.ts         Menciones @ en comentarios: marcador por id (#208)
+    conector.ts          Regla y ruta del conector de Claude, compartidas con el MCP (#350)
   auth/
     auth.ts              Interfaz del servicio de autenticación
     memoryAuth.ts        Login simulado ("entrar como…") para modo Local
@@ -193,6 +194,13 @@ src/
     LoginPage, DefinirPassword, ConfiguracionView, NombreTocable,
     CampoPassword, Modal, TextPromptModal, …
     Iconos.tsx           Iconos de acción como SVG de trazo (#203)
+    AutorizarConector.tsx  Pantalla de autorización del conector (/oauth/consent, #350)
+mcp/                     MCP de planificación (#350): lógica, sin estado
+  plan.ts                Núcleo puro: alcance, rutas, descripción, plan, carga
+  herramientas.ts        Las 12 herramientas (6 lecturas, 6 escrituras)
+  servidor.ts            Token → identidad → servidor MCP; metadatos OAuth
+api/                     Funciones de Vercel: mcp.ts (/mcp) y
+                         oauth-protected-resource.ts (/.well-known/…)
 supabase/
   migrations/            31 migraciones (1→31). Lista ordenada en DEPLOY.md.
   functions/             Edge Functions (Deno): invitar-usuario, aceptar-invitacion,
@@ -233,6 +241,11 @@ docs/
   prueba-321-gantt-y-encabezados.mjs  Prueba e2e del alto y el scroll de la
                          Gantt, del encabezado de Mis Tareas y del cierre de
                          #305 (#321, #324, #305c y #305d), contra `vite preview`
+  prueba-350-mcp-carga-en-node.mjs  El MCP carga en Node como en Vercel
+                         (archivo por archivo, sin empaquetar); no necesita la app
+  prueba-350-mcp-herramientas.mjs  Las 12 herramientas con un cliente MCP real
+                         sobre el repo de memoria, y la carga contra la Gantt
+                         celda por celda, contra `vite preview`
   documento-funcional-v3.1.md  (histórico)
 ```
 

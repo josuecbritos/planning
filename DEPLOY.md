@@ -339,8 +339,9 @@ Desde aquí, cada push a `main` redepliega automáticamente.
 ### Alternativa: Netlify
 
 Add new site → Import from Git → mismo build (`npm run build`, publish `dist`)
-→ mismas variables de entorno → Deploy. Para que las rutas funcionen igual no
-se necesita nada extra (la app es una sola página, sin rutas de servidor).
+→ mismas variables de entorno → Deploy. La aplicación funciona igual, pero
+**el conector de Claude (#350) no**: el MCP son funciones de Vercel (`api/`) y
+reescrituras de `vercel.json`. En Netlify habría que portarlas.
 
 ## Paso 7 — Checklist final
 
@@ -610,6 +611,86 @@ afecta la entrega** —lo que decide si el correo entra es la autenticación del
 dominio, que ya está montada, y el volumen está lejos del umbral de remitente
 masivo (5.000 mensajes diarios a cuentas personales)—. Se agrega si aparece la
 primera queja de spam.
+
+## Conector de Claude — el MCP de planificación (#350)
+
+El MCP se publica **con la aplicación**: cada deploy a `main` lo actualiza. Vive
+en `https://planning.andotek.cl/mcp` (o el dominio del producto que tengas). No
+lleva migración ni secretos nuevos. Lo que sí hay que hacer **una vez**, en el
+panel de Supabase, es encender su servidor OAuth — sin eso, Claude no tiene
+dónde iniciar sesión.
+
+### 1. Supabase — encender el servidor OAuth
+
+1. **Authentication → URL Configuration → Site URL**: la dirección del
+   producto, `https://planning.andotek.cl`. (Ya debería estar: es la misma que
+   usan los correos de invitación.)
+2. **Authentication → OAuth Server**:
+   - **Enable** el servidor OAuth 2.1.
+   - **Authorization Path**: `/oauth/consent` — exactamente así. Supabase lo
+     pega a la Site URL; la aplicación muestra ahí la pantalla de autorización
+     (`src/lib/conector.ts` tiene la misma ruta).
+   - **Allow Dynamic Client Registration**: encendido. Claude se registra solo
+     la primera vez que se conecta; no hay que crear el cliente a mano.
+3. **(Recomendado) Project Settings → JWT Keys**: pasar a llaves de firma
+   **asimétricas** (ES256/RS256). El MCP funciona también con la llave
+   simétrica de siempre (valida cada token preguntándole al servidor de Auth),
+   pero Supabase lo recomienda para OAuth, y es **obligatorio** si al conectar
+   Claude falla el paso del token con un error de *ID token*: eso pasa cuando
+   el cliente pide el scope `openid` y el proyecto firma con HS256. La rotación
+   no cierra las sesiones abiertas de la aplicación.
+
+**Comprobar** que quedó encendido (no requiere sesión):
+
+```bash
+curl -s https://<project-ref>.supabase.co/.well-known/oauth-authorization-server/auth/v1
+```
+
+Debe responder un JSON con `authorization_endpoint`, `token_endpoint` y
+**`registration_endpoint`** (este último solo aparece con el registro dinámico
+encendido).
+
+### 2. Vercel — nada nuevo
+
+Las funciones leen las **mismas dos variables** que la aplicación
+(`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`): en Vercel las variables del
+proyecto llegan también a las funciones. **No se usa ni se agrega la llave de
+servicio.** Comprobar después del deploy:
+
+```bash
+# Sin token: 401 y dónde autorizarse.
+curl -si -X POST https://planning.andotek.cl/mcp | grep -i www-authenticate
+#   → Bearer resource_metadata="https://planning.andotek.cl/.well-known/oauth-protected-resource/mcp"
+
+# Los metadatos: el recurso y su servidor de autorización (Supabase).
+curl -s https://planning.andotek.cl/.well-known/oauth-protected-resource/mcp
+#   → {"resource":"https://planning.andotek.cl/mcp","authorization_servers":["https://<ref>.supabase.co/auth/v1"],...}
+```
+
+### 3. Claude — agregar el conector
+
+En Claude (navegador): **Configuración → Conectores → Agregar conector
+personalizado**. Nombre: `Andotek Planning`. URL:
+`https://planning.andotek.cl/mcp`. **Conectar** abre la pantalla de
+autorización de la aplicación: si no hay sesión, primero el login de siempre;
+después, quién pide acceso y **Autorizar / Rechazar**.
+
+- **Solo administradores**, por ahora. Una cuenta que no lo es ve el aviso en
+  la pantalla de autorización y solo puede rechazar; si de todos modos llegara
+  un token suyo al MCP, el MCP lo rechaza (403).
+- **Quitar el acceso**: desconectar el conector en Claude. Desde Supabase,
+  **Authentication → OAuth Apps** lista los clientes registrados y permite
+  borrarlos.
+
+### 4. Lo que el conector puede y no puede hacer
+
+Lee los proyectos de los que la persona es **miembro** (no archivados), con su
+plan completo, las tareas de cualquier persona, la carga diaria y el historial.
+Escribe **seis cosas**: crear frente, sub frente y tarea; cambiar la fecha;
+asignar responsable; marcar lista. **No** borra, no archiva, no crea proyectos
+y no administra usuarios, permisos, accesos ni organizaciones. Todo pasa por la
+RLS y los triggers de siempre, con la sesión de quien autorizó. Detalle en
+`docs/PROYECTO.md` §4 y `docs/SEGURIDAD.md` §2 (#350).
 
 ## Mantenimiento
 

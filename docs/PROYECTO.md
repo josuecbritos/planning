@@ -1429,6 +1429,51 @@ eso la barra lateral tiene su propia `--sidebar-acento`. Una variable
 inexistente invalida la declaración completa: `var()` sin respaldo no cae al
 valor por defecto del navegador, cae al inicial (un `border` así desaparece).
 
+**Conector de Claude — el MCP de planificación (#350):** un administrador
+agrega Andotek Planning como conector en Claude (`https://planning.andotek.cl/mcp`),
+inicia sesión con su cuenta y desde el chat **lee el plan y planifica** con las
+mismas reglas de la aplicación.
+
+- **Conexión:** OAuth 2.1 del servidor de Supabase Auth, con registro dinámico
+  de clientes. La única pantalla nueva es la de autorización
+  (`/oauth/consent`): quién pide acceso, la cuenta, a qué dominio vuelve, y
+  **Autorizar / Rechazar**. Sin sesión, antes aparece el login de siempre.
+  **Solo administradores** por ahora: los demás ven el aviso y solo pueden
+  rechazar, y el MCP los rechaza igual si llegaran.
+- **Alcance:** los proyectos de los que la persona es **miembro** y no están
+  archivados —los de la barra lateral, Resumen y Mis Tareas—, no todos los que
+  un administrador ve en Administración → Proyectos. Decisión tomada al
+  implementar; vive en una sola función (`proyectosDelAlcance`, `mcp/plan.ts`).
+- **Lecturas (6):** proyectos con contadores y miembros; el plan completo de
+  un proyecto (todas las tareas, no solo las propias, con responsable, estado,
+  fecha objetivo, fecha original, atraso y replanificaciones); las tareas de
+  una persona como las ordena Mis Tareas; la carga diaria de un proyecto y la
+  de una persona; el historial de replanificaciones de una tarea. Las
+  archivadas no aparecen. Lo derivado sale de `src/lib/derive.ts`.
+- **Escrituras (6):** crear frente, sub frente y tarea (puede nacer sin fecha
+  ni responsable), cambiar la fecha (o quitarla), asignar responsable y marcar
+  lista / volver a abrir. Nada más: no borra, no archiva, no crea proyectos, no
+  administra. Las descripciones de estas herramientas dicen que modifican
+  datos reales.
+- **Reglas:** las de la base aplican solas (replanificación solo si la fecha
+  vencía hoy o antes, original congelada, una vencida no queda sin fecha, la
+  hecha cierra en su última fecha planificada, la asignación notifica). El MCP
+  agrega las que la base no exige: responsable miembro activo del proyecto,
+  archivadas intocables (y lo dice), fechas solo `AAAA-MM-DD` y existentes.
+  Después de cada escritura **relee** y responde con lo que quedó guardado; un
+  rechazo de la base se traduce a algo que se entienda.
+- **Nombres:** todo se nombra por su ruta (proyecto › frente › sub frente ›
+  tarea), sin mayúsculas ni tildes; si un nombre coincide con más de uno, **no
+  se toca nada** y se devuelven los candidatos con su ruta. Las personas, por
+  nombre; si coinciden varias, se pregunta. "Hoy" es el día en Chile, el mismo
+  de la base.
+- **Carga:** con **la regla de la Gantt** (§6.5): cada tarea cuenta una vez en
+  su fecha vigente, hechas y no hechas, más "sin responsable" y el total. El
+  cálculo está **copiado** de `GanttView` —el pedido no dejaba tocarla—, así
+  que hay dos copias de la misma regla; la prueba
+  `docs/prueba-350-mcp-herramientas.mjs` compara las dos celda por celda.
+  Unificarlas queda como mejora pendiente.
+
 ## 5. Arquitectura
 
 - **Frontend:** Vite + React 18 + TypeScript (estricto), single-page, sin router.
@@ -1458,8 +1503,18 @@ valor por defecto del navegador, cae al inicial (un `border` así desaparece).
   queda fuera a sabiendas). Una sola cañería en el cliente
   (`data/tiempoReal.ts`); los eventos son avisos de releer, nunca datos, y la
   relectura es una sola y completa — la notificación y su tarea llegan juntas.
-- **Despliegue:** Vercel (frontend estático + `vercel.json` con headers de
-  seguridad). Migraciones en `supabase/migrations/`, aplicadas desde el dashboard.
+- **MCP de planificación (#350):** servidor MCP remoto (Streamable HTTP, sin
+  estado) en dos funciones de Vercel: `api/mcp.ts` (`/mcp`) y
+  `api/oauth-protected-resource.ts` (metadatos RFC 9728). La lógica vive en
+  `mcp/` y reutiliza la capa de datos de la app (`SupabaseRepo`, que desde
+  #350 recibe el cliente por constructor) y `src/lib/`. Las importaciones
+  relativas de ese recorrido llevan `.js` porque Vercel compila archivo por
+  archivo y Node no adivina extensiones; `docs/prueba-350-mcp-carga-en-node.mjs`
+  falla si se pierde alguna. Tipos revisados aparte con `tsconfig.mcp.json`.
+- **Despliegue:** Vercel (frontend estático + funciones del MCP + `vercel.json`
+  con headers de seguridad y las reescrituras de `/mcp`, sus metadatos y
+  `/oauth/consent`). Migraciones en `supabase/migrations/`, aplicadas desde el
+  dashboard.
 
 ## 6. Estado y roadmap
 

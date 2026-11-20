@@ -1,5 +1,7 @@
 import type { AppState, Tarea } from '../types'
-import { atrasoHabiles, categoriaDe, nReplanificaciones, type Categoria } from './derive'
+// #350: `.js` a propósito — el MCP carga este archivo en Node sin empaquetar.
+// Ver el comentario en `src/data/supabaseRepo.ts`.
+import { atrasoHabiles, categoriaDe, nReplanificaciones, type Categoria } from './derive.js'
 
 // Ordenamiento multinivel (menu "Ordenar", proyectos y Mis Tareas). Se apilan
 // varias reglas campo + direccion, que se aplican por prioridad (de arriba
