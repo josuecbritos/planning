@@ -5057,6 +5057,13 @@ exactamente qué y dónde (Authentication → OAuth Server, Authorization Path
   responsables que no son miembros hace caer las de membresía; contra la app de
   `main`, cae la de la pantalla de autorización.
 
+**Regresión completa: 39 suites, 1573 en verde, 0 fallas** (2 saltadas por la
+fecha, las de #344). Sin las dos nuevas son **37 suites y 1485**, exactamente
+el total registrado en #317. Una sola suite tuvo que ajustarse: la de #357
+buscaba la importación del traductor como `from './repo'` y ahora es
+`'./repo.js'` —el mismo traductor, con la extensión que pide el MCP—; la
+comprobación acepta las dos formas.
+
 **Lo que no se pudo probar acá:** el ida y vuelta real con Claude y Supabase
 (este entorno no llega a Supabase ni a Vercel). Queda para la verificación de
 `DEPLOY.md` después del merge.
