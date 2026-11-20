@@ -474,6 +474,44 @@ Edge Functions y un `vercel.json`, y se validaron con la compuerta de RLS
   `service_role`, y la tabla de corridas sigue sin lectura para `anon` ni para la
   aplicación.
 
+### #350 — El MCP de planificación (sin migración)
+
+Un servidor MCP remoto en `/mcp` (funciones de Vercel, `api/` + `mcp/`) para
+que un administrador planifique desde Claude. **No toca la base**: ni
+migración, ni función nueva, ni grant. Lo que agrega es una puerta de entrada
+nueva, así que estas son sus reglas:
+
+- **Identidad = el token de quien autorizó.** El token lo emite el servidor
+  OAuth 2.1 de Supabase Auth (con registro dinámico de clientes); el MCP arma
+  con él un cliente con la **llave anon** —igual que el navegador— y la RLS
+  decide todo como en la aplicación. **La llave de servicio no existe en el
+  MCP**, y no se guarda ninguna contraseña: el MCP no tiene estado.
+- **El token se valida en Supabase** (`getClaims`: firma con las llaves del
+  proyecto, o el servidor de Auth si la firma es simétrica) y **debe traer
+  `client_id`**: solo lo tienen los tokens emitidos por el servidor OAuth, así
+  que una sesión normal de la aplicación no abre el MCP.
+- **Solo administradores activos**, comprobado en el servidor
+  (`puedeUsarConector`, `src/lib/conector.ts`); la pantalla de autorización
+  usa la misma función para no ofrecer "Autorizar" a quien no lo es. La ficha
+  se lee de **`usuario_visible`** (invariante 3), nunca de la tabla.
+- **Seis escrituras, por el repo de siempre** (`SupabaseRepo`): crear frente,
+  sub frente y tarea, cambiar fecha (RPC `replanificar_tarea` /
+  `desplanificar_tarea`), responsable y hecha (`updateTarea`). Ninguna
+  herramienta borra, archiva, crea proyectos ni administra
+  usuarios/permisos/accesos/organizaciones. Las reglas de fecha, historial,
+  cierre y notificación siguen en la base.
+- **Lo que la base NO exige y el MCP sí**, antes de escribir: responsable
+  miembro activo del proyecto (`miembrosDeProyecto`), no tocar archivadas,
+  fechas solo `AAAA-MM-DD` y existentes, y ante un nombre ambiguo **no hacer
+  nada** y devolver los candidatos.
+- **Pantalla de autorización** (`/oauth/consent`): muestra la aplicación que
+  pide acceso, la cuenta y **el dominio al que vuelve** —es lo que permite
+  reconocer un cliente registrado con un nombre engañoso—. Funciona con los
+  headers de `vercel.json` tal como están: habla con `*.supabase.co`
+  (`connect-src`) y la vuelta al cliente es una navegación, no un formulario.
+  **`vercel.json` no cambió sus headers**; solo se agregaron reescrituras.
+- **Desvío conocido** (§7): la audiencia del token no se ata al MCP.
+
 **Despliegue**
 - `vercel.json` con headers: CSP, `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS, `Permissions-Policy`.
@@ -667,6 +705,13 @@ reintroduce un hallazgo de la auditoría.
     quedaría una cuenta muerta con un usuario que la interfaz muestra activo.
     La autorización NO se replica en TypeScript: la función llama a la RPC con
     el JWT de quien pide y la barrera sigue siendo `es_admin()` en la base.
+24. **El MCP (`/mcp`) actúa SIEMPRE como la persona del token (#350).**
+    Cliente con la llave anon + el token OAuth; nunca la llave de servicio,
+    nunca credenciales guardadas. Exige token con `client_id` y perfil admin
+    activo leído de `usuario_visible`. Toda herramienta nueva debe pasar por el
+    repo (`Repo`) y no por consultas propias, y una herramienta que borre,
+    archive o administre usuarios/permisos/accesos **no se agrega sin un
+    pedido que lo diga**.
 
 ---
 
@@ -779,3 +824,17 @@ funciones de permisos.**
   (permisos de tarea entre miembros) queda cerrada a nivel de fila.
 - **L5/L6** — CORS y rate limiting quedaron en su versión endurecida mínima;
   suficientes para el contexto.
+- **#350 — Audiencia del token del MCP.** La especificación MCP pide que el
+  servidor rechace tokens emitidos para otro recurso. Supabase no permite atar
+  la audiencia por recurso: todos sus tokens dicen `aud: "authenticated"`
+  (cambiarlo exige un *custom access token hook*, es decir, una función de base
+  y una migración, fuera de lo pedido). Mitigación: el MCP exige `client_id`
+  —solo los tokens del servidor OAuth lo traen— y un token así no permite nada
+  que la persona no pueda ya hacer en la aplicación, porque todo pasa por la
+  RLS con su identidad. Si algún día se agrega el hook, el MCP puede exigir la
+  audiencia sin otros cambios.
+- **#350 — Registro dinámico abierto.** Cualquiera puede registrar un cliente
+  OAuth (es lo que permite a Claude conectarse solo). Registrarse no da acceso:
+  hace falta que un administrador inicie sesión y apriete **Autorizar** en una
+  pantalla que muestra el dominio de vuelta. Los clientes registrados se ven y
+  se borran en Authentication → OAuth Apps.

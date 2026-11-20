@@ -1,6 +1,6 @@
 import type { Repo } from './repo'
 import { SupabaseRepo } from './supabaseRepo'
-import { supabaseConfigured } from './client'
+import { getClient, supabaseConfigured } from './client'
 
 // Selecciona el backend: Supabase si esta configurado por env, si no memoria.
 //
@@ -12,7 +12,9 @@ import { supabaseConfigured } from './client'
 // Por eso la funcion es asincrona: se resuelve en `main.tsx`, antes de montar
 // la aplicacion, asi el resto del codigo sigue recibiendo un repo ya listo.
 export async function makeRepo(): Promise<Repo> {
-  if (supabaseConfigured) return new SupabaseRepo()
+  // #350: el cliente se le pasa — el repo ya no lo busca solo (ver su
+  // constructor). Es el mismo objeto de siempre.
+  if (supabaseConfigured) return new SupabaseRepo(getClient())
   const { MemoryRepo } = await import('./memoryRepo')
   return new MemoryRepo()
 }

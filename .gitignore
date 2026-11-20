@@ -33,3 +33,7 @@ dist-ssr
 
 # Scratch de la CLI de Supabase (la crea cualquier `npx supabase ...`).
 supabase/.temp/
+
+# #350: salida local de `vercel build` y carpeta temporal de la prueba del MCP
+.vercel
+.prueba-350-node

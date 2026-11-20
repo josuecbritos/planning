@@ -141,7 +141,9 @@ chk(
   '#357 · la SESIÓN usa el traductor compartido',
 )
 chk(
-  /import \{[^}]*usuarioDesdeFila[^}]*\} from '\.\/repo'/.test(sinComentarios(repo)),
+  // #350: `./repo.js` cuenta igual — la extensión la pide el MCP, que carga
+  // este archivo en Node sin empaquetar; sigue siendo el mismo traductor.
+  /import \{[^}]*usuarioDesdeFila[^}]*\} from '\.\/repo(\.js)?'/.test(sinComentarios(repo)),
   '#357 · y el repositorio, el mismo',
 )
 // La comprobación que impide que vuelvan a separarse: ningún archivo puede

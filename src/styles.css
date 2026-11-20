@@ -2037,6 +2037,15 @@ table.gantt th, table.gantt td { border-right: 1px solid var(--gris-linea); bord
 .login__link { display: block; margin: 12px auto 0; font-size: 12.5px; color: var(--gris-texto); }
 .login__link:hover { color: var(--primario); }
 .login__submit { width: 100%; margin-top: 4px; padding: 9px; }
+/* #350: pantalla de autorización del conector (/oauth/consent). */
+.autorizar__pide { margin: 0 0 12px; font-size: 14px; line-height: 1.45; }
+.autorizar__datos {
+  display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 14px;
+  font-size: 13px;
+}
+.autorizar__datos dt { color: var(--gris-texto); }
+.autorizar__datos dd { margin: 0; overflow-wrap: anywhere; }
+.autorizar__acciones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
 /* ---------- Sesion en el header ---------- */
 

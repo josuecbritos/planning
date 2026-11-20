@@ -13,10 +13,17 @@ import type {
   Usuario,
 } from '../types'
 import type { VistaGuardada } from '../lib/filtros'
-import { getClient } from './client'
 // #357: `usuarioDesdeFila` es el ÚNICO traductor de usuario, compartido con
 // la sesión (`src/auth/supabaseAuth.ts`). Ver su comentario en `repo.ts`.
-import { derivarIniciales, normalizarOrganizacion, usuarioDesdeFila } from './repo'
+//
+// #350: con `.js` a propósito. Este archivo lo carga también el MCP, que corre
+// en una función de Vercel: ahí cada archivo se compila por separado, sin
+// empaquetar, y Node no resuelve una importación relativa sin extensión —
+// revienta al cargar con `ERR_MODULE_NOT_FOUND`—. Vite y TypeScript entienden
+// que `./repo.js` es `./repo.ts`, así que la aplicación no cambia.
+// `docs/prueba-350-mcp-carga-en-node.mjs` falla si una importación de este
+// recorrido pierde la extensión.
+import { derivarIniciales, normalizarOrganizacion, usuarioDesdeFila } from './repo.js'
 import type {
   NuevaTarea,
   NuevoFrente,
@@ -103,8 +110,15 @@ export class SupabaseRepo implements Repo {
   readonly modo = 'supabase' as const
   private db: SupabaseClient
 
-  constructor() {
-    this.db = getClient()
+  /**
+   * #350: el cliente llega de afuera. La aplicación le pasa el suyo —el de
+   * siempre, con la sesión del navegador— y el MCP uno armado con el token de
+   * quien autorizó, así que las reglas de acceso por fila se aplican igual en
+   * los dos. Antes el repo lo pedía a `./client`, que lee `import.meta.env` al
+   * cargarse: eso solo existe en el navegador, y fuera de él revienta.
+   */
+  constructor(db: SupabaseClient) {
+    this.db = db
   }
 
   // El actor sale del JWT (usuario_actual_id en la base); no hace falta fijarlo.
@@ -333,7 +347,7 @@ export class SupabaseRepo implements Repo {
     // API, con `service_role`, que nunca llega al navegador. La función llama
     // a la MISMA RPC con el JWT de quien pide —la autorización sigue siendo
     // `es_admin()` dentro de la base— y después revoca la cuenta.
-    const { data: res, error } = await getClient().functions.invoke('eliminar-usuario', {
+    const { data: res, error } = await this.db.functions.invoke('eliminar-usuario', {
       body: { usuarioId: id },
     })
     // #210/#249: el cuerpo trae el mensaje en español; el error de invoke, no.

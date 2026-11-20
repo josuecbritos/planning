@@ -29,6 +29,8 @@ import { Header } from './components/Header'
 import { TableView } from './components/TableView'
 import { GanttView, type ModoHorizonte } from './components/GanttView'
 import { LoginPage } from './components/LoginPage'
+import { AutorizarConector } from './components/AutorizarConector'
+import { RUTA_AUTORIZACION } from './lib/conector'
 import { UsersView } from './components/UsersView'
 import { TaskPanel } from './components/TaskPanel'
 import { FiltrosBar } from './components/FiltrosBar'
@@ -1356,6 +1358,12 @@ export default function App({ repo }: { repo: Repo }) {
         onAvisoVisto={() => setMotivoSalida(null)}
       />
     )
+  }
+
+  // #350: pantalla de autorización del conector de Claude. Va antes que la
+  // aplicación y después del login: sin sesión, primero se entra.
+  if (window.location.pathname === RUTA_AUTORIZACION) {
+    return <AutorizarConector sesion={sesion} />
   }
 
   if (error && !state) {

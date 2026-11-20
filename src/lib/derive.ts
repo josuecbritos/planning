@@ -6,7 +6,9 @@ import type {
   Replanificacion,
   Tarea,
 } from '../types'
-import { cmp, difDiasHabiles } from './dates'
+// #350: `.js` a propósito — el MCP carga este archivo en Node sin empaquetar.
+// Ver el comentario en `src/data/supabaseRepo.ts`.
+import { cmp, difDiasHabiles } from './dates.js'
 
 // Modelo de estados (definiciones cerradas): el usuario solo marca "hecha";
 // todo lo demas se deriva de la fecha y del historial. Toda tarea cae en
