@@ -26,23 +26,23 @@
 //   RESEND_API_KEY  — API key de Resend
 //   EMAIL_FROM      — remitente verificado, ej. "Andotek Planning <planning@andotek.cl>"
 //   SITE_URL        — URL publica de la app
-// (SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY los inyecta la plataforma.)
+// (SUPABASE_URL y SUPABASE_SECRET_KEYS los inyecta la plataforma — #356.)
 //
 // DOS USOS DE CREDENCIAL QUE NO COMPARTEN CLAVE. Confundirlos costó una corrida
 // entera, así que queda escrito:
 //
-//   1. RECONOCER A QUIEN LLAMA — la cabecera `Authorization` del programador. Se
-//      compara contra la lista de `credenciales.ts`, que acepta las claves
-//      vigentes y también la anterior.
-//   2. HABLAR CON LA BASE con permisos de servicio — `SUPABASE_SERVICE_ROLE_KEY`,
-//      igual que las otras cuatro funciones del proyecto.
+//   1. RECONOCER A QUIEN LLAMA — la clave que manda el programador, en la
+//      cabecera `apikey` (o, durante el cambio, en `Authorization: Bearer`).
+//      Se acepta cualquiera de las claves secretas vigentes.
+//   2. HABLAR CON LA BASE con permisos de servicio — la clave secreta con
+//      nombre `default`, igual que las otras cuatro funciones del proyecto.
 //
-// Una credencial de la lista (1) NO sirve para (2): la base responde
-// `Invalid API key` y la corrida muere antes de anotar nada.
+// Las dos salen de `SUPABASE_SECRET_KEYS` (#356); ver `credenciales.ts`. La
+// antigua `SUPABASE_SERVICE_ROLE_KEY` ya no se lee.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { asunto, html, texto, type Resumen, type TareaCorreo } from './plantilla.ts'
-import { autorizada, clavesAceptadas } from './credenciales.ts'
+import { autorizada, claveConNombre, clavesAceptadas } from './credenciales.ts'
 
 // SIN CORS, y es deliberado: a esta función no la llama ningún navegador. La
 // llama el programador de la base con una clave del proyecto. Publicar cabeceras
@@ -59,22 +59,22 @@ const FALTAN = (
     ['EMAIL_FROM', Deno.env.get('EMAIL_FROM')],
     ['SITE_URL', Deno.env.get('SITE_URL')],
     ['SUPABASE_URL', Deno.env.get('SUPABASE_URL')],
-    ['SUPABASE_SERVICE_ROLE_KEY', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')],
+    // #356: la clave secreta nueva, con nombre `default`. Si falta —o la
+    // variable no trae una clave con ese nombre—, 503 con el motivo.
+    ['SUPABASE_SECRET_KEYS (default)', claveConNombre(Deno.env.get('SUPABASE_SECRET_KEYS'))],
   ] as const
 )
   .filter(([, valor]) => !(valor ?? '').trim())
   .map(([nombre]) => nombre)
 
-/** Uso 2: la credencial con la que se HABLA CON LA BASE. Es la misma que usan
- *  las otras cuatro funciones del proyecto, y no admite reemplazo: si falta, la
- *  función responde 503. */
-const CLAVE_SERVICIO = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim()
+/** Uso 2: la credencial con la que se HABLA CON LA BASE: la clave secreta
+ *  `default`, la misma que usan las otras cuatro funciones del proyecto. Si
+ *  falta, la función responde 503 (está en FALTAN). */
+const CLAVE_SERVICIO = claveConNombre(Deno.env.get('SUPABASE_SECRET_KEYS')) ?? ''
 
-/** Uso 1: las credenciales que se ACEPTAN de quien llama. Solo para la puerta. */
-const CLAVES = clavesAceptadas(
-  Deno.env.get('SUPABASE_SECRET_KEYS'),
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-)
+/** Uso 1: las credenciales que se ACEPTAN de quien llama: todas las claves
+ *  secretas vigentes. Solo para la puerta. */
+const CLAVES = clavesAceptadas(Deno.env.get('SUPABASE_SECRET_KEYS'))
 
 function registrar(etiqueta: string, detalle: unknown) {
   console.error(`[resumen-diario] ${etiqueta}:`, detalle instanceof Error ? detalle.message : detalle)
@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
   // rechaza, porque esta función lee correos de terceros. Se aceptan TODAS las
   // vigentes, no una sola: comparar contra una cadena fija convierte cualquier
   // rotación de clave en una caída silenciosa, que es exactamente lo que pasó.
-  if (!autorizada(req.headers.get('Authorization'), CLAVES)) {
+  if (!autorizada(req.headers.get('apikey'), req.headers.get('Authorization'), CLAVES)) {
     // Se deja constancia: sin esta línea, el 401 solo se ve en el registro del
     // borde y no hay forma de distinguirlo del que pone la plataforma.
     registrar('autorización', 'la credencial recibida no es ninguna de las claves del proyecto')
@@ -141,9 +141,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Con la clave de SERVICIO, no con la de la puerta: son dos usos distintos
-    // y no comparten credencial. Construirlo con una de la lista de arriba
-    // dejaba la función respondiendo 500 con `Invalid API key`.
+    // Con la clave secreta `default` (#356), no con "la primera de la lista" de
+    // la puerta: la primera corrección de #272 tomó `CLAVES[0]` y la base
+    // respondió `Invalid API key`. (Causa probable, pendiente de confirmar con
+    // el formato medido en producción: si la variable llega como objeto, la
+    // lectura anterior tomaba el texto JSON entero como una sola clave.)
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, CLAVE_SERVICIO)
     const sitio = Deno.env.get('SITE_URL')!
 

@@ -1,69 +1,81 @@
-// #272 — Qué credenciales acepta `resumen-diario` como "el programador".
+// #272 / #356 — Las credenciales de `resumen-diario`.
 //
-// ⚠️ ESTA LISTA SIRVE PARA RECONOCER A QUIEN LLAMA, NO PARA HABLAR CON LA BASE.
+// DOS USOS, Y DESDE #356 UNA SOLA FUENTE: `SUPABASE_SECRET_KEYS`.
 //
-// Son dos usos distintos y NO comparten credencial. Para hablar con la base con
-// permisos de servicio está `SUPABASE_SERVICE_ROLE_KEY`, y es la única que
-// sirve: construir el cliente con una clave de esta lista hace que la base
-// responda `Invalid API key` y la corrida muera antes de anotar nada. Pasó —la
-// primera corrección de #272 tomaba `CLAVES[0]` para el cliente— y por eso esta
-// advertencia está acá arriba y no al final.
+//   1. RECONOCER A QUIEN LLAMA (la puerta). Se acepta CUALQUIERA de las claves
+//      secretas vigentes del proyecto: un proyecto puede tener varias a la vez
+//      —es lo que permite rotar una sin cortar el servicio—, y comparar contra
+//      una sola cadena fija convirtió una rotación en una caída silenciosa
+//      (#272). `clavesAceptadas`.
+//   2. HABLAR CON LA BASE con permisos de servicio. Se usa la clave con NOMBRE
+//      `default`, como indica la guía oficial de Supabase
+//      (`JSON.parse(SUPABASE_SECRET_KEYS)['default']`). `claveConNombre`.
 //
-// Vive en su propio archivo, y no dentro de `index.ts`, por la misma razón que
-// `plantilla.ts`: para que la prueba `docs/prueba-272-credenciales.mjs` pueda
-// comprobar la puerta DE VERDAD en vez de leer el código y creerle. No usa
-// ninguna API de Deno —recibe los valores del entorno como argumentos—, así que
-// se ejecuta igual en Deno y en Node.
+// La antigua `SUPABASE_SERVICE_ROLE_KEY` ya no se lee (#356): Supabase retira
+// las claves `anon` y `service_role` a fines de 2026.
 //
-// POR QUÉ EXISTE ESTE ARCHIVO. La primera versión comparaba contra
-// `SUPABASE_SERVICE_ROLE_KEY` y nada más. En este proyecto esa variable está
-// marcada como OBSOLETA: la vigente es `SUPABASE_SECRET_KEYS`. La llamada del
-// programador llegaba con una credencial válida, la comparación se hacía contra
-// `undefined` y la función respondía 401 — medido en los registros: la función
-// arrancó y respondió 401 veintitrés milisegundos después, así que fue esta
-// comparación y no la verificación de JWT de la plataforma.
+// EL FORMATO. Según la documentación, `SUPABASE_SECRET_KEYS` llega como objeto
+// JSON con nombre (`{"default":"sb_secret_…"}`). Hasta #356 esto solo entendía
+// un arreglo o una lista separada por comas: con un objeto tomaba el TEXTO JSON
+// entero como si fuera una sola clave — candidato a ser la causa del
+// `Invalid API key` anotado al corregir #272, cuando se armó el cliente con una
+// clave de esa lista. Ahora se entienden las tres formas, y el formato real se
+// midió en producción antes del cambio (CHANGELOG, #356).
 //
-// La lección, más allá del nombre de la variable: comparar contra UNA cadena
-// fija convierte cualquier rotación de clave en una caída silenciosa. Un
-// proyecto puede tener varias claves vigentes a la vez —es lo que permite rotar
-// una sin cortar el servicio—, y por eso la variable vigente viene en PLURAL.
+// Vive en su propio archivo, y no dentro de `index.ts`, para que
+// `docs/prueba-272-credenciales.mjs` pueda comprobar la puerta DE VERDAD en vez
+// de leer el código y creerle. No usa ninguna API de Deno —recibe los valores
+// del entorno como argumentos—, así que se ejecuta igual en Deno y en Node.
+
+/** Las claves de un valor de `SUPABASE_SECRET_KEYS`, en cualquiera de sus formas. */
+function leer(crudo: string): { lista: string[]; nombradas: Record<string, string> } {
+  try {
+    const leido: unknown = JSON.parse(crudo)
+    if (Array.isArray(leido)) return { lista: leido.map((k) => String(k)), nombradas: {} }
+    if (leido && typeof leido === 'object') {
+      const nombradas = Object.fromEntries(
+        Object.entries(leido as Record<string, unknown>).filter(([, v]) => typeof v === 'string') as [string, string][],
+      )
+      return { lista: Object.values(nombradas), nombradas }
+    }
+    if (typeof leido === 'string') return { lista: [leido], nombradas: {} }
+    return { lista: [crudo], nombradas: {} }
+  } catch {
+    return { lista: crudo.split(','), nombradas: {} }
+  }
+}
 
 /**
- * Las credenciales que la función acepta, a partir de los dos valores del
- * entorno. Se aceptan TODAS las vigentes y también la anterior mientras el
- * proyecto la tenga: así esto funciona antes y después del cambio de sistema de
- * claves, sin una ventana en la que el resumen deje de salir.
+ * Uso 1 — Las credenciales que la puerta acepta: TODAS las claves secretas
+ * vigentes. Objeto con nombre, arreglo JSON o lista separada por comas.
  *
- * `SUPABASE_SECRET_KEYS` puede llegar como arreglo JSON o como lista separada
- * por comas. Se admiten las dos formas: cuál de las dos entrega la plataforma
- * no es algo que esta función deba adivinar, y equivocarse ahí es exactamente
- * el error que se está corrigiendo.
- *
- * Devuelve una lista SIN vacíos. Si queda vacía, la función no tiene con qué
- * autorizar a nadie y debe rechazar —nunca abrirse—, igual que #249 hizo con
- * `SITE_URL`.
+ * Devuelve una lista SIN vacíos ni duplicados. Si queda vacía, la función no
+ * tiene con qué autorizar a nadie y debe rechazar —nunca abrirse—, igual que
+ * #249 hizo con `SITE_URL`.
  */
-export function clavesAceptadas(secretKeys?: string | null, serviceRoleKey?: string | null): string[] {
+export function clavesAceptadas(secretKeys?: string | null): string[] {
   const crudo = (secretKeys ?? '').trim()
-  let vigentes: string[] = []
-  if (crudo) {
-    try {
-      const leido: unknown = JSON.parse(crudo)
-      vigentes = Array.isArray(leido) ? leido.map((k) => String(k)) : [crudo]
-    } catch {
-      vigentes = crudo.split(',')
-    }
-  }
-  const todas = [...vigentes, serviceRoleKey ?? '']
-  const limpias = todas.map((k) => k.trim()).filter(Boolean)
-  // Sin duplicados: la anterior puede estar también en la lista de vigentes.
+  if (!crudo) return []
+  const limpias = leer(crudo).lista.map((k) => k.trim()).filter(Boolean)
   return [...new Set(limpias)]
 }
 
 /**
- * Comparación en tiempo constante. No es ceremonia: desde que esta función
- * dejó de apoyarse en una sola variable, esta comparación ES la puerta, y una
- * comparación que corta en el primer byte distinto le cuenta al que prueba
+ * Uso 2 — La clave con la que se habla con la base: la que tiene NOMBRE
+ * `nombre` (por omisión `default`). Solo existe si la variable llega como
+ * objeto con nombre; con cualquier otra forma devuelve `null` y la función
+ * responde 503 diciendo qué falta, en vez de adivinar cuál de una lista usar.
+ */
+export function claveConNombre(secretKeys?: string | null, nombre = 'default'): string | null {
+  const crudo = (secretKeys ?? '').trim()
+  if (!crudo) return null
+  const clave = (leer(crudo).nombradas[nombre] ?? '').trim()
+  return clave || null
+}
+
+/**
+ * Comparación en tiempo constante. No es ceremonia: esta comparación ES la
+ * puerta, y una que corta en el primer byte distinto le cuenta al que prueba
  * cuánto lleva acertado.
  *
  * La LONGITUD sí se filtra, y no hay forma de evitarlo comparando cadenas; no
@@ -79,18 +91,23 @@ export function credencialIgual(a: string, b: string): boolean {
 }
 
 /**
- * ¿La cabecera `Authorization` trae una credencial que esta función acepta?
+ * ¿Quien llama trae una credencial que esta función acepta?
+ *
+ * #356: la clave se busca en la cabecera `apikey`, que es donde la guía de
+ * Supabase dice que van las claves nuevas, y TAMBIÉN en `Authorization:
+ * Bearer`, donde la manda hoy el programador: así el cambio del programador no
+ * deja ni una hora sin resumen. Basta con que una de las dos calce.
  *
  * Con la lista VACÍA devuelve `false` siempre: sin ninguna clave configurada no
  * hay forma de saber quién es legítimo, y abrirse "por si acaso" sería peor que
  * no responder.
  */
-export function autorizada(cabecera: string | null, claves: string[]): boolean {
-  const enviada = (cabecera ?? '').replace(/^Bearer\s+/i, '').trim()
-  if (!enviada || claves.length === 0) return false
-  // Se recorren TODAS y no se corta en la primera que calza: con una sola clave
-  // no cambia nada, y con varias evita que el tiempo de respuesta diga cuál fue.
+export function autorizada(apikey: string | null, authorization: string | null, claves: string[]): boolean {
+  const enviadas = [(apikey ?? '').trim(), (authorization ?? '').replace(/^Bearer\s+/i, '').trim()].filter(Boolean)
+  if (!enviadas.length || claves.length === 0) return false
+  // Se recorren TODAS y no se corta en la primera que calza: el tiempo de
+  // respuesta no dice cuál fue ni por qué cabecera llegó.
   let alguna = false
-  for (const k of claves) if (credencialIgual(enviada, k)) alguna = true
+  for (const enviada of enviadas) for (const k of claves) if (credencialIgual(enviada, k)) alguna = true
   return alguna
 }

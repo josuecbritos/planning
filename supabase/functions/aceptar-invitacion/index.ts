@@ -6,6 +6,20 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
+// #356 — Claves nuevas de Supabase. El cliente con permisos de servicio se arma
+// con la clave SECRETA nueva, tal como indica la guía oficial:
+// `SUPABASE_SECRET_KEYS` llega como objeto JSON con nombre y se usa `default`.
+// La antigua `SUPABASE_SERVICE_ROLE_KEY` deja de leerse: Supabase la retira a
+// fines de 2026. Si falta, la función lo dice (503) en vez de caerse.
+function claveSecreta(): string | null {
+  try {
+    const clave = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '')['default']
+    return typeof clave === 'string' && clave.trim() ? clave.trim() : null
+  } catch {
+    return null
+  }
+}
+
 // CORS por LISTA de orígenes permitidos (invariante 8: acotado, nunca '*').
 // `SITE_URL` es la app en producción. `SITE_URLS` es opcional y admite orígenes
 // extra separados por coma — sirve para las URL de preview de Vercel, que son
@@ -95,10 +109,17 @@ Deno.serve(async (req) => {
     if (!token) return responder(400, { error: 'Falta el token de invitación' })
     if (!verificar && !contrasenaValida(password)) return responder(400, { error: REGLA_PASSWORD })
 
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    )
+    const secreta = claveSecreta()
+
+    if (!secreta) {
+
+      console.error('[aceptar-invitacion] configuración: falta SUPABASE_SECRET_KEYS (default)')
+
+      return responder(503, { error: ERROR_CONFIG })
+
+    }
+
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, secreta)
 
     const { data: inv } = await admin
       .from('invitacion')

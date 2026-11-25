@@ -16,11 +16,26 @@
 // y la operación se puede reintentar. Al revés —revocar primero— dejaría una
 // cuenta sin acceso y un usuario que la interfaz sigue mostrando activo.
 //
-// Secrets: los inyecta la plataforma (SUPABASE_URL, SUPABASE_ANON_KEY,
-// SUPABASE_SERVICE_ROLE_KEY). SITE_URL / SITE_URLS gobiernan el CORS, igual
+// Secrets: los inyecta la plataforma (SUPABASE_URL, SUPABASE_SECRET_KEYS y
+// SUPABASE_PUBLISHABLE_KEYS — #356: ya no las antiguas anon/service_role).
+// SITE_URL / SITE_URLS gobiernan el CORS, igual
 // que en las otras tres funciones.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
+
+// #356 — Claves nuevas de Supabase. El cliente con permisos de servicio se arma
+// con la clave SECRETA nueva, tal como indica la guía oficial:
+// `SUPABASE_SECRET_KEYS` llega como objeto JSON con nombre y se usa `default`.
+// La antigua `SUPABASE_SERVICE_ROLE_KEY` deja de leerse: Supabase la retira a
+// fines de 2026. Si falta, la función lo dice (503) en vez de caerse.
+function claveSecreta(): string | null {
+  try {
+    const clave = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '')['default']
+    return typeof clave === 'string' && clave.trim() ? clave.trim() : null
+  } catch {
+    return null
+  }
+}
 
 // CORS por LISTA de orígenes permitidos (invariante 8: acotado, nunca '*').
 const PERMITIDOS = [
@@ -76,16 +91,35 @@ Deno.serve(async (req) => {
     const jwt = req.headers.get('Authorization')?.replace('Bearer ', '')
     if (!jwt) return responder(401, { error: 'Sin sesión' })
 
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    )
+    const secreta = claveSecreta()
+
+    if (!secreta) {
+
+      console.error('[eliminar-usuario] configuración: falta SUPABASE_SECRET_KEYS (default)')
+
+      return responder(503, { error: ERROR_CONFIG })
+
+    }
+
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, secreta)
     // Cliente que actúa COMO QUIEN LLAMA: la RPC decide si puede o no.
-    const comoUsuario = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: `Bearer ${jwt}` } } },
-    )
+    // #356: con la clave PUBLICABLE nueva (`SUPABASE_PUBLISHABLE_KEYS` →
+    // `default`), y el token de quien llama en `Authorization`: así la RPC
+    // corre con SU identidad, igual que antes con la `anon`.
+    let publicable: string | null = null
+    try {
+      const p = JSON.parse(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') ?? '')['default']
+      publicable = typeof p === 'string' && p.trim() ? p.trim() : null
+    } catch {
+      publicable = null
+    }
+    if (!publicable) {
+      console.error('[eliminar-usuario] configuración: falta SUPABASE_PUBLISHABLE_KEYS (default)')
+      return responder(503, { error: ERROR_CONFIG })
+    }
+    const comoUsuario = createClient(Deno.env.get('SUPABASE_URL')!, publicable, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+    })
 
     const { usuarioId } = await req.json()
     if (!usuarioId) return responder(400, { error: 'Falta el usuario a eliminar' })
