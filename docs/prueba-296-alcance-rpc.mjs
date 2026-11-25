@@ -46,10 +46,17 @@ import { createClient } from '@supabase/supabase-js'
 
 const URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
 const ANON = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY
-if (!URL || !ANON) {
-  console.error('Faltan SUPABASE_URL / SUPABASE_ANON_KEY.')
-  process.exit(2)
+// #360: esta suite corre contra la base REAL. En un entorno sin sus
+// credenciales no hay nada que probar, y antes moría con `exit(2)` sin decir
+// nada en el formato de la batería: en el conteo aparecía como una suite que
+// no llegó al final. Ahora lo DECLARA, como cualquier caso que se salta, y
+// termina limpia. Un SKIP no es un OK: el conteo lo muestra aparte.
+function noCorre(motivo) {
+  console.log(`SKIP  #296 no corre en este entorno: ${motivo}`)
+  console.log('FIN: 0 OK, 0 FALLA, 1 SKIP')
+  process.exit(0)
 }
+if (!URL || !ANON) noCorre('faltan SUPABASE_URL y SUPABASE_ANON_KEY (credenciales de la base real)')
 
 const anon = createClient(URL, ANON, { auth: { persistSession: false } })
 
@@ -85,8 +92,7 @@ function leer(nombre, quien, { data, error }) {
 const adminEmail = process.env.RLS_ADMIN_EMAIL
 const adminPass = process.env.RLS_ADMIN_PASS
 if (!adminEmail || !adminPass) {
-  console.error('RLS_ADMIN_* es obligatorio: crea el terreno de prueba y lo limpia al final.')
-  process.exit(2)
+  noCorre('falta RLS_ADMIN_*: el admin crea el terreno de prueba y lo limpia al final')
 }
 const admin = await sesion(adminEmail, adminPass)
 

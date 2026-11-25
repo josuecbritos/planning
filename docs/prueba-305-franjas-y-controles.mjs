@@ -228,6 +228,10 @@ await p.waitForTimeout(400)
 chk((await ctrl(p, 'Filtrar').locator('.controles-btn__n').count()) === 0, 'C4 la × del botón limpia todos los filtros')
 
 // ── C5 · Seleccionar todos sigue; "Limpiar filtro" ya no ───────────────────
+// #360: desde #347 el menú de Estado tiene DOS botones `.filtro-op--todos`
+// ("…todos menos Hecha" y "…todos"), y el locator por clase resolvía a los dos:
+// la suite moría acá. Se nombra el de "todos" por su texto exacto.
+const todos = (pg) => menu(pg).locator('.filtro-op--todos').filter({ hasText: /^(Seleccionar|Deseleccionar) todos$/ })
 console.log('\n── C5 · Seleccionar todos / sin "Limpiar filtro" ──')
 for (const campo of ['Responsable', 'Estado']) {
   await abrirCtrl(p, 'Filtrar')
@@ -236,13 +240,13 @@ for (const campo of ['Responsable', 'Estado']) {
   const txt = await menu(p).innerText()
   chk(txt.includes('Seleccionar todos'), `C5 ${campo} conserva "Seleccionar todos"`)
   chk(!txt.includes('Limpiar filtro'), `C5 ${campo} ya no tiene "Limpiar filtro" adentro`)
-  await menu(p).locator('.filtro-op--todos').click()
+  await todos(p).click()
   await p.waitForTimeout(300)
   chk(
     (await menu(p).innerText()).includes('Deseleccionar todos'),
     `C5 ${campo} alterna a "Deseleccionar todos" con todo marcado`,
   )
-  await menu(p).locator('.filtro-op--todos').click()
+  await todos(p).click()
   await p.waitForTimeout(250)
   await cerrarMenu(p)
 }
@@ -529,7 +533,7 @@ for (const W of [320, 360, 390, 768, 1024]) {
   await abrirCtrl(q, 'Filtrar')
   await menu(q).locator('.filtro-op--campo', { hasText: 'Estado' }).click()
   await q.waitForTimeout(300)
-  await menu(q).locator('.filtro-op--todos').click()
+  await todos(q).click()
   await q.waitForTimeout(300)
   await cerrarMenu(q)
   await abrirCtrl(q, 'Ordenar')

@@ -16,8 +16,13 @@
 //
 // #339: el caso de la organización necesita LAS DOS cuentas de consultor y
 // toca sus filas —les pone una organización de prueba y las restituye—. Si
-// falta alguna, ese caso se salta con aviso; si las dos ya se ven porque
-// comparten un proyecto, se marca NO CONCLUYENTE en vez de aprobar de casualidad.
+// falta alguna, ese caso se salta con aviso; si las dos ya se ven, se marca NO
+// CONCLUYENTE en vez de aprobar de casualidad, con la causa MEDIDA (#360).
+//
+// #360 — CUSTODIA: tres campos de las tres cuentas reales (organización,
+// permisos de proyecto, resumen diario) se fotografían al empezar y se revisan
+// después de cada caso; lo que no volvió, la compuerta lo devuelve y lo informa
+// como FALLA nombrando caso, campo y cuenta. Ver `abrirCustodia`.
 //
 // El admin es obligatorio (es la línea base: ve todo). Los demás roles son
 // opcionales: los que falten se omiten con aviso. Para probar el modelo
@@ -1218,7 +1223,37 @@ async function probarEliminarCorta(admin) {
  * consultores YA se ven —porque comparten un proyecto—, el caso no demuestra
  * nada y se marca NO CONCLUYENTE en vez de aprobar por casualidad.
  */
-async function probarOrganizacion(admin) {
+/**
+ * #360 — Por qué A ya ve a B, MEDIDO. El motivo anterior decía "(comparten
+ * proyecto)" escrito a mano, la única causa que su autor imaginó; el
+ * 12-sep-2026 era falso —no compartían ningún proyecto: compartían la
+ * organización que les dejó puesta la corrida anterior— y mandó a buscar un
+ * proyecto que no existía. Aquí se mide cada causa conocida y se nombra solo
+ * la que consta; si ninguna consta, se dice eso, sin inventar otra.
+ */
+async function porQueSeVen(admin, idA, idB, orgA, orgB) {
+  const causas = []
+  if (orgA && orgB && orgA === orgB) causas.push(`comparten la organización «${orgA}»`)
+  const { data: proys, error: e1 } = await admin.from('proyecto').select('id, nombre, creado_por')
+  const { data: accesos, error: e2 } = await admin.from('acceso_proyecto').select('usuario_id, proyecto_id')
+  if (e1 || e2) {
+    causas.push('no se pudo medir si comparten proyecto')
+  } else {
+    const de = (id) => new Set([
+      ...(proys ?? []).filter((x) => x.creado_por === id).map((x) => x.id),
+      ...(accesos ?? []).filter((x) => x.usuario_id === id).map((x) => x.proyecto_id),
+    ])
+    const deB = de(idB)
+    const comunes = [...de(idA)].filter((id) => deB.has(id))
+    if (comunes.length) {
+      const nombres = comunes.map((id) => (proys ?? []).find((x) => x.id === id)?.nombre ?? id)
+      causas.push(`comparten ${comunes.length} proyecto(s): ${nombres.slice(0, 3).join(', ')}${nombres.length > 3 ? '…' : ''}`)
+    }
+  }
+  return causas.length ? causas.join('; ') : 'no comparten organización ni proyecto: la causa no se midió'
+}
+
+export async function probarOrganizacion(admin) {
   const rotulo = 'organización'
 
   // ---- Criterio 12: la regla dice lo mismo en los dos lugares ----
@@ -1281,6 +1316,21 @@ async function probarOrganizacion(admin) {
       marcaNoConcluyente(rotulo, '#339 dos consultores de la misma organización se ven', 'las cuentas A y B no son dos consultores activos')
       return
     }
+    // #360: lo guardado se lee ANTES de cualquier salida temprana. Antes se
+    // leía después del control de abajo: cuando ese control cortaba, lo
+    // guardado seguía vacío y `restituir` les ESCRIBÍA VACÍO a las dos cuentas
+    // —el caso borraba la organización real cada vez que no llegaba a correr,
+    // y se realimentaba: una corrida dejaba la de prueba puesta, la siguiente
+    // veía que se veían, cortaba y borraba—. Desde que se lee, `idA` e `idB`
+    // quedan puestos: restituir solo con lo leído.
+    const { data: filas, error: errFilas } = await admin
+      .from('usuario_visible').select('id, organizacion').in('id', [yoA.id, yoB.id])
+    if (errFilas) {
+      marcaNoConcluyente(rotulo, '#339 dos consultores de la misma organización se ven', `no se pudo leer la organización de A y B (${errFilas.message})`)
+      return
+    }
+    previoA = (filas ?? []).find((f) => f.id === yoA.id)?.organizacion ?? null
+    previoB = (filas ?? []).find((f) => f.id === yoB.id)?.organizacion ?? null
     idA = yoA.id
     idB = yoB.id
 
@@ -1290,14 +1340,10 @@ async function probarOrganizacion(admin) {
       marcaNoConcluyente(
         rotulo,
         '#339 dos consultores de la misma organización se ven',
-        'A ya ve a B sin organización (comparten proyecto): el caso no demostraría nada',
+        `A ya ve a B antes de empezar (${await porQueSeVen(admin, idA, idB, previoA, previoB)}): el caso no demostraría nada`,
       )
       return
     }
-
-    const { data: filas } = await admin.from('usuario_visible').select('id, organizacion').in('id', [idA, idB])
-    previoA = (filas ?? []).find((f) => f.id === idA)?.organizacion ?? null
-    previoB = (filas ?? []).find((f) => f.id === idB)?.organizacion ?? null
 
     // Misma organización → se ven.
     await admin.from('usuario').update({ organizacion: sello }).eq('id', idA)
@@ -1375,7 +1421,7 @@ async function probarOrganizacion(admin) {
  * prueba— y las RESTITUYE siempre, también si algo falla en el medio, igual que
  * el caso de #339. El proyecto de prueba lo limpia `limpiarProyectosDePrueba`.
  */
-async function probarAgregarColega(admin) {
+export async function probarAgregarColega(admin) {
   const rotulo = 'colega'
   const emailA = process.env.RLS_CONSULTOR_A_EMAIL
   const passA = process.env.RLS_CONSULTOR_A_PASS
@@ -1392,10 +1438,15 @@ async function probarAgregarColega(admin) {
   let previoA = null
   let previoB = null
   let permisosA = null
+  let leido = false
+  // #360: se devuelve SOLO lo que se leyó, y TODO lo que se leyó. Antes los
+  // permisos se devolvían solo si había algo guardado: con `null` como valor
+  // original quedaba puesto el `invitarClientes: true` de la prueba. Y las
+  // organizaciones se escribían aunque no se hubieran leído.
   const restituir = async () => {
-    if (idA) await admin.from('usuario').update({ organizacion: previoA }).eq('id', idA)
-    if (idB) await admin.from('usuario').update({ organizacion: previoB }).eq('id', idB)
-    if (idA && permisosA) await admin.from('usuario').update({ permisos_proyecto: permisosA }).eq('id', idA)
+    if (!leido) return
+    await admin.from('usuario').update({ organizacion: previoA, permisos_proyecto: permisosA }).eq('id', idA)
+    await admin.from('usuario').update({ organizacion: previoB }).eq('id', idB)
   }
 
   try {
@@ -1411,10 +1462,15 @@ async function probarAgregarColega(admin) {
     idA = yoA.id
     idB = yoB.id
 
-    const { data: filas } = await admin.from('usuario_visible').select('id, organizacion, permisos_proyecto').in('id', [idA, idB])
+    const { data: filas, error: errFilas } = await admin.from('usuario_visible').select('id, organizacion, permisos_proyecto').in('id', [idA, idB])
+    if (errFilas) {
+      marcaNoConcluyente(rotulo, '#353 el dueño suma a un colega de su organización', `no se pudo leer la organización de A y B (${errFilas.message})`)
+      return
+    }
     previoA = (filas ?? []).find((f) => f.id === idA)?.organizacion ?? null
     previoB = (filas ?? []).find((f) => f.id === idB)?.organizacion ?? null
     permisosA = (filas ?? []).find((f) => f.id === idA)?.permisos_proyecto ?? null
+    leido = true
 
     // Un proyecto DEL CONSULTOR A: la regla es sobre proyectos propios.
     const { data: proy, error: errProy } = await a
@@ -1504,7 +1560,7 @@ async function probarAgregarColega(admin) {
  * plataforma y son los criterios 5 a 14, que se verifican contra la casilla
  * del dueño (DEPLOY.md § "Resumen diario").
  */
-async function probarResumenDiario(admin) {
+export async function probarResumenDiario(admin) {
   const rotulo = 'resumen'
   const emailA = process.env.RLS_CONSULTOR_A_EMAIL
   const passA = process.env.RLS_CONSULTOR_A_PASS
@@ -1652,6 +1708,102 @@ async function probarExecutePublico(admin) {
   )
 }
 
+// =====================================================================
+// #360 — CUSTODIA de las cuentas reales.
+//
+// Casi todo lo que la compuerta escribe lo crea ella misma y lo borra al final
+// (proyectos `__prueba_rls_*` y lo que cuelga de ellos). La excepción son TRES
+// CAMPOS de cuentas que YA EXISTEN —las dos de consultor y la de cliente—,
+// porque las pruebas necesitan gente real con sesión. Esos no los recupera
+// ninguna limpieza: nadie más sabe qué valor tenían. El 12-sep-2026 el caso
+// de #339 les borró la organización a Consultor A y Consultor B.
+//
+// Por eso: al empezar se fotografían esos tres campos de esas tres cuentas;
+// después de CADA caso se comparan contra la foto; si algo no volvió, la
+// custodia lo devuelve ella misma y lo informa como FALLA nombrando caso,
+// campo y cuenta (decisión del dueño: un caso que no restituye es un defecto
+// que hay que ver, y la compuerta no pasa). La revisión corre también si el
+// caso cortó temprano o reventó, y una última al final de la corrida.
+// =====================================================================
+export const CAMPOS_CUSTODIADOS = ['organizacion', 'permisos_proyecto', 'resumen_diario']
+
+/** Igualdad de valores de la base: objetos JSON comparados sin importar el orden de claves. */
+function canonico(v) {
+  if (v === undefined) return 'null'
+  if (v === null || typeof v !== 'object') return JSON.stringify(v)
+  if (Array.isArray(v)) return `[${v.map(canonico).join(',')}]`
+  return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canonico(v[k])}`).join(',')}}`
+}
+
+/**
+ * Toma la foto. Las cuentas salen de las mismas variables que usan los casos.
+ * Un campo que la base todavía no tiene (migración sin aplicar) no se custodia:
+ * nadie puede tocarlo.
+ */
+export async function abrirCustodia(admin, env = process.env) {
+  const cuentas = [
+    ['Consultor A', env.RLS_CONSULTOR_A_EMAIL],
+    ['Consultor B', env.RLS_CONSULTOR_B_EMAIL],
+    ['Cliente', env.RLS_CLIENTE_EMAIL],
+  ].filter(([, email]) => email)
+  const custodia = { cuentas: [], campos: [], incidentes: [] }
+  if (!cuentas.length) return custodia
+  for (const campo of CAMPOS_CUSTODIADOS) {
+    const { error } = await admin.from('usuario_visible').select(`id, ${campo}`).limit(1)
+    if (!error) custodia.campos.push(campo)
+  }
+  const { data, error } = await admin.from('usuario_visible').select(['id', 'email', ...custodia.campos].join(', '))
+  if (error) throw new Error(`custodia: no se pudo leer la foto inicial (${error.message})`)
+  for (const [rotulo, email] of cuentas) {
+    const fila = (data ?? []).find((u) => (u.email ?? '').toLowerCase() === email.toLowerCase())
+    if (!fila) continue // sin ficha: ningún caso puede tocarla
+    custodia.cuentas.push({ rotulo, id: fila.id, original: Object.fromEntries(custodia.campos.map((c) => [c, fila[c] ?? null])) })
+  }
+  return custodia
+}
+
+/**
+ * Compara contra la foto; devuelve lo que no volvió y lo informa como FALLA.
+ * Nombra el caso que acaba de correr: la revisión va después de CADA uno, así
+ * que lo que aparezca acá lo dejó ese caso.
+ */
+export async function revisarCustodia(admin, custodia, caso) {
+  if (!custodia?.cuentas.length) return
+  const ids = custodia.cuentas.map((c) => c.id)
+  const { data, error } = await admin.from('usuario_visible').select(['id', ...custodia.campos].join(', ')).in('id', ids)
+  if (error) {
+    marca(false, 'custodia', `tras ${caso}: no se pudo releer las cuentas de prueba`, error.message)
+    return
+  }
+  for (const cuenta of custodia.cuentas) {
+    const fila = (data ?? []).find((u) => u.id === cuenta.id) ?? {}
+    for (const campo of custodia.campos) {
+      const ahora = fila[campo] ?? null
+      const antes = cuenta.original[campo]
+      if (canonico(ahora) === canonico(antes)) continue
+      const { error: errUpd } = await admin.from('usuario').update({ [campo]: antes }).eq('id', cuenta.id)
+      const { data: rel } = await admin.from('usuario_visible').select(`id, ${campo}`).eq('id', cuenta.id).maybeSingle()
+      const devuelto = !errUpd && canonico(rel?.[campo] ?? null) === canonico(antes)
+      custodia.incidentes.push({ caso, campo, cuenta: cuenta.rotulo, quedo: ahora, original: antes, devuelto })
+      marca(
+        false,
+        'custodia',
+        `${caso} no restituyó \`${campo}\` de ${cuenta.rotulo}`,
+        `quedó ${canonico(ahora)}, el original era ${canonico(antes)} — ${devuelto ? 'la custodia lo devolvió' : `NO SE PUDO DEVOLVER${errUpd ? ` (${errUpd.message})` : ''}: devolverlo a mano`}`,
+      )
+    }
+  }
+}
+
+/** Corre un caso y, pase lo que pase, revisa la custodia nombrándolo. */
+export async function conCustodia(admin, custodia, caso, fn) {
+  try {
+    await fn()
+  } finally {
+    await revisarCustodia(admin, custodia, caso)
+  }
+}
+
 async function limpiarProyectosDePrueba(admin) {
   if (!admin) return
   const { data: previos } = await admin.from('proyecto').select('id').like('nombre', '__prueba_rls_%')
@@ -1682,6 +1834,14 @@ async function main() {
     console.error('La cuenta RLS_ADMIN no es un admin activo.')
     process.exit(2)
   }
+  // #360: la foto de los tres campos de las cuentas reales, ANTES de tocar
+  // nada. Si no se puede tomar, la compuerta no corre: sin foto, nadie sabría
+  // qué devolver.
+  const custodia = await abrirCustodia(admin)
+  console.log(
+    `Custodia: ${custodia.cuentas.map((c) => c.rotulo).join(', ') || 'ninguna cuenta'} · campos ${custodia.campos.join(', ') || '—'}`,
+  )
+  const caso = (nombre, fn) => conCustodia(admin, custodia, nombre, fn)
   // #202: todo el cuerpo de pruebas va en try/finally para que el barrido de
   // proyectos de prueba corra SIEMPRE, aunque una prueba falle o reviente.
   try {
@@ -1947,47 +2107,61 @@ async function main() {
     await c.auth.signOut()
   }
 
+  // #360: las pruebas por rol no van envueltas en `caso` (son el cuerpo del
+  // bucle de arriba); se revisan acá para no atribuirle lo suyo al siguiente.
+  await revisarCustodia(admin, custodia, 'las pruebas por rol')
+
   // ---------- #281/#283: membresía visible y entrega de notificaciones ----------
-  await probarMiembrosYNotificaciones(admin)
+  await caso('#281/#283 miembros y notificaciones', () => probarMiembrosYNotificaciones(admin))
 
   // ---------- #286: el borrado lógico de usuarios funciona y sigue acotado ----------
-  await probarBorradoLogicoDeUsuario(admin)
+  await caso('#286 borrado lógico', () => probarBorradoLogicoDeUsuario(admin))
 
   // ---------- #289: las vistas guardadas son privadas ----------
-  await probarVistasGuardadas(admin)
+  await caso('#289 vistas guardadas', () => probarVistasGuardadas(admin))
 
   // ---------- #291: la base y la app coinciden en qué día es hoy ----------
-  await probarDiaDeChile(admin)
+  await caso('#291 día de Chile', () => probarDiaDeChile(admin))
 
   // ---------- #293: mover tareas arrastrando ----------
-  await probarMoverTarea(admin)
+  await caso('#293 mover tarea', () => probarMoverTarea(admin))
 
   // ---------- #294: la hecha sin fecha queda con fecha ----------
-  await probarHechaSinFecha(admin)
+  await caso('#294 hecha sin fecha', () => probarHechaSinFecha(admin))
 
   // ---------- #300: el perfil se cambia solo por la RPC, y solo un admin ----
-  await probarCambioDePerfil(admin)
+  await caso('#300 cambio de perfil', () => probarCambioDePerfil(admin))
 
   // ---------- #301: eliminar suelta accesos e identidad ----------
-  await probarEliminarCorta(admin)
+  await caso('#301 eliminar', () => probarEliminarCorta(admin))
 
   // ---------- #339: la organización del usuario ----------
-  await probarOrganizacion(admin)
+  await caso('el caso de #339 (organización)', () => probarOrganizacion(admin))
 
   // ---------- #353: el dueño suma a un colega de su organización ----------
-  await probarAgregarColega(admin)
+  await caso('el caso de #353 (agregar colega)', () => probarAgregarColega(admin))
 
   // ---------- #272: el resumen diario por correo ----------
-  await probarResumenDiario(admin)
+  await caso('el caso de #272 (resumen diario)', () => probarResumenDiario(admin))
 
   // ---------- #290: el permiso de ejecución universal quedó cerrado ----------
-  await probarExecutePublico(admin)
+  await caso('#290 execute público', () => probarExecutePublico(admin))
 
   // ---------- #255: el canal de tiempo real ----------
-  await probarCanalTiempoReal(admin)
+  await caso('#255 canal de tiempo real', () => probarCanalTiempoReal(admin))
 
   } finally {
     await limpiarProyectosDePrueba(admin)
+    // #360: la última revisión, pase lo que pase —también si un caso reventó
+    // y la corrida se cortó—. Lo que aparezca acá no lo dejó ningún caso
+    // envuelto: lo dejaron las pruebas por rol o la limpieza.
+    await revisarCustodia(admin, custodia, 'la corrida (fuera de los casos)')
+    const devueltos = custodia.incidentes.filter((i) => i.devuelto).length
+    console.log(
+      custodia.incidentes.length
+        ? `\nCustodia: ${custodia.incidentes.length} campo(s) no restituido(s) por su caso; ${devueltos} devuelto(s) por la custodia.`
+        : `\nCustodia: las ${custodia.cuentas.length} cuenta(s) de prueba quedaron como estaban (${custodia.campos.join(', ')}).`,
+    )
   }
 
   resumen()

@@ -752,6 +752,26 @@ funciones de permisos.**
   credenciales `RLS_*` estén configuradas).
 - El script lee `usuario_visible` (invariante 3), tanto en `perfilDe` como en la
   consulta base del admin.
+- **Custodia de las cuentas reales (#360).** La compuerta corre contra
+  producción y toca tres campos de tres cuentas que ya existen —
+  `organizacion`, `permisos_proyecto` y `resumen_diario` de Consultor A,
+  Consultor B y Cliente—, que ninguna limpieza puede recuperar porque nadie
+  más sabe qué valor tenían. Al empezar los fotografía; después de **cada**
+  caso los compara contra la foto y, si alguno no volvió, **lo devuelve y lo
+  informa como FALLA `[custodia]`** nombrando caso, campo y cuenta: la
+  compuerta no pasa (decisión del dueño — un caso que no restituye es un
+  defecto que hay que ver). La revisión corre también si un caso cortó
+  temprano o reventó, y una última al final de la corrida. Sin la foto inicial,
+  la compuerta no corre. El 12-sep-2026, antes de esto, el caso de #339 les
+  borró la organización a Consultor A y B (no se les devolvió: decisión del
+  dueño). Lo prueba `docs/prueba-360-custodia.mjs` contra una Supabase de
+  mentira en memoria.
+- **Regla para casos nuevos que toquen datos que no crearon:** leer lo que se
+  va a devolver ANTES de cualquier salida temprana, y devolver todo lo leído
+  —también un `null`—. La custodia es la red, no el método.
+- **Un motivo de NO CONCLUYENTE dice lo que se midió**, nunca una causa
+  supuesta (#360: el de #339 afirmaba "(comparten proyecto)" de memoria y era
+  falso).
 - **Caso de #255/#260**: `probarCanalTiempoReal` abre canales simultáneos
   sobre `notificacion` y sobre `tarea`, y genera el hecho real completo (el
   admin crea un proyecto de prueba, hace MIEMBRO al consultor A y le asigna
