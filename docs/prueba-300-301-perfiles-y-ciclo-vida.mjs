@@ -63,12 +63,35 @@ async function abrirEdicion(nombre) {
   await filaDe(nombre).locator('.icon-btn[data-tip="Editar"]').click()
   await esperar(500)
 }
-const selectorPerfil = () => p.locator('form .campo select')
+// #360: desde #353 el perfil NO es un `<select>` del navegador sino el
+// desplegable del producto (`Selector`): un botón con aria-label "Perfil" que
+// abre una lista de opciones en un portal. Con el `<select>` la suite moría en
+// la primera elección y todo lo de abajo —permisos y ciclo de vida— dejaba de
+// correr.
+const selectorPerfil = () => p.locator('form .selector-btn[aria-label="Perfil"]')
+const ETIQUETA_PERFIL = { cliente: 'Cliente', consultor: 'Consultor', admin: 'Admin' }
+async function elegirPerfil(rol) {
+  await selectorPerfil().click()
+  await esperar(250)
+  await p.locator('.selector-menu .selector-op').filter({ hasText: new RegExp(`^${ETIQUETA_PERFIL[rol]}$`) }).click()
+  await esperar(200)
+}
+async function opcionesPerfil() {
+  await selectorPerfil().click()
+  await esperar(250)
+  const ops = await p.locator('.selector-menu .selector-op').allInnerTexts()
+  await selectorPerfil().click() // se cierra sin elegir
+  await esperar(200)
+  return ops.map((x) => x.trim())
+}
+// Un desplegable de perfil, del navegador o del producto. Contar solo
+// `<select>` aprobaba "no hay desplegable" por accidente desde #353.
+const DESPLEGABLES = 'select, .selector-btn'
 
 async function cambiarPerfil(nombre, rol, accion = 'guardar', nombreNuevo) {
   await abrirEdicion(nombre)
   if (nombreNuevo !== undefined) await p.locator('form .campo input').first().fill(nombreNuevo)
-  await selectorPerfil().selectOption(rol)
+  await elegirPerfil(rol)
   await esperar(200)
   if (accion === 'cancelar') {
     await p.locator('form button', { hasText: 'Cancelar' }).click()
@@ -183,7 +206,7 @@ await esperar(300)
 
 // ── C10 · La columna Rol ya no tiene desplegable ───────────────────────────
 chk(
-  (await p.locator('.usuarios-tabla select').count()) === 0,
+  (await p.locator(`.usuarios-tabla :is(${DESPLEGABLES})`).count()) === 0,
   'C10 la columna Rol ya no tiene desplegable: muestra el chip de siempre',
 )
 chk(
@@ -206,7 +229,7 @@ await esperar(300)
 
 // ── C9 · Administrador queda fuera del selector al editar ──────────────────
 await abrirEdicion('Cliente Arauco')
-const opciones = await selectorPerfil().locator('option').allInnerTexts()
+const opciones = await opcionesPerfil()
 chk(
   opciones.length === 2 && !opciones.join().toLowerCase().includes('admin'),
   'C9 al editar, el perfil solo ofrece consultor y cliente',
@@ -231,7 +254,7 @@ chk(ambos?.rol === 'consultor' && ambos?.nombre === 'Cliente Arauco Dos',
 // Se deja como estaba para el resto de la prueba.
 await abrirEdicion('Cliente Arauco Dos')
 await p.locator('form .campo input').first().fill('Cliente Arauco')
-await selectorPerfil().selectOption('cliente')
+await elegirPerfil('cliente')
 await p.locator('form button[type="submit"]').first().click()
 await esperar(900)
 
@@ -256,7 +279,7 @@ await esperar(800)
 // ── C13 · Un consultor no ve nada de esto ──────────────────────────────────
 await entrarComo('Carla Soto')
 await irAUsuarios()
-chk((await p.locator('.usuarios-tabla select').count()) === 0, 'C13 un consultor no ve desplegables de perfil')
+chk((await p.locator(`.usuarios-tabla :is(${DESPLEGABLES})`).count()) === 0, 'C13 un consultor no ve desplegables de perfil')
 
 // ── C10 · Archivar (desactivar) conserva y apaga ───────────────────────────
 // Se parte de un estado LIMPIO: el bloque anterior le retiró el acceso al
@@ -351,7 +374,7 @@ await p.locator('.usuarios-head button, button', { hasText: /Nuevo usuario|\+ Us
 await esperar(500)
 await p.locator('form .campo input').first().fill('Cliente Arauco Segundo')
 await p.locator('form input[type="email"], form .campo input').nth(2).fill(victima.email)
-await p.locator('form select').first().selectOption('consultor')
+await elegirPerfil('consultor')
 await p.locator('form button[type="submit"]').first().click()
 await esperar(900)
 const revivido = (await estado()).usuarios.find((u) => u.email === victima.email)

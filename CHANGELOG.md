@@ -5128,3 +5128,81 @@ dos.
 Regresión completa: **40 suites, 1667 en verde, 0 fallas** (2 saltadas por la
 fecha, las de #344). Sin la nueva son 39 suites y 1573, **idénticas suite por
 suite** a la corrida de #350.
+
+### #360 — Arreglar el arnés de pruebas
+
+**No toca el producto.** Solo la compuerta de permisos y las pruebas. Sin
+migración.
+
+> Una corrida termina con los datos de producción como los encontró, y una
+> corrida verde significa que se comprobó lo que dice comprobar.
+
+#### 1 · La compuerta borraba la organización de dos cuentas reales
+
+El 12-sep-2026, después de correr la compuerta contra producción, Consultor A y
+Consultor B quedaron sin organización. **La causa:** el caso de #339 guardaba
+la organización de cada cuenta en variables que nacían vacías, comprobaba si A
+ya veía a B y, si se veían, **cortaba antes de leer**; al salir "restituía" lo
+guardado… vacío. Y se realimentaba: una corrida dejaba la organización de
+prueba puesta, la siguiente veía que se veían, cortaba y borraba.
+
+- **#339 lee lo que va a devolver ANTES de cualquier salida temprana**, y solo
+  devuelve lo que leyó.
+- **#353 tenía el mismo defecto en otra forma**, encontrado al inventariar: los
+  permisos de proyecto se devolvían solo si había algo guardado, así que con
+  `null` como original quedaba puesto el `invitarClientes: true` de la prueba.
+  Ahora devuelve todo lo leído, también un `null`.
+- **Custodia.** Los tres campos que ninguna limpieza recupera —`organizacion`,
+  `permisos_proyecto`, `resumen_diario` de Consultor A, Consultor B y
+  Cliente— se fotografían al empezar y se revisan **después de cada caso**. Si
+  alguno no volvió, la compuerta **lo devuelve y lo informa como FALLA
+  `[custodia]`**, nombrando caso, campo y cuenta (por ejemplo: *"el caso de
+  #339 (organización) no restituyó `organizacion` de Consultor A"*). **La
+  compuerta no pasa** — decisión del dueño. Corre también cuando un caso corta
+  o revienta, más una revisión final de la corrida.
+
+Consultor A y Consultor B siguen sin organización: no se les devolvió
+(decisión del dueño).
+
+#### 2 · El motivo de "no concluyente" ya no afirma causas que no midió
+
+Decía *"A ya ve a B sin organización (comparten proyecto)"*, escrito a mano. El
+12-sep era falso: no compartían ningún proyecto, compartían la organización que
+les dejó la corrida anterior. Ahora **se mide**: nombra la organización
+compartida, o los proyectos en común, o —si no consta ninguna— *"no comparten
+organización ni proyecto: la causa no se midió"*.
+
+#### 3 · Las tres suites que no llegaban al final
+
+| Suite | Por qué moría | Ahora |
+|---|---|---|
+| `prueba-296-alcance-rpc.mjs` | Sin credenciales de Supabase salía con `exit(2)` | **Declara `SKIP`** y por qué, y termina limpia. Con credenciales corre igual que antes |
+| `prueba-300-301-perfiles-y-ciclo-vida.mjs` | Buscaba el Perfil como `<select>`; desde #353 es el desplegable del producto | Lo maneja como desplegable. **1 → 43 comprobaciones.** Dos comprobaciones de "no hay desplegable" (C10, C13) pasaban por accidente contando solo `<select>`: ahora cuentan los dos |
+| `prueba-305-franjas-y-controles.mjs` | "Seleccionar todos" resolvía a dos botones desde la segunda línea de #347 | Lo nombra por su texto exacto. **29 → 129 comprobaciones** |
+
+#### 4 · Cómo se corre la batería
+
+Sin vigilantes en segundo plano: la regresión se corrió **en primer plano, en
+tandas**, esperando el resultado de cada una.
+
+#### Cómo se comprobó
+
+- `docs/prueba-360-custodia.mjs` — **29 comprobaciones**. Corre los casos
+  REALES de la compuerta (#339, #353, #272) contra una Supabase de mentira en
+  memoria (Auth + PostgREST, interceptando `fetch`), con tres cuentas cargadas
+  con valores que importan: dos corridas seguidas dejan las cuentas exactas;
+  #339 cortando temprano no borra nada; un caso que no restituye o que revienta
+  queda devuelto e informado con caso, campo y cuenta, y la compuerta no pasa;
+  el motivo nombra la causa medida en tres escenarios. **Control negativo:** con
+  el código anterior de #339 y #353, sin custodia **se reproduce el incidente
+  del 12-sep** (las dos organizaciones en `null`, el motivo afirmando un
+  proyecto que no existe); con custodia, se atrapa, se nombra y se devuelve.
+- **Regresión: 41 suites, 1838 en verde, 0 fallas, 3 saltadas**, y **todas
+  terminan** (código de salida 0). Ninguna baja respecto de la corrida
+  anterior; cambian la 300-301 (1 → 43), la 305 (29 → 129), la nueva 360 (29) y
+  la 296, que ahora declara su `SKIP` en vez de morir.
+
+**Pendiente de producción (criterios 1 a 3):** correr la compuerta dos veces
+seguidas contra producción con esta rama. Se hace con el workflow **"Validar
+RLS (compuerta)"** sobre esta rama, y se comprueba leyendo los tres campos de
+las tres cuentas antes y después.
