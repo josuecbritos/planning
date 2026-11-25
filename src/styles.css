@@ -668,6 +668,10 @@ table.tareas .col-desv { text-align: center; }
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; border-radius: 50%; font-size: 11px; font-weight: 700;
   color: #fff; background: #607d8b;
+  /* Desbordes mobile (nov-2026): junto a un nombre largo, el flex lo
+     encogía y el círculo quedaba ovalado (6px en mobile, 2px en escritorio,
+     en Usuarios). Es un círculo: no se encoge nunca. */
+  flex-shrink: 0;
 }
 
 .fecha-input {
@@ -2758,7 +2762,15 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   .usuarios-tabla .col-dueno { width: 130px; }
   .usuarios-tabla .col-mini { width: 76px; }
   .usuarios-tabla .col-proy { width: 76px; }
+  /* Desbordes mobile (nov-2026): en Usuarios, 156 y no 132. El máximo de
+     una fila son CINCO íconos —editar, permisos de proyecto, invitar,
+     desactivar, eliminar: un consultor activo que todavía no entra— y suman
+     150; con 132 el quinto quedaba fuera de la tabla. La invitación solo
+     existe con la base real, por eso no se veía en modo Local. La tabla ya
+     se desplaza en horizontal: son 24px más de eso. Proyectos comparte la
+     clase pero su máximo son tres: se queda en 132. */
   .usuarios-tabla .col-acc { width: 132px; }
+  .usuarios-tabla--personas .col-acc { width: 156px; }
   /* El nombre puede truncar con elipsis, pero nunca desaparecer. */
   .usuarios-tabla td:first-child { overflow: hidden; text-overflow: ellipsis; }
 
@@ -2999,6 +3011,14 @@ table.tareas td.col-fecha, table.tareas td.col-desv { font-size: 12px; }
   table.tareas td.col-acc { padding-left: 1px; padding-right: 1px; }
   .col-acc .icon-btn[aria-label='Archivar'],
   .col-acc .icon-btn[aria-label='Eliminar'] { display: none; }
+  /* Desbordes mobile (nov-2026): la fila de nueva tarea lleva DOS botones
+     en esta columna —✓ guardar y ✕ cerrar— y la columna mide 26, pensada
+     para el único ⓘ de las demás filas. En una línea necesitaban 42: la ✕
+     quedaba 17px fuera de la tabla y la tabla pasaba 5px del ancho de la
+     pantalla. Se apilan, solo en esta fila; la columna y el resto de la
+     tabla no cambian. */
+  .fila-nueva td.col-acc { white-space: normal; }
+  .fila-nueva td.col-acc .icon-btn { display: flex; margin: 0 auto; padding: 3px; }
   .subfrente__titulo { font-size: 12.5px; padding: 6px 8px; }
   /* #306: el frente sigue pesando más que sus hijos, pero sin pasarle por
      encima al título de la pantalla, que en mobile mide 15. */

@@ -246,6 +246,9 @@ docs/
   prueba-350-mcp-herramientas.mjs  Las 12 herramientas con un cliente MCP real
                          sobre el repo de memoria, y la carga contra la Gantt
                          celda por celda, contra `vite preview`
+  prueba-desbordes-mobile.mjs  Nada se sale de su celda, su tabla ni la pantalla,
+                         en todas las pantallas y modales, a 360/390/768 px y
+                         en escritorio, contra `vite preview`
   documento-funcional-v3.1.md  (histórico)
 ```
 

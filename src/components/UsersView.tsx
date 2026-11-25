@@ -232,7 +232,7 @@ export function UsersView({ state, usuarioActual, actions, onIrAProyectos }: Pro
           Aún no hay clientes ni consultores con acceso a tus proyectos. Invita a alguien con “+ Cliente”.
         </p>
       ) : (
-        <table className="tareas usuarios-tabla">
+        <table className="tareas usuarios-tabla usuarios-tabla--personas">
           <thead>
             <tr>
               <th>Usuario</th>

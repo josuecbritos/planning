@@ -525,3 +525,60 @@ Tres decisiones de implementación:
 | Sin desbordes | con la barra en 340px: `scrollWidth - clientWidth` = 0 en `documentElement`, `body` y `.app`, en Tabla, Gantt, Resumen y Mis Tareas |
 | Modo escondido | se despliega en los 340px elegidos, tras el riel de 54px, y la manija acompaña al borde |
 | Teléfono | panel `fixed` de 300px, manija en `display: none`, aun con 400px guardados para ese usuario |
+
+## 14. Desbordes: lo que se sale de su celda, su tabla o la pantalla (nov-2026)
+
+**Lo reportado:** en el teléfono, al agregar una tarea, los símbolos de la
+columna de la derecha se salían de la tabla; y lo mismo en tablas de
+administración "cuando hay muchas opciones".
+
+**Método.** Build de producción, Playwright con `isMobile` + `hasTouch` a
+**360, 390 y 768 px**, y escritorio a 1440. Plan cargado con "muchas
+opciones": seis proyectos más con nombres largos, una consultora y un cliente
+con nombre y correo largos y acceso a todo, un usuario desactivado y una tarea
+de título largo. Se recorrieron **todas las pantallas y modales**: Resumen,
+tabla del proyecto, fila de nueva tarea (abierta, con título, encadenando y
+tras crear), menú de la fila, panel de tarea, Mis Tareas, Usuarios (y sus
+modales de nuevo, editar y permisos de proyecto), Administración → Proyectos
+(y miembros, permisos del acceso, editar), Mi cuenta y Notificaciones. Las
+tablas de administración se midieron también desplazadas hasta Acciones.
+
+En cada pantalla se midió: elementos que se salen de su celda; elementos que
+pasan el borde de la pantalla sin un contenedor con scroll que los aloje;
+círculos de iniciales deformados; columnas de acciones cuyos íconos no caben;
+y scroll horizontal de la página y de los contenedores.
+
+### Hallazgos
+
+| # | Dónde | Medido | Causa |
+| --- | --- | --- | --- |
+| D1 | **Fila de nueva tarea**, columna de acciones (mobile, los tres anchos) | ✓ y ✕ necesitan 42px; la columna mide 26. **La ✕ queda 17px fuera de la tabla** y el contenido pasa 5px del ancho de la pantalla | La columna se dimensionó para el único ⓘ de las demás filas (#298) y la fila nueva pone dos botones en una línea (`white-space: nowrap`) |
+| D2 | **Usuarios**, columna de acciones (mobile) | El máximo de una fila son **cinco** íconos = 150px; la columna da 129 útiles. **El quinto queda 21px fuera de la tabla** | Un consultor activo que todavía no entra muestra editar, permisos de proyecto, **invitar**, desactivar y eliminar. La invitación solo existe con la base real: en modo Local se ven cuatro y caben, por eso pasó inadvertido |
+| D3 | **Usuarios**, círculo de iniciales (mobile y escritorio) | Junto a un nombre largo el círculo se aplasta: 12×18 px en mobile (6px), 16×18 en escritorio (2px) | `.resp-badge` dentro de un flex sin `flex-shrink: 0` |
+
+**Sanos**, sin ningún hallazgo en los cuatro anchos: Resumen, tabla del
+proyecto (fuera de la fila nueva), menú de la fila, panel de tarea, Mis Tareas,
+Administración → Proyectos (su máximo son tres íconos y caben), todos los
+modales, Mi cuenta y Notificaciones. Las dos tablas de administración se
+desplazan en horizontal dentro de `.usuarios-wrap`; eso es la decisión de #197,
+no una falla.
+
+### Resolución
+
+Solo CSS, más una clase en la tabla de Usuarios para poder distinguirla de la
+de Proyectos:
+
+- **D1:** en mobile, **solo en la fila nueva**, la ✓ y la ✕ se apilan. La
+  columna sigue en 26px y el resto de la tabla no cambia.
+- **D2:** en mobile, la columna de acciones de **Usuarios** pasa de 132 a
+  **156px** (`.usuarios-tabla--personas`). Proyectos comparte la clase
+  `.usuarios-tabla` y se queda en 132: su máximo son tres íconos. La tabla de
+  Usuarios ya se desplazaba en horizontal; son 24px más de eso (881 → 905).
+- **D3:** `.resp-badge { flex-shrink: 0 }`. Vale en toda la aplicación: un
+  círculo no se encoge nunca.
+
+Medido después: **cero hallazgos** en las cuatro anchuras.
+`docs/prueba-desbordes-mobile.mjs` (94 comprobaciones) lo deja fijo; contra
+`main` sin la corrección da **55 en verde y 39 en rojo** —caen exactamente
+D1, D2 y D3, y en escritorio solo D3—. El quinto ícono de Usuarios, que no
+existe en modo Local, la prueba lo simula clonando uno de la fila.
