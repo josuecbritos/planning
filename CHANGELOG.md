@@ -5124,3 +5124,7 @@ en rojo** —caen D1, D2 y D3, y en escritorio solo D3—. Una comprobación pas
 por accidente: "la página no se desplaza" daba verde en `main` porque el
 sobrante vive en el contenedor `.content`, no en la página; ahora se miden los
 dos.
+
+Regresión completa: **40 suites, 1667 en verde, 0 fallas** (2 saltadas por la
+fecha, las de #344). Sin la nueva son 39 suites y 1573, **idénticas suite por
+suite** a la corrida de #350.
