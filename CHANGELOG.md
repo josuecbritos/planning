@@ -5072,3 +5072,59 @@ comprobación acepta las dos formas.
 regla de carga está ahora en dos lugares (Gantt y MCP), unificarla es una
 mejora pendiente; la regla de membresía del responsable sigue sin estar
 protegida en la base.
+
+### Desbordes mobile — nada se sale de su celda, su tabla ni la pantalla (nov-2026)
+
+**Lo reportado:** en el teléfono, al agregar una tarea, los símbolos de la
+columna de la derecha se salían de la tabla; y en tablas de administración
+"cuando hay muchas opciones". Se pidió diagnosticar **todas** estas fallas y
+corregirlas.
+
+#### Diagnóstico
+
+Recorrido medido de **todas las pantallas y modales** a 360, 390 y 768 px y en
+escritorio, con un plan cargado de nombres largos, muchos proyectos y una
+consultora con acceso a todo. Detalle en `docs/diagnostico-mobile.md` §14.
+Tres fallas, nada más:
+
+- **D1 — Fila de nueva tarea:** la ✓ y la ✕ necesitan 42px y la columna de
+  acciones mide 26 en mobile. **La ✕ quedaba 17px fuera de la tabla** y el
+  contenido pasaba 5px del ancho de la pantalla. Es lo que se veía.
+- **D2 — Usuarios:** el máximo de una fila son **cinco** íconos —un consultor
+  activo que todavía no entra suma la invitación por correo— y no cabían: el
+  quinto quedaba 21px fuera. La invitación solo existe con la base real; en
+  modo Local se ven cuatro y caben, por eso no se había visto.
+- **D3 — Usuarios:** junto a un nombre largo, el **círculo de iniciales se
+  aplastaba** (6px en mobile, 2px en escritorio).
+
+Sanos en los cuatro anchos: Resumen, tabla del proyecto, menú de la fila,
+panel de tarea, Mis Tareas, Administración → Proyectos, todos los modales, Mi
+cuenta y Notificaciones.
+
+#### Lo que se hizo
+
+Solo CSS, más una clase en la tabla de Usuarios:
+
+- **D1:** en mobile, solo en la fila nueva, la ✓ y la ✕ **se apilan**. La
+  columna y el resto de la tabla no cambian.
+- **D2:** la columna de acciones de Usuarios pasa de 132 a **156px** en mobile
+  (`.usuarios-tabla--personas`). La de Proyectos, que comparte clase, se queda
+  en 132: su máximo son tres íconos.
+- **D3:** `.resp-badge` ya no se encoge (`flex-shrink: 0`), en toda la app.
+
+#### Cómo se comprobó
+
+`docs/prueba-desbordes-mobile.mjs` — **94 comprobaciones**: en cada pantalla y
+cada ancho, que nada se salga; además, que la ✓ y la ✕ queden dentro de la
+tabla, que ni la página ni el contenido se desplacen con la fila nueva
+abierta, que el círculo siga redondo, y que **cinco** acciones quepan en una
+línea en Usuarios (el quinto ícono, que no existe en modo Local, se simula
+clonando uno de la fila). **Control negativo contra `main`: 55 en verde y 39
+en rojo** —caen D1, D2 y D3, y en escritorio solo D3—. Una comprobación pasaba
+por accidente: "la página no se desplaza" daba verde en `main` porque el
+sobrante vive en el contenedor `.content`, no en la página; ahora se miden los
+dos.
+
+Regresión completa: **40 suites, 1667 en verde, 0 fallas** (2 saltadas por la
+fecha, las de #344). Sin la nueva son 39 suites y 1573, **idénticas suite por
+suite** a la corrida de #350.

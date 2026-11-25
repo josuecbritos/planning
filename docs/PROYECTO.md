@@ -418,7 +418,9 @@ completo con creación y edición **inline** (sin formularios).
   demás cabeceras de esta tabla. Aparece solo si se
   tiene algún permiso sobre las tareas: quien solo mira no ve la columna ni su
   título. En mobile la columna mide 26px y lleva solo el ⓘ, así que ahí sigue
-  sin encabezado.
+  sin encabezado. La fila de **nueva tarea** lleva dos botones en esa columna
+  —✓ guardar y ✕ cerrar—: en mobile van **apilados**, para caber en los 26px
+  sin que la ✕ se salga de la tabla (desbordes mobile, nov-2026).
 
   **El clic derecho sobre una tarea abre sus acciones (#292).** Existían solo en
   esa columna —Información, Archivar y Eliminar—, y **en la Gantt no había
@@ -1413,7 +1415,14 @@ origen (invariante 21 de `SEGURIDAD.md`).
 override manual persistente por usuario), diseño responsive (mobile prioriza
 Tabla y Mis Tareas; los modales altos, el panel de notificaciones y el menú ⋯
 tienen tratamiento propio en pantalla angosta) e iconos de acción como SVG, no
-como glifos del sistema. En mobile los dos botones flotantes son **el ☰ y la
+como glifos del sistema. **Nada se sale de su celda, de su tabla ni de la
+pantalla** a 360, 390 y 768 px ni en escritorio: lo comprueba
+`docs/prueba-desbordes-mobile.mjs` en todas las pantallas y modales, con un plan
+cargado de nombres largos y muchos proyectos. Las tablas de administración sí
+se desplazan en horizontal dentro de su envoltura (#197); su columna de
+Acciones está medida para el máximo real de íconos —cinco en Usuarios, con la
+invitación por correo que solo existe con la base real—, y los círculos de
+iniciales no se encogen junto a un nombre largo. En mobile los dos botones flotantes son **el ☰ y la
 campana de notificaciones con su contador (#284)** — el contador se ve sin
 abrir el menú; tocarla abre Notificaciones a pantalla completa y cierra el
 menú lateral. El interruptor de tema vive en el pie de la barra lateral,
@@ -1539,6 +1548,6 @@ mismas reglas de la aplicación.
 | `SEGURIDAD.md` | Invariantes de seguridad — leer antes de tocar RLS/auth/deploy. |
 | `auditoria-seguridad.md` | Informe de la auditoría (hallazgos por gravedad). |
 | `runbook-seguridad.md` | Pasos para aplicar las correcciones de seguridad. |
-| `diagnostico-mobile.md` | Estado de la vista mobile medido en 390×844, plan de mejoras y su resolución (#194–#203). |
+| `diagnostico-mobile.md` | Estado de la vista mobile medido en 390×844, plan de mejoras y su resolución (#194–#203); §14, el diagnóstico de desbordes de nov-2026. |
 | `diagnostico-297-frente-al-crear.md` | Reproducción medida del frente que no aparecía al crear un proyecto, y propuesta abierta sobre proteger la vista de una selección imposible. |
 | `DEPLOY.md` | Despliegue (Supabase, Vercel, Resend, Edge Functions). |
