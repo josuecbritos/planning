@@ -5202,7 +5202,22 @@ tandas**, esperando el resultado de cada una.
   anterior; cambian la 300-301 (1 → 43), la 305 (29 → 129), la nueva 360 (29) y
   la 296, que ahora declara su `SKIP` en vez de morir.
 
-**Pendiente de producción (criterios 1 a 3):** correr la compuerta dos veces
-seguidas contra producción con esta rama. Se hace con el workflow **"Validar
-RLS (compuerta)"** sobre esta rama, y se comprueba leyendo los tres campos de
-las tres cuentas antes y después.
+**En producción (criterios 1 a 3), el 25-nov-2026.** Se leyeron por SQL los tres
+campos de las tres cuentas, se corrió la compuerta **dos veces seguidas** con el
+workflow "Validar RLS (compuerta)" sobre esta rama, y se volvieron a leer
+después de cada una: **idénticos las tres veces**. Las dos corridas cierran con
+*"Custodia: las 3 cuenta(s) de prueba quedaron como estaban"*, y en las dos el
+caso de #339 hizo su prueba completa —A y B están hoy sin organización, así que
+ya no se ven antes de empezar—.
+
+- Corrida 44: **143 de 143**, verde.
+- Corrida 45: 141 de 143. **No por la custodia ni por nada de este pedido**: el
+  canal de tiempo real no le entregó al miembro el evento de `tarea` (#260), y
+  la compuerta hizo lo que debe —lo marcó FALLA, y el aislamiento que dependía de
+  él, NO CONCLUYENTE—. El mismo código lo pasó en la corrida 44. El historial
+  del workflow muestra que esa compuerta ya era intermitente antes de esta rama
+  (la corrida 40 necesitó tres intentos). **Queda anotado, sin tocar:** el caso
+  del canal no es parte de este pedido.
+- Como contraste, la corrida 43 (11-sep, sobre `main`) es la del incidente:
+  *"A ya ve a B sin organización (comparten proyecto)"*, no concluyente — la que
+  dejó a A y B sin organización.
